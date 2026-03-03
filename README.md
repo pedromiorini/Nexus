@@ -4,10 +4,10 @@
 
 ---
 
-## 📊 Status do Projeto: v3.28 (Embodied Cognition Edition)
-- **Progresso Real:** 65,5% (36 de 55 módulos implementados)
-- **Milestone:** 65% Atingido — Cognição Incorporada Ativa 🎉
-- **Arquitetura:** Núcleo Consolidado v3.28 (15.383 linhas de código funcional)
+## 📊 Status do Projeto: v3.31 (Narrative Identity Edition)
+- **Progresso Real:** 69,1% (38 de 55 módulos implementados)
+- **Milestone:** Rumo aos 70% — Identidade Narrativa Ativa 🎉
+- **Arquitetura:** Núcleo Consolidado v3.31 (16.045 linhas de código funcional)
 
 ---
 
@@ -56,7 +56,7 @@ O Nexus é regido por uma **Constituição Imutável**, auditada por um **Log Cr
 ---
 
 ## 🛠️ Como Utilizar
-O núcleo funcional reside em `core/NEXUS_CORE_v3.28.py`. Este arquivo contém a integração total dos 36 módulos e pode ser executado em ambientes Python 3.11+ com suporte a SQLite e FAISS.
+O núcleo funcional reside em `core/NEXUS_CORE_v3.31.py`. Este arquivo contém a integração total dos 38 módulos e pode ser executado em ambientes Python 3.11+ com suporte a SQLite e FAISS.
 
 ---
 
