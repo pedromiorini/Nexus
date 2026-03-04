@@ -4,10 +4,10 @@
 
 ---
 
-## 📊 Status do Projeto: v3.32 (Goal-Conditioned Identity Edition)
-- **Progresso Real:** 72,7% (40 de 55 módulos implementados)
-- **Milestone:** 70% Atingido — Memória Estratégica e Transições Ativas 🎉
-- **Arquitetura:** Núcleo Consolidado v3.32 (16.672 linhas de código funcional)
+## 📊 Status do Projeto: v3.33 (Self-Memory Bootstrap Edition)
+- **Progresso Real:** 74,5% (41 de 55 módulos implementados)
+- **Milestone:** Rumo aos 75% — Co-Evolução Identitária Ativa 🎉
+- **Arquitetura:** Núcleo Consolidado v3.33 (17.061 linhas de código funcional)
 
 ---
 
@@ -56,7 +56,7 @@ O Nexus é regido por uma **Constituição Imutável**, auditada por um **Log Cr
 ---
 
 ## 🛠️ Como Utilizar
-O núcleo funcional reside em `core/NEXUS_CORE_v3.32.py`. Este arquivo contém a integração total dos 40 módulos e pode ser executado em ambientes Python 3.11+ com suporte a SQLite e FAISS.
+O núcleo funcional reside em `core/NEXUS_CORE_v3.33.py`. Este arquivo contém a integração total dos 41 módulos e pode ser executado em ambientes Python 3.11+ com suporte a SQLite e FAISS.
 
 ---
 
