@@ -23491,12 +23491,7 @@ class CompleteNexusBrain:
                 "answer": "No answer due to security policy"  # FIXED v3.77
             }
         print(f"🔍 DEBUG v3.72: ✅ Jailbreak check passed")
-        
-<<<<<<< HEAD
-        
-=======
         # ═══════════════════════════════════════════════════════════════════
->>>>>>> c2aab17 (feat: Indentação corrigida, EthicsGuard integrado e referências de terceiros removidas.)
         # PHASE 4.5: ETHICAL OVERSIGHT (POST 69)
         # ═══════════════════════════════════════════════════════════════════
         print(f"🔍 DEBUG v3.94: PHASE 4.5 - Ethical oversight")
