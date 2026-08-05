@@ -1,0 +1,4 @@
+Config loaded for non-project session.
+Config file: /home/ubuntu/.manus/config/config.json
+Baseline file: /home/ubuntu/.manus/config/baseline/config.json
+Next step: edit config.json and run `manus-config config save`
