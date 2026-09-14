@@ -40,6 +40,22 @@ class VramDefenseGuardTests(unittest.TestCase):
         decision = router.vram_guard.evaluate(VramSnapshot(True, reserved_bytes=95, total_bytes=100))
         self.assertEqual(decision.action, "emergency_release")
 
+    def test_mitigation_executes_safe_steps_and_audits(self):
+        decision = self.guard.evaluate(VramSnapshot(True, reserved_bytes=95, total_bytes=100))
+        stopped = []
+        result = self.guard.execute_mitigation(decision, stop_callback=lambda: stopped.append(True))
+        self.assertIn("stop_noncritical_tasks", result.completed)
+        self.assertIn("gc_collect", result.completed)
+        self.assertIn("require_recheck", result.skipped)
+        self.assertEqual(stopped, [True])
+        self.assertEqual(len(self.guard.audit_log), 1)
+
+    def test_mitigation_callback_failure_is_contained(self):
+        decision = self.guard.evaluate(VramSnapshot(True, reserved_bytes=85, total_bytes=100))
+        result = self.guard.execute_mitigation(decision, defer_callback=lambda: (_ for _ in ()).throw(RuntimeError("blocked")))
+        self.assertFalse(result.successful)
+        self.assertTrue(any("defer_next_task" in item for item in result.errors))
+
 
 if __name__ == "__main__":
     unittest.main()

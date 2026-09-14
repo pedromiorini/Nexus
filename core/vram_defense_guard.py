@@ -1,18 +1,14 @@
-"""Governança de memória e defesa proativa para a roadmap Nexus v4.0.
-
-O módulo é opcional: funciona mesmo quando PyTorch ou GPU não estão disponíveis.
-Ele separa telemetria, política de orçamento e resposta defensiva para permitir
-integração posterior com o CentralRouter sem acoplamento ao monólito.
-"""
+"""Governança de memória e defesa proativa para a roadmap Nexus v4.0."""
 from __future__ import annotations
 
+import gc
 from dataclasses import dataclass, field
 from time import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 try:
     import torch
-except Exception:  # pragma: no cover - ambiente sem torch
+except Exception:  # pragma: no cover
     torch = None
 
 
@@ -39,6 +35,19 @@ class DefenseDecision:
     snapshot: VramSnapshot
 
 
+@dataclass
+class MitigationResult:
+    action: str
+    completed: List[str]
+    skipped: List[str]
+    errors: List[str]
+    timestamp: float = field(default_factory=time)
+
+    @property
+    def successful(self) -> bool:
+        return not self.errors
+
+
 class VramDefenseGuard:
     """Observa pressão de memória e aplica respostas graduais e auditáveis."""
 
@@ -48,6 +57,8 @@ class VramDefenseGuard:
         self.soft_limit = soft_limit
         self.hard_limit = hard_limit
         self.history: List[DefenseDecision] = []
+        self.mitigation_history: List[MitigationResult] = []
+        self.audit_log: List[Dict[str, Any]] = []
 
     def snapshot(self) -> VramSnapshot:
         if torch is None or not torch.cuda.is_available():
@@ -83,8 +94,47 @@ class VramDefenseGuard:
         }[current.action]
         return {"action": current.action, "severity": current.severity, "steps": actions, "utilization": current.snapshot.utilization}
 
+    def execute_mitigation(
+        self,
+        decision: Optional[DefenseDecision] = None,
+        defer_callback: Optional[Callable[[], None]] = None,
+        stop_callback: Optional[Callable[[], None]] = None,
+    ) -> MitigationResult:
+        """Executa somente ações locais e reversíveis; callbacks são opcionais e explícitos."""
+        current = decision or self.evaluate()
+        result = MitigationResult(current.action, [], [], [])
+        steps = self.mitigation_plan(current)["steps"]
+        for step in steps:
+            try:
+                if step == "release_cached_tensors":
+                    if torch is not None and torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    result.completed.append(step)
+                elif step == "gc_collect":
+                    gc.collect()
+                    result.completed.append(step)
+                elif step == "defer_next_task":
+                    if defer_callback is not None:
+                        defer_callback()
+                        result.completed.append(step)
+                    else:
+                        result.skipped.append(step)
+                elif step == "stop_noncritical_tasks":
+                    if stop_callback is not None:
+                        stop_callback()
+                        result.completed.append(step)
+                    else:
+                        result.skipped.append(step)
+                else:
+                    result.skipped.append(step)
+            except Exception as exc:  # defesa nunca deve derrubar o roteador
+                result.errors.append(f"{step}: {type(exc).__name__}: {exc}")
+        self.mitigation_history.append(result)
+        self.audit_log.append({"action": result.action, "completed": result.completed[:], "skipped": result.skipped[:], "errors": result.errors[:], "timestamp": result.timestamp})
+        return result
+
     def statistics(self) -> Dict[str, Any]:
         counts: Dict[str, int] = {}
         for item in self.history:
             counts[item.action] = counts.get(item.action, 0) + 1
-        return {"samples": len(self.history), "actions": counts, "soft_limit": self.soft_limit, "hard_limit": self.hard_limit}
+        return {"samples": len(self.history), "actions": counts, "mitigations": len(self.mitigation_history), "audit_events": len(self.audit_log), "soft_limit": self.soft_limit, "hard_limit": self.hard_limit}

@@ -12593,12 +12593,14 @@ class CentralRouter:
 
         # ─── 0.5 GOVERNANÇA VRAM (roadmap v4.0) ───────────────────────────
         vram_decision = self.vram_guard.evaluate()
+        mitigation_result = self.vram_guard.execute_mitigation(vram_decision)
         if vram_decision.action == "emergency_release":
             return {
                 "success": False,
                 "error": "VRAM_PRESSURE",
                 "reason": vram_decision.reason,
                 "vram_guard": self.vram_guard.mitigation_plan(vram_decision),
+                "vram_mitigation": mitigation_result.__dict__,
                 "prompt": prompt[:100]
             }
 
@@ -12682,6 +12684,7 @@ class CentralRouter:
             r.module.value for r in all_results if r.success
         ]
         final_result["vram_guard"] = self.vram_guard.mitigation_plan(vram_decision)
+        final_result["vram_mitigation"] = mitigation_result.__dict__
         final_result["request_type"] = request_type.value
         final_result["cached"] = False
         
