@@ -1,6 +1,7 @@
 import unittest
 
 from core.vram_defense_guard import DefenseDecision, VramDefenseGuard, VramSnapshot
+from core.constitutional_brain import CentralRouter
 
 
 class VramDefenseGuardTests(unittest.TestCase):
@@ -32,6 +33,12 @@ class VramDefenseGuardTests(unittest.TestCase):
         self.guard.evaluate(VramSnapshot(True, reserved_bytes=95, total_bytes=100))
         self.assertEqual(self.guard.statistics()["samples"], 2)
         self.assertEqual(self.guard.statistics()["actions"]["emergency_release"], 1)
+
+    def test_router_owns_vram_guard(self):
+        router = CentralRouter({}, object())
+        self.assertIsInstance(router.vram_guard, VramDefenseGuard)
+        decision = router.vram_guard.evaluate(VramSnapshot(True, reserved_bytes=95, total_bytes=100))
+        self.assertEqual(decision.action, "emergency_release")
 
 
 if __name__ == "__main__":

@@ -152,6 +152,7 @@ import sys
 
 # Importar o bridge Vita; CentralRouter e EthicsGuard são definidos neste módulo.
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
+from core.vram_defense_guard import VramDefenseGuard
 
 # v3.90: Monitoramento de sistema
 try:
@@ -12366,6 +12367,7 @@ class CentralRouter:
     def __init__(self, brain_modules: Dict[ModuleType, Any], ethics_guard: EthicsGuard):
         self.modules = brain_modules
         self.ethics = ethics_guard
+        self.vram_guard = VramDefenseGuard()
 
         # ─── Sistema de Cache ──────────────────────────────────────────────
         self.execution_cache: Dict[str, Dict] = {}
@@ -12589,6 +12591,17 @@ class CentralRouter:
         
         print(f"🔍 DEBUG v3.70: total_requests incremented to {self.stats['total_requests']}")
 
+        # ─── 0.5 GOVERNANÇA VRAM (roadmap v4.0) ───────────────────────────
+        vram_decision = self.vram_guard.evaluate()
+        if vram_decision.action == "emergency_release":
+            return {
+                "success": False,
+                "error": "VRAM_PRESSURE",
+                "reason": vram_decision.reason,
+                "vram_guard": self.vram_guard.mitigation_plan(vram_decision),
+                "prompt": prompt[:100]
+            }
+
         # ─── 1. ANÁLISE ────────────────────────────────────────────────────
         request_type = self.analyze_request(prompt, context)
         self.stats["requests_by_type"][request_type] += 1
@@ -12668,6 +12681,7 @@ class CentralRouter:
         final_result["modules_executed"] = [
             r.module.value for r in all_results if r.success
         ]
+        final_result["vram_guard"] = self.vram_guard.mitigation_plan(vram_decision)
         final_result["request_type"] = request_type.value
         final_result["cached"] = False
         
