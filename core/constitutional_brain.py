@@ -153,6 +153,7 @@ import sys
 # Importar o bridge Vita; CentralRouter e EthicsGuard são definidos neste módulo.
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
 from core.vram_defense_guard import VramDefenseGuard
+from core.deferred_task_queue import DeferredTaskQueue
 
 # v3.90: Monitoramento de sistema
 try:
@@ -12368,6 +12369,7 @@ class CentralRouter:
         self.modules = brain_modules
         self.ethics = ethics_guard
         self.vram_guard = VramDefenseGuard()
+        self.deferred_queue = DeferredTaskQueue()
 
         # ─── Sistema de Cache ──────────────────────────────────────────────
         self.execution_cache: Dict[str, Dict] = {}
@@ -12595,12 +12597,19 @@ class CentralRouter:
         vram_decision = self.vram_guard.evaluate()
         mitigation_result = self.vram_guard.execute_mitigation(vram_decision)
         if vram_decision.action == "emergency_release":
+            priority = int((context or {}).get("priority", 0))
+            task = self.deferred_queue.enqueue(prompt, context, priority=priority, reason=vram_decision.reason)
+            recheck = self.vram_guard.evaluate()
             return {
                 "success": False,
                 "error": "VRAM_PRESSURE",
+                "deferred": True,
+                "deferred_task_id": task.task_id,
+                "recheck_passed": recheck.action != "emergency_release",
                 "reason": vram_decision.reason,
                 "vram_guard": self.vram_guard.mitigation_plan(vram_decision),
                 "vram_mitigation": mitigation_result.__dict__,
+                "deferred_queue": self.deferred_queue.statistics(),
                 "prompt": prompt[:100]
             }
 
@@ -12685,6 +12694,7 @@ class CentralRouter:
         ]
         final_result["vram_guard"] = self.vram_guard.mitigation_plan(vram_decision)
         final_result["vram_mitigation"] = mitigation_result.__dict__
+        final_result["deferred_queue"] = self.deferred_queue.statistics()
         final_result["request_type"] = request_type.value
         final_result["cached"] = False
         
@@ -12909,6 +12919,7 @@ class CentralRouter:
                 k.value: v for k, v in self.stats["module_errors"].items()
                 if v > 0
             },
+            "deferred_queue": self.deferred_queue.statistics(),
             "avg_modules_per_request": self.stats["avg_modules_per_request"]
         }
 
