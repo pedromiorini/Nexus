@@ -150,9 +150,7 @@ import threading
 import os
 import sys
 
-# Importar os novos módulos
-from core.router.central_router import CentralRouter
-from core.ethics.ethics_guard import EthicsGuard
+# Importar o bridge Vita; CentralRouter e EthicsGuard são definidos neste módulo.
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
 
 # v3.90: Monitoramento de sistema
@@ -972,7 +970,7 @@ class RealImmutableLog:
         self.conn.commit()
 
     def log_event(self, event_type: str, event_data: Dict) -> str:
-         """Log evento e retornar hash (correção de auditoria)""
+        """Log evento e retornar hash (correção de auditoria)"""
         # FIXED v3.68: Thread-safe with lock
         with self.db_lock:
             cursor = self.conn.cursor()
@@ -12146,6 +12144,12 @@ class EthicsGuard:
 
         print("⚖️  POST 7 - EthicsGuard initialized (Constitutional validation active)")
 
+    def review_action_plan(self, question: str, current_context: str, proposed_action: str, risk_level: float):
+        """Adaptador de revisão ética usado pelo ciclo think()."""
+        plan = ExecutionPlan(RequestType.QUERY, [], [], 0)
+        result = self.pre_execution_check(question, plan)
+        return type("EthicalReview", (), {"is_approved": result["cleared"], "concern": result["reason"]})()
+
     def pre_execution_check(self, prompt: str, execution_plan: ExecutionPlan) -> Dict:
         """
         Validação PRÉ-execução: Verificar se request viola algum princípio.
@@ -12383,6 +12387,12 @@ class CentralRouter:
 
         print("🎯 POST 7 - CentralRouter initialized (Intelligent orchestration active)")
         print(f"🔍 DEBUG v3.71: Router registered {len(self.modules)} modules at initialization")
+
+    def set_ethics_guard(self, ethics_guard: EthicsGuard):
+        self.ethics = ethics_guard
+
+    def set_vita_bridge(self, bridge: Any):
+        self.vita_bridge = bridge
 
     def _init_routing_rules(self) -> Dict[RequestType, List[ModuleType]]:
         """
@@ -22350,6 +22360,7 @@ class CompleteNexusBrain:
         self.constitutional_log = RealImmutableLog(f"{self.db_prefix}_log" if self.db_prefix != ":memory:" else ":memory:")
         self.budget = RealCognitiveBudgetEnforcer()
         self.memory = RealHierarchicalMemory(f"{self.db_prefix}_memory" if self.db_prefix != ":memory:" else ":memory:")
+        self.vita_federation = NexusConstitutionalBridge()
 
         # Module 4: Knowledge Graph (integrates with memory)
         self.knowledge_graph = RealKnowledgeGraph(hierarchical_memory=self.memory)
@@ -23495,13 +23506,13 @@ class CompleteNexusBrain:
         # PHASE 4.5: ETHICAL OVERSIGHT (POST 69)
         # ═══════════════════════════════════════════════════════════════════
         print(f"🔍 DEBUG v3.94: PHASE 4.5 - Ethical oversight")
-        if self.enable_ethics_guard and self.ethics_guard:
+        if self.enable_router and self.ethics_guard:
             modules_activated.append("ethics_guard")
             ethical_review = self.ethics_guard.review_action_plan(
                 question=question,
                 current_context=context_profile.context_type if context_profile else "unknown",
                 proposed_action="reasoning_process", # Ação genérica para o processo de raciocínio
-                risk_level=jailbreak_result.risk_score # Usar o risco do jailbreak como entrada
+                risk_level=jailbreak_result.severity # Usar a severidade do jailbreak como entrada
             )
             if not ethical_review.is_approved:
                 print(f"🔍 DEBUG v3.94: ❌ ETHICAL VIOLATION DETECTED - RETURNING EARLY!")
@@ -23733,7 +23744,7 @@ class CompleteNexusBrain:
                 print(f"🔍 DEBUG v3.81: possible_actions exists = {possible_actions is not None}")
                 
                 # Injeção do CentralRouter para orquestrar o raciocínio
-                if self.enable_router and self.router:
+                if use_router and self.enable_router and self.router:
                     modules_activated.append("central_router")
                     
                     # Obter o estado do Nexus Vita via bridge
@@ -23761,64 +23772,36 @@ class CompleteNexusBrain:
                     answer_value = reasoning_result.get("answer", answer_value)
                 else:
                     # Fallback para o raciocínio direto se o router não estiver habilitado
-                    # FIXED v3.80: If planning_goal provided, use MCTS + WorldModel
+                    # MCTS planning when an explicit goal is supplied.
                     if planning_goal:
                         print(f"🔍 DEBUG v3.81: ✅ planning_goal PROVIDED - executing MCTS!")
-                        # Planejamento MCTS (POST 5)
                         modules_activated.append("mcts_planner")
-                    
-                    try:
-                        mcts_result = self.mcts_planner.plan(
-                            goal=planning_goal,
-                            available_actions=[action[0] for action in possible_actions] if possible_actions else None,
-                            max_iterations=mcts_iterations
-                        )
-                        print(f"🔍 DEBUG v3.81: ✅ MCTS executed successfully!")
-                        print(f"🔍 DEBUG v3.81: mcts_result.best_action_sequence = {mcts_result.best_action_sequence}")
-                        
-                        # Build reasoning_result with MCTS output
-                        reasoning_result = {
-                            "mcts_plan": mcts_result.best_action_sequence,
-                            "mcts_expected_reward": mcts_result.expected_reward,
-                            "mcts_success_probability": mcts_result.success_probability,
-                            "answer": f"Plano recomendado: {' → '.join(mcts_result.best_action_sequence)}",
-                            "confidence": mcts_result.expected_reward,
-                            "evidence": []
-                        }
-                        print(f"🔍 DEBUG v3.81: reasoning_result keys after MCTS = {reasoning_result.keys()}")
-                        
-                        # v3.90: LOGGING EXTREMO - Estado de reasoning_result
-                        print("\n" + "="*80)
-                        print("🔬 v3.90 TRACE: reasoning_result CRIADO pelo MCTS!")
-                        print("="*80)
-                        print(f"📍 Linha: ~23786")
-                        print(f"🔬 reasoning_result type: {type(reasoning_result)}")
-                        print(f"🔬 reasoning_result keys: {list(reasoning_result.keys())}")
-                        print(f"🔬 mcts_plan: {reasoning_result.get('mcts_plan')}")
-                        print(f"🔬 mcts_expected_reward: {reasoning_result.get('mcts_expected_reward')}")
-                        print(f"🔬 mcts_success_probability: {reasoning_result.get('mcts_success_probability')}")
-                        print(f"🔬 answer: {reasoning_result.get('answer')}")
-                        print(f"🔬 confidence: {reasoning_result.get('confidence')}")
-                        print("="*80 + "\n")
-                        print_system_state("after MCTS")
-                        
-                        # World Model Simulation (POST 13) for comparing futures
-                        if possible_actions and len(possible_actions) > 1:
-                            modules_activated.append("world_model")
-                            world_comparison = self.world_model.compare_futures(possible_actions)
-                            reasoning_result["world_comparison"] = world_comparison
-                            reasoning_result["best_future"] = world_comparison.get("best_future_index", 0)
-                    except Exception as e:
-                        print(f"⚠️ WARNING v3.81: MCTS failed: {str(e)[:200]}")
-                        # Fallback to standard reasoning if MCTS fails
-                        modules_activated.append("reasoning")
-                        reasoning_result = self.reasoning.reason(question)
+                        try:
+                            mcts_result = self.mcts_planner.plan(
+                                goal=planning_goal,
+                                available_actions=[action[0] for action in possible_actions] if possible_actions else None,
+                                max_iterations=mcts_iterations
+                            )
+                            reasoning_result = {
+                                "mcts_plan": mcts_result.best_action_sequence,
+                                "mcts_expected_reward": mcts_result.expected_reward,
+                                "mcts_success_probability": mcts_result.success_probability,
+                                "answer": f"Plano recomendado: {' → '.join(mcts_result.best_action_sequence)}",
+                                "confidence": mcts_result.expected_reward,
+                                "evidence": []
+                            }
+                            if possible_actions and len(possible_actions) > 1:
+                                modules_activated.append("world_model")
+                                comparison = self.world_model.compare_futures(possible_actions)
+                                reasoning_result["world_comparison"] = comparison
+                                reasoning_result["best_future"] = comparison.get("best_future_index", 0)
+                        except Exception as e:
+                            print(f"⚠️ WARNING: MCTS failed: {str(e)[:200]}")
+                            modules_activated.append("reasoning")
+                            reasoning_result = self.reasoning.reason(question)
                     else:
-                        print(f"🔍 DEBUG v3.81: ❌ planning_goal NOT PROVIDED - using standard reasoning")
-                        # Direct reasoning (POST 2) - standard flow
                         modules_activated.append("reasoning")
                         reasoning_result = self.reasoning.reason(question)
-                
                 # Knowledge Graph RAG (POST 4)
                 modules_activated.append("knowledge_graph")
                 kg_result = self.knowledge_graph.rag_query(question, top_k=3)
