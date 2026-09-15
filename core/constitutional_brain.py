@@ -12390,6 +12390,12 @@ class CentralRouter:
                 "failed": 0,
                 "discarded": 0,
                 "total_latency_ms": 0.0,
+            },
+            "reprocessing_policy": {
+                "state": "active",
+                "paused_until": 0.0,
+                "cooldown_seconds": 30.0,
+                "last_reason": "",
             }
         }
 
@@ -12735,8 +12741,31 @@ class CentralRouter:
             on_discard=on_discard,
         )
 
+    def _reprocessing_policy_decision(self) -> Dict[str, Any]:
+        """Decide se o reprocessamento pode prosseguir após uma nova leitura VRAM."""
+        policy = self.stats["reprocessing_policy"]
+        now = time.time()
+        decision = self.vram_guard.evaluate()
+        if decision.action == "emergency_release":
+            policy["state"] = "paused"
+            policy["paused_until"] = now + policy["cooldown_seconds"]
+            policy["last_reason"] = decision.reason
+            return {"allowed": False, "state": "paused", "reason": decision.reason, "vram_action": decision.action}
+        if policy["state"] == "paused" and now < policy["paused_until"]:
+            return {"allowed": False, "state": "paused", "reason": policy["last_reason"], "vram_action": decision.action}
+        if policy["state"] == "paused":
+            policy["state"] = "active"
+            policy["last_reason"] = "cooldown_expired"
+        return {"allowed": True, "state": policy["state"], "reason": policy["last_reason"], "vram_action": decision.action}
+
     def reprocess_deferred_tasks(self, max_batch: int = 1, on_success=None, on_failure=None, on_discard=None) -> Dict[str, Any]:
-        """Reenvia tarefas adiadas ao fluxo cognitivo com contexto e callbacks preservados."""
+        """Reenvia tarefas adiadas com política automática de pausa e degradação."""
+        policy_decision = self._reprocessing_policy_decision()
+        if not policy_decision["allowed"]:
+            return {"processed": 0, "completed": 0, "retried": 0, "discarded": 0, "blocked": True, "reprocessing_telemetry": None, "reprocessing_policy": policy_decision}
+        policy = self.stats["reprocessing_policy"]
+        if policy["state"] == "degraded":
+            max_batch = min(max_batch, 1)
         timings = {}
         metrics = self.stats["deferred_reprocessing"]
 
@@ -12780,7 +12809,14 @@ class CentralRouter:
         telemetry = None
         if getattr(self, "vita_bridge", None) is not None and hasattr(self.vita_bridge, "record_reprocessing_telemetry"):
             telemetry = self.vita_bridge.record_reprocessing_telemetry(metrics)
-        return {**result, "reprocessing_telemetry": telemetry}
+        if telemetry and telemetry.get("alerts"):
+            policy["last_reason"] = ",".join(telemetry["alerts"])
+            if any(alert in telemetry["alerts"] for alert in ("reprocessing_failure_rate_high", "reprocessing_discard_rate_high")):
+                policy["state"] = "paused"
+                policy["paused_until"] = time.time() + policy["cooldown_seconds"]
+            elif "reprocessing_latency_high" in telemetry["alerts"]:
+                policy["state"] = "degraded"
+        return {**result, "reprocessing_telemetry": telemetry, "reprocessing_policy": {**policy}}
 
     def _execute_stage(
         self, 

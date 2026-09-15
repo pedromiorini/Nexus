@@ -85,6 +85,9 @@ class DeferredTaskQueueTests(unittest.TestCase):
         router.stats = {"deferred_reprocessing": {
             "attempts": 0, "completed": 0, "failed": 0,
             "discarded": 0, "total_latency_ms": 0.0,
+        }, "reprocessing_policy": {
+            "state": "active", "paused_until": 0.0,
+            "cooldown_seconds": 30.0, "last_reason": "",
         }}
         router.vram_guard = type("Guard", (), {
             "evaluate": lambda self: type("Decision", (), {"action": "normal"})()
@@ -118,6 +121,46 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertIn("reprocessing_discard_rate_high", record["alerts"])
         self.assertIn("reprocessing_latency_high", record["alerts"])
         self.assertEqual(len(bridge.reprocessing_telemetry), 1)
+
+    def test_policy_blocks_critical_vram(self):
+        router = CentralRouter.__new__(CentralRouter)
+        router.deferred_queue = DeferredTaskQueue()
+        router.stats = {"deferred_reprocessing": {
+            "attempts": 0, "completed": 0, "failed": 0,
+            "discarded": 0, "total_latency_ms": 0.0,
+        }, "reprocessing_policy": {
+            "state": "active", "paused_until": 0.0,
+            "cooldown_seconds": 30.0, "last_reason": "",
+        }}
+        router.vram_guard = type("Guard", (), {
+            "evaluate": lambda self: type("Decision", (), {"action": "emergency_release", "reason": "critical_vram"})()
+        })()
+        router.deferred_queue.enqueue("must_wait")
+        result = router.reprocess_deferred_tasks()
+        self.assertTrue(result["blocked"])
+        self.assertEqual(result["reprocessing_policy"]["state"], "paused")
+        self.assertEqual(router.deferred_queue.statistics()["depth"], 1)
+
+    def test_degraded_policy_limits_batch(self):
+        router = CentralRouter.__new__(CentralRouter)
+        router.deferred_queue = DeferredTaskQueue()
+        router.stats = {"deferred_reprocessing": {
+            "attempts": 0, "completed": 0, "failed": 0,
+            "discarded": 0, "total_latency_ms": 0.0,
+        }, "reprocessing_policy": {
+            "state": "degraded", "paused_until": 0.0,
+            "cooldown_seconds": 30.0, "last_reason": "latency",
+        }}
+        router.vram_guard = type("Guard", (), {
+            "evaluate": lambda self: type("Decision", (), {"action": "normal"})()
+        })()
+        router.vita_bridge = NexusConstitutionalBridge()
+        router.route = lambda prompt, context: {"success": True}
+        router.deferred_queue.enqueue("one")
+        router.deferred_queue.enqueue("two")
+        result = router.reprocess_deferred_tasks(max_batch=2)
+        self.assertEqual(result["processed"], 1)
+        self.assertEqual(router.deferred_queue.statistics()["depth"], 1)
 
 
 if __name__ == "__main__":
