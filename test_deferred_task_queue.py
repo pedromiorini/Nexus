@@ -131,6 +131,27 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(audit[0]["event_type"], "policy_transition")
         self.assertEqual(audit[0]["payload"]["reason"], "critical_vram")
 
+    def test_recovery_analysis(self):
+        bridge = NexusConstitutionalBridge(":memory:")
+        now = 1000.0
+        rows = [
+            ("policy_transition", now, {"previous_state": "active", "new_state": "paused", "reason": "critical_vram", "policy": {}}),
+            ("telemetry", now + 1, {"alerts": ["reprocessing_failure_rate_high"]}),
+            ("policy_transition", now + 5, {"previous_state": "paused", "new_state": "active", "reason": "cooldown_expired", "policy": {}}),
+        ]
+        bridge._audit_db.executemany(
+            "INSERT INTO policy_audit (event_type, timestamp, payload) VALUES (?, ?, ?)",
+            [(kind, timestamp, __import__("json").dumps(payload)) for kind, timestamp, payload in rows],
+        )
+        bridge._audit_db.commit()
+        analysis = bridge.get_recovery_analysis()
+        self.assertEqual(analysis["pauses"], 1)
+        self.assertEqual(analysis["recoveries"], 1)
+        self.assertEqual(analysis["recovery_rate"], 1.0)
+        self.assertEqual(analysis["critical_events"], 2)
+        self.assertEqual(analysis["total_pause_seconds"], 5.0)
+        self.assertFalse(analysis["open_pause"])
+
     def test_policy_blocks_critical_vram(self):
         router = CentralRouter.__new__(CentralRouter)
         router.deferred_queue = DeferredTaskQueue()

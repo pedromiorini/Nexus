@@ -84,6 +84,44 @@ class NexusConstitutionalBridge:
         ).fetchall()
         return [{"event_type": event_type, "timestamp": timestamp, "payload": json.loads(payload)} for event_type, timestamp, payload in reversed(rows)]
 
+    def get_recovery_analysis(self, limit: int = 128) -> Dict[str, Any]:
+        """Calcula pausas, recuperações e recorrência de eventos críticos."""
+        events = self.get_policy_audit(limit)
+        paused_at = None
+        pause_durations = []
+        pauses = recoveries = critical_events = 0
+        latest_state = "active"
+        for event in events:
+            payload = event["payload"]
+            if event["event_type"] == "policy_transition":
+                previous = payload.get("previous_state")
+                current = payload.get("new_state")
+                latest_state = current or latest_state
+                if current == "paused" and previous != "paused":
+                    pauses += 1
+                    paused_at = event["timestamp"]
+                    critical_events += 1
+                elif current == "active" and previous == "paused":
+                    recoveries += 1
+                    if paused_at is not None:
+                        pause_durations.append(max(0.0, event["timestamp"] - paused_at))
+                    paused_at = None
+            elif event["event_type"] == "telemetry":
+                alerts = payload.get("alerts", [])
+                if any(alert in alerts for alert in ("reprocessing_failure_rate_high", "reprocessing_discard_rate_high")):
+                    critical_events += 1
+        return {
+            "events_analyzed": len(events),
+            "latest_state": latest_state,
+            "pauses": pauses,
+            "recoveries": recoveries,
+            "recovery_rate": recoveries / pauses if pauses else 0.0,
+            "critical_events": critical_events,
+            "avg_pause_seconds": sum(pause_durations) / len(pause_durations) if pause_durations else 0.0,
+            "total_pause_seconds": sum(pause_durations),
+            "open_pause": paused_at is not None,
+        }
+
     def get_brain_state(self, fed: Any, uci_global: float) -> dict:
         """Compatível com CompleteNexusBrain.get_status()."""
         self.query_count += 1
