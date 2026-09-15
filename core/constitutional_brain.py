@@ -13012,6 +13012,13 @@ class CentralRouter:
             return None
         return bridge.get_recovery_analysis(limit=limit, window_seconds=window_seconds)
 
+    def export_recovery_diagnostics(self, limit: int = 128, window_seconds: Optional[float] = None, as_json: bool = False):
+        """Exporta o diagnóstico em schema versionado para integração externa."""
+        bridge = getattr(self, "vita_bridge", None)
+        if bridge is None or not hasattr(bridge, "export_recovery_diagnostics"):
+            return None
+        return bridge.export_recovery_diagnostics(limit=limit, window_seconds=window_seconds, as_json=as_json)
+
     def get_statistics(self) -> Dict:
         """Estatísticas de roteamento para observabilidade"""
         total_reqs = self.stats["total_requests"]

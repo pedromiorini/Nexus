@@ -146,6 +146,17 @@ class NexusConstitutionalBridge:
             "open_pause": paused_at is not None,
         }
 
+    def export_recovery_diagnostics(self, limit: int = 128, window_seconds: Optional[float] = None, as_json: bool = False):
+        """Exporta um snapshot versionado para consumidores externos de observabilidade."""
+        payload = {
+            "schema": "nexus.recovery.diagnostics.v1",
+            "generated_at": time.time(),
+            "source": "NexusConstitutionalBridge",
+            "diagnostics": self.get_recovery_analysis(limit=limit, window_seconds=window_seconds),
+            "events": self.get_policy_audit(limit=limit),
+        }
+        return json.dumps(payload, sort_keys=True, separators=(",", ":")) if as_json else payload
+
     def get_brain_state(self, fed: Any, uci_global: float) -> dict:
         """Compatível com CompleteNexusBrain.get_status()."""
         self.query_count += 1

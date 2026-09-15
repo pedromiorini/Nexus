@@ -1,3 +1,4 @@
+import json
 import time
 import unittest
 from core.deferred_task_queue import DeferredTaskQueue
@@ -114,6 +115,11 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertIsNotNone(diagnostics)
         self.assertIn("severity", diagnostics)
         self.assertIn("events_analyzed", diagnostics)
+        exported = router.export_recovery_diagnostics(as_json=True)
+        decoded = json.loads(exported)
+        self.assertEqual(decoded["schema"], "nexus.recovery.diagnostics.v1")
+        self.assertIn("diagnostics", decoded)
+        self.assertIn("events", decoded)
 
     def test_vita_telemetry_alerts_on_discard_rate(self):
         bridge = NexusConstitutionalBridge(":memory:")
@@ -160,6 +166,10 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertFalse(analysis["open_pause"])
         with self.assertRaises(ValueError):
             bridge.get_recovery_analysis(window_seconds=0)
+        snapshot = bridge.export_recovery_diagnostics()
+        self.assertEqual(snapshot["schema"], "nexus.recovery.diagnostics.v1")
+        self.assertEqual(snapshot["diagnostics"]["severity"], "critical")
+        self.assertEqual(len(snapshot["events"]), 3)
 
     def test_policy_blocks_critical_vram(self):
         router = CentralRouter.__new__(CentralRouter)
