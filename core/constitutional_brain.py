@@ -12597,14 +12597,17 @@ class CentralRouter:
         vram_decision = self.vram_guard.evaluate()
         mitigation_result = self.vram_guard.execute_mitigation(vram_decision)
         if vram_decision.action == "emergency_release":
-            priority = int((context or {}).get("priority", 0))
-            task = self.deferred_queue.enqueue(prompt, context, priority=priority, reason=vram_decision.reason)
+            deferred_context = context or {}
+            task = None
+            if not deferred_context.get("_deferred_reprocess"):
+                priority = int(deferred_context.get("priority", 0))
+                task = self.deferred_queue.enqueue(prompt, context, priority=priority, reason=vram_decision.reason)
             recheck = self.vram_guard.evaluate()
             return {
                 "success": False,
                 "error": "VRAM_PRESSURE",
                 "deferred": True,
-                "deferred_task_id": task.task_id,
+                "deferred_task_id": task.task_id if task is not None else deferred_context.get("deferred_task_id"),
                 "recheck_passed": recheck.action != "emergency_release",
                 "reason": vram_decision.reason,
                 "vram_guard": self.vram_guard.mitigation_plan(vram_decision),
@@ -12713,14 +12716,30 @@ class CentralRouter:
 
         return final_result
 
-    def consume_deferred_tasks(self, processor, max_batch: int = 1) -> Dict[str, Any]:
+    def consume_deferred_tasks(self, processor, max_batch: int = 1, on_success=None, on_failure=None, on_discard=None) -> Dict[str, Any]:
         """Consome tarefas adiadas somente após rechecagem de pressão VRAM."""
         decision = self.vram_guard.evaluate()
         return self.deferred_queue.consume(
             processor,
             max_batch=max_batch,
             pressure_critical=decision.action == "emergency_release",
+            on_success=on_success,
+            on_failure=on_failure,
+            on_discard=on_discard,
         )
+
+    def reprocess_deferred_tasks(self, max_batch: int = 1, on_success=None, on_failure=None, on_discard=None) -> Dict[str, Any]:
+        """Reenvia tarefas adiadas ao fluxo cognitivo com contexto e callbacks preservados."""
+        def process(task) -> bool:
+            context = dict(task.context)
+            context.update({"_deferred_reprocess": True, "deferred_task_id": task.task_id, "deferred_attempt": task.attempts})
+            result = self.route(task.prompt, context)
+            if result.get("success"):
+                return True
+            task.last_reason = result.get("reason", result.get("error", "reprocessamento não concluído"))
+            return False
+
+        return self.consume_deferred_tasks(process, max_batch=max_batch, on_success=on_success, on_failure=on_failure, on_discard=on_discard)
 
     def _execute_stage(
         self, 

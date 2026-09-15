@@ -60,6 +60,24 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertTrue(result["blocked"])
         self.assertEqual(result["processed"], 0)
 
+    def test_lifecycle_callbacks(self):
+        queue = DeferredTaskQueue(max_attempts=1)
+        queue.enqueue("ok")
+        queue.enqueue("bad")
+        success, failure, discarded = [], [], []
+        result = queue.consume(
+            lambda task: task.prompt == "ok",
+            max_batch=2,
+            on_success=lambda task: success.append(task.prompt),
+            on_failure=lambda task: failure.append(task.prompt),
+            on_discard=lambda task: discarded.append(task.prompt),
+        )
+        self.assertEqual(result["completed"], 1)
+        self.assertEqual(result["discarded"], 1)
+        self.assertEqual(success, ["ok"])
+        self.assertEqual(failure, ["bad"])
+        self.assertEqual(discarded, ["bad"])
+
 
 if __name__ == "__main__":
     unittest.main()

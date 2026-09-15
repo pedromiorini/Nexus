@@ -64,8 +64,8 @@ class DeferredTaskQueue:
         self._tasks[task.task_id] = task
         return True
 
-    def consume(self, processor, max_batch: int = 1, pressure_critical: bool = False) -> Dict[str, Any]:
-        """Processa no máximo um lote finito; `processor(task)` deve retornar bool."""
+    def consume(self, processor, max_batch: int = 1, pressure_critical: bool = False, on_success=None, on_failure=None, on_discard=None) -> Dict[str, Any]:
+        """Processa um lote finito; callbacks são opcionais e nunca controlam o retry."""
         if max_batch < 1:
             raise ValueError("max_batch deve ser positivo")
         if pressure_critical:
@@ -85,10 +85,18 @@ class DeferredTaskQueue:
             if ok:
                 self.complete(task.task_id)
                 completed += 1
+                if on_success is not None:
+                    on_success(task)
             elif self.requeue(task):
                 retried += 1
+                if on_failure is not None:
+                    on_failure(task)
             else:
                 discarded += 1
+                if on_failure is not None:
+                    on_failure(task)
+                if on_discard is not None:
+                    on_discard(task)
         return {"processed": processed, "completed": completed, "retried": retried, "discarded": discarded, "blocked": False}
 
     def complete(self, task_id: str) -> None:
