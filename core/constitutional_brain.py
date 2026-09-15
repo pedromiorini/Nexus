@@ -13005,11 +13005,18 @@ class CentralRouter:
             (current_avg * (total_reqs - 1) + num_modules) / total_reqs
         )
 
+    def get_recovery_diagnostics(self, limit: int = 128, window_seconds: Optional[float] = None) -> Optional[Dict[str, Any]]:
+        """Expõe o diagnóstico de recuperação sem exigir acesso direto à ponte Vita."""
+        bridge = getattr(self, "vita_bridge", None)
+        if bridge is None or not hasattr(bridge, "get_recovery_analysis"):
+            return None
+        return bridge.get_recovery_analysis(limit=limit, window_seconds=window_seconds)
+
     def get_statistics(self) -> Dict:
         """Estatísticas de roteamento para observabilidade"""
         total_reqs = self.stats["total_requests"]
-
         return {
+
             "total_requests": total_reqs,
             "cache_hits": self.stats["cache_hits"],
             "cache_hit_rate": (
@@ -13039,6 +13046,7 @@ class CentralRouter:
                 if v > 0
             },
             "deferred_queue": self.deferred_queue.statistics(),
+            "recovery_diagnostics": self.get_recovery_diagnostics(),
             "avg_modules_per_request": self.stats["avg_modules_per_request"]
         }
 

@@ -110,6 +110,10 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(router.stats["deferred_reprocessing"]["completed"], 1)
         self.assertEqual(len(callbacks), 1)
         self.assertEqual(result["reprocessing_telemetry"]["status"], "nominal")
+        diagnostics = router.get_recovery_diagnostics()
+        self.assertIsNotNone(diagnostics)
+        self.assertIn("severity", diagnostics)
+        self.assertIn("events_analyzed", diagnostics)
 
     def test_vita_telemetry_alerts_on_discard_rate(self):
         bridge = NexusConstitutionalBridge(":memory:")
