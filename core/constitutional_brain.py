@@ -12383,7 +12383,14 @@ class CentralRouter:
             "requests_by_type": defaultdict(int),
             "module_call_count": {m: 0 for m in ModuleType},
             "module_errors": {m: 0 for m in ModuleType},
-            "avg_modules_per_request": 0
+            "avg_modules_per_request": 0,
+            "deferred_reprocessing": {
+                "attempts": 0,
+                "completed": 0,
+                "failed": 0,
+                "discarded": 0,
+                "total_latency_ms": 0.0,
+            }
         }
 
         # ─── Regras de Roteamento (otimizáveis via RSI) ───────────────────
@@ -12730,16 +12737,46 @@ class CentralRouter:
 
     def reprocess_deferred_tasks(self, max_batch: int = 1, on_success=None, on_failure=None, on_discard=None) -> Dict[str, Any]:
         """Reenvia tarefas adiadas ao fluxo cognitivo com contexto e callbacks preservados."""
+        timings = {}
+        metrics = self.stats["deferred_reprocessing"]
+
+        def elapsed(task) -> float:
+            started = timings.pop(task.task_id, time.time())
+            return (time.time() - started) * 1000
+
         def process(task) -> bool:
+            metrics["attempts"] += 1
+            timings[task.task_id] = time.time()
             context = dict(task.context)
             context.update({"_deferred_reprocess": True, "deferred_task_id": task.task_id, "deferred_attempt": task.attempts})
-            result = self.route(task.prompt, context)
+            try:
+                result = self.route(task.prompt, context)
+            except Exception as exc:
+                task.last_reason = f"{type(exc).__name__}: {exc}"
+                return False
             if result.get("success"):
                 return True
             task.last_reason = result.get("reason", result.get("error", "reprocessamento não concluído"))
             return False
 
-        return self.consume_deferred_tasks(process, max_batch=max_batch, on_success=on_success, on_failure=on_failure, on_discard=on_discard)
+        def success(task):
+            metrics["completed"] += 1
+            metrics["total_latency_ms"] += elapsed(task)
+            if on_success is not None:
+                on_success(task)
+
+        def failure(task):
+            metrics["failed"] += 1
+            metrics["total_latency_ms"] += elapsed(task)
+            if on_failure is not None:
+                on_failure(task)
+
+        def discard(task):
+            metrics["discarded"] += 1
+            if on_discard is not None:
+                on_discard(task)
+
+        return self.consume_deferred_tasks(process, max_batch=max_batch, on_success=success, on_failure=failure, on_discard=discard)
 
     def _execute_stage(
         self, 
@@ -12934,10 +12971,19 @@ class CentralRouter:
                 self.stats["cache_hits"] / total_reqs 
                 if total_reqs > 0 else 0
             ),
-            "avg_latency_ms": (
+                        "avg_latency_ms": (
                 self.stats["total_latency_ms"] / total_reqs
                 if total_reqs > 0 else 0
             ),
+            "deferred_reprocessing": {
+                **self.stats["deferred_reprocessing"],
+                "avg_latency_ms": (
+                    self.stats["deferred_reprocessing"]["total_latency_ms"] /
+                    self.stats["deferred_reprocessing"]["attempts"]
+                    if self.stats["deferred_reprocessing"]["attempts"] > 0 else 0
+                ),
+            },
+
             "requests_by_type": dict(self.stats["requests_by_type"]),
             "module_usage": {
                 k.value: v for k, v in self.stats["module_call_count"].items()

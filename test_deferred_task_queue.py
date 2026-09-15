@@ -1,6 +1,6 @@
 import unittest
-
 from core.deferred_task_queue import DeferredTaskQueue
+from core.constitutional_brain import CentralRouter
 
 
 class DeferredTaskQueueTests(unittest.TestCase):
@@ -77,6 +77,32 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(success, ["ok"])
         self.assertEqual(failure, ["bad"])
         self.assertEqual(discarded, ["bad"])
+
+    def test_router_reprocess_preserves_context_and_metrics(self):
+        router = CentralRouter.__new__(CentralRouter)
+        router.deferred_queue = DeferredTaskQueue(max_attempts=1)
+        router.stats = {"deferred_reprocessing": {
+            "attempts": 0, "completed": 0, "failed": 0,
+            "discarded": 0, "total_latency_ms": 0.0,
+        }}
+        router.vram_guard = type("Guard", (), {
+            "evaluate": lambda self: type("Decision", (), {"action": "normal"})()
+        })()
+        observed = []
+        router.route = lambda prompt, context: observed.append((prompt, context)) or {"success": True}
+        router.deferred_queue.enqueue("recover", {"trace_id": "t-1"})
+        callbacks = []
+        result = router.reprocess_deferred_tasks(
+            on_success=lambda task: callbacks.append(task.task_id)
+        )
+        self.assertEqual(result["completed"], 1)
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(observed[0][0], "recover")
+        self.assertEqual(observed[0][1]["trace_id"], "t-1")
+        self.assertTrue(observed[0][1]["_deferred_reprocess"])
+        self.assertEqual(router.stats["deferred_reprocessing"]["attempts"], 1)
+        self.assertEqual(router.stats["deferred_reprocessing"]["completed"], 1)
+        self.assertEqual(len(callbacks), 1)
 
 
 if __name__ == "__main__":
