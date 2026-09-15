@@ -35,6 +35,31 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(queue.statistics()["retried"], 1)
         self.assertEqual(queue.statistics()["completed"], 1)
 
+    def test_consume_batch_completes_tasks(self):
+        queue = DeferredTaskQueue()
+        queue.enqueue("a", priority=1)
+        queue.enqueue("b", priority=2)
+        seen = []
+        result = queue.consume(lambda task: seen.append(task.prompt) or True, max_batch=2)
+        self.assertEqual(result["completed"], 2)
+        self.assertEqual(seen, ["b", "a"])
+
+    def test_consume_retries_then_discards(self):
+        queue = DeferredTaskQueue(max_attempts=2)
+        queue.enqueue("unstable")
+        first = queue.consume(lambda task: False)
+        second = queue.consume(lambda task: False)
+        self.assertEqual(first["retried"], 1)
+        self.assertEqual(second["discarded"], 1)
+        self.assertEqual(queue.statistics()["depth"], 0)
+
+    def test_consume_blocked_by_critical_pressure(self):
+        queue = DeferredTaskQueue()
+        queue.enqueue("blocked")
+        result = queue.consume(lambda task: True, pressure_critical=True)
+        self.assertTrue(result["blocked"])
+        self.assertEqual(result["processed"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

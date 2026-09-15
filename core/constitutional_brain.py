@@ -12713,6 +12713,15 @@ class CentralRouter:
 
         return final_result
 
+    def consume_deferred_tasks(self, processor, max_batch: int = 1) -> Dict[str, Any]:
+        """Consome tarefas adiadas somente após rechecagem de pressão VRAM."""
+        decision = self.vram_guard.evaluate()
+        return self.deferred_queue.consume(
+            processor,
+            max_batch=max_batch,
+            pressure_critical=decision.action == "emergency_release",
+        )
+
     def _execute_stage(
         self, 
         modules: List[ModuleType], 

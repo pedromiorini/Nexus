@@ -55,6 +55,42 @@ class DeferredTaskQueue:
         self._stats["retried"] += 1
         return task
 
+    def requeue(self, task: DeferredTask, reason: str = "") -> bool:
+        task.last_reason = reason or task.last_reason
+        if task.attempts >= task.max_attempts:
+            self._stats["discarded"] += 1
+            return False
+        heapq.heappush(self._heap, task)
+        self._tasks[task.task_id] = task
+        return True
+
+    def consume(self, processor, max_batch: int = 1, pressure_critical: bool = False) -> Dict[str, Any]:
+        """Processa no máximo um lote finito; `processor(task)` deve retornar bool."""
+        if max_batch < 1:
+            raise ValueError("max_batch deve ser positivo")
+        if pressure_critical:
+            return {"processed": 0, "completed": 0, "retried": 0, "discarded": 0, "blocked": True}
+        processed = completed = retried = discarded = 0
+        initial_depth = min(len(self._heap), max_batch)
+        for _ in range(initial_depth):
+            task = self.recheck_and_pop(False)
+            if task is None:
+                break
+            processed += 1
+            try:
+                ok = bool(processor(task))
+            except Exception as exc:
+                ok = False
+                task.last_reason = f"{type(exc).__name__}: {exc}"
+            if ok:
+                self.complete(task.task_id)
+                completed += 1
+            elif self.requeue(task):
+                retried += 1
+            else:
+                discarded += 1
+        return {"processed": processed, "completed": completed, "retried": retried, "discarded": discarded, "blocked": False}
+
     def complete(self, task_id: str) -> None:
         self._tasks.pop(task_id, None)
         self._stats["completed"] += 1
