@@ -12741,21 +12741,26 @@ class CentralRouter:
             on_discard=on_discard,
         )
 
+    def _record_policy_transition(self, policy: Dict[str, Any], new_state: str, reason: str) -> None:
+        previous_state = policy["state"]
+        policy["state"] = new_state
+        policy["last_reason"] = reason
+        if previous_state != new_state and getattr(self, "vita_bridge", None) is not None and hasattr(self.vita_bridge, "record_policy_transition"):
+            self.vita_bridge.record_policy_transition(previous_state, new_state, reason, policy)
+
     def _reprocessing_policy_decision(self) -> Dict[str, Any]:
         """Decide se o reprocessamento pode prosseguir após uma nova leitura VRAM."""
         policy = self.stats["reprocessing_policy"]
         now = time.time()
         decision = self.vram_guard.evaluate()
         if decision.action == "emergency_release":
-            policy["state"] = "paused"
+            self._record_policy_transition(policy, "paused", decision.reason)
             policy["paused_until"] = now + policy["cooldown_seconds"]
-            policy["last_reason"] = decision.reason
             return {"allowed": False, "state": "paused", "reason": decision.reason, "vram_action": decision.action}
         if policy["state"] == "paused" and now < policy["paused_until"]:
             return {"allowed": False, "state": "paused", "reason": policy["last_reason"], "vram_action": decision.action}
         if policy["state"] == "paused":
-            policy["state"] = "active"
-            policy["last_reason"] = "cooldown_expired"
+            self._record_policy_transition(policy, "active", "cooldown_expired")
         return {"allowed": True, "state": policy["state"], "reason": policy["last_reason"], "vram_action": decision.action}
 
     def reprocess_deferred_tasks(self, max_batch: int = 1, on_success=None, on_failure=None, on_discard=None) -> Dict[str, Any]:
@@ -12812,10 +12817,10 @@ class CentralRouter:
         if telemetry and telemetry.get("alerts"):
             policy["last_reason"] = ",".join(telemetry["alerts"])
             if any(alert in telemetry["alerts"] for alert in ("reprocessing_failure_rate_high", "reprocessing_discard_rate_high")):
-                policy["state"] = "paused"
+                self._record_policy_transition(policy, "paused", policy["last_reason"])
                 policy["paused_until"] = time.time() + policy["cooldown_seconds"]
             elif "reprocessing_latency_high" in telemetry["alerts"]:
-                policy["state"] = "degraded"
+                self._record_policy_transition(policy, "degraded", policy["last_reason"])
         return {**result, "reprocessing_telemetry": telemetry, "reprocessing_policy": {**policy}}
 
     def _execute_stage(

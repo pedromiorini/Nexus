@@ -1,3 +1,7 @@
+import json
+import os
+import sqlite3
+import time
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Any
 
@@ -9,10 +13,14 @@ class NexusConstitutionalBridge:
     Incorpora métricas avançadas de Inteligência Coletiva (CIS), Sucesso Referencial (SCI) 
     e Meta-Cognição (MCS).
     """
-    def __init__(self):
+    def __init__(self, audit_db_path: Optional[str] = None):
         self.query_count = 0
         self.integration_history: List[dict] = []
         self.reprocessing_telemetry: List[dict] = []
+        self.audit_db_path = audit_db_path or os.environ.get("NEXUS_AUDIT_DB", "nexus_audit.sqlite3")
+        self._audit_db = sqlite3.connect(self.audit_db_path, check_same_thread=False)
+        self._audit_db.execute("CREATE TABLE IF NOT EXISTS policy_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, event_type TEXT NOT NULL, timestamp REAL NOT NULL, payload TEXT NOT NULL)")
+        self._audit_db.commit()
         self.reprocessing_thresholds = {
             "failure_rate": 0.50,
             "discard_rate": 0.10,
@@ -46,7 +54,35 @@ class NexusConstitutionalBridge:
         }
         self.reprocessing_telemetry.append(record)
         del self.reprocessing_telemetry[:-128]
+        self._write_audit_event("telemetry", record)
         return record
+
+    def record_policy_transition(self, previous_state: str, new_state: str, reason: str, policy: Dict[str, Any]) -> Dict[str, Any]:
+        """Persiste uma transição de política para auditoria longitudinal."""
+        event = {
+            "previous_state": previous_state,
+            "new_state": new_state,
+            "reason": reason,
+            "policy": dict(policy),
+        }
+        self._write_audit_event("policy_transition", event)
+        return event
+
+    def _write_audit_event(self, event_type: str, payload: Dict[str, Any]) -> None:
+        self._audit_db.execute(
+            "INSERT INTO policy_audit (event_type, timestamp, payload) VALUES (?, ?, ?)",
+            (event_type, time.time(), json.dumps(payload, sort_keys=True)),
+        )
+        self._audit_db.commit()
+
+    def get_policy_audit(self, limit: int = 128) -> List[Dict[str, Any]]:
+        """Retorna eventos recentes de auditoria em ordem cronológica."""
+        if limit < 1:
+            raise ValueError("limit deve ser positivo")
+        rows = self._audit_db.execute(
+            "SELECT event_type, timestamp, payload FROM policy_audit ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [{"event_type": event_type, "timestamp": timestamp, "payload": json.loads(payload)} for event_type, timestamp, payload in reversed(rows)]
 
     def get_brain_state(self, fed: Any, uci_global: float) -> dict:
         """Compatível com CompleteNexusBrain.get_status()."""

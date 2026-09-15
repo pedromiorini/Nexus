@@ -92,7 +92,7 @@ class DeferredTaskQueueTests(unittest.TestCase):
         router.vram_guard = type("Guard", (), {
             "evaluate": lambda self: type("Decision", (), {"action": "normal"})()
         })()
-        router.vita_bridge = NexusConstitutionalBridge()
+        router.vita_bridge = NexusConstitutionalBridge(":memory:")
         observed = []
         router.route = lambda prompt, context: observed.append((prompt, context)) or {"success": True}
         router.deferred_queue.enqueue("recover", {"trace_id": "t-1"})
@@ -111,7 +111,7 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(result["reprocessing_telemetry"]["status"], "nominal")
 
     def test_vita_telemetry_alerts_on_discard_rate(self):
-        bridge = NexusConstitutionalBridge()
+        bridge = NexusConstitutionalBridge(":memory:")
         record = bridge.record_reprocessing_telemetry({
             "attempts": 2, "completed": 0, "failed": 2,
             "discarded": 1, "total_latency_ms": 2400.0,
@@ -121,6 +121,15 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertIn("reprocessing_discard_rate_high", record["alerts"])
         self.assertIn("reprocessing_latency_high", record["alerts"])
         self.assertEqual(len(bridge.reprocessing_telemetry), 1)
+
+    def test_policy_transition_is_audited(self):
+        bridge = NexusConstitutionalBridge(":memory:")
+        event = bridge.record_policy_transition("active", "paused", "critical_vram", {"state": "paused"})
+        audit = bridge.get_policy_audit()
+        self.assertEqual(event["new_state"], "paused")
+        self.assertEqual(len(audit), 1)
+        self.assertEqual(audit[0]["event_type"], "policy_transition")
+        self.assertEqual(audit[0]["payload"]["reason"], "critical_vram")
 
     def test_policy_blocks_critical_vram(self):
         router = CentralRouter.__new__(CentralRouter)
@@ -154,7 +163,7 @@ class DeferredTaskQueueTests(unittest.TestCase):
         router.vram_guard = type("Guard", (), {
             "evaluate": lambda self: type("Decision", (), {"action": "normal"})()
         })()
-        router.vita_bridge = NexusConstitutionalBridge()
+        router.vita_bridge = NexusConstitutionalBridge(":memory:")
         router.route = lambda prompt, context: {"success": True}
         router.deferred_queue.enqueue("one")
         router.deferred_queue.enqueue("two")
