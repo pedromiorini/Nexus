@@ -84,39 +84,63 @@ class NexusConstitutionalBridge:
         ).fetchall()
         return [{"event_type": event_type, "timestamp": timestamp, "payload": json.loads(payload)} for event_type, timestamp, payload in reversed(rows)]
 
-    def get_recovery_analysis(self, limit: int = 128) -> Dict[str, Any]:
-        """Calcula pausas, recuperações e recorrência de eventos críticos."""
+    def get_recovery_analysis(self, limit: int = 128, window_seconds: Optional[float] = None) -> Dict[str, Any]:
+        """Calcula recuperação em uma janela opcional e classifica a severidade dos eventos."""
+        if window_seconds is not None and window_seconds <= 0:
+            raise ValueError("window_seconds deve ser positivo")
         events = self.get_policy_audit(limit)
+        if window_seconds is not None:
+            cutoff = time.time() - window_seconds
+            events = [event for event in events if event["timestamp"] >= cutoff]
         paused_at = None
         pause_durations = []
         pauses = recoveries = critical_events = 0
+        severity_counts = {"info": 0, "warning": 0, "critical": 0}
         latest_state = "active"
         for event in events:
             payload = event["payload"]
+            severity = "info"
             if event["event_type"] == "policy_transition":
                 previous = payload.get("previous_state")
                 current = payload.get("new_state")
                 latest_state = current or latest_state
+                reason = payload.get("reason", "")
                 if current == "paused" and previous != "paused":
                     pauses += 1
                     paused_at = event["timestamp"]
                     critical_events += 1
+                    severity = "critical"
                 elif current == "active" and previous == "paused":
                     recoveries += 1
                     if paused_at is not None:
                         pause_durations.append(max(0.0, event["timestamp"] - paused_at))
                     paused_at = None
+                elif current == "degraded" or "latency" in reason:
+                    severity = "warning"
             elif event["event_type"] == "telemetry":
                 alerts = payload.get("alerts", [])
                 if any(alert in alerts for alert in ("reprocessing_failure_rate_high", "reprocessing_discard_rate_high")):
                     critical_events += 1
+                    severity = "critical"
+                elif "reprocessing_latency_high" in alerts:
+                    severity = "warning"
+            severity_counts[severity] += 1
+        if severity_counts["critical"]:
+            overall_severity = "critical"
+        elif severity_counts["warning"]:
+            overall_severity = "warning"
+        else:
+            overall_severity = "info"
         return {
             "events_analyzed": len(events),
+            "window_seconds": window_seconds,
             "latest_state": latest_state,
             "pauses": pauses,
             "recoveries": recoveries,
             "recovery_rate": recoveries / pauses if pauses else 0.0,
             "critical_events": critical_events,
+            "severity": overall_severity,
+            "severity_counts": severity_counts,
             "avg_pause_seconds": sum(pause_durations) / len(pause_durations) if pause_durations else 0.0,
             "total_pause_seconds": sum(pause_durations),
             "open_pause": paused_at is not None,

@@ -1,3 +1,4 @@
+import time
 import unittest
 from core.deferred_task_queue import DeferredTaskQueue
 from core.constitutional_brain import CentralRouter
@@ -149,8 +150,12 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(analysis["recoveries"], 1)
         self.assertEqual(analysis["recovery_rate"], 1.0)
         self.assertEqual(analysis["critical_events"], 2)
+        self.assertEqual(analysis["severity"], "critical")
+        self.assertEqual(analysis["severity_counts"]["critical"], 2)
         self.assertEqual(analysis["total_pause_seconds"], 5.0)
         self.assertFalse(analysis["open_pause"])
+        with self.assertRaises(ValueError):
+            bridge.get_recovery_analysis(window_seconds=0)
 
     def test_policy_blocks_critical_vram(self):
         router = CentralRouter.__new__(CentralRouter)
