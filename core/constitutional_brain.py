@@ -12776,7 +12776,11 @@ class CentralRouter:
             if on_discard is not None:
                 on_discard(task)
 
-        return self.consume_deferred_tasks(process, max_batch=max_batch, on_success=success, on_failure=failure, on_discard=discard)
+        result = self.consume_deferred_tasks(process, max_batch=max_batch, on_success=success, on_failure=failure, on_discard=discard)
+        telemetry = None
+        if getattr(self, "vita_bridge", None) is not None and hasattr(self.vita_bridge, "record_reprocessing_telemetry"):
+            telemetry = self.vita_bridge.record_reprocessing_telemetry(metrics)
+        return {**result, "reprocessing_telemetry": telemetry}
 
     def _execute_stage(
         self, 

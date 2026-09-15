@@ -12,6 +12,41 @@ class NexusConstitutionalBridge:
     def __init__(self):
         self.query_count = 0
         self.integration_history: List[dict] = []
+        self.reprocessing_telemetry: List[dict] = []
+        self.reprocessing_thresholds = {
+            "failure_rate": 0.50,
+            "discard_rate": 0.10,
+            "avg_latency_ms": 1000.0,
+        }
+
+    def record_reprocessing_telemetry(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Registra métricas do fluxo adiado e produz alertas operacionais determinísticos."""
+        snapshot = dict(metrics)
+        attempts = int(snapshot.get("attempts", 0))
+        failed = int(snapshot.get("failed", 0))
+        discarded = int(snapshot.get("discarded", 0))
+        total_latency = float(snapshot.get("total_latency_ms", 0.0))
+        avg_latency = total_latency / attempts if attempts else 0.0
+        failure_rate = failed / attempts if attempts else 0.0
+        discard_rate = discarded / attempts if attempts else 0.0
+        alerts = []
+        if attempts and failure_rate >= self.reprocessing_thresholds["failure_rate"]:
+            alerts.append("reprocessing_failure_rate_high")
+        if attempts and discard_rate >= self.reprocessing_thresholds["discard_rate"]:
+            alerts.append("reprocessing_discard_rate_high")
+        if avg_latency >= self.reprocessing_thresholds["avg_latency_ms"]:
+            alerts.append("reprocessing_latency_high")
+        record = {
+            **snapshot,
+            "avg_latency_ms": avg_latency,
+            "failure_rate": failure_rate,
+            "discard_rate": discard_rate,
+            "alerts": alerts,
+            "status": "alert" if alerts else "nominal",
+        }
+        self.reprocessing_telemetry.append(record)
+        del self.reprocessing_telemetry[:-128]
+        return record
 
     def get_brain_state(self, fed: Any, uci_global: float) -> dict:
         """Compatível com CompleteNexusBrain.get_status()."""

@@ -1,6 +1,7 @@
 import unittest
 from core.deferred_task_queue import DeferredTaskQueue
 from core.constitutional_brain import CentralRouter
+from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
 
 
 class DeferredTaskQueueTests(unittest.TestCase):
@@ -88,6 +89,7 @@ class DeferredTaskQueueTests(unittest.TestCase):
         router.vram_guard = type("Guard", (), {
             "evaluate": lambda self: type("Decision", (), {"action": "normal"})()
         })()
+        router.vita_bridge = NexusConstitutionalBridge()
         observed = []
         router.route = lambda prompt, context: observed.append((prompt, context)) or {"success": True}
         router.deferred_queue.enqueue("recover", {"trace_id": "t-1"})
@@ -103,6 +105,19 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(router.stats["deferred_reprocessing"]["attempts"], 1)
         self.assertEqual(router.stats["deferred_reprocessing"]["completed"], 1)
         self.assertEqual(len(callbacks), 1)
+        self.assertEqual(result["reprocessing_telemetry"]["status"], "nominal")
+
+    def test_vita_telemetry_alerts_on_discard_rate(self):
+        bridge = NexusConstitutionalBridge()
+        record = bridge.record_reprocessing_telemetry({
+            "attempts": 2, "completed": 0, "failed": 2,
+            "discarded": 1, "total_latency_ms": 2400.0,
+        })
+        self.assertEqual(record["status"], "alert")
+        self.assertIn("reprocessing_failure_rate_high", record["alerts"])
+        self.assertIn("reprocessing_discard_rate_high", record["alerts"])
+        self.assertIn("reprocessing_latency_high", record["alerts"])
+        self.assertEqual(len(bridge.reprocessing_telemetry), 1)
 
 
 if __name__ == "__main__":
