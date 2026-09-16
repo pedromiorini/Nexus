@@ -23,6 +23,9 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install runtime dependencies
+        run: python -m pip install --upgrade pip numpy
+
       - name: Compile changed Python modules
         run: |
           python -m py_compile \
