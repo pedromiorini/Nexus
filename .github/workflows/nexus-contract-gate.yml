@@ -1,0 +1,56 @@
+name: Nexus Contract Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  contract-gate:
+    name: Contract and regression gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Compile changed Python modules
+        run: |
+          python -m py_compile \
+            core/constitutional_brain.py \
+            core/deferred_task_queue.py \
+            vita/nexus_constitutional_bridge_v3.py \
+            test_deferred_task_queue.py \
+            test_recovery_diagnostics_contract.py
+
+      - name: Run schema contract tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v test_recovery_diagnostics_contract.py
+
+      - name: Run deferred queue regression tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v test_deferred_task_queue.py
+
+      - name: Run integrated Nexus suite
+        env:
+          PYTHONPATH: .
+        run: python core/constitutional_brain.py
+
+      - name: Verify clean generated artifacts
+        run: |
+          rm -f nexus_audit.sqlite3
+          if find . -type f \( -name '*.sqlite3' -o -name '*.db' \) -print -quit | grep -q .; then
+            echo 'Unexpected database artifact detected'
+            exit 1
+          fi
