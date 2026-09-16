@@ -24,7 +24,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install runtime dependencies
-        run: python -m pip install --upgrade pip numpy
+        run: python -m pip install --upgrade pip numpy coverage
 
       - name: Compile changed Python modules
         run: |
@@ -39,6 +39,22 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m unittest -v test_recovery_diagnostics_contract.py
+
+      - name: Measure contract and regression coverage
+        env:
+          PYTHONPATH: .
+        run: |
+          coverage run --branch -m unittest test_recovery_diagnostics_contract.py test_deferred_task_queue.py
+          coverage report --fail-under=0
+          coverage xml -o coverage.xml
+
+      - name: Retain coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-contract-coverage
+          path: coverage.xml
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Run deferred queue regression tests
         env:
