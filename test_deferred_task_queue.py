@@ -120,6 +120,12 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(decoded["schema"], "nexus.recovery.diagnostics.v1")
         self.assertIn("diagnostics", decoded)
         self.assertIn("events", decoded)
+        validation = router.validate_recovery_diagnostics(exported)
+        self.assertTrue(validation["valid"])
+        self.assertTrue(validation["compatible"])
+        invalid = router.validate_recovery_diagnostics({"schema": "nexus.recovery.diagnostics.v9"})
+        self.assertFalse(invalid["valid"])
+        self.assertFalse(invalid["compatible"])
 
     def test_vita_telemetry_alerts_on_discard_rate(self):
         bridge = NexusConstitutionalBridge(":memory:")
@@ -170,6 +176,8 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(snapshot["schema"], "nexus.recovery.diagnostics.v1")
         self.assertEqual(snapshot["diagnostics"]["severity"], "critical")
         self.assertEqual(len(snapshot["events"]), 3)
+        self.assertTrue(bridge.validate_recovery_diagnostics(snapshot)["valid"])
+        self.assertFalse(bridge.validate_recovery_diagnostics("not-json")["valid"])
 
     def test_policy_blocks_critical_vram(self):
         router = CentralRouter.__new__(CentralRouter)

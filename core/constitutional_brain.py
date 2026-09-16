@@ -13019,6 +13019,13 @@ class CentralRouter:
             return None
         return bridge.export_recovery_diagnostics(limit=limit, window_seconds=window_seconds, as_json=as_json)
 
+    def validate_recovery_diagnostics(self, payload: Any) -> Optional[Dict[str, Any]]:
+        """Valida um snapshot exportado sem expor a implementação da ponte Vita."""
+        bridge = getattr(self, "vita_bridge", None)
+        if bridge is None or not hasattr(bridge, "validate_recovery_diagnostics"):
+            return None
+        return bridge.validate_recovery_diagnostics(payload)
+
     def get_statistics(self) -> Dict:
         """Estatísticas de roteamento para observabilidade"""
         total_reqs = self.stats["total_requests"]

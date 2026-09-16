@@ -6,6 +6,8 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple, Any
 
 class NexusConstitutionalBridge:
+    RECOVERY_SCHEMA = "nexus.recovery.diagnostics.v1"
+    SUPPORTED_RECOVERY_SCHEMA_VERSIONS = (1,)
     """
     Nexus Constitutional Bridge v3.0 (Fase 50 - Plenitude Eterna)
     
@@ -149,7 +151,7 @@ class NexusConstitutionalBridge:
     def export_recovery_diagnostics(self, limit: int = 128, window_seconds: Optional[float] = None, as_json: bool = False):
         """Exporta um snapshot versionado para consumidores externos de observabilidade."""
         payload = {
-            "schema": "nexus.recovery.diagnostics.v1",
+            "schema": self.RECOVERY_SCHEMA,
             "generated_at": time.time(),
             "source": "NexusConstitutionalBridge",
             "diagnostics": self.get_recovery_analysis(limit=limit, window_seconds=window_seconds),
@@ -157,7 +159,38 @@ class NexusConstitutionalBridge:
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":")) if as_json else payload
 
+    def validate_recovery_diagnostics(self, payload: Any) -> Dict[str, Any]:
+        """Valida estrutura, tipos essenciais e compatibilidade do schema exportado."""
+        errors = []
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except json.JSONDecodeError:
+                return {"valid": False, "compatible": False, "errors": ["invalid_json"]}
+        if not isinstance(payload, dict):
+            return {"valid": False, "compatible": False, "errors": ["payload_must_be_object"]}
+        schema = payload.get("schema")
+        compatible = schema == self.RECOVERY_SCHEMA
+        if not compatible:
+            errors.append("unsupported_schema")
+        for field in ("schema", "generated_at", "source", "diagnostics", "events"):
+            if field not in payload:
+                errors.append(f"missing_{field}")
+        diagnostics = payload.get("diagnostics")
+        if not isinstance(diagnostics, dict):
+            errors.append("diagnostics_must_be_object")
+        else:
+            for field in ("severity", "severity_counts", "events_analyzed", "recovery_rate"):
+                if field not in diagnostics:
+                    errors.append(f"missing_diagnostics_{field}")
+            if diagnostics.get("severity") not in {"info", "warning", "critical"}:
+                errors.append("invalid_severity")
+        if not isinstance(payload.get("events"), list):
+            errors.append("events_must_be_array")
+        return {"valid": not errors, "compatible": compatible, "schema": schema, "errors": errors}
+
     def get_brain_state(self, fed: Any, uci_global: float) -> dict:
+
         """Compatível com CompleteNexusBrain.get_status()."""
         self.query_count += 1
         all_inst = fed._all_instances()
