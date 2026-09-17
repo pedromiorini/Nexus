@@ -384,13 +384,14 @@ class RealHierarchicalMemory:
                 placeholders = " OR ".join(["content LIKE ?" for _ in keywords])
                 patterns = [f"%{kw}%" for kw in keywords]
 
-                cursor.execute(f"""
-                    SELECT id, content, importance, memory_type, access_count
-                    FROM memories
-                    WHERE {placeholders}
-                    ORDER BY importance DESC, access_count DESC
-                    LIMIT ?
-                """, patterns + [limit])
+                # A estrutura usa somente placeholders derivados da contagem de
+                # palavras; conteúdo e limite continuam vinculados por parâmetros.
+                query = (
+                    "SELECT id, content, importance, memory_type, access_count "
+                    "FROM memories WHERE " + placeholders + " "
+                    "ORDER BY importance DESC, access_count DESC LIMIT ?"
+                )
+                cursor.execute(query, patterns + [limit])
 
             results = []
             for row in cursor.fetchall():
@@ -3533,7 +3534,7 @@ class RealToolUse:
         """Criar chave de cache para resultado"""
         import json
         params_str = json.dumps(params, sort_keys=True)
-        return hashlib.md5(f"{tool_name}:{params_str}".encode()).hexdigest()
+        return hashlib.sha256(f"{tool_name}:{params_str}".encode()).hexdigest()
 
     def _execute_math_calculate(self, params: Dict[str, Any]) -> Any:
         """Executar cálculo matemático seguro"""
@@ -12568,7 +12569,7 @@ class CentralRouter:
         estimated_cost = sum(module_costs.get(m, 5) for m in modules_required)
 
         # ─── Cache key ─────────────────────────────────────────────────────
-        cache_key = hashlib.md5(
+        cache_key = hashlib.sha256(
             f"{prompt}:{request_type.value}".encode()
         ).hexdigest()
 

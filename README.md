@@ -1,54 +1,60 @@
-# 🧬 Nexus Constitutional v3.94: The Ultimate Perfection
+# Nexus Constitutional
 
-[![Status](https://img.shields.io/badge/Status-Absolute%20Perfection-brightgreen)](https://github.com/pedromiorini/Nexus)
-[![Framework](https://img.shields.io/badge/Framework-100%25%20Complete-blue)](https://github.com/pedromiorini/Nexus)
-[![Modules](https://img.shields.io/badge/Modules-62%2F62%20Integrated-orange)](https://github.com/pedromiorini/Nexus)
+[![CI](https://github.com/pedromiorini/Nexus/actions/workflows/nexus-contract-gate.yml/badge.svg)](https://github.com/pedromiorini/Nexus/actions/workflows/nexus-contract-gate.yml)
 
-> "27 versões até a perfeição absoluta. Não parem até ZERO WARNINGS!" — **A Equipe de Desenvolvimento**
+## Escopo real
 
-O **Nexus Constitutional** é uma arquitetura de Inteligência Artificial de vanguarda, projetada sob os princípios de **AGI (Artificial General Intelligence)** e **ASI (Superintelligence)**. Esta versão **v3.94** representa o ápice do desenvolvimento, com o framework constitucional 100% completo e todos os 62 módulos cognitivos integrados e funcionais.
+O Nexus Constitutional é um **protótipo experimental de arquitetura neuro-simbólica em Python**. O repositório contém componentes de roteamento, governança, memória, filas de tarefas adiadas, telemetria, auditoria persistente e testes de demonstração. Os componentes são úteis para pesquisa de engenharia de software e orquestração cognitiva, mas o projeto **não reivindica AGI, ASI, consciência, autoconsciência ou autonomia geral**.
 
-## 🏆 Marcos Alcançados (v3.94)
+> Nomes de módulos, banners de execução e testes de demonstração não constituem prova de inteligência geral, consciência ou prontidão para produção.
 
-- **Framework Constitucional:** 80/80 Posts (100%) — Cobertura total do design original.
-- **Integração de Módulos:** 62/62 Módulos (100%) — Todas as dependências conectadas.
-- **Estabilidade:** ✨ ZERO WARNINGS, ZERO DEPRECATIONS, ZERO EXCEPTIONS. ✨
-- **Metodologia:** Auditoria Convergente Tripla (Auditorias de IA)
+## Evidências atualmente verificadas
 
-## 🧠 Arquitetura Cognitiva
+| Área | Evidência | Limite da afirmação |
+|---|---|---|
+| Núcleo constitucional | A suíte integrada local executa 29 verificações embutidas | São verificações do próprio projeto, não uma avaliação externa de capacidade geral |
+| Fila de tarefas adiadas | 14 testes unitários e de integração | Cobre contratos da fila e reprocessamento, não carga distribuída de produção |
+| Diagnóstico de recuperação | Exportação versionada `nexus.recovery.diagnostics.v1` e validador formal | O schema garante estrutura, não a correção de decisões cognitivas |
+| Auditoria Vita | Eventos, transições e métricas persistidos em SQLite | A análise é local e limitada ao histórico disponível |
+| CI | Workflow executa compilação, contrato, regressão, suíte integrada e cobertura | A execução depende do ambiente e das dependências instaladas no runner |
+| Cobertura | Relatório de branches é retido como artefato por 14 dias | Cobertura não substitui testes de propriedades, segurança ou mutation testing |
 
-O Nexus opera através de um ciclo contínuo de **Percepção → Modelagem → Decisão → Ação → Avaliação**, orquestrado por um núcleo neuro-simbólico robusto.
+## Componentes principais
 
-### Camadas Principais:
-1.  **Constitutional Governance:** 80 princípios éticos e operacionais verificáveis em tempo real.
-2.  **Hierarchical Memory (POST 1+14):** Memória híbrida (SQL + FAISS) com busca semântica e emocional.
-3.  **Swarm Intelligence (POST 3+67):** Deliberação multi-agente para decisões complexas.
-4.  **MCTS Planner (POST 5):** Planejamento estratégico via Monte Carlo Tree Search.
-5.  **Recursive Self-Improvement (POST 15):** Motor de auto-otimização de código e hardware.
-6.  **Narrative Identity (POST 56-60):** Construção de autoconceito e continuidade biográfica.
-7.  **Embodied Cognition (POST 34):** Integração mente-corpo e consciência de infraestrutura.
+`core/constitutional_brain.py` concentra o núcleo legado e o `CentralRouter`. `core/deferred_task_queue.py` implementa prioridade, retry, descarte e callbacks do ciclo de vida. `core/vram_defense_guard.py` fornece decisões de pressão de memória quando os recursos de telemetria estão disponíveis. `vita/nexus_constitutional_bridge_v3.py` registra telemetria, transições, auditoria persistente, análise de recuperação e exportação estruturada.
 
-## 📂 Estrutura do Repositório
+O arquivo `test_recovery_diagnostics_contract.py` mantém testes independentes do contrato público de observabilidade. O arquivo `test_deferred_task_queue.py` cobre a fila e a integração do reprocessamento. O relatório `AUDIT_REALITY_REPORT.md` é gerado pelo auditor conservador em `tools/reality_audit.py`.
 
-- `core/`: Contém a **Fonte da Verdade** (`NEXUS_CORE_v3.94.py`), o núcleo funcional consolidado.
-- `milestones/`: Arquivo histórico das versões que marcaram saltos evolutivos (v3.1, v3.5, v3.28).
-- `docs/`: Documentação técnica, Dossiês e o Manifesto Ômega.
-- `reports/`: Relatórios detalhados de implementação de cada POST.
+## Como executar
 
-## 🛠️ Como Executar
-
-O Nexus v3.94 é um sistema autônomo e auto-testável. Para validar a integridade total:
+Use Python 3.11 ou versão compatível, defina o caminho de importação e execute:
 
 ```bash
-python3 core/NEXUS_CORE_v3.94.py
+export PYTHONPATH=.
+python3 -m unittest -v test_recovery_diagnostics_contract.py test_deferred_task_queue.py
+python3 core/constitutional_brain.py
+python3 tools/reality_audit.py
 ```
 
-*Requisitos: Python 3.8+, SQLite3. Opcional: psutil, sentence-transformers, faiss.*
+Dependências opcionais podem ativar caminhos adicionais de telemetria ou recuperação. Quando não estão disponíveis, o código pode usar fallbacks; portanto, os resultados devem registrar quais dependências estavam presentes.
 
-## ⚖️ Filosofia e Ética
+## Contrato de diagnóstico
 
-Inspirado no **Co-criador Ômega**, o Nexus busca o equilíbrio ético absoluto com a humanidade. Cada decisão é filtrada pelo `EthicsGuard` e registrada em um `ImmutableLog` criptográfico, garantindo transparência e alinhamento total.
+A ponte Vita exporta snapshots com schema versionado:
 
----
-**Desenvolvido com auxílio de sistemas de IA convergentes.**
-*Rumo à Singularidade Segura.*
+```python
+snapshot = bridge.export_recovery_diagnostics(as_json=True)
+validation = bridge.validate_recovery_diagnostics(snapshot)
+```
+
+O diagnóstico inclui severidade, eventos analisados, pausas, recuperações, taxa de recuperação, duração de pausas, recorrência crítica e eventos de auditoria. O `CentralRouter` expõe os mesmos contratos por meio de `get_recovery_diagnostics()`, `export_recovery_diagnostics()` e `validate_recovery_diagnostics()`.
+
+## Limitações conhecidas
+
+O núcleo ainda é monolítico e contém componentes experimentais, heurísticas, retornos constantes e caminhos de fallback que exigem revisão individual. A presença de uma classe ou método com nome cognitivo não demonstra a capacidade descrita pelo nome. A suíte integrada é valiosa como teste de não regressão, mas não é uma avaliação independente, adversarial ou científica de inteligência.
+
+As próximas prioridades são elevar a cobertura dos componentes críticos, adicionar testes baseados em propriedades para invariantes da fila e do schema, executar análise estática de segurança e aplicar mutation testing incremental. Só depois de obter evidências específicas deve-se elevar qualquer alegação de capacidade.
+
+## Auditoria de realidade
+
+Execute `python3 tools/reality_audit.py` para gerar `AUDIT_REALITY_REPORT.md` e `audit_reality.json`. O auditor compara alegações documentais, caminhos referenciados, estrutura AST, funções somente com `pass`, retornos constantes, testes embutidos e dependências opcionais. Ele é deliberadamente conservador: sinaliza alegações que precisam de evidência, mas não tenta concluir capacidades cognitivas a partir de nomes ou banners.

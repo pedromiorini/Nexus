@@ -24,7 +24,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install runtime dependencies
-        run: python -m pip install --upgrade pip numpy coverage
+        run: python -m pip install --upgrade pip numpy coverage hypothesis bandit
 
       - name: Compile changed Python modules
         run: |
@@ -33,18 +33,38 @@ jobs:
             core/deferred_task_queue.py \
             vita/nexus_constitutional_bridge_v3.py \
             test_deferred_task_queue.py \
-            test_recovery_diagnostics_contract.py
+            test_recovery_diagnostics_contract.py \
+            test_reality_audit.py \
+            test_deferred_task_properties.py
 
       - name: Run schema contract tests
         env:
           PYTHONPATH: .
         run: python -m unittest -v test_recovery_diagnostics_contract.py
 
+      - name: Run reality audit tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v test_reality_audit.py
+
+      - name: Generate reality audit report
+        run: python tools/reality_audit.py
+
+      - name: Retain reality audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-reality-audit
+          path: |
+            AUDIT_REALITY_REPORT.md
+            audit_reality.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Measure contract and regression coverage
         env:
           PYTHONPATH: .
         run: |
-          coverage run --branch -m unittest test_recovery_diagnostics_contract.py test_deferred_task_queue.py
+          coverage run --branch -m unittest test_recovery_diagnostics_contract.py test_deferred_task_queue.py test_reality_audit.py test_deferred_task_properties.py
           coverage report --fail-under=0
           coverage xml -o coverage.xml
 
@@ -60,6 +80,22 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m unittest -v test_deferred_task_queue.py
+
+      - name: Run deferred queue property tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v test_deferred_task_properties.py
+
+      - name: Run static security scan
+        run: bandit -r core vita tools -f json -o bandit-report.json || true
+
+      - name: Retain security scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-bandit-report
+          path: bandit-report.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Run integrated Nexus suite
         env:
