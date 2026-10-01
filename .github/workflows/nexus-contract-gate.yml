@@ -35,7 +35,13 @@ jobs:
             test_deferred_task_queue.py \
             test_recovery_diagnostics_contract.py \
             test_reality_audit.py \
-            test_deferred_task_properties.py
+            test_deferred_task_properties.py \
+            test_deferred_task_snapshot.py \
+            test_memory_sql_contract.py \
+            test_security_triage.py \
+            tools/diagnostics_dashboard.py \
+            tools/security_triage.py \
+            tools/targeted_mutation.py
 
       - name: Run schema contract tests
         env:
@@ -64,8 +70,10 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          coverage run --branch -m unittest test_recovery_diagnostics_contract.py test_deferred_task_queue.py test_reality_audit.py test_deferred_task_properties.py
+          coverage run --branch -m unittest test_recovery_diagnostics_contract.py test_deferred_task_queue.py test_deferred_task_snapshot.py test_memory_sql_contract.py test_reality_audit.py test_deferred_task_properties.py test_security_triage.py
           coverage report --fail-under=0
+          coverage report --include='core/deferred_task_queue.py' --fail-under=90
+          coverage report --include='vita/nexus_constitutional_bridge_v3.py' --fail-under=70
           coverage xml -o coverage.xml
 
       - name: Retain coverage report
@@ -76,6 +84,18 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Run deferred queue snapshot contract tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v test_deferred_task_snapshot.py
+      - name: Run expanded contract tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v test_memory_sql_contract.py test_security_triage.py
+      - name: Run targeted mutation gate
+        env:
+          PYTHONPATH: .
+        run: python tools/targeted_mutation.py
       - name: Run deferred queue regression tests
         env:
           PYTHONPATH: .
@@ -89,11 +109,15 @@ jobs:
       - name: Run static security scan
         run: bandit -r core vita tools -f json -o bandit-report.json || true
 
+      - name: Generate security triage
+        run: python tools/security_triage.py bandit-report.json security-triage-generated.md
       - name: Retain security scan report
         uses: actions/upload-artifact@v4
         with:
           name: nexus-bandit-report
-          path: bandit-report.json
+          path: |
+            bandit-report.json
+            security-triage-generated.md
           if-no-files-found: error
           retention-days: 14
 

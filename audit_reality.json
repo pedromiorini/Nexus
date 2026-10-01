@@ -414,6 +414,10 @@
       "exists": true
     },
     {
+      "path": "test_deferred_task_snapshot.py",
+      "exists": true
+    },
+    {
       "path": "tools/reality_audit.py",
       "exists": true
     }

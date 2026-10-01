@@ -49,6 +49,25 @@ validation = bridge.validate_recovery_diagnostics(snapshot)
 
 O diagnóstico inclui severidade, eventos analisados, pausas, recuperações, taxa de recuperação, duração de pausas, recorrência crítica e eventos de auditoria. O `CentralRouter` expõe os mesmos contratos por meio de `get_recovery_diagnostics()`, `export_recovery_diagnostics()` e `validate_recovery_diagnostics()`.
 
+## Snapshot da fila de tarefas adiadas
+
+A `DeferredTaskQueue` expõe `export_snapshot(as_json=True)` e `restore_snapshot(snapshot, replace=False)` para transportar tarefas pendentes entre processos ou pontos de recuperação. O contrato é versionado como `nexus.deferred_task_queue.v1` e preserva prioridade, contexto, tentativas, razão, IDs e ordem de criação. A restauração valida o payload inteiro antes de alterar a fila, rejeita schema incompatível, IDs duplicados, tipos inválidos e excesso de capacidade, e não executa processadores ou callbacks.
+
+Esse recurso **não é persistência física em disco**, não oferece locking distribuído e não garante entrega exatamente uma vez. O consumidor deve armazenar o JSON, controlar concorrência e decidir quando usar `replace=True` para substituir uma fila em memória. Exemplos mínimos:
+
+```python
+snapshot = queue.export_snapshot(as_json=True)
+recovered = DeferredTaskQueue(max_attempts=3, max_size=256)
+recovered.restore_snapshot(snapshot)
+```
+
+Verifique o contrato com:
+
+```bash
+export PYTHONPATH=.
+python3 -m unittest -v test_deferred_task_snapshot.py
+```
+
 ## Limitações conhecidas
 
 O núcleo ainda é monolítico e contém componentes experimentais, heurísticas, retornos constantes e caminhos de fallback que exigem revisão individual. A presença de uma classe ou método com nome cognitivo não demonstra a capacidade descrita pelo nome. A suíte integrada é valiosa como teste de não regressão, mas não é uma avaliação independente, adversarial ou científica de inteligência.

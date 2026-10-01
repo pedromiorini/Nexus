@@ -31,6 +31,7 @@ O núcleo analisado possui **26500 linhas**, **267 classes** e **842 funções**
 - `test_deferred_task_queue.py`: existe.
 - `core/constitutional_brain.py`: existe.
 - `tools/reality_audit.py`: existe.
+- `test_deferred_task_snapshot.py`: existe.
 - `tools/reality_audit.py`: existe.
 
 ## Riscos prioritários

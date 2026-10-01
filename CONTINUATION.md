@@ -1,86 +1,59 @@
 # Nexus — Continuidade entre agentes
 
-> Este arquivo é o handoff operacional do projeto. Atualize-o no mesmo commit de cada marco relevante para que outro agente Manus possa continuar sem depender do histórico da conversa.
+> Handoff operacional versionado para continuidade entre agentes Manus.
 
 ## Estado atual
 
-- **Branch de trabalho:** `main`
-- **Remoto:** `https://github.com/pedromiorini/Nexus`
-- **Último estado remoto conhecido:** `d598c79` (`security: add conservative Bandit triage report`)
-- **Commit local pendente:** o commit mais recente contém `ci: enforce critical coverage and targeted mutation gates`; ele altera apenas o workflow e exige escopo GitHub `workflow` para publicação.
-- **Fase:** endurecimento de qualidade, operacionalização de diagnósticos e triagem de segurança.
+- **Branch:** `main`
+- **Base remota sincronizada:** `origin/main` em `0bfec12` (`test: cover memory SQL fallback injection boundary`)
+- **Marco local desta rodada:** integração dos artefatos remotos de qualidade, contrato de snapshot da fila e gates locais de cobertura/mutation.
+- **Publicação:** o workflow atualizado ainda depende da tentativa de push com escopo GitHub `workflow`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
-## O que já está implementado
+## O que está implementado
 
-- Reprocessamento de tarefas adiadas no `CentralRouter`, com preservação de contexto, callbacks e telemetria.
+- Reprocessamento de tarefas adiadas no `CentralRouter`, preservando contexto, callbacks e telemetria.
 - Auditoria persistente SQLite e análise longitudinal no bridge Vita.
 - Exportação/validação do contrato `nexus.recovery.diagnostics.v1`.
-- `tools/diagnostics_dashboard.py`: dashboard CLI determinístico que valida o snapshot antes de renderizar severidade, pausas, recuperação e eventos observáveis.
-- `tools/security_triage.py`: inventário conservador dos achados Bandit; não suprime nem marca achados como corrigidos automaticamente.
-- `SECURITY_TRIAGE.md`: relatório versionado dos achados atuais e suas disposições de revisão.
-- Teste adversarial `test_memory_sql_contract.py` para demonstrar que aspas e tokens SQL são tratados como dados no fallback parametrizado da memória.
+- `tools/diagnostics_dashboard.py`: dashboard CLI determinístico que valida snapshots antes de renderizar métricas observáveis.
+- `tools/security_triage.py` e `SECURITY_TRIAGE.md`: inventário conservador dos achados Bandit, sem supressão automática.
+- `test_memory_sql_contract.py`: teste adversarial para a fronteira SQL do fallback parametrizado da memória.
+- `tools/targeted_mutation.py`: mutation testing direcionado para fila, Vita e schema.
+- `core/deferred_task_queue.py`: snapshot versionado `nexus.deferred_task_queue.v1`, exportação JSON/objeto, restauração atômica, validação de tipos/capacidade/IDs e opção `replace=True`.
+- `test_deferred_task_snapshot.py`: contrato de round-trip, ordem, atomicidade, limites, tipos inválidos e ausência de execução durante restauração.
 - Auditoria de realidade em `tools/reality_audit.py`.
-- Testes de contrato, regressão, Hypothesis, Bandit e cobertura no workflow `.github/workflows/nexus-contract-gate.yml`.
-- Mutation testing direcionado em fila, Vita e schema.
 
-## Trabalho desta rodada
+## Gates locais desta rodada
 
-1. Manter este arquivo versionado e atualizá-lo após cada marco.
-2. Publicar o teste SQL e o handoff sem incluir o workflow pendente.
-3. Publicar o workflow quando a credencial GitHub tiver escopo `workflow`.
-4. Fazer triagem futura dos achados Bandit sem mascarar riscos reais.
+- **50 testes unitários/property/contrato/triagem/SQL:** passaram.
+- **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%).
+- **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
+- **Bandit:** **133 achados** preservados e classificados: 132 LOW, 1 MEDIUM; B608 permanece revisão prioritária.
+- **Auditoria de realidade:** executada sem elevar claims cognitivos.
+- **Dashboard:** snapshot válido renderizado; payload inválido rejeitado pelos testes.
+- **Compilação Python:** passou para módulos, ferramentas e testes alterados.
 
-## Decisões e limites
+## Gates do workflow local
 
-- Thresholds críticos: fila ≥90%; bridge Vita ≥70%; medidos com `coverage.py`.
+O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
+
+- compilar os novos testes e utilitários;
+- executar os contratos SQL, segurança e snapshot;
+- exigir fila >=90% e bridge Vita >=70%;
+- executar mutation testing direcionado;
+- gerar e reter o relatório de triagem Bandit junto ao JSON.
+
+O workflow remoto em `0bfec12` ainda não contém essas alterações até que a publicação seja autorizada pelo escopo da credencial.
+
+## Limites e decisões
+
+- Snapshot é contrato de transporte; não é persistência física em disco, locking distribuído ou garantia exactly-once.
 - Mutation testing é direcionado e não muta o núcleo monolítico inteiro.
-- O dashboard só exibe métricas observáveis e rejeita snapshots inválidos; não infere capacidade cognitiva.
-- A concatenação marcada pelo B608 monta somente a estrutura de placeholders; valores e limite continuam parametrizados. O teste adversarial documenta o comportamento, mas não fecha a revisão de segurança do núcleo legado.
-- A triagem Bandit é classificação operacional, não autorização de supressão; qualquer correção exige revisão e testes.
-- Relatórios gerados (`coverage.xml`, JSON de mutation, SQLite temporário) não devem ser commitados; `SECURITY_TRIAGE.md` é uma evidência textual reproduzível.
-- Não expor tokens, credenciais ou conteúdo de `.env` em commits, logs ou handoffs.
+- O dashboard exibe apenas métricas observáveis e não infere capacidade cognitiva.
+- A concatenação marcada pelo B608 monta somente placeholders; valores e limites permanecem parametrizados, mas a revisão manual continua aberta.
+- Relatórios gerados (`coverage.xml`, JSON de mutation, SQLite temporário e saídas Bandit) não devem ser commitados.
+- Não expor tokens, credenciais ou conteúdo de `.env`.
 
-## Comandos de validação
+## Próxima ação
 
-```bash
-export PYTHONPATH=.
-python -m unittest -v test_memory_sql_contract.py test_recovery_diagnostics_contract.py test_deferred_task_queue.py test_reality_audit.py test_deferred_task_properties.py test_security_triage.py
-coverage run --branch -m unittest test_recovery_diagnostics_contract.py test_deferred_task_queue.py test_reality_audit.py test_deferred_task_properties.py test_security_triage.py test_memory_sql_contract.py
-coverage report --include='core/deferred_task_queue.py,vita/nexus_constitutional_bridge_v3.py'
-python tools/targeted_mutation.py
-python tools/reality_audit.py
-python core/constitutional_brain.py
-bandit -r core vita tools -f json -o bandit-report.json || true
-python tools/security_triage.py bandit-report.json SECURITY_TRIAGE.md
-```
-
-Para renderizar um snapshot exportado:
-
-```bash
-python tools/diagnostics_dashboard.py snapshot.json
-# ou
-cat snapshot.json | python tools/diagnostics_dashboard.py -
-```
-
-## Resultado da última validação
-
-- **40 testes unitários/property/contrato/triagem/SQL:** passaram.
-- **Cobertura branch dos módulos críticos:** `core/deferred_task_queue.py` **92,56%** (threshold **90%**); `vita/nexus_constitutional_bridge_v3.py` **70,69%** (threshold **70%**); total crítico **78%**.
-- **Mutation testing direcionado:** **10/10 mutações mortas, 0 sobreviventes, 100%**, cobrindo fila, telemetria Vita e validação do schema.
-- **SQL:** teste adversarial passou; nenhum código legado foi alterado sem evidência adicional.
-- **Dashboard:** renderização e rejeição de payload inválido cobertas por testes.
-- **Triagem Bandit:** **133 achados preservados e classificados**, incluindo o B608 de SQL dinâmico como revisão prioritária; nenhum achado foi suprimido.
-- **CI remoto:** workflow `Nexus Contract Gate`, run `36818099481` para `d598c79`, terminou em **success** em 20 segundos. Todos os passos passaram.
-- **Avisos do CI:** depreciação futura do Node.js 20 nas actions atuais e migração futura de `ubuntu-latest` para Ubuntu 26; não bloquearam o run.
-- **Auditoria de realidade:** executada; continua identificando alegações não comprovadas e riscos conhecidos, sem elevar claims.
-- **Suíte integrada:** passou, mas seus banners são demos internas e não evidência independente de capacidade cognitiva.
-- **Publicação parcial:** testes, mutation harness, dashboard, triagem e handoff estão publicados; alterações de workflow permanecem locais por exigirem escopo `workflow`.
-
-## Próximo agente
-
-1. Ler este arquivo e `git status --short --branch`.
-2. Verificar se há mutações/artefatos temporários pendentes.
-3. Reexecutar os comandos de validação acima.
-4. Se modificar código, atualizar este arquivo no mesmo commit e registrar o novo SHA.
-5. Confirmar `git status` limpo e `git branch -vv` sincronizado antes de encerrar.
+Após publicar o commit local, verificar o run do workflow remoto. Se o push for rejeitado por escopo `workflow`, manter o commit local e solicitar uma credencial GitHub com esse escopo antes de publicar o workflow.
