@@ -5,9 +5,9 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `477a59a` (`ci: integrate continuity quality gates and queue snapshots`)
-- **Marco publicado desta rodada:** integração dos artefatos remotos de qualidade, contrato de snapshot da fila e gates de cobertura/mutation.
-- **CI remoto:** run `36819282235` terminou com `success`; todos os passos passaram.
+- **Base remota sincronizada:** `origin/main` em `888d7a5` (`security: harden keyword memory SQL fallback`)
+- **Marco publicado desta rodada:** hardening do fallback SQL, teste adversarial multi-termo e atualização da triagem Bandit.
+- **CI remoto:** run `36819675496` terminou com `success`; todos os passos passaram.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -45,7 +45,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - gerar e reter o relatório de triagem Bandit junto ao JSON.
 - validar a busca SQL multi-termo e o limite no teste adversarial de memória.
 
-O workflow endurecido está publicado em `477a59a`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
+O workflow endurecido está publicado em `888d7a5`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
 
 ## Limites e decisões
 
