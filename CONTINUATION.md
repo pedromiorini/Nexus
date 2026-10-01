@@ -5,9 +5,9 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `888d7a5` (`security: harden keyword memory SQL fallback`)
-- **Marco publicado desta rodada:** hardening do fallback SQL, teste adversarial multi-termo e atualização da triagem Bandit.
-- **CI remoto:** run `36819675496` terminou com `success`; todos os passos passaram.
+- **Base remota sincronizada:** `origin/main` em `eca8fc4` (`security: narrow error correction exception handling`)
+- **Marco publicado desta rodada:** estreitamento das exceções do motor de correção, contrato de fallback e atualização da triagem Bandit.
+- **CI remoto:** run `36820012209` terminou com `success`; todos os passos passaram.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -47,7 +47,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - validar a busca SQL multi-termo e o limite no teste adversarial de memória.
 - validar o fallback original do motor de correção para descrições malformadas.
 
-O workflow endurecido está publicado em `888d7a5`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
+O workflow endurecido está publicado em `eca8fc4`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
 
 ## Limites e decisões
 
