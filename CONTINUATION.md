@@ -6,9 +6,9 @@
 
 - **Branch de trabalho:** `main`
 - **Remoto:** `https://github.com/pedromiorini/Nexus`
-- **Último estado remoto conhecido antes desta rodada:** `7f941db` (`audit: verify capabilities and harden quality gates`)
-- **Commit local desta rodada:** o commit mais recente da branch local (`git log -1`) contém `ci: enforce critical coverage and targeted mutation gates`.
-- **Fase:** endurecimento de qualidade; cobertura crítica e mutation testing direcionado.
+- **Último estado remoto conhecido:** `9809ddd` (`test: publish quality harness and continuation handoff`)
+- **Commit local pendente:** o commit mais recente contém `ci: enforce critical coverage and targeted mutation gates`; ele altera apenas o workflow e exige escopo GitHub `workflow` para publicação.
+- **Fase:** endurecimento de qualidade e operacionalização de diagnósticos.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que já está implementado
@@ -16,23 +16,23 @@
 - Reprocessamento de tarefas adiadas no `CentralRouter`, com preservação de contexto, callbacks e telemetria.
 - Auditoria persistente SQLite e análise longitudinal no bridge Vita.
 - Exportação/validação do contrato `nexus.recovery.diagnostics.v1`.
+- `tools/diagnostics_dashboard.py`: dashboard CLI determinístico que valida o snapshot antes de renderizar severidade, pausas, recuperação e eventos observáveis.
 - Auditoria de realidade em `tools/reality_audit.py`.
 - Testes de contrato, regressão, Hypothesis, Bandit e cobertura no workflow `.github/workflows/nexus-contract-gate.yml`.
-- Testes adicionais da fila e do contrato Vita restaurados/adicionados nesta rodada.
+- Mutation testing direcionado em fila, Vita e schema.
 
 ## Trabalho desta rodada
 
 1. Manter este arquivo versionado e atualizá-lo após cada marco.
-2. Definir thresholds graduais de cobertura para `core/deferred_task_queue.py` e `vita/nexus_constitutional_bridge_v3.py`.
-3. Expandir `tools/targeted_mutation.py` para fila, telemetria Vita e validação de schema.
-4. Executar suíte completa, mutation testing, auditoria e validação local do YAML.
-5. Commitar e sincronizar a branch `main`; registrar SHA e resultados abaixo.
+2. Publicar o dashboard e seus testes sem incluir o workflow pendente.
+3. Publicar o workflow quando a credencial GitHub tiver escopo `workflow`.
+4. Fazer triagem futura dos achados Bandit sem mascarar riscos reais.
 
 ## Decisões e limites
 
-- Thresholds devem ser mensuráveis pelo `coverage.py`, inicialmente conservadores e explícitos; subir valores somente após medir a suíte no runner.
-- Mutation testing será direcionado e sem mutar o núcleo monolítico inteiro.
-- O harness deve restaurar arquivos mesmo em falha/interrupção tratável e falhar se houver mutação aplicável sobrevivente ou não aplicada.
+- Thresholds críticos: fila ≥90%; bridge Vita ≥70%; medidos com `coverage.py`.
+- Mutation testing é direcionado e não muta o núcleo monolítico inteiro.
+- O dashboard só exibe métricas observáveis e rejeita snapshots inválidos; não infere capacidade cognitiva.
 - Relatórios gerados (`coverage.xml`, JSON de mutation, SQLite temporário) não devem ser commitados.
 - Não expor tokens, credenciais ou conteúdo de `.env` em commits, logs ou handoffs.
 
@@ -48,17 +48,25 @@ python tools/reality_audit.py
 python core/constitutional_brain.py
 ```
 
+Para renderizar um snapshot exportado:
+
+```bash
+python tools/diagnostics_dashboard.py snapshot.json
+# ou
+cat snapshot.json | python tools/diagnostics_dashboard.py -
+```
+
 ## Resultado da última validação
 
-- **33 testes unitários/property:** passaram.
+- **35 testes unitários/property/contrato:** passaram.
 - **Cobertura branch dos módulos críticos:** `core/deferred_task_queue.py` **92,56%** (threshold **90%**); `vita/nexus_constitutional_bridge_v3.py` **70,69%** (threshold **70%**); total crítico **78%**.
 - **Mutation testing direcionado:** **10/10 mutações mortas, 0 sobreviventes, 100%**, cobrindo fila, telemetria Vita e validação do schema.
+- **Dashboard:** renderização e rejeição de payload inválido cobertas por testes.
 - **Workflow YAML:** parseado com sucesso.
 - **Auditoria de realidade:** executada; continua identificando alegações não comprovadas e riscos conhecidos, sem elevar claims.
 - **Suíte integrada (`python core/constitutional_brain.py`):** passou, mas seus banners são demos internas e não evidência independente de capacidade cognitiva.
-- **Bandit:** relatório gerado; 133 achados existentes/legados permanecem não bloqueantes no workflow (`|| true`) e exigem triagem futura.
-- **Ambiente local:** dependências de desenvolvimento instaladas no usuário (`coverage`, `hypothesis`, `bandit`); CI instala as dependências em runner limpo.
-- **Publicação parcial:** testes, mutation harness e este handoff foram publicados; a alteração de `.github/workflows/nexus-contract-gate.yml` permanece local por exigir escopo `workflow`.
+- **Bandit:** 133 achados; 112 B101 em asserts de demos, 16 B311 de aleatoriedade não criptográfica, 2 B110 de `except/pass`, e achados B404/B603 do harness. Há um B608 em SQL dinâmico no núcleo legado; triagem futura deve revisar esse ponto sem alterar semântica sem testes.
+- **Publicação parcial:** testes, mutation harness e handoff estão publicados; alterações de workflow permanecem locais por exigirem escopo `workflow`.
 
 ## Próximo agente
 

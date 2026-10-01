@@ -2,6 +2,7 @@ import json
 import unittest
 
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
+from tools.diagnostics_dashboard import render_dashboard
 
 
 class RecoveryDiagnosticsContractTests(unittest.TestCase):
@@ -45,6 +46,17 @@ class RecoveryDiagnosticsContractTests(unittest.TestCase):
         self.bridge.record_policy_transition("paused", "active", "second", {})
         events = self.bridge.get_policy_audit()
         self.assertEqual([event["payload"]["reason"] for event in events], ["first", "second"])
+
+    def test_dashboard_renders_observable_recovery_metrics(self):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        rendered = render_dashboard(snapshot)
+        self.assertIn("NEXUS RECOVERY DASHBOARD", rendered)
+        self.assertIn("schema: nexus.recovery.diagnostics.v1", rendered)
+        self.assertIn("events_analyzed: 0", rendered)
+
+    def test_dashboard_rejects_invalid_snapshot(self):
+        with self.assertRaises(ValueError):
+            render_dashboard({"schema": "nexus.recovery.diagnostics.v9"})
 
     def test_incompatible_version_is_rejected(self):
         payload = self.bridge.export_recovery_diagnostics()
