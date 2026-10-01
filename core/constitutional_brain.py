@@ -20102,7 +20102,7 @@ class RealErrorDetectionCorrectionEngine:
                     try:
                         min_val = float(parts[1].split()[0])
                         return min_val
-                    except:
+                    except (ValueError, IndexError):
                         pass
             elif "above maximum" in error.description:
                 # Extract maximum value
@@ -20111,7 +20111,7 @@ class RealErrorDetectionCorrectionEngine:
                     try:
                         max_val = float(parts[1].split()[0])
                         return max_val
-                    except:
+                    except (ValueError, IndexError):
                         pass
         
         # Default: return original

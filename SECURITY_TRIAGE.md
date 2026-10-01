@@ -2,8 +2,8 @@
 
 > This is a conservative inventory, not a clearance report. Findings remain open until reviewed and fixed or explicitly justified.
 
-- Total findings: **132**
-- Severity counts: LOW=132
+- Total findings: **130**
+- Severity counts: LOW=130
 
 ## Dispositions
 
@@ -12,7 +12,6 @@
 | `controlled_subprocess_review` | 2 | Mutation harness subprocess; keep inputs fixed and review execution boundaries. |
 | `legacy_demo_assert_review` | 112 | Assertions in legacy/demo paths; review whether they are appropriate and isolated. |
 | `non_cryptographic_random_review` | 16 | Non-cryptographic randomness; confirm it is never used for secrets or security decisions. |
-| `silent_exception_review` | 2 | Silent exception handling; review whether fallback behavior hides failures. |
 
 ## Findings
 
@@ -34,8 +33,6 @@
 | `B311` | LOW | `core/constitutional_brain.py` | 11773 | `non_cryptographic_random_review` |
 | `B311` | LOW | `core/constitutional_brain.py` | 11775 | `non_cryptographic_random_review` |
 | `B311` | LOW | `core/constitutional_brain.py` | 11984 | `non_cryptographic_random_review` |
-| `B110` | LOW | `core/constitutional_brain.py` | 20105 | `silent_exception_review` |
-| `B110` | LOW | `core/constitutional_brain.py` | 20114 | `silent_exception_review` |
 | `B101` | LOW | `core/constitutional_brain.py` | 24843 | `legacy_demo_assert_review` |
 | `B101` | LOW | `core/constitutional_brain.py` | 24888 | `legacy_demo_assert_review` |
 | `B101` | LOW | `core/constitutional_brain.py` | 24917 | `legacy_demo_assert_review` |

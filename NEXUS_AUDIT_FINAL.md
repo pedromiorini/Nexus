@@ -93,3 +93,9 @@ O próximo marco sugerido anteriormente continua válido: estabelecer um limiar 
 O fallback de busca por palavras em `RealHierarchicalMemory` foi endurecido após revisão do achado Bandit B608. A implementação deixou de montar uma cláusula `WHERE` variável e passou a executar uma consulta estática parametrizada por termo, unindo resultados por ID e preservando a ordenação por importância e acesso. O teste adversarial SQL foi ampliado para cobrir busca OR por múltiplas palavras e limite.
 
 Uma nova execução do Bandit registrou **132 achados LOW e nenhum MEDIUM**; a triagem continua conservadora e não trata isso como prova de ausência de vulnerabilidades. A revisão manual de limites de confiança, concorrência e comportamento do núcleo legado permanece necessária.
+
+## Atualização posterior — correção de exceções silenciosas
+
+O motor `RealErrorDetectionCorrectionEngine` passou a capturar somente `ValueError` e `IndexError` ao interpretar limites numéricos, preservando o conteúdo original para descrições malformadas. O contrato foi coberto por `test_error_correction_contract.py`.
+
+A execução posterior do Bandit registrou **130 achados LOW**, sem B110 e sem B608. Isso reduz padrões conhecidos, mas não substitui revisão manual do núcleo monolítico.

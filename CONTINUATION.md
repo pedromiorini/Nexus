@@ -23,13 +23,14 @@
 - `test_deferred_task_snapshot.py`: contrato de round-trip, ordem, atomicidade, limites, tipos inválidos e ausência de execução durante restauração.
 - Auditoria de realidade em `tools/reality_audit.py`.
 - Hardening do fallback SQL em `RealHierarchicalMemory`: consultas estáticas parametrizadas por termo, sem montagem dinâmica de placeholders.
+- Hardening de `_generate_correction`: captura explícita de `ValueError`/`IndexError`, com preservação do conteúdo original em descrições inválidas.
 
 ## Gates locais desta rodada
 
-- **51 testes unitários/property/contrato/triagem/SQL:** passaram.
+- **53 testes unitários/property/contrato/triagem/SQL:** passaram.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%).
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
-- **Bandit:** **132 achados LOW** preservados e classificados; o B608 foi removido após a refatoração, sem suprimir achados.
+- **Bandit:** **130 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, sem suprimir achados.
 - **Auditoria de realidade:** executada sem elevar claims cognitivos.
 - **Dashboard:** snapshot válido renderizado; payload inválido rejeitado pelos testes.
 - **Compilação Python:** passou para módulos, ferramentas e testes alterados.
@@ -44,6 +45,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar mutation testing direcionado;
 - gerar e reter o relatório de triagem Bandit junto ao JSON.
 - validar a busca SQL multi-termo e o limite no teste adversarial de memória.
+- validar o fallback original do motor de correção para descrições malformadas.
 
 O workflow endurecido está publicado em `888d7a5`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
 
@@ -53,6 +55,7 @@ O workflow endurecido está publicado em `888d7a5`. O CI registra apenas avisos 
 - Mutation testing é direcionado e não muta o núcleo monolítico inteiro.
 - O dashboard exibe apenas métricas observáveis e não infere capacidade cognitiva.
 - O antigo B608 foi eliminado por consultas estáticas parametrizadas por termo; revisão manual de confiança, concorrência e núcleo legado continua aberta.
+- Os antigos B110 foram eliminados com exceções estreitas; falhas inesperadas continuam exigindo revisão operacional.
 - Relatórios gerados (`coverage.xml`, JSON de mutation, SQLite temporário e saídas Bandit) não devem ser commitados.
 - Não expor tokens, credenciais ou conteúdo de `.env`.
 
