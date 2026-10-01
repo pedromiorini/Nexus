@@ -211,6 +211,14 @@ class RealHierarchicalMemory:
     Multiplica capacidade de retrieval com embeddings reais.
     """
 
+    _KEYWORD_SEARCH_SQL = """
+        SELECT id, content, importance, memory_type, access_count
+        FROM memories
+        WHERE content LIKE ?
+        ORDER BY importance DESC, access_count DESC
+        LIMIT ?
+    """
+
     def __init__(self, db_path: str = ":memory:", model_name: str = 'all-MiniLM-L6-v2'):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
@@ -379,22 +387,23 @@ class RealHierarchicalMemory:
                     ORDER BY importance DESC, access_count DESC
                     LIMIT ?
                 """, (limit,))
+                rows = cursor.fetchall()
             else:
-                # Busca por keyword
-                placeholders = " OR ".join(["content LIKE ?" for _ in keywords])
-                patterns = [f"%{kw}%" for kw in keywords]
-
-                # A estrutura usa somente placeholders derivados da contagem de
-                # palavras; conteúdo e limite continuam vinculados por parâmetros.
-                query = (
-                    "SELECT id, content, importance, memory_type, access_count "
-                    "FROM memories WHERE " + placeholders + " "
-                    "ORDER BY importance DESC, access_count DESC LIMIT ?"
-                )
-                cursor.execute(query, patterns + [limit])
+                # Executa uma consulta estática por palavra e une os resultados
+                # em memória. Conteúdo e limite continuam vinculados por
+                # parâmetros, sem montar SQL com entrada variável.
+                rows_by_id = {}
+                for keyword in keywords:
+                    cursor.execute(self._KEYWORD_SEARCH_SQL, (f"%{keyword}%", limit))
+                    for row in cursor.fetchall():
+                        rows_by_id[row[0]] = row
+                rows = sorted(
+                    rows_by_id.values(),
+                    key=lambda row: (-row[2], -row[4]),
+                )[:limit]
 
             results = []
-            for row in cursor.fetchall():
+            for row in rows:
                 results.append({
                     "id": row[0],
                     "content": row[1],

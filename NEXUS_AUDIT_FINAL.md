@@ -87,3 +87,9 @@ O próximo marco sugerido anteriormente continua válido: estabelecer um limiar 
 [3]: https://bandit.readthedocs.io/en/latest/ "Bandit — documentação oficial"
 [4]: https://dl.acm.org/doi/10.1145/3701625.3701659 "Static and Dynamic Comparison of Mutation Testing Tools for Python"
 [5]: https://github.com/boxed/mutmut "mutmut — Mutation testing system for Python"
+
+## Atualização posterior — 1º de outubro de 2026
+
+O fallback de busca por palavras em `RealHierarchicalMemory` foi endurecido após revisão do achado Bandit B608. A implementação deixou de montar uma cláusula `WHERE` variável e passou a executar uma consulta estática parametrizada por termo, unindo resultados por ID e preservando a ordenação por importância e acesso. O teste adversarial SQL foi ampliado para cobrir busca OR por múltiplas palavras e limite.
+
+Uma nova execução do Bandit registrou **132 achados LOW e nenhum MEDIUM**; a triagem continua conservadora e não trata isso como prova de ausência de vulnerabilidades. A revisão manual de limites de confiança, concorrência e comportamento do núcleo legado permanece necessária.

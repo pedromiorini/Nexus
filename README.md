@@ -68,6 +68,12 @@ export PYTHONPATH=.
 python3 -m unittest -v test_deferred_task_snapshot.py
 ```
 
+## Hardening do fallback SQL
+
+A busca por palavras do fallback da memória usa consultas SQL estáticas, uma por termo, com conteúdo e limite sempre parametrizados. Os resultados são unidos por ID e ordenados pelas mesmas métricas de importância e acesso do contrato anterior. Isso elimina a montagem dinâmica de placeholders sinalizada pelo B608 do Bandit.
+
+O teste adversarial `test_memory_sql_contract.py` cobre tokens SQL como dados, busca OR por múltiplas palavras e respeito ao limite. A busca semântica opcional continua sujeita às limitações e aos fallbacks documentados.
+
 ## Limitações conhecidas
 
 O núcleo ainda é monolítico e contém componentes experimentais, heurísticas, retornos constantes e caminhos de fallback que exigem revisão individual. A presença de uma classe ou método com nome cognitivo não demonstra a capacidade descrita pelo nome. A suíte integrada é valiosa como teste de não regressão, mas não é uma avaliação independente, adversarial ou científica de inteligência.

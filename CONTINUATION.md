@@ -22,13 +22,14 @@
 - `core/deferred_task_queue.py`: snapshot versionado `nexus.deferred_task_queue.v1`, exportação JSON/objeto, restauração atômica, validação de tipos/capacidade/IDs e opção `replace=True`.
 - `test_deferred_task_snapshot.py`: contrato de round-trip, ordem, atomicidade, limites, tipos inválidos e ausência de execução durante restauração.
 - Auditoria de realidade em `tools/reality_audit.py`.
+- Hardening do fallback SQL em `RealHierarchicalMemory`: consultas estáticas parametrizadas por termo, sem montagem dinâmica de placeholders.
 
 ## Gates locais desta rodada
 
-- **50 testes unitários/property/contrato/triagem/SQL:** passaram.
+- **51 testes unitários/property/contrato/triagem/SQL:** passaram.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%).
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
-- **Bandit:** **133 achados** preservados e classificados: 132 LOW, 1 MEDIUM; B608 permanece revisão prioritária.
+- **Bandit:** **132 achados LOW** preservados e classificados; o B608 foi removido após a refatoração, sem suprimir achados.
 - **Auditoria de realidade:** executada sem elevar claims cognitivos.
 - **Dashboard:** snapshot válido renderizado; payload inválido rejeitado pelos testes.
 - **Compilação Python:** passou para módulos, ferramentas e testes alterados.
@@ -42,6 +43,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - exigir fila >=90% e bridge Vita >=70%;
 - executar mutation testing direcionado;
 - gerar e reter o relatório de triagem Bandit junto ao JSON.
+- validar a busca SQL multi-termo e o limite no teste adversarial de memória.
 
 O workflow endurecido está publicado em `477a59a`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
 
@@ -50,7 +52,7 @@ O workflow endurecido está publicado em `477a59a`. O CI registra apenas avisos 
 - Snapshot é contrato de transporte; não é persistência física em disco, locking distribuído ou garantia exactly-once.
 - Mutation testing é direcionado e não muta o núcleo monolítico inteiro.
 - O dashboard exibe apenas métricas observáveis e não infere capacidade cognitiva.
-- A concatenação marcada pelo B608 monta somente placeholders; valores e limites permanecem parametrizados, mas a revisão manual continua aberta.
+- O antigo B608 foi eliminado por consultas estáticas parametrizadas por termo; revisão manual de confiança, concorrência e núcleo legado continua aberta.
 - Relatórios gerados (`coverage.xml`, JSON de mutation, SQLite temporário e saídas Bandit) não devem ser commitados.
 - Não expor tokens, credenciais ou conteúdo de `.env`.
 

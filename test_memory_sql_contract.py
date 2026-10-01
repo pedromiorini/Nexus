@@ -23,6 +23,13 @@ class MemorySqlContractTests(unittest.TestCase):
         results = memory.retrieve("alpha", limit=5)
         self.assertEqual([item["content"] for item in results], ["alpha beta"])
 
+    def test_multiple_keywords_preserve_or_search_and_limit(self):
+        memory = RealHierarchicalMemory(":memory:")
+        memory.store("low beta", importance=0.2)
+        memory.store("high alpha", importance=0.9)
+        results = memory.retrieve("alpha beta", limit=1)
+        self.assertEqual([item["content"] for item in results], ["high alpha"])
+
 
 if __name__ == "__main__":
     unittest.main()
