@@ -6,7 +6,7 @@
 
 - **Branch de trabalho:** `main`
 - **Remoto:** `https://github.com/pedromiorini/Nexus`
-- **Último estado remoto conhecido:** `9809ddd` (`test: publish quality harness and continuation handoff`)
+- **Último estado remoto conhecido:** `bf87fc7` (`ops: add validated recovery diagnostics dashboard`)
 - **Commit local pendente:** o commit mais recente contém `ci: enforce critical coverage and targeted mutation gates`; ele altera apenas o workflow e exige escopo GitHub `workflow` para publicação.
 - **Fase:** endurecimento de qualidade e operacionalização de diagnósticos.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
@@ -62,11 +62,12 @@ cat snapshot.json | python tools/diagnostics_dashboard.py -
 - **Cobertura branch dos módulos críticos:** `core/deferred_task_queue.py` **92,56%** (threshold **90%**); `vita/nexus_constitutional_bridge_v3.py` **70,69%** (threshold **70%**); total crítico **78%**.
 - **Mutation testing direcionado:** **10/10 mutações mortas, 0 sobreviventes, 100%**, cobrindo fila, telemetria Vita e validação do schema.
 - **Dashboard:** renderização e rejeição de payload inválido cobertas por testes.
-- **Workflow YAML:** parseado com sucesso.
+- **CI remoto:** workflow `Nexus Contract Gate`, run `36817436102` para `bf87fc7`, terminou em **success** em 27 segundos. Todos os passos passaram.
+- **Avisos do CI:** depreciação futura do Node.js 20 nas actions atuais e migração futura de `ubuntu-latest` para Ubuntu 26; não bloquearam o run.
 - **Auditoria de realidade:** executada; continua identificando alegações não comprovadas e riscos conhecidos, sem elevar claims.
 - **Suíte integrada (`python core/constitutional_brain.py`):** passou, mas seus banners são demos internas e não evidência independente de capacidade cognitiva.
 - **Bandit:** 133 achados; 112 B101 em asserts de demos, 16 B311 de aleatoriedade não criptográfica, 2 B110 de `except/pass`, e achados B404/B603 do harness. Há um B608 em SQL dinâmico no núcleo legado; triagem futura deve revisar esse ponto sem alterar semântica sem testes.
-- **Publicação parcial:** testes, mutation harness e handoff estão publicados; alterações de workflow permanecem locais por exigirem escopo `workflow`.
+- **Publicação parcial:** testes, mutation harness, dashboard e handoff estão publicados; alterações de workflow permanecem locais por exigirem escopo `workflow`.
 
 ## Próximo agente
 
