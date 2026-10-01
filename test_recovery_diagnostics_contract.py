@@ -34,6 +34,18 @@ class RecoveryDiagnosticsContractTests(unittest.TestCase):
         self.assertGreaterEqual(diagnostics["events_analyzed"], 0)
         self.assertGreaterEqual(diagnostics["recovery_rate"], 0.0)
 
+    def test_failure_alert_includes_exact_threshold(self):
+        record = self.bridge.record_reprocessing_telemetry({
+            "attempts": 2, "failed": 1, "discarded": 0, "total_latency_ms": 0.0,
+        })
+        self.assertIn("reprocessing_failure_rate_high", record["alerts"])
+
+    def test_policy_audit_is_returned_in_chronological_order(self):
+        self.bridge.record_policy_transition("active", "paused", "first", {})
+        self.bridge.record_policy_transition("paused", "active", "second", {})
+        events = self.bridge.get_policy_audit()
+        self.assertEqual([event["payload"]["reason"] for event in events], ["first", "second"])
+
     def test_incompatible_version_is_rejected(self):
         payload = self.bridge.export_recovery_diagnostics()
         payload["schema"] = "nexus.recovery.diagnostics.v2"
@@ -60,4 +72,3 @@ class RecoveryDiagnosticsContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
