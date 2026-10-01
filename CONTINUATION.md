@@ -5,9 +5,9 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `0bfec12` (`test: cover memory SQL fallback injection boundary`)
-- **Marco local desta rodada:** integração dos artefatos remotos de qualidade, contrato de snapshot da fila e gates locais de cobertura/mutation.
-- **Publicação:** o workflow atualizado ainda depende da tentativa de push com escopo GitHub `workflow`.
+- **Base remota sincronizada:** `origin/main` em `477a59a` (`ci: integrate continuity quality gates and queue snapshots`)
+- **Marco publicado desta rodada:** integração dos artefatos remotos de qualidade, contrato de snapshot da fila e gates de cobertura/mutation.
+- **CI remoto:** run `36819282235` terminou com `success`; todos os passos passaram.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -43,7 +43,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar mutation testing direcionado;
 - gerar e reter o relatório de triagem Bandit junto ao JSON.
 
-O workflow remoto em `0bfec12` ainda não contém essas alterações até que a publicação seja autorizada pelo escopo da credencial.
+O workflow endurecido está publicado em `477a59a`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
 
 ## Limites e decisões
 
@@ -56,4 +56,4 @@ O workflow remoto em `0bfec12` ainda não contém essas alterações até que a 
 
 ## Próxima ação
 
-Após publicar o commit local, verificar o run do workflow remoto. Se o push for rejeitado por escopo `workflow`, manter o commit local e solicitar uma credencial GitHub com esse escopo antes de publicar o workflow.
+Manter a triagem Bandit aberta e executar mutation testing direcionado antes de qualquer alteração no núcleo monolítico. Não tratar os banners da suíte integrada como evidência independente de capacidade cognitiva.
