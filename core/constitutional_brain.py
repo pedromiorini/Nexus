@@ -6365,8 +6365,18 @@ class RealPredictiveCodingSystem:
     def _propagate_error_up(self, error: PredictionError, target_level: int):
         """Propagar erro para níveis superiores"""
         # Níveis superiores ajustam predições baseado em erros de níveis inferiores
-        # Simplificado: registrar que erro foi propagado
-        pass
+        if target_level not in self.errors:
+            raise ValueError(f"target_level inválido: {target_level}")
+        propagated = PredictionError(
+            error_id=str(uuid.uuid4()),
+            level=target_level,
+            predicted=error.predicted,
+            observed=error.observed,
+            error_magnitude=error.error_magnitude,
+            weighted_error=error.weighted_error,
+        )
+        self.errors[target_level].append(propagated)
+        return propagated
 
     def _update_generative_model(self, error: PredictionError, learning_rate: float):
         """Atualizar modelo gerativo baseado em erro"""
@@ -21639,9 +21649,19 @@ class RealRealTimeAdaptationEngine:
     
     def _execute_adaptation(self, event: RealTimeEvent, adaptation_type: str):
         """Executar adaptação"""
-        # Simular execução de adaptação
-        # Em um sistema real, isso modificaria parâmetros do sistema
-        pass
+        # O núcleo não possui atuadores reais; registrar a decisão evita
+        # confundir uma adaptação simulada com uma alteração operacional.
+        record = {
+            "event_id": event.event_id,
+            "event_type": event.event_type,
+            "adaptation_type": adaptation_type,
+            "timestamp": time.time(),
+            "executed": False,
+        }
+        if not hasattr(self, "adaptation_history"):
+            self.adaptation_history = []
+        self.adaptation_history.append(record)
+        return record
     
     def _calculate_effectiveness(self, event: RealTimeEvent, 
                                 response_time: float) -> float:

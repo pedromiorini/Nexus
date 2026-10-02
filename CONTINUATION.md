@@ -28,10 +28,11 @@
 - `tools/embedded_assert_audit.py`: guardrail AST que impede B101 e qualquer `assert` fora do bloco `__main__` enquanto a migração é incremental.
 - `test_central_router_contract.py`: contrato independente para contagem de requisições, cache hit rate e latência média.
 - `tools/implementation_gap_audit.py`: inventário AST conservador de funções pass-only e `NotImplementedError`, sem tratar lacunas como implementadas.
+- `test_explicit_gap_contract.py`: contratos independentes para propagação de erro e registro de adaptação simulada.
 
 ## Gates locais desta rodada
 
-- **68 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
+- **71 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
@@ -41,7 +42,7 @@
 - **CI alinhado nesta rodada:** `test_vram_defense_guard.py` agora é compilado, incluído na medição de cobertura e executado explicitamente pelo workflow.
 - **CI modernizado nesta rodada:** runner fixado em `ubuntu-24.04`; `checkout@v5`, `setup-python@v6` e `upload-artifact@v7` removem a dependência das versões legadas que geravam avisos de Node.js 20.
 - **Auditor B101:** 111 achados restantes, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26510`; compilação de módulos, ferramentas e testes passou.
-- **Inventário de lacunas:** 2 funções pass-only (`_propagate_error_up`, `_execute_adaptation`) e 1 `NotImplementedError` no núcleo legado; inventariados sem alegar correção.
+- **Inventário de lacunas:** as duas funções pass-only foram implementadas com contratos mínimos observáveis e testes independentes; resta 1 `NotImplementedError` intencional para ferramenta sem executor registrado (linha 3715), retornado como falha explícita pelo executor.
 
 ## Gates do workflow local
 
