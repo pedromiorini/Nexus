@@ -5,9 +5,9 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `49b7ce9` (`security: classify legacy randomness as simulation-only`)
-- **Marco publicado desta rodada:** classificação explícita dos 16 B311 como aleatoriedade de simulação/heurística, mantendo-os abertos.
-- **CI remoto:** run `36961505258` terminou com `success`; todos os passos passaram.
+- **Base remota sincronizada:** `origin/main` em `4ab40b4` (`security: classify embedded demo assertions`)
+- **Marco publicado desta rodada:** classificação explícita dos 112 B101 como asserts do demo embutido, mantendo-os abertos para migração incremental.
+- **CI remoto:** run `36961795097` terminou com `success`; todos os passos passaram.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -51,7 +51,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - preservar os B311 no relatório, com disposição explícita de simulação não criptográfica.
 - preservar os B101 no relatório, com disposição explícita de asserts do demo embutido.
 
-O workflow endurecido está publicado em `49b7ce9`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
+O workflow endurecido está publicado em `4ab40b4`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
 
 ## Limites e decisões
 
