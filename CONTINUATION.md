@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base local em preparação:** migração do primeiro B101 do demo para contrato independente.
-- **Marco desta rodada:** `test_central_router_contract.py` fixa estatísticas observáveis e o demo troca um assert por falha explícita.
+- **Base remota sincronizada:** `origin/main` em `f3cba60` (`test: extract central router demo contract`)
+- **Marco desta rodada:** primeiro B101 migrado para `test_central_router_contract.py`, com CI remoto aprovado no run `36962663915`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -24,7 +24,7 @@
 - Hardening do fallback SQL em `RealHierarchicalMemory`: consultas estáticas parametrizadas por termo, sem montagem dinâmica de placeholders.
 - Hardening de `_generate_correction`: captura explícita de `ValueError`/`IndexError`, com preservação do conteúdo original em descrições inválidas.
 - Revisão dos 16 achados B311: usos classificados como simulação/heurística, sem reutilização autorizada para segredos ou decisões de segurança.
-- Revisão dos 112 achados B101: todos estão no bloco `__main__` demonstrativo e permanecem fora dos contratos independentes de produção.
+- Revisão dos 111 achados B101 restantes: todos estão no bloco `__main__` demonstrativo e permanecem fora dos contratos independentes de produção.
 - `tools/embedded_assert_audit.py`: guardrail AST que impede B101 e qualquer `assert` fora do bloco `__main__` enquanto a migração é incremental.
 - `test_central_router_contract.py`: contrato independente para contagem de requisições, cache hit rate e latência média.
 
@@ -55,7 +55,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o auditor AST e falhar se um B101 ou qualquer `assert` aparecer fora do bloco demonstrativo.
 - executar o contrato independente do CentralRouter junto com a suíte expandida.
 
-O workflow endurecido continua publicado em `5cb4fa6`; este marco ainda aguarda publicação e CI remoto. Os avisos conhecidos são a migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26.
+O workflow endurecido está publicado em `f3cba60`; o CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26, sem bloqueio.
 
 ## Limites e decisões
 
