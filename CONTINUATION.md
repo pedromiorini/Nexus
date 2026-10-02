@@ -5,9 +5,9 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `6e36979` (`quality: guard embedded demo assertion boundary`)
-- **Marco publicado desta rodada:** auditor AST e gate de CI para impedir B101 fora do bloco demonstrativo durante a migração incremental.
-- **CI remoto:** run `36962076625` terminou com `success`; todos os passos passaram.
+- **Base remota sincronizada:** `origin/main` em `5cb4fa6` (`quality: reject asserts outside embedded demo`)
+- **Marco publicado desta rodada:** auditor AST também verifica todos os nós `ast.Assert`, não apenas os achados B101 do Bandit.
+- **CI remoto:** run `36962363981` terminou com `success`; todos os passos passaram.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -54,7 +54,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - preservar os B101 no relatório, com disposição explícita de asserts do demo embutido.
 - executar o auditor AST e falhar se um B101 ou qualquer `assert` aparecer fora do bloco demonstrativo.
 
-O workflow endurecido está publicado em `6e36979`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
+O workflow endurecido está publicado em `5cb4fa6`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
 
 ## Limites e decisões
 
