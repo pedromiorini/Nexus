@@ -34,8 +34,19 @@ def _main_block_ranges(source: str) -> list[tuple[int, int]]:
     return ranges
 
 
+def _assert_lines_outside_main(source: str, ranges: list[tuple[int, int]]) -> list[int]:
+    tree = ast.parse(source)
+    return [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assert)
+        and not any(start <= node.lineno <= end for start, end in ranges)
+    ]
+
+
 def audit(payload: dict[str, Any], source: str, filename: str) -> dict[str, Any]:
     ranges = _main_block_ranges(source)
+    assert_lines_outside_main = _assert_lines_outside_main(source, ranges)
     findings = [item for item in payload.get("results", []) if item.get("test_id") == "B101"]
     outside = [
         item
@@ -51,7 +62,8 @@ def audit(payload: dict[str, Any], source: str, filename: str) -> dict[str, Any]
             {"line_number": item.get("line_number"), "code": item.get("code", "")}
             for item in outside
         ],
-        "ok": bool(ranges) and not outside,
+        "assert_lines_outside_main": assert_lines_outside_main,
+        "ok": bool(ranges) and not outside and not assert_lines_outside_main,
     }
 
 

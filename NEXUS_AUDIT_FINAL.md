@@ -111,3 +111,7 @@ Os 112 achados B101 foram localizados exclusivamente no bloco `if __name__ == "_
 ## Atualização posterior — guardrail de migração dos asserts
 
 Foi adicionado `tools/embedded_assert_audit.py`, que analisa o AST do arquivo e verifica que cada achado B101 do relatório Bandit permanece dentro do bloco `if __name__ == "__main__"`. A execução atual encontrou **112** B101 e **zero** fora do bloco (`outside_main_block: []`). O auditor não considera os asserts seguros nem os suprime; ele impede a expansão silenciosa do padrão enquanto a migração para testes isolados ocorre incrementalmente.
+
+## Atualização posterior — bloqueio de asserts fora do demo
+
+O `embedded_assert_audit` agora verifica duas fontes: os achados B101 do Bandit e todos os nós `ast.Assert` encontrados diretamente no código. A execução atual confirmou `outside_main_block: []` e `assert_lines_outside_main: []`, impedindo que um assert novo fora do bloco demonstrativo passe despercebido por uma alteração no scanner.
