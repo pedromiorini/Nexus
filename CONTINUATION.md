@@ -5,9 +5,9 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `eca8fc4` (`security: narrow error correction exception handling`)
-- **Marco publicado desta rodada:** estreitamento das exceções do motor de correção, contrato de fallback e atualização da triagem Bandit.
-- **CI remoto:** run `36820012209` terminou com `success`; todos os passos passaram.
+- **Base remota sincronizada:** `origin/main` em `49b7ce9` (`security: classify legacy randomness as simulation-only`)
+- **Marco publicado desta rodada:** classificação explícita dos 16 B311 como aleatoriedade de simulação/heurística, mantendo-os abertos.
+- **CI remoto:** run `36961505258` terminou com `success`; todos os passos passaram.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -49,7 +49,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - validar o fallback original do motor de correção para descrições malformadas.
 - preservar os B311 no relatório, com disposição explícita de simulação não criptográfica.
 
-O workflow endurecido está publicado em `eca8fc4`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
+O workflow endurecido está publicado em `49b7ce9`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
 
 ## Limites e decisões
 
