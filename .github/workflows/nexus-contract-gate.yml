@@ -12,14 +12,14 @@ permissions:
 jobs:
   contract-gate:
     name: Contract and regression gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -62,7 +62,7 @@ jobs:
         run: python tools/reality_audit.py
 
       - name: Retain reality audit report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nexus-reality-audit
           path: |
@@ -82,7 +82,7 @@ jobs:
           coverage xml -o coverage.xml
 
       - name: Retain coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nexus-contract-coverage
           path: coverage.xml
@@ -124,7 +124,7 @@ jobs:
           python tools/security_triage.py bandit-report.json security-triage-generated.md
           python tools/embedded_assert_audit.py bandit-report.json core/constitutional_brain.py
       - name: Retain security scan report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nexus-bandit-report
           path: |

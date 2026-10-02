@@ -38,6 +38,7 @@
 - **Dashboard:** snapshot válido renderizado; payload inválido rejeitado pelos testes.
 - **Compilação Python:** passou para módulos, ferramentas e testes alterados.
 - **CI alinhado nesta rodada:** `test_vram_defense_guard.py` agora é compilado, incluído na medição de cobertura e executado explicitamente pelo workflow.
+- **CI modernizado nesta rodada:** runner fixado em `ubuntu-24.04`; `checkout@v5`, `setup-python@v6` e `upload-artifact@v7` removem a dependência das versões legadas que geravam avisos de Node.js 20.
 - **Auditor B101:** 111 achados restantes, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26510`; compilação de módulos, ferramentas e testes passou.
 
 ## Gates do workflow local
