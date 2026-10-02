@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 DISPOSITIONS = {
-    "B101": "legacy_demo_assert_review",
+    "B101": "embedded_demo_assert_review",
     "B110": "silent_exception_review",
     "B311": "simulation_only_random_review",
     "B404": "controlled_subprocess_review",
@@ -44,7 +44,7 @@ def build_report(payload: dict[str, Any]) -> str:
         "|---|---:|---|",
     ]
     meanings = {
-        "legacy_demo_assert_review": "Assertions in legacy/demo paths; review whether they are appropriate and isolated.",
+        "embedded_demo_assert_review": "Assertions inside the legacy __main__ demonstration block; keep them out of production contracts and migrate incrementally.",
         "silent_exception_review": "Silent exception handling; review whether fallback behavior hides failures.",
         "simulation_only_random_review": "Randomness reviewed as simulation/heuristic behavior; keep it out of secrets and security decisions.",
         "controlled_subprocess_review": "Mutation harness subprocess; keep inputs fixed and review execution boundaries.",

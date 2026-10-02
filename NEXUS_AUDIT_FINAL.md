@@ -103,3 +103,7 @@ A execução posterior do Bandit registrou **130 achados LOW**, sem B110 e sem B
 ## Atualização posterior — revisão de aleatoriedade não criptográfica
 
 Os 16 achados B311 em `core/constitutional_brain.py` foram revisados como usos de simulação, exploração, ruído heurístico ou escolhas não relacionadas a segredo, autenticação ou decisão de segurança. A triagem agora os classifica como `simulation_only_random_review`, mantendo cada achado aberto e exigindo que futuras mudanças não reutilizem esses caminhos para material secreto ou controles de segurança.
+
+## Atualização posterior — revisão dos asserts B101
+
+Os 112 achados B101 foram localizados exclusivamente no bloco `if __name__ == "__main__"` de demonstração integrada em `core/constitutional_brain.py`, entre as linhas 24843 e 26495. Eles permanecem abertos sob `embedded_demo_assert_review`: não são tratados como contratos independentes de produção e devem ser migrados incrementalmente para testes isolados, sem uma substituição em massa que altere a demonstração sem cobertura equivalente.

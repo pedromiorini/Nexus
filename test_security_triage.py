@@ -10,7 +10,7 @@ class SecurityTriageTests(unittest.TestCase):
     def test_known_findings_have_explicit_dispositions(self):
         self.assertEqual(classify({"test_id": "B608"}), "sql_construction_high_priority_review")
         self.assertEqual(classify({"test_id": "B311"}), "simulation_only_random_review")
-        self.assertEqual(classify({"test_id": "B101"}), "legacy_demo_assert_review")
+        self.assertEqual(classify({"test_id": "B101"}), "embedded_demo_assert_review")
         self.assertEqual(classify({"test_id": "B999"}), "manual_review")
 
     def test_report_preserves_findings_and_counts(self):

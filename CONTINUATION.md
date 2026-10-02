@@ -25,13 +25,14 @@
 - Hardening do fallback SQL em `RealHierarchicalMemory`: consultas estáticas parametrizadas por termo, sem montagem dinâmica de placeholders.
 - Hardening de `_generate_correction`: captura explícita de `ValueError`/`IndexError`, com preservação do conteúdo original em descrições inválidas.
 - Revisão dos 16 achados B311: usos classificados como simulação/heurística, sem reutilização autorizada para segredos ou decisões de segurança.
+- Revisão dos 112 achados B101: todos estão no bloco `__main__` demonstrativo e permanecem fora dos contratos independentes de produção.
 
 ## Gates locais desta rodada
 
 - **53 testes unitários/property/contrato/triagem/SQL:** passaram.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%).
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
-- **Bandit:** **130 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, e os 16 B311 permanecem abertos sob `simulation_only_random_review`.
+- **Bandit:** **130 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 112 B101 sob `embedded_demo_assert_review`.
 - **Auditoria de realidade:** executada sem elevar claims cognitivos.
 - **Dashboard:** snapshot válido renderizado; payload inválido rejeitado pelos testes.
 - **Compilação Python:** passou para módulos, ferramentas e testes alterados.
@@ -48,6 +49,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - validar a busca SQL multi-termo e o limite no teste adversarial de memória.
 - validar o fallback original do motor de correção para descrições malformadas.
 - preservar os B311 no relatório, com disposição explícita de simulação não criptográfica.
+- preservar os B101 no relatório, com disposição explícita de asserts do demo embutido.
 
 O workflow endurecido está publicado em `49b7ce9`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
 
@@ -59,6 +61,7 @@ O workflow endurecido está publicado em `49b7ce9`. O CI registra apenas avisos 
 - O antigo B608 foi eliminado por consultas estáticas parametrizadas por termo; revisão manual de confiança, concorrência e núcleo legado continua aberta.
 - Os antigos B110 foram eliminados com exceções estreitas; falhas inesperadas continuam exigindo revisão operacional.
 - Os B311 não foram suprimidos nem convertidos em aleatoriedade criptográfica; são adequados apenas para os caminhos de simulação revisados.
+- Os B101 não foram removidos em massa; a migração para testes isolados deve ser incremental e preservar cobertura comportamental.
 - Relatórios gerados (`coverage.xml`, JSON de mutation, SQLite temporário e saídas Bandit) não devem ser commitados.
 - Não expor tokens, credenciais ou conteúdo de `.env`.
 
