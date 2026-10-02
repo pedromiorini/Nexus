@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `f3cba60` (`test: extract central router demo contract`)
-- **Marco desta rodada:** primeiro B101 migrado para `test_central_router_contract.py`, com CI remoto aprovado no run `36962663915`.
+- **Base remota sincronizada:** `origin/main` em `725ae07` (`docs: record router contract migration checkpoint`)
+- **Marco desta rodada:** primeiro B101 migrado para `test_central_router_contract.py`, snapshot da fila validado, guardrail AST ativo e CI remoto aprovado no run `36962730957`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -30,14 +30,14 @@
 
 ## Gates locais desta rodada
 
-- **58 testes unitários/property/contrato/triagem/SQL:** passaram.
-- **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%).
+- **66 testes unitários/property/contrato/triagem/SQL/VRAM:** passaram na suíte integral.
+- **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
 - **Auditoria de realidade:** executada sem elevar claims cognitivos.
 - **Dashboard:** snapshot válido renderizado; payload inválido rejeitado pelos testes.
 - **Compilação Python:** passou para módulos, ferramentas e testes alterados.
-- **Auditor B101:** 111 achados restantes, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26510`.
+- **Auditor B101:** 111 achados restantes, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26510`; compilação de módulos, ferramentas e testes passou.
 
 ## Gates do workflow local
 
