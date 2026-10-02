@@ -107,3 +107,7 @@ Os 16 achados B311 em `core/constitutional_brain.py` foram revisados como usos d
 ## Atualização posterior — revisão dos asserts B101
 
 Os 112 achados B101 foram localizados exclusivamente no bloco `if __name__ == "__main__"` de demonstração integrada em `core/constitutional_brain.py`, entre as linhas 24843 e 26495. Eles permanecem abertos sob `embedded_demo_assert_review`: não são tratados como contratos independentes de produção e devem ser migrados incrementalmente para testes isolados, sem uma substituição em massa que altere a demonstração sem cobertura equivalente.
+
+## Atualização posterior — guardrail de migração dos asserts
+
+Foi adicionado `tools/embedded_assert_audit.py`, que analisa o AST do arquivo e verifica que cada achado B101 do relatório Bandit permanece dentro do bloco `if __name__ == "__main__"`. A execução atual encontrou **112** B101 e **zero** fora do bloco (`outside_main_block: []`). O auditor não considera os asserts seguros nem os suprime; ele impede a expansão silenciosa do padrão enquanto a migração para testes isolados ocorre incrementalmente.
