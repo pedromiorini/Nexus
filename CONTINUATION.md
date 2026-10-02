@@ -5,9 +5,9 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `4ab40b4` (`security: classify embedded demo assertions`)
-- **Marco publicado desta rodada:** classificação explícita dos 112 B101 como asserts do demo embutido, mantendo-os abertos para migração incremental.
-- **CI remoto:** run `36961795097` terminou com `success`; todos os passos passaram.
+- **Base remota sincronizada:** `origin/main` em `6e36979` (`quality: guard embedded demo assertion boundary`)
+- **Marco publicado desta rodada:** auditor AST e gate de CI para impedir B101 fora do bloco demonstrativo durante a migração incremental.
+- **CI remoto:** run `36962076625` terminou com `success`; todos os passos passaram.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -54,7 +54,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - preservar os B101 no relatório, com disposição explícita de asserts do demo embutido.
 - executar o auditor AST e falhar se um B101 aparecer fora do bloco demonstrativo.
 
-O workflow endurecido está publicado em `4ab40b4`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
+O workflow endurecido está publicado em `6e36979`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
 
 ## Limites e decisões
 
