@@ -15,7 +15,7 @@ from typing import Any
 DISPOSITIONS = {
     "B101": "legacy_demo_assert_review",
     "B110": "silent_exception_review",
-    "B311": "non_cryptographic_random_review",
+    "B311": "simulation_only_random_review",
     "B404": "controlled_subprocess_review",
     "B603": "controlled_subprocess_review",
     "B608": "sql_construction_high_priority_review",
@@ -46,7 +46,7 @@ def build_report(payload: dict[str, Any]) -> str:
     meanings = {
         "legacy_demo_assert_review": "Assertions in legacy/demo paths; review whether they are appropriate and isolated.",
         "silent_exception_review": "Silent exception handling; review whether fallback behavior hides failures.",
-        "non_cryptographic_random_review": "Non-cryptographic randomness; confirm it is never used for secrets or security decisions.",
+        "simulation_only_random_review": "Randomness reviewed as simulation/heuristic behavior; keep it out of secrets and security decisions.",
         "controlled_subprocess_review": "Mutation harness subprocess; keep inputs fixed and review execution boundaries.",
         "sql_construction_high_priority_review": "SQL construction in legacy core; highest-priority manual review for parameterization and trust boundaries.",
         "manual_review": "No project-specific disposition; manual review required.",

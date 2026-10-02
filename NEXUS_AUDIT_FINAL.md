@@ -99,3 +99,7 @@ Uma nova execução do Bandit registrou **132 achados LOW e nenhum MEDIUM**; a t
 O motor `RealErrorDetectionCorrectionEngine` passou a capturar somente `ValueError` e `IndexError` ao interpretar limites numéricos, preservando o conteúdo original para descrições malformadas. O contrato foi coberto por `test_error_correction_contract.py`.
 
 A execução posterior do Bandit registrou **130 achados LOW**, sem B110 e sem B608. Isso reduz padrões conhecidos, mas não substitui revisão manual do núcleo monolítico.
+
+## Atualização posterior — revisão de aleatoriedade não criptográfica
+
+Os 16 achados B311 em `core/constitutional_brain.py` foram revisados como usos de simulação, exploração, ruído heurístico ou escolhas não relacionadas a segredo, autenticação ou decisão de segurança. A triagem agora os classifica como `simulation_only_random_review`, mantendo cada achado aberto e exigindo que futuras mudanças não reutilizem esses caminhos para material secreto ou controles de segurança.

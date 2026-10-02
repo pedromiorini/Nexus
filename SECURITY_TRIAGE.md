@@ -11,28 +11,28 @@
 |---|---:|---|
 | `controlled_subprocess_review` | 2 | Mutation harness subprocess; keep inputs fixed and review execution boundaries. |
 | `legacy_demo_assert_review` | 112 | Assertions in legacy/demo paths; review whether they are appropriate and isolated. |
-| `non_cryptographic_random_review` | 16 | Non-cryptographic randomness; confirm it is never used for secrets or security decisions. |
+| `simulation_only_random_review` | 16 | Randomness reviewed as simulation/heuristic behavior; keep it out of secrets and security decisions. |
 
 ## Findings
 
 | ID | Severity | File | Line | Disposition |
 |---|---|---|---:|---|
-| `B311` | LOW | `core/constitutional_brain.py` | 1378 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 2171 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 2204 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 7044 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 8109 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 8228 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 10352 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 10374 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 10810 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 11153 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 11274 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 11275 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 11409 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 11773 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 11775 | `non_cryptographic_random_review` |
-| `B311` | LOW | `core/constitutional_brain.py` | 11984 | `non_cryptographic_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 1378 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 2171 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 2204 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 7044 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 8109 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 8228 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 10352 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 10374 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 10810 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 11153 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 11274 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 11275 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 11409 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 11773 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 11775 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | 11984 | `simulation_only_random_review` |
 | `B101` | LOW | `core/constitutional_brain.py` | 24843 | `legacy_demo_assert_review` |
 | `B101` | LOW | `core/constitutional_brain.py` | 24888 | `legacy_demo_assert_review` |
 | `B101` | LOW | `core/constitutional_brain.py` | 24917 | `legacy_demo_assert_review` |
