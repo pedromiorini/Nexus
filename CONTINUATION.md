@@ -5,9 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `5cb4fa6` (`quality: reject asserts outside embedded demo`)
-- **Marco publicado desta rodada:** auditor AST também verifica todos os nós `ast.Assert`, não apenas os achados B101 do Bandit.
-- **CI remoto:** run `36962363981` terminou com `success`; todos os passos passaram.
+- **Base local em preparação:** migração do primeiro B101 do demo para contrato independente.
+- **Marco desta rodada:** `test_central_router_contract.py` fixa estatísticas observáveis e o demo troca um assert por falha explícita.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -27,17 +26,18 @@
 - Revisão dos 16 achados B311: usos classificados como simulação/heurística, sem reutilização autorizada para segredos ou decisões de segurança.
 - Revisão dos 112 achados B101: todos estão no bloco `__main__` demonstrativo e permanecem fora dos contratos independentes de produção.
 - `tools/embedded_assert_audit.py`: guardrail AST que impede B101 e qualquer `assert` fora do bloco `__main__` enquanto a migração é incremental.
+- `test_central_router_contract.py`: contrato independente para contagem de requisições, cache hit rate e latência média.
 
 ## Gates locais desta rodada
 
-- **57 testes unitários/property/contrato/triagem/SQL:** passaram.
+- **58 testes unitários/property/contrato/triagem/SQL:** passaram.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%).
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
-- **Bandit:** **130 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 112 B101 sob `embedded_demo_assert_review`.
+- **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
 - **Auditoria de realidade:** executada sem elevar claims cognitivos.
 - **Dashboard:** snapshot válido renderizado; payload inválido rejeitado pelos testes.
 - **Compilação Python:** passou para módulos, ferramentas e testes alterados.
-- **Auditor B101:** 112 achados, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26509`.
+- **Auditor B101:** 111 achados restantes, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26510`.
 
 ## Gates do workflow local
 
@@ -53,8 +53,9 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - preservar os B311 no relatório, com disposição explícita de simulação não criptográfica.
 - preservar os B101 no relatório, com disposição explícita de asserts do demo embutido.
 - executar o auditor AST e falhar se um B101 ou qualquer `assert` aparecer fora do bloco demonstrativo.
+- executar o contrato independente do CentralRouter junto com a suíte expandida.
 
-O workflow endurecido está publicado em `5cb4fa6`. O CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26; nenhum aviso bloqueou a execução.
+O workflow endurecido continua publicado em `5cb4fa6`; este marco ainda aguarda publicação e CI remoto. Os avisos conhecidos são a migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26.
 
 ## Limites e decisões
 
@@ -67,6 +68,7 @@ O workflow endurecido está publicado em `5cb4fa6`. O CI registra apenas avisos 
 - Os B101 não foram removidos em massa; a migração para testes isolados deve ser incremental e preservar cobertura comportamental.
 - O auditor B101 é um guardrail de localização, não uma liberação de segurança nem substituto dos testes isolados.
 - A verificação AST direta reduz dependência do Bandit, mas também não substitui a migração dos asserts para contratos independentes.
+- O primeiro assert migrado preserva a falha explícita da demonstração; a garantia comportamental agora vive em `test_central_router_contract.py`.
 - Relatórios gerados (`coverage.xml`, JSON de mutation, SQLite temporário e saídas Bandit) não devem ser commitados.
 - Não expor tokens, credenciais ou conteúdo de `.env`.
 

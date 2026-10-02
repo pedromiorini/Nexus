@@ -24885,7 +24885,8 @@ if __name__ == "__main__":
         print(f"  Cache hits: {router_stats['cache_hits']}")
         print(f"  Cache hit rate: {router_stats['cache_hit_rate']:.1%}")
 
-        assert router_stats['total_requests'] >= 3, "TEST 0.5 FAILED: should have 3+ requests"
+        if router_stats['total_requests'] < 3:
+            raise RuntimeError("TEST 0.5 FAILED: should have 3+ requests")
         print("✅ TEST 0.5 PASSED - CentralRouter working!\n")
     else:
         print("="*70)

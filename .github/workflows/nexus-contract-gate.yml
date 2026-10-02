@@ -41,6 +41,7 @@ jobs:
             test_security_triage.py \
             test_error_correction_contract.py \
             test_embedded_assert_audit.py \
+            test_central_router_contract.py \
             tools/diagnostics_dashboard.py \
             tools/security_triage.py \
             tools/embedded_assert_audit.py \
@@ -73,7 +74,7 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          coverage run --branch -m unittest test_recovery_diagnostics_contract.py test_deferred_task_queue.py test_deferred_task_snapshot.py test_memory_sql_contract.py test_reality_audit.py test_deferred_task_properties.py test_security_triage.py test_error_correction_contract.py test_embedded_assert_audit.py
+          coverage run --branch -m unittest test_recovery_diagnostics_contract.py test_deferred_task_queue.py test_deferred_task_snapshot.py test_memory_sql_contract.py test_reality_audit.py test_deferred_task_properties.py test_security_triage.py test_error_correction_contract.py test_embedded_assert_audit.py test_central_router_contract.py
           coverage report --fail-under=0
           coverage report --include='core/deferred_task_queue.py' --fail-under=90
           coverage report --include='vita/nexus_constitutional_bridge_v3.py' --fail-under=70
@@ -94,7 +95,7 @@ jobs:
       - name: Run expanded contract tests
         env:
           PYTHONPATH: .
-        run: python -m unittest -v test_memory_sql_contract.py test_security_triage.py test_error_correction_contract.py test_embedded_assert_audit.py
+        run: python -m unittest -v test_memory_sql_contract.py test_security_triage.py test_error_correction_contract.py test_embedded_assert_audit.py test_central_router_contract.py
       - name: Run targeted mutation gate
         env:
           PYTHONPATH: .

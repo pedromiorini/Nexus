@@ -115,3 +115,7 @@ Foi adicionado `tools/embedded_assert_audit.py`, que analisa o AST do arquivo e 
 ## Atualização posterior — bloqueio de asserts fora do demo
 
 O `embedded_assert_audit` agora verifica duas fontes: os achados B101 do Bandit e todos os nós `ast.Assert` encontrados diretamente no código. A execução atual confirmou `outside_main_block: []` e `assert_lines_outside_main: []`, impedindo que um assert novo fora do bloco demonstrativo passe despercebido por uma alteração no scanner.
+
+## Atualização posterior — primeiro B101 migrado
+
+O assert do demo que verificava `router_stats['total_requests'] >= 3` foi substituído por uma falha explícita de demonstração (`RuntimeError`) e seu comportamento foi coberto independentemente por `test_central_router_contract.py`, que valida contagem de requisições, cache hit rate e latência média. O inventário B101 caiu de 112 para **111**; o guardrail continua confirmando `outside_main_block: []` e `assert_lines_outside_main: []`.
