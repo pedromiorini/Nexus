@@ -43,10 +43,12 @@ jobs:
             test_embedded_assert_audit.py \
             test_central_router_contract.py \
             test_vram_defense_guard.py \
+            test_implementation_gap_audit.py \
             tools/diagnostics_dashboard.py \
             tools/security_triage.py \
             tools/embedded_assert_audit.py \
-            tools/targeted_mutation.py
+            tools/targeted_mutation.py \
+            tools/implementation_gap_audit.py
 
       - name: Run schema contract tests
         env:
@@ -123,6 +125,7 @@ jobs:
         run: |
           python tools/security_triage.py bandit-report.json security-triage-generated.md
           python tools/embedded_assert_audit.py bandit-report.json core/constitutional_brain.py
+          python tools/implementation_gap_audit.py core/constitutional_brain.py --output implementation-gaps.json
       - name: Retain security scan report
         uses: actions/upload-artifact@v7
         with:
@@ -130,6 +133,7 @@ jobs:
           path: |
             bandit-report.json
             security-triage-generated.md
+            implementation-gaps.json
           if-no-files-found: error
           retention-days: 14
 
