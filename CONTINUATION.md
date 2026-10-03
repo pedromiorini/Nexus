@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `d1cd760` (`core: replace explicit adaptation and error stubs`)
-- **Marco desta rodada:** stubs explícitos de propagação, adaptação e atualização gerativa tratados com contratos observáveis; CI remoto aprovado no run `36964071462`.
+- **Base remota sincronizada:** `origin/main` em `395abff` (`core: record generative model update proposals`)
+- **Marco desta rodada:** propagação, adaptação e atualização gerativa tratadas com contratos observáveis; CI remoto aprovado no run `37095618619`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
