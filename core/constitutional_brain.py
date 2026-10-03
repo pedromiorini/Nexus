@@ -14829,6 +14829,33 @@ class RealHardwareAwareSelfOptimization:
             attention_budget=1.0,
             parallel_threads=2
         )
+
+    def _read_gpu_percent(self) -> float:
+        """Ler utilização GPU; retorna zero quando nenhum backend está disponível."""
+        nvml_percent: Optional[float] = None
+        try:
+            import pynvml
+            pynvml.nvmlInit()
+            try:
+                handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+                nvml_percent = float(pynvml.nvmlDeviceGetUtilizationRates(handle).gpu)
+            finally:
+                pynvml.nvmlShutdown()
+        except (ImportError, AttributeError, OSError, RuntimeError):
+            nvml_percent = None
+        if nvml_percent is not None:
+            return nvml_percent
+
+        try:
+            import torch
+            if torch.cuda.is_available():
+                device = torch.cuda.current_device()
+                total = float(torch.cuda.get_device_properties(device).total_memory)
+                reserved = float(torch.cuda.memory_reserved(device))
+                return min(100.0, (reserved / total) * 100.0) if total else 0.0
+        except (ImportError, AttributeError, OSError, RuntimeError):
+            return 0.0
+        return 0.0
     
     def monitor_hardware(self) -> HardwareSnapshot:
         """
@@ -14847,8 +14874,8 @@ class RealHardwareAwareSelfOptimization:
         ram_percent = ram.percent
         ram_available_mb = ram.available / (1024 * 1024)
         
-        # GPU usage (placeholder - requer pynvml ou similar)
-        gpu_percent = 0.0  # TODO: Implementar com NVIDIA/AMD APIs
+        # GPU usage: NVML, depois proxy de memória CUDA; zero sem backend.
+        gpu_percent = self._read_gpu_percent()
         
         # Latência (medida via operação de benchmark)
         latency_ms = self._measure_latency()

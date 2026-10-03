@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** atualização local pendente desta rodada sobre `origin/main` em `bff9899` (`core: return structured unsupported-tool failures`).
-- **Marco desta rodada:** `CentralExecutive.allocate_attention` passou a registrar alocações observáveis, com contrato independente; inventário AST permanece zerado.
+- **Base remota sincronizada:** atualização local pendente desta rodada sobre `origin/main` em `af32da2` (`core: make attention allocation observable`).
+- **Marco desta rodada:** telemetria GPU deixou de usar TODO fixo; agora usa NVML, proxy de memória CUDA ou fallback CPU explícito, com contrato independente.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -30,10 +30,11 @@
 - `tools/implementation_gap_audit.py`: inventário AST conservador de funções pass-only e `NotImplementedError`, sem tratar lacunas como implementadas.
 - `test_explicit_gap_contract.py`: contratos independentes para propagação de erro e registro de adaptação simulada.
 - `test_working_memory_contract.py`: contrato independente para alocação de atenção local e delegação declarada.
+- `test_hardware_telemetry_contract.py`: contrato de fallback GPU conservador quando não há backend disponível.
 
 ## Gates locais desta rodada
 
-- **75 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
+- **76 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
@@ -44,6 +45,7 @@
 - **CI modernizado nesta rodada:** runner fixado em `ubuntu-24.04`; `checkout@v5`, `setup-python@v6` e `upload-artifact@v7` removem a dependência das versões legadas que geravam avisos de Node.js 20.
 - **Auditor B101:** 111 achados restantes, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26510`; compilação de módulos, ferramentas e testes passou.
 - **Inventário de lacunas:** propagação, adaptação e atualização gerativa registram contratos mínimos observáveis; ferramenta registrada sem executor retorna falha estruturada. O inventário AST agora registra `pass_only_count=0` e `not_implemented_count=0`.
+- **Telemetria GPU:** `monitor_hardware` tenta NVML, depois memória reservada CUDA como proxy; sem backend retorna `0.0` sem afirmar disponibilidade.
 
 ## Gates do workflow local
 
