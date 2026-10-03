@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** atualização local pendente desta rodada sobre `origin/main` em `20312d2` (`telemetry: add optional GPU utilization backends`).
-- **Marco desta rodada:** motor contrafactual usa protocolos opcionais reais de world model e causalidade, com fallback heurístico preservado e contrato independente.
+- **Base remota sincronizada:** `origin/main` em `72c6136` (`reasoning: integrate optional counterfactual protocols`).
+- **Marco desta rodada:** processadores multimodais aceitam backends opcionais para visão e áudio, com fallbacks explícitos e contrato independente.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -32,10 +32,11 @@
 - `test_working_memory_contract.py`: contrato independente para alocação de atenção local e delegação declarada.
 - `test_hardware_telemetry_contract.py`: contrato de fallback GPU conservador quando não há backend disponível.
 - `test_counterfactual_contract.py`: contratos de world model, causalidade e fallback heurístico.
+- `test_multimodal_backend_contract.py`: contratos de backends opcionais de visão/áudio e fallbacks de demonstração.
 
 ## Gates locais desta rodada
 
-- **79 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
+- **83 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
@@ -48,6 +49,8 @@
 - **Inventário de lacunas:** propagação, adaptação e atualização gerativa registram contratos mínimos observáveis; ferramenta registrada sem executor retorna falha estruturada. O inventário AST agora registra `pass_only_count=0` e `not_implemented_count=0`.
 - **Telemetria GPU:** `monitor_hardware` tenta NVML, depois memória reservada CUDA como proxy; sem backend retorna `0.0` sem afirmar disponibilidade.
 - **Contrafactuais:** `_predict_outcome` usa `world_model.predict_outcome` somente quando o protocolo existe; `_build_causal_chain` usa `extract_causal_relations` somente quando disponível.
+- **Multimodal:** `VisionProcessor` usa `detect_objects`/`analyze_scene` do backend opcional; `AudioProcessor` usa `transcribe_speech`; sem backend, os fallbacks permanecem explicitamente demonstrativos.
+- **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 63 retornos constantes simples restantes.
 
 ## Gates do workflow local
 
@@ -65,7 +68,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o auditor AST e falhar se um B101 ou qualquer `assert` aparecer fora do bloco demonstrativo.
 - executar o contrato independente do CentralRouter junto com a suíte expandida.
 
-O workflow endurecido está publicado em `d1cd760`; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
+O workflow endurecido está publicado em `72c6136`; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
 
 ## Limites e decisões
 

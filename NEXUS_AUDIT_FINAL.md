@@ -119,3 +119,7 @@ O `embedded_assert_audit` agora verifica duas fontes: os achados B101 do Bandit 
 ## Atualização posterior — primeiro B101 migrado
 
 O assert do demo que verificava `router_stats['total_requests'] >= 3` foi substituído por uma falha explícita de demonstração (`RuntimeError`) e seu comportamento foi coberto independentemente por `test_central_router_contract.py`, que valida contagem de requisições, cache hit rate e latência média. O inventário B101 caiu de 112 para **111**; o guardrail continua confirmando `outside_main_block: []` e `assert_lines_outside_main: []`.
+
+## Atualização posterior — backends multimodais opcionais
+
+Os métodos `VisionProcessor.detect_objects`, `VisionProcessor.analyze_scene` e `AudioProcessor.transcribe_speech` deixaram de depender exclusivamente de retornos fixos. Eles agora aceitam backends opcionais com protocolos pequenos e preservam fallback de demonstração quando nenhum backend é fornecido. `test_multimodal_backend_contract.py` cobre os dois caminhos. A auditoria AST caiu de 66 para **63 funções com retorno constante simples**, sem alterar a conclusão conservadora sobre capacidades.

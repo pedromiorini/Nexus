@@ -4,13 +4,13 @@
 
 ## Evidência estrutural
 
-O núcleo analisado possui **26509 linhas**, **267 classes** e **842 funções**. Foram encontrados **2** métodos compostos apenas por `pass`, **66** funções com retorno constante simples e **30** marcadores de testes embutidos.
+O núcleo analisado possui **26594 linhas**, **267 classes** e **843 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **63** funções com retorno constante simples e **30** marcadores de testes embutidos.
 
 | Área | Resultado | Interpretação |
 |---|---:|---|
 | Testes embutidos marcados | 30 | Evidência de demos internas, não de capacidade geral |
-| Funções somente com `pass` | 2 | Lacunas explícitas que exigem revisão |
-| Funções com retorno constante | 66 | Possíveis heurísticas, stubs ou simplificações |
+| Funções somente com `pass` | 0 | Lacunas explícitas que exigem revisão |
+| Funções com retorno constante | 63 | Possíveis heurísticas, stubs ou simplificações |
 | Dependências opcionais sinalizadas | 2 | Fallbacks podem alterar o comportamento |
 
 ## Alegações não comprovadas
@@ -27,6 +27,7 @@ O núcleo analisado possui **26509 linhas**, **267 classes** e **842 funções**
 - `test_recovery_diagnostics_contract.py`: existe.
 - `test_deferred_task_queue.py`: existe.
 - `tools/reality_audit.py`: existe.
+- `test_multimodal_backend_contract.py`: existe.
 - `test_recovery_diagnostics_contract.py`: existe.
 - `test_deferred_task_queue.py`: existe.
 - `core/constitutional_brain.py`: existe.

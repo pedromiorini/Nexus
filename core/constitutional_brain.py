@@ -1269,8 +1269,9 @@ class VisionProcessor:
     Simula processamento de imagens e cenas visuais.
     """
 
-    def __init__(self):
+    def __init__(self, backend=None):
         # Features visuais que podemos extrair
+        self.backend = backend
         self.visual_features = [
             "objects", "colors", "shapes", "spatial_relations",
             "motion", "depth", "textures", "faces"
@@ -1309,12 +1310,17 @@ class VisionProcessor:
         )
 
     def detect_objects(self, image_data: Any) -> List[str]:
-        """Detectar objetos na imagem"""
-        # Simulação
+        """Detectar objetos usando backend opcional ou fallback explícito."""
+        detector = getattr(self.backend, "detect_objects", None)
+        if callable(detector):
+            return list(detector(image_data))
         return ["person", "chair", "table", "laptop"]
 
     def analyze_scene(self, image_data: Any) -> Dict[str, Any]:
-        """Analisar cena completa"""
+        """Analisar cena usando backend opcional ou fallback explícito."""
+        analyzer = getattr(self.backend, "analyze_scene", None)
+        if callable(analyzer):
+            return dict(analyzer(image_data))
         return {
             "scene_category": "office",
             "activity": "working",
@@ -1330,11 +1336,12 @@ class AudioProcessor:
     Simula processamento de sons e fala.
     """
 
-    def __init__(self):
+    def __init__(self, backend=None):
         self.audio_features = [
             "pitch", "volume", "tempo", "timbre",
             "speech", "music", "noise", "emotion"
         ]
+        self.backend = backend
 
     def process_audio(self, audio_data: Any) -> ModalityData:
         """
@@ -1369,7 +1376,10 @@ class AudioProcessor:
         )
 
     def transcribe_speech(self, audio_data: Any) -> str:
-        """Transcrever fala (simulado)"""
+        """Transcrever fala usando backend opcional ou fallback explícito."""
+        transcriber = getattr(self.backend, "transcribe_speech", None)
+        if callable(transcriber):
+            return str(transcriber(audio_data))
         return "This is a simulated speech transcription"
 
     def detect_emotion_from_voice(self, audio_data: Any) -> str:

@@ -25,6 +25,8 @@ O Nexus Constitutional é um **protótipo experimental de arquitetura neuro-simb
 
 O arquivo `test_recovery_diagnostics_contract.py` mantém testes independentes do contrato público de observabilidade. O arquivo `test_deferred_task_queue.py` cobre a fila e a integração do reprocessamento. O relatório `AUDIT_REALITY_REPORT.md` é gerado pelo auditor conservador em `tools/reality_audit.py`.
 
+Os processadores multimodais aceitam backends opcionais por protocolo: `VisionProcessor(backend=...)` pode fornecer `detect_objects` e `analyze_scene`, enquanto `AudioProcessor(backend=...)` pode fornecer `transcribe_speech`. Sem esses métodos, o código mantém respostas de demonstração explicitamente limitadas; elas não são inferência visual ou transcrição real. O contrato independente está em `test_multimodal_backend_contract.py`.
+
 ## Como executar
 
 Use Python 3.11 ou versão compatível, defina o caminho de importação e execute:
