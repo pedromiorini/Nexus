@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `537cdbe` (`quality: add optional multimodal backend contracts`), com melhoria local de métricas do swarm em preparação.
-- **Marco desta rodada:** estatísticas de consenso/diversidade do swarm são derivadas de deliberações reais, com falha explícita para swarm sem agentes e contrato independente.
+- **Base remota sincronizada:** `origin/main` em `b867e56` (`quality: derive swarm statistics from deliberations`).
+- **Marco desta rodada:** estatísticas de consenso/diversidade do swarm são derivadas de deliberações reais, com falha explícita para swarm sem agentes e contrato independente; CI remoto `37097115384` terminou com `success`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -72,7 +72,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o contrato multimodal para backends opcionais de visão/áudio junto com a suíte expandida.
 - executar o contrato de estatísticas observadas do swarm junto com a suíte expandida.
 
-O workflow endurecido está publicado em `537cdbe`; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
+O workflow endurecido está publicado em `b867e56`; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
 
 ## Limites e decisões
 
