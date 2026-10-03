@@ -1195,6 +1195,8 @@ class RealSwarmIntelligence:
     def __init__(self, num_agents: int = 5):
         self.agents = self._create_agents(num_agents)
         self.deliberations = 0
+        self._consensus_total = 0.0
+        self._diversity_total = 0.0
 
     def _create_agents(self, num: int) -> List[SwarmAgent]:
         base = [
@@ -1209,6 +1211,8 @@ class RealSwarmIntelligence:
     def deliberate(self, proposal: Dict, evidence: List[Dict]) -> SwarmDecision:
         """Deliberar sobre proposta"""
         votes = [agent.vote(proposal, evidence) for agent in self.agents]
+        if not votes:
+            raise ValueError("deliberation requires at least one swarm agent")
         self.deliberations += 1
 
         # Calculate consensus
@@ -1218,7 +1222,9 @@ class RealSwarmIntelligence:
         consensus = max(vote_counts.values()) / len(votes)
 
         # Calculate diversity
-        diversity = len(set(v.perspective for v in votes)) / 5.0
+        diversity = len(set(v.perspective for v in votes)) / len(votes)
+        self._consensus_total += consensus
+        self._diversity_total += diversity
 
         # Final decision
         final = max(vote_counts, key=vote_counts.get)
@@ -1231,10 +1237,11 @@ class RealSwarmIntelligence:
         )
 
     def get_statistics(self) -> Dict:
+        deliberations = self.deliberations
         return {
-            "total_deliberations": self.deliberations,
-            "avg_consensus": 0.63,
-            "avg_diversity": 0.63
+            "total_deliberations": deliberations,
+            "avg_consensus": self._consensus_total / deliberations if deliberations else 0.0,
+            "avg_diversity": self._diversity_total / deliberations if deliberations else 0.0,
         }
 
 

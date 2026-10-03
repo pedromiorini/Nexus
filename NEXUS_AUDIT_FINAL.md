@@ -123,3 +123,7 @@ O assert do demo que verificava `router_stats['total_requests'] >= 3` foi substi
 ## Atualização posterior — backends multimodais opcionais
 
 Os métodos `VisionProcessor.detect_objects`, `VisionProcessor.analyze_scene` e `AudioProcessor.transcribe_speech` deixaram de depender exclusivamente de retornos fixos. Eles agora aceitam backends opcionais com protocolos pequenos e preservam fallback de demonstração quando nenhum backend é fornecido. `test_multimodal_backend_contract.py` cobre os dois caminhos. A auditoria AST caiu de 66 para **63 funções com retorno constante simples**, sem alterar a conclusão conservadora sobre capacidades.
+
+## Atualização posterior — métricas observadas do swarm
+
+`RealSwarmIntelligence.get_statistics()` deixou de expor médias fixas (`0.63`) e passou a calcular consenso e diversidade a partir das deliberações realizadas. O contrato `test_swarm_statistics_contract.py` cobre médias acumuladas, estado inicial e falha explícita quando não há agentes.

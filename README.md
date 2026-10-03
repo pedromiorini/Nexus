@@ -27,6 +27,8 @@ O arquivo `test_recovery_diagnostics_contract.py` mantém testes independentes d
 
 Os processadores multimodais aceitam backends opcionais por protocolo: `VisionProcessor(backend=...)` pode fornecer `detect_objects` e `analyze_scene`, enquanto `AudioProcessor(backend=...)` pode fornecer `transcribe_speech`. Sem esses métodos, o código mantém respostas de demonstração explicitamente limitadas; elas não são inferência visual ou transcrição real. O contrato independente está em `test_multimodal_backend_contract.py`.
 
+As estatísticas de `RealSwarmIntelligence` (`avg_consensus` e `avg_diversity`) são calculadas a partir das decisões produzidas durante as deliberações; não são constantes de demonstração. Uma deliberação sem agentes é rejeitada explicitamente. O contrato está em `test_swarm_statistics_contract.py`.
+
 ## Como executar
 
 Use Python 3.11 ou versão compatível, defina o caminho de importação e execute:
