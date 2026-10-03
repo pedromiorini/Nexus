@@ -16066,10 +16066,9 @@ class RealCounterfactualReasoningEngine:
     
     def _predict_outcome(self, situation: str, intervention: Optional[str]) -> str:
         """Predizer outcome (com ou sem intervenção)"""
-        # Simular outcome baseado em world model se disponível
-        if self.world_model:
-            # World model pode simular cenários
-            pass
+        predictor = getattr(self.world_model, "predict_outcome", None)
+        if callable(predictor):
+            return str(predictor(situation, intervention))
         
         # Heurística simples
         if intervention:
@@ -16079,10 +16078,14 @@ class RealCounterfactualReasoningEngine:
     
     def _build_causal_chain(self, situation: str, intervention: str) -> List[str]:
         """Construir cadeia causal"""
-        # Usar causal reasoning se disponível
-        if self.causal:
-            # Causal reasoning pode construir chains
-            pass
+        extractor = getattr(self.causal, "extract_causal_relations", None)
+        if callable(extractor):
+            relations = extractor(f"{situation} causes {intervention}")
+            if relations:
+                return [
+                    f"{relation.cause} causes {relation.effect}"
+                    for relation in relations
+                ]
         
         # Heurística: steps básicos
         chain = [
