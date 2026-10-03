@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `72c6136` (`reasoning: integrate optional counterfactual protocols`).
-- **Marco desta rodada:** processadores multimodais aceitam backends opcionais para visão e áudio, com fallbacks explícitos e contrato independente.
+- **Base remota sincronizada:** `origin/main` em `537cdbe` (`quality: add optional multimodal backend contracts`).
+- **Marco desta rodada:** processadores multimodais aceitam backends opcionais para visão e áudio, com fallbacks explícitos e contrato independente; CI remoto `37096821481` terminou com `success`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -67,8 +67,9 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - preservar os B101 no relatório, com disposição explícita de asserts do demo embutido.
 - executar o auditor AST e falhar se um B101 ou qualquer `assert` aparecer fora do bloco demonstrativo.
 - executar o contrato independente do CentralRouter junto com a suíte expandida.
+- executar o contrato multimodal para backends opcionais de visão/áudio junto com a suíte expandida.
 
-O workflow endurecido está publicado em `72c6136`; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
+O workflow endurecido está publicado em `537cdbe`; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
 
 ## Limites e decisões
 
