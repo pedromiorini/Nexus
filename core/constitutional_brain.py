@@ -6229,6 +6229,7 @@ class RealPredictiveCodingSystem:
         self.total_errors_computed = 0
         self.total_updates = 0
         self.avg_error_magnitude = 0.0
+        self.generative_model_updates: List[Dict[str, Any]] = []
 
         print("🧠📊 POST 33 - RealPredictiveCodingSystem initialized (Bayesian prediction machine active)")
 
@@ -6380,13 +6381,19 @@ class RealPredictiveCodingSystem:
 
     def _update_generative_model(self, error: PredictionError, learning_rate: float):
         """Atualizar modelo gerativo baseado em erro"""
-        # Usar learning system se disponível
-        if self.learning:
-            # Learning from prediction errors
-            pass
-
-        # Simplificado: erro influencia futuras predições
-        pass
+        # O núcleo não conhece um contrato comum de ``learning``. Registra a
+        # atualização proposta para manter a evidência observável sem afirmar
+        # que um modelo externo foi realmente treinado.
+        update = {
+            "error_id": error.error_id,
+            "level": error.level,
+            "learning_rate": learning_rate,
+            "weighted_error": error.weighted_error,
+            "learning_available": self.learning is not None,
+            "applied": False,
+        }
+        self.generative_model_updates.append(update)
+        return update
 
     def precision_weighting(self, error: PredictionError, 
                            attention_weight: float = 1.0) -> float:

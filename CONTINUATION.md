@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `725ae07` (`docs: record router contract migration checkpoint`)
-- **Marco desta rodada:** primeiro B101 migrado para `test_central_router_contract.py`, snapshot da fila validado, guardrail AST ativo e CI remoto aprovado no run `36962730957`.
+- **Base remota sincronizada:** `origin/main` em `d1cd760` (`core: replace explicit adaptation and error stubs`)
+- **Marco desta rodada:** stubs explícitos de propagação, adaptação e atualização gerativa tratados com contratos observáveis; CI remoto aprovado no run `36964071462`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -32,7 +32,7 @@
 
 ## Gates locais desta rodada
 
-- **71 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
+- **72 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
@@ -42,7 +42,7 @@
 - **CI alinhado nesta rodada:** `test_vram_defense_guard.py` agora é compilado, incluído na medição de cobertura e executado explicitamente pelo workflow.
 - **CI modernizado nesta rodada:** runner fixado em `ubuntu-24.04`; `checkout@v5`, `setup-python@v6` e `upload-artifact@v7` removem a dependência das versões legadas que geravam avisos de Node.js 20.
 - **Auditor B101:** 111 achados restantes, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26510`; compilação de módulos, ferramentas e testes passou.
-- **Inventário de lacunas:** as duas funções pass-only foram implementadas com contratos mínimos observáveis e testes independentes; resta 1 `NotImplementedError` intencional para ferramenta sem executor registrado (linha 3715), retornado como falha explícita pelo executor.
+- **Inventário de lacunas:** propagação, adaptação e atualização gerativa agora registram contratos mínimos observáveis; resta 1 `NotImplementedError` intencional para ferramenta sem executor registrado (linha 3715), retornado como falha explícita pelo executor.
 
 ## Gates do workflow local
 
@@ -60,7 +60,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o auditor AST e falhar se um B101 ou qualquer `assert` aparecer fora do bloco demonstrativo.
 - executar o contrato independente do CentralRouter junto com a suíte expandida.
 
-O workflow endurecido está publicado em `f3cba60`; o CI registra apenas avisos de migração futura do Node.js 20 nas actions e do rótulo `ubuntu-latest` para Ubuntu 26, sem bloqueio.
+O workflow endurecido está publicado em `d1cd760`; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
 
 ## Limites e decisões
 
