@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `b867e56` (`quality: derive swarm statistics from deliberations`), com melhoria episódica em preparação.
-- **Marco desta rodada:** estatísticas de episódios e vínculos são derivadas do SQLite, com contrato independente para estado vazio e dados persistidos.
+- **Base remota sincronizada:** `origin/main` em `e523d9f` (`quality: derive episodic statistics from sqlite`).
+- **Marco desta rodada:** estatísticas de episódios e vínculos são derivadas do SQLite, com contrato independente para estado vazio e dados persistidos; CI remoto `37097334156` terminou com `success`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -75,7 +75,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o contrato de estatísticas observadas do swarm junto com a suíte expandida.
 - executar o contrato de estatísticas episódicas SQLite junto com a suíte expandida.
 
-O workflow endurecido está publicado em `b867e56`; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
+O workflow endurecido está publicado em `e523d9f`; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
 
 ## Limites e decisões
 
