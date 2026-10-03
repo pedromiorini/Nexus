@@ -29,6 +29,8 @@ Os processadores multimodais aceitam backends opcionais por protocolo: `VisionPr
 
 As estatísticas de `RealSwarmIntelligence` (`avg_consensus` e `avg_diversity`) são calculadas a partir das decisões produzidas durante as deliberações; não são constantes de demonstração. Uma deliberação sem agentes é rejeitada explicitamente. O contrato está em `test_swarm_statistics_contract.py`.
 
+As estatísticas de `RealEpisodicMemory` (`total_links` e `avg_importance`) são derivadas das tabelas SQLite de episódios e vínculos. No estado vazio, a média retorna `0.0`; o contrato independente está em `test_episodic_memory_statistics_contract.py`.
+
 ## Como executar
 
 Use Python 3.11 ou versão compatível, defina o caminho de importação e execute:

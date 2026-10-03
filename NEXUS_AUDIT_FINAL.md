@@ -127,3 +127,7 @@ Os métodos `VisionProcessor.detect_objects`, `VisionProcessor.analyze_scene` e 
 ## Atualização posterior — métricas observadas do swarm
 
 `RealSwarmIntelligence.get_statistics()` deixou de expor médias fixas (`0.63`) e passou a calcular consenso e diversidade a partir das deliberações realizadas. O contrato `test_swarm_statistics_contract.py` cobre médias acumuladas, estado inicial e falha explícita quando não há agentes.
+
+## Atualização posterior — métricas observadas da memória episódica
+
+`RealEpisodicMemory.get_statistics()` deixou de reportar `total_links: 0` e `avg_importance: 0.7` fixos. Os valores agora são derivados das tabelas SQLite de episódios e vínculos, com `0.0` somente quando não há episódios. O contrato `test_episodic_memory_statistics_contract.py` cobre estado vazio, média persistida, contagem de vínculos e fechamento de episódio. A auditoria AST passou a registrar **61 funções com retorno constante simples**.

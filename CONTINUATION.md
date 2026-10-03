@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `b867e56` (`quality: derive swarm statistics from deliberations`).
-- **Marco desta rodada:** estatísticas de consenso/diversidade do swarm são derivadas de deliberações reais, com falha explícita para swarm sem agentes e contrato independente; CI remoto `37097115384` terminou com `success`.
+- **Base remota sincronizada:** `origin/main` em `b867e56` (`quality: derive swarm statistics from deliberations`), com melhoria episódica em preparação.
+- **Marco desta rodada:** estatísticas de episódios e vínculos são derivadas do SQLite, com contrato independente para estado vazio e dados persistidos.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -34,10 +34,11 @@
 - `test_counterfactual_contract.py`: contratos de world model, causalidade e fallback heurístico.
 - `test_multimodal_backend_contract.py`: contratos de backends opcionais de visão/áudio e fallbacks de demonstração.
 - `test_swarm_statistics_contract.py`: contrato de médias observadas do swarm e rejeição de deliberação sem agentes.
+- `test_episodic_memory_statistics_contract.py`: contrato de contagem de vínculos, média de importância e fechamento de episódios.
 
 ## Gates locais desta rodada
 
-- **85 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
+- **86 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
@@ -52,7 +53,8 @@
 - **Contrafactuais:** `_predict_outcome` usa `world_model.predict_outcome` somente quando o protocolo existe; `_build_causal_chain` usa `extract_causal_relations` somente quando disponível.
 - **Multimodal:** `VisionProcessor` usa `detect_objects`/`analyze_scene` do backend opcional; `AudioProcessor` usa `transcribe_speech`; sem backend, os fallbacks permanecem explicitamente demonstrativos.
 - **Swarm:** `avg_consensus` e `avg_diversity` são médias acumuladas dos resultados de `deliberate`; sem agentes, `deliberate` lança `ValueError` explícito.
-- **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 63 retornos constantes simples restantes.
+- **Memória episódica:** `total_links` e `avg_importance` são consultados das tabelas SQLite; sem episódios, `avg_importance` é `0.0`.
+- **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
 
 ## Gates do workflow local
 
@@ -71,6 +73,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o contrato independente do CentralRouter junto com a suíte expandida.
 - executar o contrato multimodal para backends opcionais de visão/áudio junto com a suíte expandida.
 - executar o contrato de estatísticas observadas do swarm junto com a suíte expandida.
+- executar o contrato de estatísticas episódicas SQLite junto com a suíte expandida.
 
 O workflow endurecido está publicado em `b867e56`; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
 

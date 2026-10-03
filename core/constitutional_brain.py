@@ -2040,11 +2040,16 @@ class RealEpisodicMemory:
         return memories
 
     def get_statistics(self) -> Dict:
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM episodic_memory_links")
+        total_links = int(cursor.fetchone()[0])
+        cursor.execute("SELECT AVG(importance) FROM episodic_memories")
+        avg_importance = cursor.fetchone()[0]
         return {
             "episodes_created": self.episodes_created,
             "episodes_closed": self.episodes_closed,
-            "total_links": 0,
-            "avg_importance": 0.7
+            "total_links": total_links,
+            "avg_importance": float(avg_importance) if avg_importance is not None else 0.0,
         }
 
 
