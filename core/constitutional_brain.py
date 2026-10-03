@@ -3712,7 +3712,20 @@ class RealToolUse:
             }
 
             if tool_name not in executors:
-                raise NotImplementedError(f"Executor for '{tool_name}' not implemented")
+                error = f"Executor for '{tool_name}' not implemented"
+                self.failed_executions += 1
+                execution_result = ToolExecutionResult(
+                    tool_name=tool_name,
+                    success=False,
+                    result=None,
+                    error=error,
+                    execution_time=time.time() - start_time,
+                )
+                self.log.log_event("TOOL_EXECUTION_FAILED", {
+                    "tool": tool_name,
+                    "error": error,
+                })
+                return execution_result
 
             result = executors[tool_name](params)
 

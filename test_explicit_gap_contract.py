@@ -5,10 +5,19 @@ from core.constitutional_brain import (
     RealPredictiveCodingSystem,
     RealRealTimeAdaptationEngine,
     RealTimeEvent,
+    RealToolUse,
+    ToolDefinition,
 )
 
 
 class ExplicitGapContractTests(unittest.TestCase):
+    class _Log:
+        def __init__(self):
+            self.events = []
+
+        def log_event(self, name, payload):
+            self.events.append((name, payload))
+
     def test_prediction_error_is_copied_to_target_level(self):
         system = RealPredictiveCodingSystem()
         error = PredictionError("source", 0, "expected", "observed", 1.0, 0.5)
@@ -41,6 +50,21 @@ class ExplicitGapContractTests(unittest.TestCase):
         self.assertEqual(record["adaptation_type"], "scale_up")
         self.assertFalse(record["executed"])
         self.assertEqual(engine.adaptation_history, [record])
+
+    def test_registered_tool_without_executor_returns_structured_failure(self):
+        log = self._Log()
+        tool_use = RealToolUse(log)
+        self.assertTrue(tool_use.registry.register_tool(ToolDefinition(
+            name="future_tool",
+            description="A registered future capability",
+            parameters={},
+            returns={"type": "object"},
+        )))
+        result = tool_use.execute_tool("future_tool", {})
+        self.assertFalse(result.success)
+        self.assertIn("not implemented", result.error)
+        self.assertEqual(tool_use.failed_executions, 1)
+        self.assertEqual(log.events[-1][0], "TOOL_EXECUTION_FAILED")
 
 
 if __name__ == "__main__":

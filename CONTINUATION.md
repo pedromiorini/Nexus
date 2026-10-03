@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `395abff` (`core: record generative model update proposals`)
-- **Marco desta rodada:** propagação, adaptação e atualização gerativa tratadas com contratos observáveis; CI remoto aprovado no run `37095618619`.
+- **Base remota sincronizada:** atualização local pendente desta rodada sobre `origin/main` em `559973d` (`docs: record generative update validation`).
+- **Marco desta rodada:** caminho de ferramenta sem executor convertido em falha estruturada; inventário AST zerado para `pass-only` e `NotImplementedError`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -32,7 +32,7 @@
 
 ## Gates locais desta rodada
 
-- **72 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
+- **73 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
@@ -42,7 +42,7 @@
 - **CI alinhado nesta rodada:** `test_vram_defense_guard.py` agora é compilado, incluído na medição de cobertura e executado explicitamente pelo workflow.
 - **CI modernizado nesta rodada:** runner fixado em `ubuntu-24.04`; `checkout@v5`, `setup-python@v6` e `upload-artifact@v7` removem a dependência das versões legadas que geravam avisos de Node.js 20.
 - **Auditor B101:** 111 achados restantes, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26510`; compilação de módulos, ferramentas e testes passou.
-- **Inventário de lacunas:** propagação, adaptação e atualização gerativa agora registram contratos mínimos observáveis; resta 1 `NotImplementedError` intencional para ferramenta sem executor registrado (linha 3715), retornado como falha explícita pelo executor.
+- **Inventário de lacunas:** propagação, adaptação e atualização gerativa registram contratos mínimos observáveis; ferramenta registrada sem executor retorna falha estruturada. O inventário AST agora registra `pass_only_count=0` e `not_implemented_count=0`.
 
 ## Gates do workflow local
 
