@@ -5543,15 +5543,19 @@ class CentralExecutive:
         # Controle
         self.current_task: Optional[str] = None
         self.task_switching_cost = 0.2
+        self.attention_allocations: List[Dict[str, Any]] = []
 
     def allocate_attention(self, target: str, strength: float = 0.8):
         """Alocar atenção para target"""
-        if self.attention_system:
-            # Usar sistema de atenção se disponível
-            pass
-
-        # Simples: track current task
+        normalized_strength = max(0.0, min(1.0, float(strength)))
+        allocation = {
+            "target": target,
+            "strength": normalized_strength,
+            "delegated": self.attention_system is not None,
+        }
+        self.attention_allocations.append(allocation)
         self.current_task = target
+        return allocation
 
     def switch_task(self, new_task: str) -> float:
         """Mudar tarefa (com custo)"""

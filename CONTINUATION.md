@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** atualização local pendente desta rodada sobre `origin/main` em `559973d` (`docs: record generative update validation`).
-- **Marco desta rodada:** caminho de ferramenta sem executor convertido em falha estruturada; inventário AST zerado para `pass-only` e `NotImplementedError`.
+- **Base remota sincronizada:** atualização local pendente desta rodada sobre `origin/main` em `bff9899` (`core: return structured unsupported-tool failures`).
+- **Marco desta rodada:** `CentralExecutive.allocate_attention` passou a registrar alocações observáveis, com contrato independente; inventário AST permanece zerado.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -29,10 +29,11 @@
 - `test_central_router_contract.py`: contrato independente para contagem de requisições, cache hit rate e latência média.
 - `tools/implementation_gap_audit.py`: inventário AST conservador de funções pass-only e `NotImplementedError`, sem tratar lacunas como implementadas.
 - `test_explicit_gap_contract.py`: contratos independentes para propagação de erro e registro de adaptação simulada.
+- `test_working_memory_contract.py`: contrato independente para alocação de atenção local e delegação declarada.
 
 ## Gates locais desta rodada
 
-- **73 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
+- **75 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
