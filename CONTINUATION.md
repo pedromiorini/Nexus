@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `89bdbd7` (`docs: add canonical nexus knowledge system`).
-- **Marco desta rodada:** bootstrap audit concluído; estado atual reconciliado, conflitos históricos classificados e documentos canônicos de constituição, conhecimento, arquitetura, evidências, decisões e roadmap publicados; CI remoto `37173628013` terminou com `success`.
+- **Base remota sincronizada:** `origin/main` em `3697e1e` (`quality: add observable attention signals`).
+- **Marco desta rodada:** sinais opcionais de contraste e movimento foram adicionados à atenção bottom-up, com fallbacks heurísticos explícitos e contrato independente; CI remoto `37173944212` terminou com `success`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -46,7 +46,7 @@
 
 ## Gates locais desta rodada
 
-- **89 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral.
+- **89 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral; o contrato de atenção cobre sinais, limites, contexto e fallback.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
