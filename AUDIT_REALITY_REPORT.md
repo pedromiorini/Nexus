@@ -29,6 +29,7 @@ O núcleo analisado possui **26606 linhas**, **267 classes** e **843 funções**
 - `tools/reality_audit.py`: existe.
 - `test_multimodal_backend_contract.py`: existe.
 - `test_swarm_statistics_contract.py`: existe.
+- `test_episodic_memory_statistics_contract.py`: existe.
 - `test_recovery_diagnostics_contract.py`: existe.
 - `test_deferred_task_queue.py`: existe.
 - `core/constitutional_brain.py`: existe.

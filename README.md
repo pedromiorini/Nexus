@@ -89,3 +89,7 @@ As próximas prioridades são elevar a cobertura dos componentes críticos, adic
 ## Auditoria de realidade
 
 Execute `python3 tools/reality_audit.py` para gerar `AUDIT_REALITY_REPORT.md` e `audit_reality.json`. O auditor compara alegações documentais, caminhos referenciados, estrutura AST, funções somente com `pass`, retornos constantes, testes embutidos e dependências opcionais. Ele é deliberadamente conservador: sinaliza alegações que precisam de evidência, mas não tenta concluir capacidades cognitivas a partir de nomes ou banners.
+
+## Conhecimento e continuidade
+
+O estado canônico de engenharia está separado por finalidade: [`NEXUS_CONSTITUTION.md`](NEXUS_CONSTITUTION.md) define limites e regras; [`NEXUS_KNOWLEDGE.md`](NEXUS_KNOWLEDGE.md) registra fontes e estado operacional; [`NEXUS_ARCHITECTURE.md`](NEXUS_ARCHITECTURE.md) descreve responsabilidades e fronteiras; [`NEXUS_EVIDENCE.md`](NEXUS_EVIDENCE.md) mantém a matriz fato/evidência/limitação; [`NEXUS_DECISIONS.md`](NEXUS_DECISIONS.md) registra decisões; [`NEXUS_ROADMAP.md`](NEXUS_ROADMAP.md) prioriza evolução verificável; e [`CONTINUATION.md`](CONTINUATION.md) registra o último checkpoint entre agentes. O diagnóstico que originou essa separação está em [`NEXUS_BOOTSTRAP_AUDIT.md`](NEXUS_BOOTSTRAP_AUDIT.md).

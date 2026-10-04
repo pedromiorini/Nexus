@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `e523d9f` (`quality: derive episodic statistics from sqlite`).
-- **Marco desta rodada:** estatísticas de episódios e vínculos são derivadas do SQLite, com contrato independente para estado vazio e dados persistidos; CI remoto `37097334156` terminou com `success`.
+- **Base remota sincronizada:** `origin/main` em `5f261fc` (`docs: record episodic statistics CI checkpoint`).
+- **Marco desta rodada:** bootstrap audit concluído; estado atual reconciliado, conflitos históricos classificados e documentos canônicos de constituição, conhecimento, arquitetura, evidências, decisões e roadmap criados.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -35,6 +35,13 @@
 - `test_multimodal_backend_contract.py`: contratos de backends opcionais de visão/áudio e fallbacks de demonstração.
 - `test_swarm_statistics_contract.py`: contrato de médias observadas do swarm e rejeição de deliberação sem agentes.
 - `test_episodic_memory_statistics_contract.py`: contrato de contagem de vínculos, média de importância e fechamento de episódios.
+- `NEXUS_CONSTITUTION.md`: limites permanentes e regras epistemológicas do projeto.
+- `NEXUS_KNOWLEDGE.md`: fontes de verdade e estado operacional canônico.
+- `NEXUS_ARCHITECTURE.md`: mapa de responsabilidades e fronteiras observadas.
+- `NEXUS_EVIDENCE.md`: ledger de fatos, evidências e limitações.
+- `NEXUS_DECISIONS.md`: decisões arquiteturais com contexto e evidência.
+- `NEXUS_ROADMAP.md`: prioridades técnicas orientadas por risco.
+- `NEXUS_BOOTSTRAP_AUDIT.md`: auditoria de bootstrap e reconciliação documental.
 
 ## Gates locais desta rodada
 
@@ -55,6 +62,7 @@
 - **Swarm:** `avg_consensus` e `avg_diversity` são médias acumuladas dos resultados de `deliberate`; sem agentes, `deliberate` lança `ValueError` explícito.
 - **Memória episódica:** `total_links` e `avg_importance` são consultados das tabelas SQLite; sem episódios, `avg_importance` é `0.0`.
 - **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
+- **Bootstrap audit:** 86 testes atuais, 129 findings LOW atuais e dependências opcionais ausentes (`psutil`, `FAISS/SentenceTransformers`) registrados como limitações.
 
 ## Gates do workflow local
 
@@ -94,4 +102,4 @@ O workflow endurecido está publicado em `e523d9f`; as actions estão em versõe
 
 ## Próxima ação
 
-Manter a triagem Bandit aberta e executar mutation testing direcionado antes de qualquer alteração no núcleo monolítico. Não tratar os banners da suíte integrada como evidência independente de capacidade cognitiva.
+Manter os documentos canônicos sincronizados com o código e executar mutation testing direcionado antes de qualquer alteração no núcleo monolítico. Não tratar os banners da suíte integrada como evidência independente de capacidade cognitiva.
