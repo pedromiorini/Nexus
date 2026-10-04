@@ -20265,7 +20265,7 @@ class RealErrorDetectionCorrectionEngine:
                         min_val = float(parts[1].split()[0])
                         return min_val
                     except (ValueError, IndexError):
-                        pass
+                        return original_content
             elif "above maximum" in error.description:
                 # Extract maximum value
                 parts = error.description.split("maximum ")
@@ -20274,7 +20274,7 @@ class RealErrorDetectionCorrectionEngine:
                         max_val = float(parts[1].split()[0])
                         return max_val
                     except (ValueError, IndexError):
-                        pass
+                        return original_content
         
         # Default: return original
         return original_content
