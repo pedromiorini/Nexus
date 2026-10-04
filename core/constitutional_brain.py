@@ -16429,6 +16429,8 @@ class RealDistributedConsensusProtocol:
         self.total_consensus_reached = 0
         self.total_knowledge_syncs = 0
         self.avg_consensus_time = 0.0
+        self.applied_parameter_changes: List[Dict[str, Any]] = []
+        self.applied_decisions: List[Dict[str, Any]] = []
         
         # Registrar self como primeiro nó
         self._register_self_node()
@@ -16568,14 +16570,44 @@ class RealDistributedConsensusProtocol:
         if proposal.proposal_type == "knowledge_update":
             # Sincronizar conhecimento
             self._sync_knowledge_from_proposal(proposal)
+            return True
         
         elif proposal.proposal_type == "parameter_change":
-            # Atualizar parâmetros
-            pass
+            parameter = proposal.content.get("parameter")
+            value = proposal.content.get("value")
+            bounds = {
+                "quorum_size": (0.0, 1.0),
+                "heartbeat_interval": (0.001, float("inf")),
+                "election_timeout": (0.001, float("inf")),
+            }
+            if parameter not in bounds:
+                return False
+            try:
+                numeric_value = float(value)
+            except (TypeError, ValueError):
+                return False
+            lower, upper = bounds[parameter]
+            if not lower <= numeric_value <= upper:
+                return False
+            setattr(self, parameter, numeric_value)
+            self.applied_parameter_changes.append({
+                "proposal_id": proposal.proposal_id,
+                "parameter": parameter,
+                "value": numeric_value,
+            })
+            return True
         
         elif proposal.proposal_type == "decision":
-            # Executar decisão
-            pass
+            decision = proposal.content.get("decision")
+            if not isinstance(decision, str) or not decision.strip():
+                return False
+            self.applied_decisions.append({
+                "proposal_id": proposal.proposal_id,
+                "decision": decision.strip(),
+            })
+            return True
+
+        return False
     
     def _sync_knowledge_from_proposal(self, proposal: ConsensusProposal):
         """Sincronizar conhecimento de proposta aceita"""

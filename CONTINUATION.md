@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** atualização local pendente sobre `origin/main` em `099ee90` (`quality: preserve unique knowledge graph entities`).
-- **Marco desta rodada:** `SensorimotorIntegrationLayer` usa processadores multimodais opcionais quando o protocolo existe e preserva fallback heurístico explícito.
+- **Base remota sincronizada:** atualização local pendente sobre `origin/main` em `364fe71` (`perception: integrate optional multimodal processors`).
+- **Marco desta rodada:** propostas de `parameter_change` e `decision` aceitas pelo consenso agora têm aplicação local limitada, validada e auditável.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -39,6 +39,7 @@
 - `test_integration_synergy_contract.py`: contrato da média aritmética de sinergia sobre todas as integrações registradas.
 - `test_knowledge_graph_contract.py`: contrato de identidade única, média de confiança e reclassificação de tipo no grafo.
 - `test_sensorimotor_multimodal_contract.py`: contrato de processadores multimodais opcionais e fallback sensorial.
+- `test_consensus_application_contract.py`: contratos de parâmetros aceitos, decisões auditadas e rejeição sem mutação.
 - `NEXUS_CONSTITUTION.md`: limites permanentes e regras epistemológicas do projeto.
 - `NEXUS_KNOWLEDGE.md`: fontes de verdade e estado operacional canônico.
 - `NEXUS_ARCHITECTURE.md`: mapa de responsabilidades e fronteiras observadas.
@@ -49,7 +50,7 @@
 
 ## Gates locais desta rodada
 
-- **95 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral; os contratos de atenção, sinergia, grafo e sensorimotor cobrem sinais observados, métricas, identidade, limites, contexto e fallback.
+- **99 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral; os contratos de atenção, sinergia, grafo, sensorimotor e consenso cobrem sinais observados, métricas, identidade, limites, contexto e fallback.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
@@ -69,6 +70,7 @@
 - **Integração/orquestração:** `avg_synergy_score` é a média das integrações registradas; scores individuais continuam heurísticos por nomes de módulos.
 - **Grafo de conhecimento:** `entity_id` é único; atualizações não inflacionam a contagem e mudanças de tipo reclassificam o índice.
 - **Sensorimotor/multimodal:** modalidades `vision`, `audio` e `text` usam processadores compatíveis quando disponíveis; entradas desconhecidas ou ausência de processador seguem fallback de features observadas.
+- **Consenso:** alterações aceitas só podem modificar `quorum_size`, `heartbeat_interval` e `election_timeout` dentro de limites; decisões são registradas como eventos locais, sem execução externa.
 - **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
 - **Bootstrap audit:** 86 testes atuais, 129 findings LOW atuais e dependências opcionais ausentes (`psutil`, `FAISS/SentenceTransformers`) registrados como limitações.
 
