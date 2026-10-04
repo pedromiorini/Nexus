@@ -13,6 +13,7 @@ Estado de referência: commit `5f261fcaabffe4e265372bfbc1e5b7c7aa303d3f`, suíte
 | Multimodalidade | parcial | protocolos de backend e fallbacks testados | sem backend não há percepção/transcrição real |
 | Atenção bottom-up | parcial/verificado no contrato | contraste e movimento opcionais, saliência limitada e fallbacks testados | sem sinais observados, usa heurística; não é percepção biológica |
 | Integração/orquestração | parcial/verificado no contrato | média de sinergia calculada sobre integrações registradas | score individual ainda é heurístico por nomes; não demonstra inteligência emergente |
+| Grafo de conhecimento | parcial/verificado no contrato | entidades únicas por ID, média de confiança e índice de tipo consistente | sem consistência distribuída ou validação externa do conhecimento |
 | Telemetria | parcial/verificado | Vita, SQLite e guard de VRAM | dependente do ambiente e dos recursos disponíveis |
 | Segurança | parcial | Bandit 129 LOW, triagem, auditorias AST e testes negativos | não substitui threat model ou revisão manual completa |
 | CI | verificado | último run conhecido `37097334156` com sucesso para `e523d9f` | qualquer novo commit exige nova execução |

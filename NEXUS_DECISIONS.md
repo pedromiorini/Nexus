@@ -61,3 +61,12 @@
 - **Evidência:** `test_integration_synergy_contract.py` detecta os valores 0.9 e 0.6 e exige média 0.75.
 - **Limitação:** os scores individuais continuam heurísticos baseados nos nomes dos módulos; a correção não demonstra sinergia cognitiva.
 - **Reversibilidade:** fácil.
+
+## D-009 — Entidades do grafo são identificadas por ID
+
+- **Decisão:** re-adicionar um `entity_id` atualiza a entidade existente, não aumenta `total_entities`, e move o ID entre índices quando o tipo muda.
+- **Contexto:** a implementação substituía o índice, mas acumulava a contagem de inserções e deixava o tipo antigo indexado.
+- **Motivo:** alinhar estatísticas e índices com a identidade observada no grafo.
+- **Evidência:** `test_knowledge_graph_contract.py` cobre duplicata, média de confiança, contagem única e reclassificação.
+- **Limitação:** o grafo continua local; isso não define identidade distribuída, consistência concorrente ou conhecimento válido externamente.
+- **Reversibilidade:** fácil.

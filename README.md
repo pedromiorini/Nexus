@@ -35,6 +35,8 @@ As estatísticas de `RealEpisodicMemory` (`total_links` e `avg_importance`) são
 
 `RealIntegrationOrchestrationEngine` calcula `avg_synergy_score` como a média das integrações registradas, evitando a média recursiva sem peso anterior. Os scores individuais continuam sendo heurísticas baseadas nos nomes dos módulos; o contrato está em `test_integration_synergy_contract.py`.
 
+`RealKnowledgeGraph` trata `entity_id` como identidade única: re-adicionar uma entidade atualiza o registro, preserva a contagem e remove o ID do índice de tipo anterior quando necessário. `test_knowledge_graph_contract.py` cobre essa invariável e a média de confiança observada.
+
 ## Como executar
 
 Use Python 3.11 ou versão compatível, defina o caminho de importação e execute:

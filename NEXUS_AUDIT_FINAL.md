@@ -141,3 +141,8 @@ Os métodos `VisionProcessor.detect_objects`, `VisionProcessor.analyze_scene` e 
 ## Atualização posterior — média de sinergia observada
 
 `RealIntegrationOrchestrationEngine` deixou de atualizar `avg_synergy_score` como média recursiva sem peso. A métrica agora é derivada de todas as integrações registradas. `test_integration_synergy_contract.py` cobre o caso de scores 0.9 e 0.6, exigindo média 0.75. Os scores individuais continuam heurísticos por nomes de módulos e não constituem evidência de inteligência emergente.
+
+
+## Atualização posterior — identidade única no grafo de conhecimento
+
+`RealKnowledgeGraph.add_entity()` passou a tratar `entity_id` como identidade única. Atualizações não inflacionam `total_entities`, a média de confiança usa a entidade atual e uma mudança de tipo remove o ID do índice anterior. `test_knowledge_graph_contract.py` cobre duplicata, contagem, média e reclassificação. Isso corrige consistência local; não oferece identidade distribuída ou validação externa do conhecimento.

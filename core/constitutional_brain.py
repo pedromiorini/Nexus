@@ -554,6 +554,7 @@ class RealKnowledgeGraph:
                    properties: Optional[Dict] = None, 
                    confidence: float = 0.9) -> Entity:
         """Adicionar entidade ao grafo."""
+        previous = self.entity_index.get(entity_id)
         entity = Entity(
             id=entity_id,
             type=entity_type,
@@ -563,6 +564,10 @@ class RealKnowledgeGraph:
         )
 
         self.entity_index[entity_id] = entity
+        if previous is not None and previous.type != entity_type:
+            self.type_index[previous.type].discard(entity_id)
+            if not self.type_index[previous.type]:
+                del self.type_index[previous.type]
         self.type_index[entity_type].add(entity_id)
 
         if self.nx:
@@ -575,7 +580,8 @@ class RealKnowledgeGraph:
         else:
             self.graph["nodes"][entity_id] = entity
 
-        self.total_entities += 1
+        if previous is None:
+            self.total_entities += 1
         return entity
 
     def add_relation(self, source_id: str, relation_type: str, target_id: str,
