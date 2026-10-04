@@ -4,7 +4,7 @@
 
 ## Evidência estrutural
 
-O núcleo analisado possui **26619 linhas**, **267 classes** e **843 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **59** funções com retorno constante simples e **30** marcadores de testes embutidos.
+O núcleo analisado possui **26622 linhas**, **267 classes** e **843 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **59** funções com retorno constante simples e **30** marcadores de testes embutidos.
 
 | Área | Resultado | Interpretação |
 |---|---:|---|
@@ -31,6 +31,7 @@ O núcleo analisado possui **26619 linhas**, **267 classes** e **843 funções**
 - `test_swarm_statistics_contract.py`: existe.
 - `test_episodic_memory_statistics_contract.py`: existe.
 - `test_attention_signal_contract.py`: existe.
+- `test_integration_synergy_contract.py`: existe.
 - `test_recovery_diagnostics_contract.py`: existe.
 - `test_deferred_task_queue.py`: existe.
 - `core/constitutional_brain.py`: existe.

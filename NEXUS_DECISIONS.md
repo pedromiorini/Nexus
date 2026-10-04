@@ -52,3 +52,12 @@
 - **Motivo:** aumentar observabilidade sem quebrar construtores existentes ou inventar um backend perceptual.
 - **Evidência:** `test_attention_signal_contract.py` cobre sinais presentes, contexto, limites e fallback.
 - **Reversibilidade:** fácil.
+
+## D-008 — Média de sinergia calculada sobre todos os registros
+
+- **Decisão:** `RealIntegrationOrchestrationEngine` calcula `avg_synergy_score` pela média aritmética das integrações registradas.
+- **Contexto:** a atualização anterior fazia uma média recursiva sem peso, distorcendo o resultado após mais de uma integração.
+- **Motivo:** preservar uma métrica estatística correta sem alterar a API pública.
+- **Evidência:** `test_integration_synergy_contract.py` detecta os valores 0.9 e 0.6 e exige média 0.75.
+- **Limitação:** os scores individuais continuam heurísticos baseados nos nomes dos módulos; a correção não demonstra sinergia cognitiva.
+- **Reversibilidade:** fácil.

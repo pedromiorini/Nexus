@@ -36,6 +36,7 @@
 - `test_swarm_statistics_contract.py`: contrato de médias observadas do swarm e rejeição de deliberação sem agentes.
 - `test_episodic_memory_statistics_contract.py`: contrato de contagem de vínculos, média de importância e fechamento de episódios.
 - `test_attention_signal_contract.py`: contrato de sinais opcionais de contraste/movimento e fallbacks heurísticos da atenção.
+- `test_integration_synergy_contract.py`: contrato da média aritmética de sinergia sobre todas as integrações registradas.
 - `NEXUS_CONSTITUTION.md`: limites permanentes e regras epistemológicas do projeto.
 - `NEXUS_KNOWLEDGE.md`: fontes de verdade e estado operacional canônico.
 - `NEXUS_ARCHITECTURE.md`: mapa de responsabilidades e fronteiras observadas.
@@ -46,7 +47,7 @@
 
 ## Gates locais desta rodada
 
-- **89 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral; o contrato de atenção cobre sinais, limites, contexto e fallback.
+- **91 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral; os contratos de atenção e sinergia cobrem sinais observados, limites, contexto, fallback e média aritmética.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
@@ -63,6 +64,7 @@
 - **Swarm:** `avg_consensus` e `avg_diversity` são médias acumuladas dos resultados de `deliberate`; sem agentes, `deliberate` lança `ValueError` explícito.
 - **Memória episódica:** `total_links` e `avg_importance` são consultados das tabelas SQLite; sem episódios, `avg_importance` é `0.0`.
 - **Atenção bottom-up:** `StimulusItem` aceita `contrast` e `motion` observados; sem sinais, os fallbacks `0.5` e `0.6` continuam explícitos e testados.
+- **Integração/orquestração:** `avg_synergy_score` é a média das integrações registradas; scores individuais continuam heurísticos por nomes de módulos.
 - **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
 - **Bootstrap audit:** 86 testes atuais, 129 findings LOW atuais e dependências opcionais ausentes (`psutil`, `FAISS/SentenceTransformers`) registrados como limitações.
 
@@ -85,6 +87,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o contrato de estatísticas observadas do swarm junto com a suíte expandida.
 - executar o contrato de estatísticas episódicas SQLite junto com a suíte expandida.
 - executar o contrato de sinais de atenção junto com a suíte expandida.
+- executar o contrato de média de sinergia junto com a suíte expandida.
 
 O workflow endurecido está publicado em `e523d9f`; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
 

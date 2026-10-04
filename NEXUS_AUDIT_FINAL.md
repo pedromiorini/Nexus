@@ -136,3 +136,8 @@ Os métodos `VisionProcessor.detect_objects`, `VisionProcessor.analyze_scene` e 
 ## Atualização posterior — sinais observados de atenção
 
 `StimulusItem` passou a aceitar `contrast` e `motion` opcionais. `BottomUpAttention` usa os sinais quando fornecidos, aceita contraste no contexto e preserva fallbacks heurísticos explícitos quando não há observação. `test_attention_signal_contract.py` cobre limites, sinais presentes, contexto e ausência de sinais. A mudança não reivindica percepção real nem altera a classificação conservadora do sistema.
+
+
+## Atualização posterior — média de sinergia observada
+
+`RealIntegrationOrchestrationEngine` deixou de atualizar `avg_synergy_score` como média recursiva sem peso. A métrica agora é derivada de todas as integrações registradas. `test_integration_synergy_contract.py` cobre o caso de scores 0.9 e 0.6, exigindo média 0.75. Os scores individuais continuam heurísticos por nomes de módulos e não constituem evidência de inteligência emergente.

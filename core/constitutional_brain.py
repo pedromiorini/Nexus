@@ -22277,10 +22277,13 @@ class RealIntegrationOrchestrationEngine:
     
     def _update_synergy_statistics(self, synergy: float):
         """Atualizar estatísticas de sinergia"""
-        if self.avg_synergy_score == 0:
-            self.avg_synergy_score = synergy
-        else:
-            self.avg_synergy_score = (self.avg_synergy_score + synergy) / 2
+        if not self.integrations:
+            self.avg_synergy_score = 0.0
+            return
+
+        self.avg_synergy_score = sum(
+            integration.synergy_score for integration in self.integrations
+        ) / len(self.integrations)
     
     def orchestrate_for_query(self, query: str,
                              available_modules: List[str]) -> OrchestrationPlan:

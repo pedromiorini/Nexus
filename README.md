@@ -33,6 +33,8 @@ As estatísticas de `RealEpisodicMemory` (`total_links` e `avg_importance`) são
 
 `StimulusItem` aceita sinais opcionais de `contrast` e `motion`. O componente `BottomUpAttention` usa esses valores quando observados, aceita `contrast` no contexto e mantém fallbacks heurísticos explícitos quando os sinais não estão disponíveis. O contrato está em `test_attention_signal_contract.py`.
 
+`RealIntegrationOrchestrationEngine` calcula `avg_synergy_score` como a média das integrações registradas, evitando a média recursiva sem peso anterior. Os scores individuais continuam sendo heurísticas baseadas nos nomes dos módulos; o contrato está em `test_integration_synergy_contract.py`.
+
 ## Como executar
 
 Use Python 3.11 ou versão compatível, defina o caminho de importação e execute:

@@ -3,7 +3,7 @@
   "scope": "conservative reality audit",
   "principle": "names, banners and demo asserts are not proof of general intelligence or production readiness",
   "static_evidence": {
-    "core_lines": 26619,
+    "core_lines": 26622,
     "classes": 267,
     "functions": 843,
     "pass_only_functions": [],
@@ -295,12 +295,12 @@
       },
       {
         "name": "get_statistics",
-        "line": 22453,
+        "line": 22456,
         "value": "{'total_integrations': self.total_integrations, 'total_orchestrations': self.total_orchestrations, 'avg_synergy_score': self.avg_synergy_score, 'system_coherence': self.system_coherence, 'active_integrations': len(self.integrations), 'orchestration_plans': len(self.orchestration_plans)}"
       },
       {
         "name": "test_task",
-        "line": 26048,
+        "line": 26051,
         "value": "True"
       }
     ],
@@ -367,6 +367,10 @@
     },
     {
       "path": "test_attention_signal_contract.py",
+      "exists": true
+    },
+    {
+      "path": "test_integration_synergy_contract.py",
       "exists": true
     },
     {
