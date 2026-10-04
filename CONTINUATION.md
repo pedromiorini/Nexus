@@ -6,7 +6,7 @@
 
 - **Branch:** `main`
 - **Base remota sincronizada:** `origin/main` em `89bdbd7` (`docs: add canonical nexus knowledge system`).
-- **Marco desta rodada:** bootstrap audit concluído; estado atual reconciliado, conflitos históricos classificados e documentos canônicos de constituição, conhecimento, arquitetura, evidências, decisões e roadmap publicados.
+- **Marco desta rodada:** bootstrap audit concluído; estado atual reconciliado, conflitos históricos classificados e documentos canônicos de constituição, conhecimento, arquitetura, evidências, decisões e roadmap publicados; CI remoto `37173628013` terminou com `success`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
