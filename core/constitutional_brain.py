@@ -14858,6 +14858,7 @@ class RealHardwareAwareSelfOptimization:
         self.total_clones_created = 0
         self.total_knowledge_reintegrations = 0
         self.avg_performance_gain = 0.0
+        self.bootstrap_reintegration_events: List[Dict[str, Any]] = []
         
         print("⚡🔧 POST 35 - RealHardwareAwareSelfOptimization initialized (Computational proprioception active)")
     
@@ -15115,10 +15116,18 @@ class RealHardwareAwareSelfOptimization:
         # Consolidar conhecimento
         consolidated_knowledge = clone.knowledge_gained.copy()
         
-        # Integrar com bootstrap loop se disponível
-        if self.bootstrap:
-            # Bootstrap loop pode usar knowledge para atualizar self-concept
-            pass
+        # Integrar somente se o bootstrap expuser um protocolo explícito.
+        ingest = getattr(self.bootstrap, "ingest_knowledge", None)
+        integrated = False
+        if callable(ingest):
+            ingest(consolidated_knowledge)
+            integrated = True
+        self.bootstrap_reintegration_events.append({
+            "clone_id": clone_id,
+            "knowledge_keys": sorted(consolidated_knowledge),
+            "bootstrap_available": self.bootstrap is not None,
+            "integrated": integrated,
+        })
         
         # Remover clone
         del self.shadow_clones[clone_id]
