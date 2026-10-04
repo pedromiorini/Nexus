@@ -16853,10 +16853,26 @@ class RealSensorimotorIntegrationLayer:
     
     def _process_modality(self, modality: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Processar modalidade específica"""
-        # Usar multimodal processor se disponível
-        if self.multimodal:
-            # Multimodal pode processar
-            pass
+        processor_names = {
+            "vision": ("vision_processor", "process_image"),
+            "audio": ("audio_processor", "process_audio"),
+            "text": ("text_processor", "process_text"),
+        }
+        processor_spec = processor_names.get(modality)
+        if self.multimodal and processor_spec:
+            processor = getattr(self.multimodal, processor_spec[0], None)
+            process = getattr(processor, processor_spec[1], None)
+            if callable(process):
+                result = process(data)
+                features = getattr(result, "processed_features", None)
+                if isinstance(features, dict):
+                    return {
+                        "modality": modality,
+                        "features": list(features.keys()),
+                        "confidence": float(getattr(result, "confidence", 0.0)),
+                        "source": "multimodal_processor",
+                        "processed_at": time.time(),
+                    }
         
         # Heurística simples
         processed = {
