@@ -14068,6 +14068,7 @@ class ReminiscenceBump:
     memory_density: float  # Densidade de memórias
     self_defining_count: int
     formative_importance: float  # 0-1
+    is_typical: bool = True
 
 class RealReminiscenceBumpClustering:
     """
@@ -14299,10 +14300,8 @@ class RealReminiscenceBumpClustering:
         
         peak_age, peak_density = densities[0]
         
-        # Verificar se está na faixa típica do bump (10-30 anos)
-        if not (10 <= peak_age <= 30):
-            # Ainda criar, mas marcar como atípico
-            pass
+        # Verificar se está na faixa típica do bump (10-30 anos).
+        is_typical = 10 <= peak_age <= 30
         
         # Contar self-defining memories no bump
         bump_memories = age_distribution[peak_age]
@@ -14321,7 +14320,8 @@ class RealReminiscenceBumpClustering:
             age_range=(peak_age, peak_age + 5),
             memory_density=peak_density / 10.0,  # Normalizar
             self_defining_count=sdm_count,
-            formative_importance=formative_importance
+            formative_importance=formative_importance,
+            is_typical=is_typical,
         )
         
         self.reminiscence_bumps.append(bump)
