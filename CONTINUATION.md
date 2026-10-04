@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` em `3697e1e` (`quality: add observable attention signals`).
-- **Marco desta rodada:** sinais opcionais de contraste e movimento foram adicionados à atenção bottom-up, com fallbacks heurísticos explícitos e contrato independente; CI remoto `37173944212` terminou com `success`.
+- **Base remota sincronizada:** `origin/main` em `49bdf17` (`quality: derive integration synergy average`).
+- **Marco desta rodada:** a média de sinergia passou a ser derivada de todas as integrações registradas, corrigindo a média recursiva sem peso; CI remoto `37174202820` terminou com `success`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
