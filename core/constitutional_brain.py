@@ -4932,6 +4932,8 @@ class StimulusItem:
     salience: float  # Proeminência do estímulo (0-1)
     priority: float  # Prioridade baseada em objetivos (0-1)
     timestamp: float
+    contrast: Optional[float] = None  # Contraste observado, quando disponível
+    motion: Optional[float] = None  # Movimento observado, quando disponível
 
 
 @dataclass
@@ -5026,12 +5028,23 @@ class BottomUpAttention:
 
     def _assess_contrast(self, stimulus: StimulusItem, context: Dict) -> float:
         """Avaliar contraste com background"""
-        # Simplificado: assume contraste médio
+        if stimulus.contrast is not None:
+            return min(1.0, max(0.0, stimulus.contrast))
+
+        # Compatibilidade com produtores que fornecem o sinal no contexto.
+        context_contrast = context.get("contrast")
+        if context_contrast is not None:
+            return min(1.0, max(0.0, float(context_contrast)))
+
+        # Fallback heurístico explícito para estímulos sem observação.
         return 0.5
 
     def _assess_motion(self, stimulus: StimulusItem) -> float:
         """Avaliar movimento/mudança"""
-        # Estímulos novos = movimento percebido
+        if stimulus.motion is not None:
+            return min(1.0, max(0.0, stimulus.motion))
+
+        # Fallback heurístico explícito para estímulos sem observação.
         return 0.6
 
 

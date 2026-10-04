@@ -44,3 +44,11 @@
 - **Motivo:** auditorias anteriores registram 132 e 130 findings; a execução atual registra 129 LOW.
 - **Evidência:** comparação entre `NEXUS_AUDIT_FINAL.md`, `SECURITY_TRIAGE.md` e Bandit executado.
 - **Reversibilidade:** fácil.
+
+## D-007 — Sinais de atenção opcionais, com fallback explícito
+
+- **Decisão:** `StimulusItem` aceita `contrast` e `motion` opcionais; `BottomUpAttention` usa sinais fornecidos e mantém valores heurísticos somente quando ausentes.
+- **Contexto:** contraste e movimento eram constantes sem uma entrada observável.
+- **Motivo:** aumentar observabilidade sem quebrar construtores existentes ou inventar um backend perceptual.
+- **Evidência:** `test_attention_signal_contract.py` cobre sinais presentes, contexto, limites e fallback.
+- **Reversibilidade:** fácil.

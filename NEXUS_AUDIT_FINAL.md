@@ -131,3 +131,8 @@ Os métodos `VisionProcessor.detect_objects`, `VisionProcessor.analyze_scene` e 
 ## Atualização posterior — métricas observadas da memória episódica
 
 `RealEpisodicMemory.get_statistics()` deixou de reportar `total_links: 0` e `avg_importance: 0.7` fixos. Os valores agora são derivados das tabelas SQLite de episódios e vínculos, com `0.0` somente quando não há episódios. O contrato `test_episodic_memory_statistics_contract.py` cobre estado vazio, média persistida, contagem de vínculos e fechamento de episódio. A auditoria AST passou a registrar **61 funções com retorno constante simples**.
+
+
+## Atualização posterior — sinais observados de atenção
+
+`StimulusItem` passou a aceitar `contrast` e `motion` opcionais. `BottomUpAttention` usa os sinais quando fornecidos, aceita contraste no contexto e preserva fallbacks heurísticos explícitos quando não há observação. `test_attention_signal_contract.py` cobre limites, sinais presentes, contexto e ausência de sinais. A mudança não reivindica percepção real nem altera a classificação conservadora do sistema.

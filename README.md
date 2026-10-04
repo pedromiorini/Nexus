@@ -31,6 +31,8 @@ As estatísticas de `RealSwarmIntelligence` (`avg_consensus` e `avg_diversity`) 
 
 As estatísticas de `RealEpisodicMemory` (`total_links` e `avg_importance`) são derivadas das tabelas SQLite de episódios e vínculos. No estado vazio, a média retorna `0.0`; o contrato independente está em `test_episodic_memory_statistics_contract.py`.
 
+`StimulusItem` aceita sinais opcionais de `contrast` e `motion`. O componente `BottomUpAttention` usa esses valores quando observados, aceita `contrast` no contexto e mantém fallbacks heurísticos explícitos quando os sinais não estão disponíveis. O contrato está em `test_attention_signal_contract.py`.
+
 ## Como executar
 
 Use Python 3.11 ou versão compatível, defina o caminho de importação e execute:
