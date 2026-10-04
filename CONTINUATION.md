@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** atualização local pendente sobre `origin/main` em `d2bf220` (`optimization: make shadow clone reintegration explicit`).
-- **Marco desta rodada:** `ReminiscenceBump` agora registra se o pico está na faixa típica de 10–30 anos, removendo o no-op e preservando o cálculo histórico.
+- **Base remota sincronizada:** atualização local pendente sobre `origin/main` em `490ad80` (`quality: make correction parse fallback explicit`).
+- **Marco desta rodada:** fallbacks de parsing de limites retornam explicitamente o conteúdo original; não há `pass` residual no núcleo.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -75,6 +75,7 @@
 - **Consenso:** alterações aceitas só podem modificar `quorum_size`, `heartbeat_interval` e `election_timeout` dentro de limites; decisões são registradas como eventos locais, sem execução externa.
 - **Shadow clones:** conhecimento é enviado ao bootstrap apenas via `ingest_knowledge`; ausência do protocolo gera evento `integrated=false` e não é apresentada como treinamento.
 - **Reminiscência:** `is_typical` é `true` somente quando o bucket de maior densidade está entre 10 e 30 anos; picos fora da faixa continuam sendo retornados, mas marcados como atípicos.
+- **Correção:** descrições malformadas de mínimo/máximo retornam imediatamente o conteúdo original, preservando o comportamento seguro já testado.
 - **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
 - **Bootstrap audit:** 86 testes atuais, 129 findings LOW atuais e dependências opcionais ausentes (`psutil`, `FAISS/SentenceTransformers`) registrados como limitações.
 
