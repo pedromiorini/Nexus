@@ -1,6 +1,7 @@
 # Nexus — Ledger de evidências
 
-Estado de referência: commit `5f261fcaabffe4e265372bfbc1e5b7c7aa303d3f`, suíte local de 86 testes.
+Estado de referência operacional: use o artefato `nexus-state-manifest` do CI. No marco verificado, o commit de código `0729317` passou no run `37258422269`, com 105 testes.
+O checkpoint de 86 testes abaixo é histórico do bootstrap de 04/10 e não deve ser usado como estado atual.
 
 | Área | Estado | Evidência verificável | Limitação |
 |---|---|---|---|
@@ -16,7 +17,7 @@ Estado de referência: commit `5f261fcaabffe4e265372bfbc1e5b7c7aa303d3f`, suíte
 | Grafo de conhecimento | parcial/verificado no contrato | entidades únicas por ID, média de confiança e índice de tipo consistente | sem consistência distribuída ou validação externa do conhecimento |
 | Telemetria | parcial/verificado | Vita, SQLite e guard de VRAM | dependente do ambiente e dos recursos disponíveis |
 | Segurança | parcial | Bandit 129 LOW, triagem, auditorias AST e testes negativos | não substitui threat model ou revisão manual completa |
-| CI | verificado | último run conhecido `37097334156` com sucesso para `e523d9f` | qualquer novo commit exige nova execução |
+| CI | verificado | run `37258422269` com sucesso para o commit de código `0729317`; o manifesto foi retido como artefato | qualquer novo commit exige leitura do manifesto correspondente |
 | Autonomia geral | não demonstrada | nenhuma evidência válida no repositório | não fazer esse claim |
 | AGI/ASI/consciência | não demonstradas | explicitamente negadas pela documentação | nomes e banners não contam como evidência |
 

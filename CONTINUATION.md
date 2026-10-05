@@ -5,8 +5,8 @@
 ## Estado atual
 
 - **Branch:** `main`
-- **Base remota sincronizada:** atualização local pendente sobre `origin/main` em `490ad80` (`quality: make correction parse fallback explicit`).
-- **Marco desta rodada:** fallbacks de parsing de limites retornam explicitamente o conteúdo original; não há `pass` residual no núcleo.
+- **Base remota sincronizada:** `origin/main` contém o gerador de manifesto e a reconciliação documental; use o artefato `nexus-state-manifest` do CI para o SHA exato verificado.
+- **Marco desta rodada:** `STATE_MANIFEST.json` passou a ser gerado e retido pelo CI, eliminando a dependência de snapshots manuais para commit, testes, segurança e mutation.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
 ## O que está implementado
@@ -49,10 +49,12 @@
 - `NEXUS_DECISIONS.md`: decisões arquiteturais com contexto e evidência.
 - `NEXUS_ROADMAP.md`: prioridades técnicas orientadas por risco.
 - `NEXUS_BOOTSTRAP_AUDIT.md`: auditoria de bootstrap e reconciliação documental.
+- `tools/state_manifest.py`: gerador determinístico do manifesto factual por execução.
+- `test_state_manifest.py`: contrato do schema básico e da proveniência do manifesto.
 
 ## Gates locais desta rodada
 
-- **103 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral; os contratos de atenção, sinergia, grafo, sensorimotor, consenso, bootstrap e reminiscência cobrem sinais observados, métricas, identidade, limites, contexto e fallback.
+- **105 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral; os contratos de atenção, sinergia, grafo, sensorimotor, consenso, bootstrap, reminiscência e manifesto cobrem sinais observados, métricas, identidade, limites, contexto e fallback.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **129 achados LOW** preservados e classificados; B110 e B608 foram removidos por correções de código, os 16 B311 permanecem sob `simulation_only_random_review` e os 111 B101 restantes sob `embedded_demo_assert_review`.
@@ -77,7 +79,8 @@
 - **Reminiscência:** `is_typical` é `true` somente quando o bucket de maior densidade está entre 10 e 30 anos; picos fora da faixa continuam sendo retornados, mas marcados como atípicos.
 - **Correção:** descrições malformadas de mínimo/máximo retornam imediatamente o conteúdo original, preservando o comportamento seguro já testado.
 - **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
-- **Bootstrap audit:** 86 testes atuais, 129 findings LOW atuais e dependências opcionais ausentes (`psutil`, `FAISS/SentenceTransformers`) registrados como limitações.
+- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; o estado operacional posterior deve ser lido do manifesto do CI, que registra 105 testes no marco atual e dependências opcionais ausentes (`psutil`, `faiss`, `sentence_transformers`).
+- **Manifesto factual:** o CI `37258422269` gerou e reteve `nexus-state-manifest`; commits e métricas sem esse artefato são classificados como não verificados.
 
 ## Gates do workflow local
 
@@ -100,7 +103,9 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o contrato de sinais de atenção junto com a suíte expandida.
 - executar o contrato de média de sinergia junto com a suíte expandida.
 
-O workflow endurecido está publicado em `e523d9f`; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
+O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
+
+O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
 
 ## Limites e decisões
 

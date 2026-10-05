@@ -96,6 +96,10 @@ As próximas prioridades são elevar a cobertura dos componentes críticos, adic
 
 Execute `python3 tools/reality_audit.py` para gerar `AUDIT_REALITY_REPORT.md` e `audit_reality.json`. O auditor compara alegações documentais, caminhos referenciados, estrutura AST, funções somente com `pass`, retornos constantes, testes embutidos e dependências opcionais. Ele é deliberadamente conservador: sinaliza alegações que precisam de evidência, mas não tenta concluir capacidades cognitivas a partir de nomes ou banners.
 
+## Manifesto factual e conhecimento
+
+O workflow gera o artefato `nexus-state-manifest` a cada execução. O manifesto contém o commit e branch efetivamente verificados, contagem de testes, resultado, Bandit, mutation testing, métricas AST, dependências opcionais e commits dos documentos. `STATE_MANIFEST.json` é um artefato de execução e não deve ser tratado como snapshot manual versionado; números sem o manifesto correspondente são históricos ou não verificados.
+
 ## Conhecimento e continuidade
 
 O estado canônico de engenharia está separado por finalidade: [`NEXUS_CONSTITUTION.md`](NEXUS_CONSTITUTION.md) define limites e regras; [`NEXUS_KNOWLEDGE.md`](NEXUS_KNOWLEDGE.md) registra fontes e estado operacional; [`NEXUS_ARCHITECTURE.md`](NEXUS_ARCHITECTURE.md) descreve responsabilidades e fronteiras; [`NEXUS_EVIDENCE.md`](NEXUS_EVIDENCE.md) mantém a matriz fato/evidência/limitação; [`NEXUS_DECISIONS.md`](NEXUS_DECISIONS.md) registra decisões; [`NEXUS_ROADMAP.md`](NEXUS_ROADMAP.md) prioriza evolução verificável; e [`CONTINUATION.md`](CONTINUATION.md) registra o último checkpoint entre agentes. O diagnóstico que originou essa separação está em [`NEXUS_BOOTSTRAP_AUDIT.md`](NEXUS_BOOTSTRAP_AUDIT.md).

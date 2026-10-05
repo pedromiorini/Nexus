@@ -16,16 +16,16 @@ Para o estado atual, usar esta ordem:
 
 Conflitos não devem ser resolvidos silenciosamente.
 
-## Estado verificado em 2026-10-04
+## Estado verificado em 2026-10-05
 
 - Branch: `main`.
-- Commit local/remoto: `5f261fcaabffe4e265372bfbc1e5b7c7aa303d3f` (`docs: record episodic statistics CI checkpoint`).
-- Árvore de trabalho estava limpa antes da auditoria; a execução do auditor gerou apenas atualização legítima de relatórios e `__pycache__` temporário.
-- Suíte atual: **86 testes**, todos passando.
+- Commit local/remoto: `0729317dbc9cd53cd56f7d75b31d910a0f5b0e5e` (`ci: generate factual state manifest artifacts`).
+- CI do mesmo commit: run `37258422269`, sucesso; o artefato `nexus-state-manifest` foi gerado após os gates.
+- Suíte atual: **105 testes**, todos passando no gate.
 - Mutation testing direcionado: **10/10 mutações mortas**.
-- Bandit atual: **129 achados LOW**, sem MEDIUM; triagem preserva 2 B311? Não: são 16 B311, 111 B101 e 2 achados de subprocesso controlado.
+- Bandit atual: **129 achados LOW**, sem MEDIUM; triagem preserva 16 B311, 111 B101 e 2 achados de subprocesso controlado.
 - Auditoria AST: 0 funções somente com `pass`, 0 `NotImplementedError`, 61 retornos constantes simples.
-- CI do commit de código anterior `e523d9f`: run `37097334156`, sucesso.
+- Os números de 86 testes e o run `37097334156` permanecem apenas como histórico do bootstrap anterior.
 
 ## Componentes
 
@@ -34,6 +34,7 @@ Conflitos não devem ser resolvidos silenciosamente.
 - `core/vram_defense_guard.py`: decisões conservadoras de pressão de memória.
 - `vita/nexus_constitutional_bridge_v3.py`: telemetria, auditoria SQLite e diagnósticos de recuperação.
 - `tools/`: auditoria de realidade, triagem de segurança, mutation testing, auditoria AST e dashboard.
+- `tools/state_manifest.py`: gera o manifesto factual por execução; o arquivo `STATE_MANIFEST.json` é artefato de CI, não snapshot manual versionado.
 
 ## Contratos independentes atuais
 
@@ -42,6 +43,10 @@ Fila, snapshots, recuperação, SQL, CentralRouter, memória episódica, working
 ## Dependências opcionais
 
 `psutil` e `FAISS/SentenceTransformers` não estavam disponíveis na execução local da auditoria. O código usa fallbacks documentados; isso reduz garantias e deve permanecer explícito.
+
+## Manifesto factual
+
+O estado operacional atual deve ser lido do artefato `nexus-state-manifest` do CI correspondente ao commit. Ele registra commit, branch, contagem de testes, mutation testing, Bandit, métricas AST, dependências opcionais e commits dos documentos. A ausência de um relatório no manifesto significa `not_generated`, não zero.
 
 ## Regra de atualização
 
