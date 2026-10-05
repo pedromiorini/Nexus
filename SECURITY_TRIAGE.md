@@ -2,8 +2,8 @@
 
 > This is a conservative inventory, not a clearance report. Findings remain open until reviewed and fixed or explicitly justified.
 
-- Total findings: **132**
-- Severity counts: LOW=132
+- Total findings: **131**
+- Severity counts: LOW=131
 
 ## Dispositions
 
@@ -11,7 +11,6 @@
 |---|---:|---|
 | `controlled_subprocess_review` | 4 | Mutation harness subprocess; keep inputs fixed and review execution boundaries. |
 | `embedded_demo_assert_review` | 111 | Assertions inside the legacy __main__ demonstration block; keep them out of production contracts and migrate incrementally. |
-| `manual_review` | 1 | No project-specific disposition; manual review required. |
 | `simulation_only_random_review` | 16 | Randomness reviewed as simulation/heuristic behavior; keep it out of secrets and security decisions. |
 
 ## Findings
@@ -145,8 +144,7 @@
 | `B101` | LOW | `core/constitutional_brain.py` | 26669 | `embedded_demo_assert_review` |
 | `B101` | LOW | `core/constitutional_brain.py` | 26670 | `embedded_demo_assert_review` |
 | `B101` | LOW | `core/constitutional_brain.py` | 26671 | `embedded_demo_assert_review` |
-| `B404` | LOW | `tools/state_manifest.py` | 13 | `controlled_subprocess_review` |
-| `B607` | LOW | `tools/state_manifest.py` | 23 | `manual_review` |
-| `B603` | LOW | `tools/state_manifest.py` | 23 | `controlled_subprocess_review` |
+| `B404` | LOW | `tools/state_manifest.py` | 14 | `controlled_subprocess_review` |
+| `B603` | LOW | `tools/state_manifest.py` | 27 | `controlled_subprocess_review` |
 | `B404` | LOW | `tools/targeted_mutation.py` | 11 | `controlled_subprocess_review` |
 | `B603` | LOW | `tools/targeted_mutation.py` | 49 | `controlled_subprocess_review` |

@@ -16,7 +16,7 @@ O checkpoint de 86 testes abaixo é histórico do bootstrap de 04/10 e não deve
 | Integração/orquestração | parcial/verificado no contrato | média de sinergia calculada sobre integrações registradas | score individual ainda é heurístico por nomes; não demonstra inteligência emergente |
 | Grafo de conhecimento | parcial/verificado no contrato | entidades únicas por ID, média de confiança e índice de tipo consistente | sem consistência distribuída ou validação externa do conhecimento |
 | Telemetria | parcial/verificado | Vita, SQLite e guard de VRAM | dependente do ambiente e dos recursos disponíveis |
-| Segurança | parcial | Bandit 132 LOW, triagem, auditorias AST e testes negativos | não substitui threat model ou revisão manual completa |
+| Segurança | parcial | Bandit 131 LOW, triagem, auditorias AST e testes negativos | não substitui threat model ou revisão manual completa |
 | CI | verificado | run `37258732531` com sucesso para o commit `5d12be0`; o manifesto foi retido como artefato | qualquer novo commit exige leitura do manifesto correspondente |
 | Autonomia geral | não demonstrada | nenhuma evidência válida no repositório | não fazer esse claim |
 | AGI/ASI/consciência | não demonstradas | explicitamente negadas pela documentação | nomes e banners não contam como evidência |

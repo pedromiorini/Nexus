@@ -57,7 +57,7 @@
 - **105 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral; os contratos de atenção, sinergia, grafo, sensorimotor, consenso, bootstrap, reminiscência e manifesto cobrem sinais observados, métricas, identidade, limites, contexto e fallback.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
-- **Bandit:** **132 achados LOW** no manifesto CI final; a triagem classifica 16 B311 como `simulation_only_random_review`, 111 B101 como `embedded_demo_assert_review`, 4 subprocessos como `controlled_subprocess_review` e 1 achado como `manual_review`. Isso não é clearance de segurança.
+- **Bandit:** **131 achados LOW** após o hardening do B607 em `tools/state_manifest.py`; a triagem classifica 16 B311 como `simulation_only_random_review`, 111 B101 como `embedded_demo_assert_review` e 4 subprocessos como `controlled_subprocess_review`, sem `manual_review` residual. Isso não é clearance de segurança.
 - **Auditoria de realidade:** executada sem elevar claims cognitivos.
 - **Dashboard:** snapshot válido renderizado; payload inválido rejeitado pelos testes.
 - **Compilação Python:** passou para módulos, ferramentas e testes alterados.
@@ -79,7 +79,7 @@
 - **Reminiscência:** `is_typical` é `true` somente quando o bucket de maior densidade está entre 10 e 30 anos; picos fora da faixa continuam sendo retornados, mas marcados como atípicos.
 - **Correção:** descrições malformadas de mínimo/máximo retornam imediatamente o conteúdo original, preservando o comportamento seguro já testado.
 - **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
-- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; o estado operacional final deve ser lido do manifesto do CI `37258732531`, que registra 105 testes, 132 findings LOW e dependências opcionais ausentes (`psutil`, `faiss`, `sentence_transformers`).
+- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; o estado operacional final deve ser lido do manifesto do CI `37258732531`, que registra 105 testes, 131 findings LOW e dependências opcionais ausentes (`psutil`, `faiss`, `sentence_transformers`).
 - **Manifesto factual:** o CI `37258732531` gerou e reteve `nexus-state-manifest` para o commit `5d12be0`; commits e métricas sem esse artefato são classificados como não verificados.
 
 ## Gates do workflow local

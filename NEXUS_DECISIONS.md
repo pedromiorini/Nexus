@@ -41,7 +41,7 @@
 ## D-006 — Documentação histórica não é fonte de estado atual
 
 - **Decisão:** manter resultados antigos, mas separar estado atual em conhecimento canônico.
-- **Motivo:** auditorias históricas registraram 132, 130 e 129 findings; o manifesto CI final registra 132 LOW, com triagem versionada correspondente.
+- **Motivo:** auditorias históricas registraram 132, 130 e 129 findings; o manifesto CI final anterior registrava 132 LOW; após o hardening do B607, a triagem versionada registra 131 LOW sem `manual_review` residual.
 - **Evidência:** comparação entre `NEXUS_AUDIT_FINAL.md`, `SECURITY_TRIAGE.md` e Bandit executado.
 - **Reversibilidade:** fácil.
 

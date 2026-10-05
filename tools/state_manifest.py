@@ -10,6 +10,7 @@ import ast
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,8 +20,11 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _git(*args: str) -> str:
+    executable = shutil.which("git")
+    if executable is None:
+        return "unknown"
     try:
-        return subprocess.check_output(["git", *args], cwd=ROOT, text=True).strip()
+        return subprocess.check_output([executable, *args], cwd=ROOT, text=True).strip()
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
 
