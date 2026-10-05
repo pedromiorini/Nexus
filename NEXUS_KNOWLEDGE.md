@@ -19,13 +19,13 @@ Conflitos não devem ser resolvidos silenciosamente.
 ## Estado verificado em 2026-10-05
 
 - Branch: `main`.
-- Commit local/remoto: `0729317dbc9cd53cd56f7d75b31d910a0f5b0e5e` (`ci: generate factual state manifest artifacts`).
-- CI do mesmo commit: run `37258732531`, sucesso; o artefato `nexus-state-manifest` foi gerado após os gates.
-- Suíte atual: **105 testes**, todos passando no gate.
+- Commit local/remoto: `fcac84c31334f302dd0fdced1b64d80d3475db51` (`quality: respect explicit empty MCTS action space`).
+- CI do mesmo commit: run `37259919820`, sucesso; o artefato `nexus-state-manifest` foi gerado após os gates.
+- Suíte atual: **107 testes**, todos passando no gate.
 - Mutation testing direcionado: **10/10 mutações mortas**.
 - Bandit após o hardening do B607: **131 achados LOW**, sem MEDIUM; a triagem classifica 16 B311, 111 B101 e 4 subprocessos controlados, sem `manual_review` residual.
 - Auditoria AST: 0 funções somente com `pass`, 0 `NotImplementedError`, 61 retornos constantes simples.
-- Os números de 86 testes e o run `37097334156` permanecem apenas como histórico do bootstrap anterior.
+- Os números de 105 testes/run `37258732531` e 86 testes/run `37097334156` permanecem apenas como histórico de marcos anteriores.
 
 ## Componentes
 
