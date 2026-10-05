@@ -61,6 +61,7 @@ jobs:
             test_state_manifest.py \
             test_mcts_action_contract.py \
             test_state_consistency_audit.py \
+            tools/test_summary.py \
             tools/diagnostics_dashboard.py \
             tools/security_triage.py \
             tools/embedded_assert_audit.py \
@@ -151,6 +152,17 @@ jobs:
           python tools/security_triage.py bandit-report.json security-triage-generated.md
           python tools/embedded_assert_audit.py bandit-report.json core/constitutional_brain.py
           python tools/implementation_gap_audit.py core/constitutional_brain.py --output implementation-gaps.json
+      - name: Enforce security severity policy
+        run: |
+          python - <<'PY'
+          import json
+          with open('bandit-report.json', encoding='utf-8') as handle:
+              report = json.load(handle)
+          severe = [item for item in report.get('results', []) if item.get('issue_severity') in {'MEDIUM', 'HIGH'}]
+          if severe:
+              raise SystemExit(f'Untriaged MEDIUM/HIGH Bandit findings: {len(severe)}')
+          print('Bandit severity policy passed: no MEDIUM/HIGH findings')
+          PY
       - name: Retain security scan report
         uses: actions/upload-artifact@v7
         with:
@@ -161,6 +173,16 @@ jobs:
             implementation-gaps.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Run integrated Nexus suite
+        env:
+          PYTHONPATH: .
+        run: python core/constitutional_brain.py
+
+      - name: Run final full test suite summary
+        env:
+          PYTHONPATH: .
+        run: python tools/test_summary.py --output test-summary.json
 
       - name: Generate current state manifest
         env:
@@ -193,16 +215,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Run integrated Nexus suite
-        env:
-          PYTHONPATH: .
-        run: python core/constitutional_brain.py
-
       - name: Verify clean generated artifacts
         run: |
           rm -f nexus_audit.sqlite3
           rm -f STATE_MANIFEST.json
           rm -f state-consistency.json
+          rm -f test-summary.json
           if find . -type f \( -name '*.sqlite3' -o -name '*.db' \) -print -quit | grep -q .; then
             echo 'Unexpected database artifact detected'
             exit 1

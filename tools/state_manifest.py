@@ -44,6 +44,18 @@ def _test_count() -> int:
     return count
 
 
+def _test_summary() -> dict[str, Any]:
+    path = ROOT / "test-summary.json"
+    try:
+        summary = json.loads(path.read_text(encoding="utf-8"))
+        required = ("executed", "passed", "failed", "skipped", "result")
+        if not all(key in summary for key in required):
+            return {"status": "invalid_summary"}
+        return {"status": "generated", **{key: summary[key] for key in required}}
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {"status": "not_generated"}
+
+
 def _document_commits() -> dict[str, str]:
     names = [
         "NEXUS_CONSTITUTION.md", "NEXUS_KNOWLEDGE.md", "NEXUS_ARCHITECTURE.md",
@@ -113,12 +125,19 @@ def build_manifest(test_result: str = "not_run", test_command: str | None = None
     commit = os.environ.get("GITHUB_SHA") or _git("rev-parse", "HEAD")
     branch = os.environ.get("GITHUB_REF_NAME") or _git("branch", "--show-current")
     run_id = os.environ.get("GITHUB_RUN_ID")
+    test_summary = _test_summary()
+    tests = {
+        "discovered_static": _test_count(),
+        **test_summary,
+        "command": test_command or "not_run",
+        "result": test_summary.get("result", test_result),
+    }
     return {
         "schema_version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "repository": {"branch": branch, "commit": commit, "worktree": "clean_required"},
         "verification": {
-            "tests": {"count": _test_count(), "command": test_command or "not_run", "result": test_result},
+            "tests": tests,
             "ast": _ast_summary(),
         },
         "security": {"bandit": _bandit_summary()},

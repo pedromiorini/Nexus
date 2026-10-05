@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 112
+tests: 113
 bandit_low: 131
 -->
 
@@ -61,10 +61,11 @@ bandit_low: 131
 - `test_mcts_action_contract.py`: contrato da distinção entre ações padrão (`None`) e espaço de ações vazio (`[]`).
 - `tools/state_consistency_audit.py`: compara claims atuais estruturados com o manifesto factual e ignora histórico fora do bloco.
 - `test_state_consistency_audit.py`: contratos de sincronização, divergência, ausência de marcador e manifesto inválido.
+- `tools/test_summary.py`: executa a suíte final e registra `executed`, `passed`, `failed` e `skipped` para o manifesto.
 
 ## Gates locais desta rodada
 
-- **112 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral local; o contrato MCTS cobre a distinção entre ações padrão e espaço vazio.
+- **113 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral local; o contrato MCTS cobre a distinção entre ações padrão e espaço vazio.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **131 achados LOW** após o hardening do B607 em `tools/state_manifest.py`; a triagem classifica 16 B311 como `simulation_only_random_review`, 111 B101 como `embedded_demo_assert_review` e 4 subprocessos como `controlled_subprocess_review`, sem `manual_review` residual. Isso não é clearance de segurança.
@@ -74,6 +75,8 @@ bandit_low: 131
 - **CI alinhado nesta rodada:** `test_vram_defense_guard.py` agora é compilado, incluído na medição de cobertura e executado explicitamente pelo workflow.
 - **CI modernizado nesta rodada:** runner fixado em `ubuntu-24.04`; `checkout@v5`, `setup-python@v6` e `upload-artifact@v7` removem a dependência das versões legadas que geravam avisos de Node.js 20.
 - **State consistency gate:** o workflow agora compila e testa o auditor, gera `state-consistency.json` após o manifesto e falha em claims atuais divergentes.
+- **Manifesto final:** a suíte integrada e o resumo completo unittest agora terminam antes da geração de `STATE_MANIFEST.json`; `discovered_static` não é apresentado como execução.
+- **Segurança:** LOW permanece triado e informativo; qualquer MEDIUM/HIGH no Bandit bloqueia o workflow após a triagem.
 - **Auditor B101:** 111 achados restantes, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26510`; compilação de módulos, ferramentas e testes passou.
 - **Inventário de lacunas:** propagação, adaptação e atualização gerativa registram contratos mínimos observáveis; ferramenta registrada sem executor retorna falha estruturada. O inventário AST agora registra `pass_only_count=0` e `not_implemented_count=0`.
 - **Telemetria GPU:** `monitor_hardware` tenta NVML, depois memória reservada CUDA como proxy; sem backend retorna `0.0` sem afirmar disponibilidade.
@@ -91,7 +94,7 @@ bandit_low: 131
 - **Reminiscência:** `is_typical` é `true` somente quando o bucket de maior densidade está entre 10 e 30 anos; picos fora da faixa continuam sendo retornados, mas marcados como atípicos.
 - **Correção:** descrições malformadas de mínimo/máximo retornam imediatamente o conteúdo original, preservando o comportamento seguro já testado.
 - **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
-- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; o estado operacional atual deve ser lido do manifesto do CI associado ao `HEAD`, que registra 112 testes e 131 findings LOW.
+- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; o estado operacional atual deve ser lido do manifesto do CI associado ao `HEAD`, que registra 113 testes e 131 findings LOW.
 - **Manifesto factual:** o CI associado ao `HEAD` gera e retém `nexus-state-manifest`; commits e métricas sem esse artefato são classificados como não verificados.
 
 ## Gates do workflow local
@@ -133,6 +136,11 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 - O primeiro assert migrado preserva a falha explícita da demonstração; a garantia comportamental agora vive em `test_central_router_contract.py`.
 - Relatórios gerados (`coverage.xml`, JSON de mutation, SQLite temporário e saídas Bandit) não devem ser commitados.
 - Não expor tokens, credenciais ou conteúdo de `.env`.
+
+## Histórico de checkpoints
+
+- **2026-10-05 — 105 testes:** run `37258732531`, marco anterior preservado para proveniência.
+- **Bootstrap — 86 testes:** run `37097334156`, snapshot histórico; não representa o estado atual.
 
 ## Próxima ação
 

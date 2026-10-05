@@ -12,7 +12,7 @@ class StateConsistencyAuditTests(unittest.TestCase):
         manifest = {
             "schema_version": 1,
             "repository": {"commit": commit},
-            "verification": {"tests": {"count": tests}},
+            "verification": {"tests": {"executed": tests}},
             "security": {"bandit": {"severity": {"LOW": bandit_low}}},
             "ci": {"run_id": "12345"},
         }

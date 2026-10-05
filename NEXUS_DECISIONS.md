@@ -88,3 +88,12 @@
 - **Evidência:** `test_state_consistency_audit.py` cobre sincronização, histórico ignorado, conflitos, marcador ausente e manifesto inválido.
 - **Limitação:** o gate não prova a validade semântica dos testes ou das disposições de segurança; ele verifica apenas a consistência dos claims estruturados.
 - **Reversibilidade:** fácil.
+
+## D-012 — Manifesto registra execução final e severidade bloqueante
+
+- **Decisão:** `verification.tests` separa `discovered_static`, `executed`, `passed`, `failed` e `skipped`; a suíte completa é executada antes da geração do manifesto. Bandit pode continuar informativo para LOW, mas MEDIUM/HIGH bloqueiam o workflow.
+- **Contexto:** inventário AST não é necessariamente a quantidade executada, e `bandit ... || true` não deve transformar uma severidade alta em sucesso silencioso.
+- **Motivo:** tornar a proveniência do estado factual e a política de segurança explícitas.
+- **Evidência:** `tools/test_summary.py`, `test_state_manifest.py` e o passo `Enforce security severity policy` no workflow.
+- **Limitação:** a contagem executada continua dependente do runner unittest; não mede cobertura semântica nem substitui revisão manual.
+- **Reversibilidade:** fácil.

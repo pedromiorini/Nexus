@@ -70,7 +70,7 @@ def _manifest_values(manifest: dict[str, Any]) -> dict[str, str]:
         ci = manifest["ci"]
         commit = repository["commit"]
         run_id = ci["run_id"]
-        test_count = tests["count"]
+        test_count = tests["executed"]
         bandit_low = security["severity"]["LOW"]
     except (KeyError, TypeError) as exc:
         raise ValueError(f"manifesto sem campos obrigatórios: {exc}") from exc
