@@ -3,7 +3,7 @@
   "scope": "conservative reality audit",
   "principle": "names, banners and demo asserts are not proof of general intelligence or production readiness",
   "static_evidence": {
-    "core_lines": 26628,
+    "core_lines": 26685,
     "classes": 267,
     "functions": 843,
     "pass_only_functions": [],
@@ -175,132 +175,132 @@
       },
       {
         "name": "get_statistics",
-        "line": 15190,
+        "line": 15199,
         "value": "{'total_optimizations': self.total_optimizations, 'total_clones_created': self.total_clones_created, 'total_knowledge_reintegrations': self.total_knowledge_reintegrations, 'active_shadow_clones': len(self.shadow_clones), 'avg_performance_gain': self.avg_performance_gain, 'current_cpu_percent': self.current_snapshot.cpu_percent if self.current_snapshot else 0, 'current_ram_percent': self.current_snapshot.ram_percent if self.current_snapshot else 0, 'current_allocation': {'swarm_agents': self.current_allocation.swarm_agents, 'mcts_depth': self.current_allocation.mcts_depth, 'parallel_threads': self.current_allocation.parallel_threads}}"
       },
       {
         "name": "get_meta_learning_report",
-        "line": 15569,
+        "line": 15578,
         "value": "{'total_tasks_learned': self.total_tasks_learned, 'total_transfers': self.total_transfers, 'avg_adaptation_speed': self.avg_adaptation_speed, 'avg_few_shot_accuracy': self.avg_few_shot_accuracy, 'active_strategies': self.active_strategies, 'meta_knowledge_count': len(self.meta_knowledge), 'transfer_mappings': len(self.transfer_mappings)}"
       },
       {
         "name": "get_statistics",
-        "line": 15581,
+        "line": 15590,
         "value": "{'total_tasks_learned': self.total_tasks_learned, 'total_transfers': self.total_transfers, 'avg_adaptation_speed': self.avg_adaptation_speed, 'avg_few_shot_accuracy': self.avg_few_shot_accuracy, 'meta_knowledge_strategies': len(self.meta_knowledge), 'transfer_mappings': len(self.transfer_mappings), 'active_strategies': len(self.active_strategies)}"
       },
       {
         "name": "get_robustness_report",
-        "line": 15933,
+        "line": 15942,
         "value": "{'overall_robustness': self.current_robustness.overall_robustness, 'attack_resistance': self.current_robustness.attack_resistance, 'recovery_rate': self.current_robustness.recovery_rate, 'certification_level': self.current_robustness.certification_level, 'total_attacks_detected': self.total_attacks_detected, 'total_attacks_blocked': self.total_attacks_blocked, 'block_rate': self.total_attacks_blocked / max(1, self.total_attacks_detected), 'active_defenses': self.active_defenses}"
       },
       {
         "name": "get_statistics",
-        "line": 15965,
+        "line": 15974,
         "value": "{'total_attacks_detected': self.total_attacks_detected, 'total_attacks_blocked': self.total_attacks_blocked, 'total_self_repairs': self.total_self_repairs, 'block_rate': self.total_attacks_blocked / max(1, self.total_attacks_detected), 'avg_robustness_score': self.avg_robustness_score, 'current_robustness': self.current_robustness.overall_robustness, 'attack_resistance': self.current_robustness.attack_resistance, 'certification_level': self.current_robustness.certification_level}"
       },
       {
         "name": "get_statistics",
-        "line": 16323,
+        "line": 16332,
         "value": "{'total_scenarios_generated': self.total_scenarios_generated, 'total_interventions_modeled': self.total_interventions_modeled, 'total_comparisons': self.total_comparisons, 'avg_insight_value': self.avg_insight_value, 'insights_learned': len(self.insights), 'avg_plausibility': sum((s.plausibility_score for s in self.scenarios)) / max(1, len(self.scenarios))}"
       },
       {
         "name": "get_statistics",
-        "line": 16710,
+        "line": 16751,
         "value": "{'total_nodes': len(self.nodes), 'active_nodes': sum((1 for n in self.nodes.values() if n.is_active)), 'total_proposals': self.total_proposals, 'total_votes_cast': self.total_votes_cast, 'total_consensus_reached': self.total_consensus_reached, 'consensus_success_rate': self.total_consensus_reached / max(1, self.total_proposals), 'total_knowledge_syncs': self.total_knowledge_syncs, 'current_role': self.current_role, 'leader_id': self.leader_id}"
       },
       {
         "name": "get_statistics",
-        "line": 17030,
+        "line": 17087,
         "value": "{'total_sensory_inputs': self.total_sensory_inputs, 'total_motor_outputs': self.total_motor_outputs, 'total_loops_completed': self.total_loops_completed, 'active_loops': len(self.active_loops), 'avg_perception_latency': self.avg_perception_latency, 'affordances_detected': len(set(self.detected_affordances)), 'actions_in_queue': len(self.action_queue)}"
       },
       {
         "name": "get_statistics",
-        "line": 17349,
+        "line": 17406,
         "value": "{'total_events_tracked': self.total_events_tracked, 'total_relations_detected': self.total_relations_detected, 'total_sequences_built': self.total_sequences_built, 'avg_sequence_length': self.avg_sequence_length, 'active_events': len(self.events), 'temporal_relations': len(self.temporal_relations)}"
       },
       {
         "name": "get_statistics",
-        "line": 17679,
+        "line": 17736,
         "value": "{'total_states_examined': self.total_states_examined, 'total_insights_generated': self.total_insights_generated, 'total_biases_detected': self.total_biases_detected, 'avg_confidence': self.avg_confidence, 'active_patterns': len(self.detect_cognitive_patterns()), 'process_traces': len(self.process_traces)}"
       },
       {
         "name": "get_statistics",
-        "line": 18012,
+        "line": 18069,
         "value": "{'total_dilemmas_analyzed': self.total_dilemmas_analyzed, 'total_evaluations': self.total_evaluations, 'total_conflicts_detected': self.total_conflicts_detected, 'avg_ethical_score': self.avg_ethical_score, 'active_dilemmas': len(self.dilemmas), 'frameworks_used': ['utilitarian', 'deontological', 'virtue_ethics']}"
       },
       {
         "name": "get_statistics",
-        "line": 18355,
+        "line": 18412,
         "value": "{'total_explanations_generated': self.total_explanations_generated, 'total_traces_recorded': self.total_traces_recorded, 'total_justifications_provided': self.total_justifications_provided, 'avg_transparency_score': self.avg_transparency_score, 'active_explanations': len(self.explanations), 'active_traces': len(self.reasoning_traces)}"
       },
       {
         "name": "get_statistics",
-        "line": 18710,
+        "line": 18767,
         "value": "{'total_agents_created': self.total_agents_created, 'total_tasks_completed': self.total_tasks_completed, 'total_coordinations': self.total_coordinations, 'avg_collaboration_quality': self.avg_collaboration_quality, 'active_agents': len(self.agents), 'active_tasks': len(self.active_tasks)}"
       },
       {
         "name": "get_statistics",
-        "line": 19039,
+        "line": 19096,
         "value": "{'total_estimates': self.total_estimates, 'total_assessments': self.total_assessments, 'avg_uncertainty': self.avg_uncertainty, 'avg_confidence': self.avg_confidence, 'active_estimates': len(self.estimates), 'active_assessments': len(self.assessments)}"
       },
       {
         "name": "get_statistics",
-        "line": 19341,
+        "line": 19398,
         "value": "{'total_tasks_learned': self.total_tasks_learned, 'total_consolidations': self.total_consolidations, 'avg_retention_rate': self.avg_retention_rate, 'total_replays': self.total_replays, 'active_tasks': len(self.tasks), 'buffer_utilization': len(self.experience_buffer) / self.max_buffer_size}"
       },
       {
         "name": "get_statistics",
-        "line": 19639,
+        "line": 19696,
         "value": "{'total_transfers': self.total_transfers, 'total_domains': self.total_domains, 'avg_transfer_quality': self.avg_transfer_quality, 'avg_performance_gain': self.avg_performance_gain, 'active_mappings': len(self.transfer_mappings), 'transfer_results': len(self.transfer_results)}"
       },
       {
         "name": "get_statistics",
-        "line": 19910,
+        "line": 19967,
         "value": "{'total_requests': self.total_requests, 'total_routes': self.total_routes, 'total_allocations': self.total_allocations, 'avg_routing_score': self.avg_routing_score, 'queue_size': len(self.request_queue), 'active_routes': len(self.active_routes)}"
       },
       {
         "name": "get_statistics",
-        "line": 20604,
+        "line": 20661,
         "value": "{'total_atomic_skills': self.total_atomic_skills, 'total_composite_skills': self.total_composite_skills, 'total_decompositions': self.total_decompositions, 'avg_composition_quality': self.avg_composition_quality, 'active_atomic_skills': len(self.atomic_skills), 'active_composite_skills': len(self.composite_skills)}"
       },
       {
         "name": "get_statistics",
-        "line": 20893,
+        "line": 20950,
         "value": "{'total_contexts': self.total_contexts, 'total_adaptations': self.total_adaptations, 'context_switches': self.context_switches, 'avg_adaptation_quality': self.avg_adaptation_quality, 'active_contexts': len(self.contexts), 'current_context': self.current_context.context_type if self.current_context else None}"
       },
       {
         "name": "get_statistics",
-        "line": 21183,
+        "line": 21240,
         "value": "{'total_tasks_coordinated': self.total_tasks_coordinated, 'total_schedules': self.total_schedules, 'parallel_executions': self.parallel_executions, 'avg_efficiency': self.avg_efficiency, 'active_tasks': len(self.tasks), 'pending_schedules': len(self.schedules)}"
       },
       {
         "name": "get_calibration_status",
-        "line": 21485,
+        "line": 21542,
         "value": "{'parameters': self.calibration_parameters.copy(), 'total_calibrations': self.total_calibrations, 'avg_calibration_quality': self.avg_calibration_quality, 'recent_adjustments': len([a for a in self.adjustments[-5:]]) if self.adjustments else 0}"
       },
       {
         "name": "get_statistics",
-        "line": 21536,
+        "line": 21593,
         "value": "{'total_metrics_tracked': self.total_metrics_tracked, 'total_calibrations': self.total_calibrations, 'total_assessments': self.total_assessments, 'avg_confidence': self.avg_confidence, 'avg_calibration_quality': self.avg_calibration_quality, 'active_metrics': len(self.metrics), 'calibration_parameters': len(self.calibration_parameters)}"
       },
       {
         "name": "get_statistics",
-        "line": 21821,
+        "line": 21878,
         "value": "{'total_events': self.total_events, 'total_responses': self.total_responses, 'avg_response_time_ms': self.avg_response_time, 'adaptation_success_rate': self.adaptation_success_rate, 'events_in_queue': len(self.event_queue), 'response_time_threshold_ms': self.response_time_threshold}"
       },
       {
         "name": "get_statistics",
-        "line": 22119,
+        "line": 22176,
         "value": "{'total_health_checks': self.total_checks, 'total_alerts': self.total_alerts, 'total_diagnostic_reports': self.total_reports, 'avg_system_health': self.avg_system_health, 'active_indicators': len(self.indicators), 'critical_alerts': len([a for a in self.alerts if a.severity == 'critical'])}"
       },
       {
         "name": "get_statistics",
-        "line": 22462,
+        "line": 22519,
         "value": "{'total_integrations': self.total_integrations, 'total_orchestrations': self.total_orchestrations, 'avg_synergy_score': self.avg_synergy_score, 'system_coherence': self.system_coherence, 'active_integrations': len(self.integrations), 'orchestration_plans': len(self.orchestration_plans)}"
       },
       {
         "name": "test_task",
-        "line": 26057,
+        "line": 26114,
         "value": "True"
       }
     ],
@@ -375,6 +375,10 @@
     },
     {
       "path": "test_knowledge_graph_contract.py",
+      "exists": true
+    },
+    {
+      "path": "test_mcts_action_contract.py",
       "exists": true
     },
     {

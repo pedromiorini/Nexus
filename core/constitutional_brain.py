@@ -2395,7 +2395,7 @@ class RealMCTSPlanner:
         initial_state = self._get_initial_state(goal)
 
         # Substituir ações disponíveis se fornecidas
-        if available_actions:
+        if available_actions is not None:
             # Registrar ações customizadas com efeitos neutros se desconhecidas
             for action in available_actions:
                 if action not in self._action_effects:
@@ -2409,7 +2409,7 @@ class RealMCTSPlanner:
             action_taken=None,
             parent=None,
             depth=0,
-            untried_actions=available_actions if available_actions else (
+            untried_actions=available_actions if available_actions is not None else (
                 self._get_available_actions(initial_state, 0)
             )
         )

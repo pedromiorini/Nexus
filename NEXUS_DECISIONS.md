@@ -70,3 +70,12 @@
 - **Evidência:** `test_knowledge_graph_contract.py` cobre duplicata, média de confiança, contagem única e reclassificação.
 - **Limitação:** o grafo continua local; isso não define identidade distribuída, consistência concorrente ou conhecimento válido externamente.
 - **Reversibilidade:** fácil.
+
+## D-010 — Lista de ações vazia é uma entrada válida no MCTS
+
+- **Decisão:** `available_actions=None` seleciona o espaço de ações padrão; `available_actions=[]` representa deliberadamente um espaço vazio.
+- **Contexto:** o planejador usava truthiness e substituía uma lista vazia pelas ações padrão.
+- **Motivo:** evitar que uma entrada explícita seja silenciosamente reinterpretada e manter resultados previsíveis para consumidores da API.
+- **Evidência:** `test_mcts_action_contract.py` cobre ambos os caminhos e confirma árvore sem filhos para o espaço vazio.
+- **Limitação:** isso corrige a semântica de entrada, mas não valida a qualidade dos rollouts ou das recompensas heurísticas do MCTS.
+- **Reversibilidade:** fácil.

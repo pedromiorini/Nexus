@@ -51,10 +51,11 @@
 - `NEXUS_BOOTSTRAP_AUDIT.md`: auditoria de bootstrap e reconciliação documental.
 - `tools/state_manifest.py`: gerador determinístico do manifesto factual por execução.
 - `test_state_manifest.py`: contrato do schema básico e da proveniência do manifesto.
+- `test_mcts_action_contract.py`: contrato da distinção entre ações padrão (`None`) e espaço de ações vazio (`[]`).
 
 ## Gates locais desta rodada
 
-- **105 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral; os contratos de atenção, sinergia, grafo, sensorimotor, consenso, bootstrap, reminiscência e manifesto cobrem sinais observados, métricas, identidade, limites, contexto e fallback.
+- **107 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral local; o contrato MCTS cobre a distinção entre ações padrão e espaço vazio.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **131 achados LOW** após o hardening do B607 em `tools/state_manifest.py`; a triagem classifica 16 B311 como `simulation_only_random_review`, 111 B101 como `embedded_demo_assert_review` e 4 subprocessos como `controlled_subprocess_review`, sem `manual_review` residual. Isso não é clearance de segurança.
@@ -73,6 +74,7 @@
 - **Atenção bottom-up:** `StimulusItem` aceita `contrast` e `motion` observados; sem sinais, os fallbacks `0.5` e `0.6` continuam explícitos e testados.
 - **Integração/orquestração:** `avg_synergy_score` é a média das integrações registradas; scores individuais continuam heurísticos por nomes de módulos.
 - **Grafo de conhecimento:** `entity_id` é único; atualizações não inflacionam a contagem e mudanças de tipo reclassificam o índice.
+- **MCTS:** `available_actions=None` usa ações padrão; `available_actions=[]` é respeitado como espaço vazio, sem afirmar qualidade geral de planejamento.
 - **Sensorimotor/multimodal:** modalidades `vision`, `audio` e `text` usam processadores compatíveis quando disponíveis; entradas desconhecidas ou ausência de processador seguem fallback de features observadas.
 - **Consenso:** alterações aceitas só podem modificar `quorum_size`, `heartbeat_interval` e `election_timeout` dentro de limites; decisões são registradas como eventos locais, sem execução externa.
 - **Shadow clones:** conhecimento é enviado ao bootstrap apenas via `ingest_knowledge`; ausência do protocolo gera evento `integrated=false` e não é apresentada como treinamento.
@@ -102,8 +104,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o contrato de estatísticas episódicas SQLite junto com a suíte expandida.
 - executar o contrato de sinais de atenção junto com a suíte expandida.
 - executar o contrato de média de sinergia junto com a suíte expandida.
-
-O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
+- executar o contrato de ações do MCTS junto com a suíte expandida.
 
 O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
 

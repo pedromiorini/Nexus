@@ -146,3 +146,8 @@ Os métodos `VisionProcessor.detect_objects`, `VisionProcessor.analyze_scene` e 
 ## Atualização posterior — identidade única no grafo de conhecimento
 
 `RealKnowledgeGraph.add_entity()` passou a tratar `entity_id` como identidade única. Atualizações não inflacionam `total_entities`, a média de confiança usa a entidade atual e uma mudança de tipo remove o ID do índice anterior. `test_knowledge_graph_contract.py` cobre duplicata, contagem, média e reclassificação. Isso corrige consistência local; não oferece identidade distribuída ou validação externa do conhecimento.
+
+
+## Atualização posterior — semântica explícita de ações no MCTS
+
+`RealMCTSPlanner.plan()` passou a distinguir `available_actions=None` de `available_actions=[]`: o primeiro usa o espaço padrão e o segundo mantém uma árvore sem ações. `test_mcts_action_contract.py` cobre ambos os caminhos. A mudança corrige a entrada da API, mas as recompensas e simulações permanecem heurísticas.

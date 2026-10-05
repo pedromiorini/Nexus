@@ -37,6 +37,8 @@ As estatísticas de `RealEpisodicMemory` (`total_links` e `avg_importance`) são
 
 `RealKnowledgeGraph` trata `entity_id` como identidade única: re-adicionar uma entidade atualiza o registro, preserva a contagem e remove o ID do índice de tipo anterior quando necessário. `test_knowledge_graph_contract.py` cobre essa invariável e a média de confiança observada.
 
+No `RealMCTSPlanner`, `available_actions=None` usa o espaço padrão, enquanto `available_actions=[]` é respeitado como espaço vazio. Essa distinção evita que uma entrada explícita seja silenciosamente substituída; o contrato está em `test_mcts_action_contract.py`.
+
 ## Como executar
 
 Use Python 3.11 ou versão compatível, defina o caminho de importação e execute:
