@@ -20,10 +20,10 @@ Conflitos não devem ser resolvidos silenciosamente.
 
 - Branch: `main`.
 - Commit local/remoto: `0729317dbc9cd53cd56f7d75b31d910a0f5b0e5e` (`ci: generate factual state manifest artifacts`).
-- CI do mesmo commit: run `37258422269`, sucesso; o artefato `nexus-state-manifest` foi gerado após os gates.
+- CI do mesmo commit: run `37258732531`, sucesso; o artefato `nexus-state-manifest` foi gerado após os gates.
 - Suíte atual: **105 testes**, todos passando no gate.
 - Mutation testing direcionado: **10/10 mutações mortas**.
-- Bandit atual: **129 achados LOW**, sem MEDIUM; triagem preserva 16 B311, 111 B101 e 2 achados de subprocesso controlado.
+- Bandit no manifesto CI final: **132 achados LOW**, sem MEDIUM; a triagem classifica 16 B311, 111 B101, 4 subprocessos controlados e 1 achado para revisão manual.
 - Auditoria AST: 0 funções somente com `pass`, 0 `NotImplementedError`, 61 retornos constantes simples.
 - Os números de 86 testes e o run `37097334156` permanecem apenas como histórico do bootstrap anterior.
 

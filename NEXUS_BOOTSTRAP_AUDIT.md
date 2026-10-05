@@ -13,8 +13,8 @@
 - Os componentes centrais citados nas considerações existem.
 - `python3 -m unittest discover -v` executou **86 testes**, todos passando naquele snapshot.
 - `tools/reality_audit.py` encontrou 26.606 linhas, 267 classes, 843 funções, 0 funções apenas com `pass`, 61 retornos constantes simples e 30 marcadores de testes embutidos naquele snapshot.
-- Bandit atual produziu **129 findings LOW**.
-- A triagem atual classifica 111 B101 como asserts do demo, 16 B311 como aleatoriedade de simulação e 2 findings de subprocesso controlado.
+- O snapshot do bootstrap produziu **129 findings LOW**; esse número é histórico e não representa o estado operacional final.
+- Naquele snapshot, a triagem classificava 111 B101 como asserts do demo, 16 B311 como aleatoriedade de simulação e 2 findings de subprocesso controlado.
 - O último CI conhecido do marco de código `e523d9f` foi o run `37097334156`, com sucesso.
 - `psutil` e `FAISS/SentenceTransformers` não estavam disponíveis na execução local; os fallbacks foram usados.
 
@@ -24,7 +24,7 @@
 |---|---|---|
 | Bandit 132 LOW | histórico em `NEXUS_AUDIT_FINAL.md` | manter como histórico; não é estado atual |
 | Bandit 130 LOW | histórico posterior em `NEXUS_AUDIT_FINAL.md` | manter como histórico; não é estado atual |
-| Bandit 129 LOW | `SECURITY_TRIAGE.md` e execução atual | fonte atual reproduzível |
+| Bandit 129 LOW | snapshot de bootstrap | manter como histórico; o manifesto CI final registra 132 LOW |
 | 63/61 retornos constantes | marcos históricos diferentes | auditoria atual confirma 61 |
 | `85/86 testes` | marcos históricos diferentes | o snapshot de bootstrap confirma 86; a execução atual posterior está no manifesto do CI |
 | `CONTINUATION.md` versus commit | drift histórico entre handoff e código | o checkpoint atual é determinado pelo manifesto do CI; este snapshot permanece histórico |
