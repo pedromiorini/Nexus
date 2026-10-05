@@ -58,11 +58,13 @@ jobs:
             test_consensus_application_contract.py \
             test_shadow_clone_reintegration_contract.py \
             test_reminiscence_bump_contract.py \
+            test_state_manifest.py \
             tools/diagnostics_dashboard.py \
             tools/security_triage.py \
             tools/embedded_assert_audit.py \
             tools/targeted_mutation.py \
-            tools/implementation_gap_audit.py
+            tools/implementation_gap_audit.py \
+            tools/state_manifest.py
 
       - name: Run schema contract tests
         env:
@@ -91,7 +93,7 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          coverage run --branch -m unittest test_recovery_diagnostics_contract.py test_deferred_task_queue.py test_deferred_task_snapshot.py test_memory_sql_contract.py test_reality_audit.py test_deferred_task_properties.py test_security_triage.py test_error_correction_contract.py test_embedded_assert_audit.py test_central_router_contract.py test_vram_defense_guard.py test_implementation_gap_audit.py test_explicit_gap_contract.py test_working_memory_contract.py test_hardware_telemetry_contract.py test_counterfactual_contract.py test_multimodal_backend_contract.py test_swarm_statistics_contract.py test_episodic_memory_statistics_contract.py test_attention_signal_contract.py test_integration_synergy_contract.py test_knowledge_graph_contract.py test_sensorimotor_multimodal_contract.py test_consensus_application_contract.py test_shadow_clone_reintegration_contract.py test_reminiscence_bump_contract.py
+          coverage run --branch -m unittest test_recovery_diagnostics_contract.py test_deferred_task_queue.py test_deferred_task_snapshot.py test_memory_sql_contract.py test_reality_audit.py test_deferred_task_properties.py test_security_triage.py test_error_correction_contract.py test_embedded_assert_audit.py test_central_router_contract.py test_vram_defense_guard.py test_implementation_gap_audit.py test_explicit_gap_contract.py test_working_memory_contract.py test_hardware_telemetry_contract.py test_counterfactual_contract.py test_multimodal_backend_contract.py test_swarm_statistics_contract.py test_episodic_memory_statistics_contract.py test_attention_signal_contract.py test_integration_synergy_contract.py test_knowledge_graph_contract.py test_sensorimotor_multimodal_contract.py test_consensus_application_contract.py test_shadow_clone_reintegration_contract.py test_reminiscence_bump_contract.py test_state_manifest.py
           coverage report --fail-under=0
           coverage report --include='core/deferred_task_queue.py' --fail-under=90
           coverage report --include='vita/nexus_constitutional_bridge_v3.py' --fail-under=70
@@ -112,7 +114,7 @@ jobs:
       - name: Run expanded contract tests
         env:
           PYTHONPATH: .
-        run: python -m unittest -v test_memory_sql_contract.py test_security_triage.py test_error_correction_contract.py test_embedded_assert_audit.py test_central_router_contract.py test_implementation_gap_audit.py test_explicit_gap_contract.py test_working_memory_contract.py test_hardware_telemetry_contract.py test_counterfactual_contract.py test_multimodal_backend_contract.py test_swarm_statistics_contract.py test_episodic_memory_statistics_contract.py test_attention_signal_contract.py test_integration_synergy_contract.py test_knowledge_graph_contract.py test_sensorimotor_multimodal_contract.py test_consensus_application_contract.py test_shadow_clone_reintegration_contract.py test_reminiscence_bump_contract.py
+        run: python -m unittest -v test_memory_sql_contract.py test_security_triage.py test_error_correction_contract.py test_embedded_assert_audit.py test_central_router_contract.py test_implementation_gap_audit.py test_explicit_gap_contract.py test_working_memory_contract.py test_hardware_telemetry_contract.py test_counterfactual_contract.py test_multimodal_backend_contract.py test_swarm_statistics_contract.py test_episodic_memory_statistics_contract.py test_attention_signal_contract.py test_integration_synergy_contract.py test_knowledge_graph_contract.py test_sensorimotor_multimodal_contract.py test_consensus_application_contract.py test_shadow_clone_reintegration_contract.py test_reminiscence_bump_contract.py test_state_manifest.py
       - name: Run targeted mutation gate
         env:
           PYTHONPATH: .
@@ -151,6 +153,24 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Generate current state manifest
+        env:
+          PYTHONPATH: .
+        run: >-
+          python tools/state_manifest.py
+          --output STATE_MANIFEST.json
+          --test-result passed
+          --test-command "python -m unittest discover -p 'test_*.py'"
+          --ci-status success
+
+      - name: Retain current state manifest
+        uses: actions/upload-artifact@v7
+        with:
+          name: nexus-state-manifest
+          path: STATE_MANIFEST.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Run integrated Nexus suite
         env:
           PYTHONPATH: .
@@ -159,6 +179,7 @@ jobs:
       - name: Verify clean generated artifacts
         run: |
           rm -f nexus_audit.sqlite3
+          rm -f STATE_MANIFEST.json
           if find . -type f \( -name '*.sqlite3' -o -name '*.db' \) -print -quit | grep -q .; then
             echo 'Unexpected database artifact detected'
             exit 1
