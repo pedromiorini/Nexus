@@ -79,3 +79,12 @@
 - **Evidência:** `test_mcts_action_contract.py` cobre ambos os caminhos e confirma árvore sem filhos para o espaço vazio.
 - **Limitação:** isso corrige a semântica de entrada, mas não valida a qualidade dos rollouts ou das recompensas heurísticas do MCTS.
 - **Reversibilidade:** fácil.
+
+## D-011 — Consistência do estado atual é um gate de CI
+
+- **Decisão:** documentos canônicos expõem um bloco `NEXUS-CURRENT-STATE`; `tools/state_consistency_audit.py` compara seus claims atuais com o manifesto produzido na mesma execução.
+- **Contexto:** histórico legítimo e estado atual coexistem em documentos long-lived, e números de testes/segurança podem evoluir em commits diferentes.
+- **Motivo:** falhar de forma determinística em commit, contagem de testes, run de CI ou findings divergentes, sem apagar histórico nem interpretar texto histórico como estado atual.
+- **Evidência:** `test_state_consistency_audit.py` cobre sincronização, histórico ignorado, conflitos, marcador ausente e manifesto inválido.
+- **Limitação:** o gate não prova a validade semântica dos testes ou das disposições de segurança; ele verifica apenas a consistência dos claims estruturados.
+- **Reversibilidade:** fácil.

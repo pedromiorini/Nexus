@@ -1,5 +1,12 @@
 # Bandit Security Triage
 
+<!-- NEXUS-CURRENT-STATE
+commit: HEAD
+ci_run: CURRENT_RUN
+tests: 112
+bandit_low: 131
+-->
+
 > This is a conservative inventory, not a clearance report. Findings remain open until reviewed and fixed or explicitly justified.
 
 - Total findings: **131**

@@ -1,5 +1,12 @@
 # Nexus — Continuidade entre agentes
 
+<!-- NEXUS-CURRENT-STATE
+commit: HEAD
+ci_run: CURRENT_RUN
+tests: 112
+bandit_low: 131
+-->
+
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
 ## Estado atual
@@ -52,10 +59,12 @@
 - `tools/state_manifest.py`: gerador determinístico do manifesto factual por execução.
 - `test_state_manifest.py`: contrato do schema básico e da proveniência do manifesto.
 - `test_mcts_action_contract.py`: contrato da distinção entre ações padrão (`None`) e espaço de ações vazio (`[]`).
+- `tools/state_consistency_audit.py`: compara claims atuais estruturados com o manifesto factual e ignora histórico fora do bloco.
+- `test_state_consistency_audit.py`: contratos de sincronização, divergência, ausência de marcador e manifesto inválido.
 
 ## Gates locais desta rodada
 
-- **107 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral local; o contrato MCTS cobre a distinção entre ações padrão e espaço vazio.
+- **112 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral local; o contrato MCTS cobre a distinção entre ações padrão e espaço vazio.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **131 achados LOW** após o hardening do B607 em `tools/state_manifest.py`; a triagem classifica 16 B311 como `simulation_only_random_review`, 111 B101 como `embedded_demo_assert_review` e 4 subprocessos como `controlled_subprocess_review`, sem `manual_review` residual. Isso não é clearance de segurança.
@@ -64,6 +73,7 @@
 - **Compilação Python:** passou para módulos, ferramentas e testes alterados.
 - **CI alinhado nesta rodada:** `test_vram_defense_guard.py` agora é compilado, incluído na medição de cobertura e executado explicitamente pelo workflow.
 - **CI modernizado nesta rodada:** runner fixado em `ubuntu-24.04`; `checkout@v5`, `setup-python@v6` e `upload-artifact@v7` removem a dependência das versões legadas que geravam avisos de Node.js 20.
+- **State consistency gate:** o workflow agora compila e testa o auditor, gera `state-consistency.json` após o manifesto e falha em claims atuais divergentes.
 - **Auditor B101:** 111 achados restantes, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26510`; compilação de módulos, ferramentas e testes passou.
 - **Inventário de lacunas:** propagação, adaptação e atualização gerativa registram contratos mínimos observáveis; ferramenta registrada sem executor retorna falha estruturada. O inventário AST agora registra `pass_only_count=0` e `not_implemented_count=0`.
 - **Telemetria GPU:** `monitor_hardware` tenta NVML, depois memória reservada CUDA como proxy; sem backend retorna `0.0` sem afirmar disponibilidade.
@@ -81,8 +91,8 @@
 - **Reminiscência:** `is_typical` é `true` somente quando o bucket de maior densidade está entre 10 e 30 anos; picos fora da faixa continuam sendo retornados, mas marcados como atípicos.
 - **Correção:** descrições malformadas de mínimo/máximo retornam imediatamente o conteúdo original, preservando o comportamento seguro já testado.
 - **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
-- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; o estado operacional final deve ser lido do manifesto do CI `37258732531`, que registra 105 testes, 131 findings LOW e dependências opcionais ausentes (`psutil`, `faiss`, `sentence_transformers`).
-- **Manifesto factual:** o CI `37258732531` gerou e reteve `nexus-state-manifest` para o commit `5d12be0`; commits e métricas sem esse artefato são classificados como não verificados.
+- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; o estado operacional atual deve ser lido do manifesto do CI associado ao `HEAD`, que registra 112 testes e 131 findings LOW.
+- **Manifesto factual:** o CI associado ao `HEAD` gera e retém `nexus-state-manifest`; commits e métricas sem esse artefato são classificados como não verificados.
 
 ## Gates do workflow local
 
@@ -105,6 +115,7 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o contrato de sinais de atenção junto com a suíte expandida.
 - executar o contrato de média de sinergia junto com a suíte expandida.
 - executar o contrato de ações do MCTS junto com a suíte expandida.
+- executar o contrato de consistência do estado e o gate contra o manifesto da mesma execução.
 
 O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
 

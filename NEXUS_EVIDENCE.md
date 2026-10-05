@@ -1,6 +1,13 @@
 # Nexus — Ledger de evidências
 
-Estado de referência operacional: use o artefato `nexus-state-manifest` do CI. No marco verificado, o commit `fcac84c` passou no run `37259919820`, com 107 testes.
+<!-- NEXUS-CURRENT-STATE
+commit: HEAD
+ci_run: CURRENT_RUN
+tests: 112
+bandit_low: 131
+-->
+
+Estado de referência operacional: use o artefato `nexus-state-manifest` do CI. O commit e o run exatos são resolvidos pelo manifesto associado ao `HEAD`, com 112 testes.
 Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e não devem ser usados como estado atual.
 
 | Área | Estado | Evidência verificável | Limitação |
@@ -18,7 +25,7 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Planejamento MCTS | parcial/verificado no contrato | `None` usa ações padrão e lista vazia permanece vazia | recompensas e rollouts continuam heurísticos; não é prova de planejamento geral |
 | Telemetria | parcial/verificado | Vita, SQLite e guard de VRAM | dependente do ambiente e dos recursos disponíveis |
 | Segurança | parcial | Bandit 131 LOW, triagem, auditorias AST e testes negativos | não substitui threat model ou revisão manual completa |
-| CI | verificado | run `37259919820` com sucesso para o commit `fcac84c`; o manifesto foi retido como artefato | qualquer novo commit exige leitura do manifesto correspondente |
+| CI | verificado | run associado ao `HEAD` com sucesso; o manifesto foi retido como artefato | qualquer novo commit exige leitura do manifesto correspondente |
 | Autonomia geral | não demonstrada | nenhuma evidência válida no repositório | não fazer esse claim |
 | AGI/ASI/consciência | não demonstradas | explicitamente negadas pela documentação | nomes e banners não contam como evidência |
 
