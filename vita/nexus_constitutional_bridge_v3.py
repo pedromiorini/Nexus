@@ -24,6 +24,7 @@ class NexusConstitutionalBridge:
         self._audit_db = sqlite3.connect(self.audit_db_path, check_same_thread=False)
         self._audit_db_lock = threading.RLock()
         with self._audit_db_lock:
+            self._audit_db.execute("PRAGMA busy_timeout = 5000")
             self._audit_db.execute("CREATE TABLE IF NOT EXISTS policy_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, event_type TEXT NOT NULL, timestamp REAL NOT NULL, payload TEXT NOT NULL)")
             self._audit_db.commit()
         self.reprocessing_thresholds = {
