@@ -1,6 +1,8 @@
 import json
 import unittest
 
+from hypothesis import given, settings, strategies as st
+
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
 from tools.diagnostics_dashboard import render_dashboard
 
@@ -80,6 +82,28 @@ class RecoveryDiagnosticsContractTests(unittest.TestCase):
         result = self.bridge.validate_recovery_diagnostics(payload)
         self.assertFalse(result["valid"])
         self.assertIn("diagnostics_must_be_object", result["errors"])
+
+    @settings(max_examples=60, deadline=None)
+    @given(
+        st.recursive(
+            st.none()
+            | st.booleans()
+            | st.integers()
+            | st.floats(allow_nan=False, allow_infinity=False)
+            | st.text(max_size=32),
+            lambda children: st.lists(children, max_size=4)
+            | st.dictionaries(st.text(max_size=16), children, max_size=4),
+            max_leaves=16,
+        )
+    )
+    def test_arbitrary_json_values_never_escape_validator_contract(self, payload):
+        result = self.bridge.validate_recovery_diagnostics(payload)
+        self.assertIsInstance(result, dict)
+        self.assertIn("valid", result)
+        self.assertIn("compatible", result)
+        self.assertIsInstance(result["valid"], bool)
+        self.assertIsInstance(result["compatible"], bool)
+        self.assertIsInstance(result["errors"], list)
 
 
 if __name__ == "__main__":
