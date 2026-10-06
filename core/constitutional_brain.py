@@ -1920,6 +1920,7 @@ class RealEpisodicMemory:
                  constitutional_log=None):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.db_lock = threading.RLock()
         self.hierarchical_memory = hierarchical_memory
         self.constitutional_log = constitutional_log
         self.current_episode_id = None
@@ -1928,25 +1929,26 @@ class RealEpisodicMemory:
         self._create_tables()
 
     def _create_tables(self):
-        cursor = self.conn.cursor()
-        cursor.executescript("""
-            CREATE TABLE IF NOT EXISTS episodic_memories (
-                episode_id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                start_timestamp REAL NOT NULL,
-                end_timestamp REAL,
-                trigger_query TEXT,
-                importance REAL DEFAULT 0.5,
-                status TEXT DEFAULT 'open'
-            );
-            CREATE TABLE IF NOT EXISTS episodic_memory_links (
-                episode_id TEXT,
-                memory_id INTEGER,
-                relevance_score REAL DEFAULT 1.0,
-                PRIMARY KEY (episode_id, memory_id)
-            );
-        """)
-        self.conn.commit()
+        with self.db_lock:
+            cursor = self.conn.cursor()
+            cursor.executescript("""
+                CREATE TABLE IF NOT EXISTS episodic_memories (
+                    episode_id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    start_timestamp REAL NOT NULL,
+                    end_timestamp REAL,
+                    trigger_query TEXT,
+                    importance REAL DEFAULT 0.5,
+                    status TEXT DEFAULT 'open'
+                );
+                CREATE TABLE IF NOT EXISTS episodic_memory_links (
+                    episode_id TEXT,
+                    memory_id INTEGER,
+                    relevance_score REAL DEFAULT 1.0,
+                    PRIMARY KEY (episode_id, memory_id)
+                );
+            """)
+            self.conn.commit()
 
     def start_episode(self, title: str, trigger_query: Optional[str] = None,
                      importance: float = 0.6, auto_log: bool = True) -> str:
@@ -1954,86 +1956,93 @@ class RealEpisodicMemory:
         episode_id = str(uuid.uuid4())
         ts = time.time()
 
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            INSERT INTO episodic_memories (episode_id, title, start_timestamp, trigger_query, importance)
-            VALUES (?, ?, ?, ?, ?)
-        """, (episode_id, title[:200], ts, trigger_query, importance))
-        self.conn.commit()
+        with self.db_lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO episodic_memories (episode_id, title, start_timestamp, trigger_query, importance)
+                VALUES (?, ?, ?, ?, ?)
+            """, (episode_id, title[:200], ts, trigger_query, importance))
+            self.conn.commit()
 
-        self.episodes_created += 1
-        self.current_episode_id = episode_id
+            self.episodes_created += 1
+            self.current_episode_id = episode_id
         return episode_id
 
     def close_episode(self, episode_id: Optional[str] = None, auto_log: bool = True):
         """Fechar episódio"""
-        if episode_id is None:
-            episode_id = self.current_episode_id
+        with self.db_lock:
+            if episode_id is None:
+                episode_id = self.current_episode_id
 
-        if not episode_id:
-            return
+            if not episode_id:
+                return
 
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            UPDATE episodic_memories 
-            SET end_timestamp = ?, status = 'closed'
-            WHERE episode_id = ?
-        """, (time.time(), episode_id))
-        self.conn.commit()
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                UPDATE episodic_memories
+                SET end_timestamp = ?, status = 'closed'
+                WHERE episode_id = ?
+            """, (time.time(), episode_id))
+            self.conn.commit()
 
-        self.episodes_closed += 1
-        if episode_id == self.current_episode_id:
-            self.current_episode_id = None
+            self.episodes_closed += 1
+            if episode_id == self.current_episode_id:
+                self.current_episode_id = None
 
     def link_memory_to_episode(self, episode_id: str, memory_id: int, 
                                relevance_score: float = 1.0):
         """Vincular memória a episódio"""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            INSERT OR REPLACE INTO episodic_memory_links 
-            (episode_id, memory_id, relevance_score)
-            VALUES (?, ?, ?)
-        """, (episode_id, memory_id, relevance_score))
-        self.conn.commit()
+        with self.db_lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO episodic_memory_links
+                (episode_id, memory_id, relevance_score)
+                VALUES (?, ?, ?)
+            """, (episode_id, memory_id, relevance_score))
+            self.conn.commit()
 
     def search_episodes(self, query: Optional[str] = None, 
                        status: str = "closed", limit: int = 10) -> List[Episode]:
         """Buscar episódios"""
-        cursor = self.conn.cursor()
+        with self.db_lock:
+            cursor = self.conn.cursor()
 
-        if query:
-            cursor.execute("""
-                SELECT episode_id, title, start_timestamp, end_timestamp, 
-                       trigger_query, importance, status
-                FROM episodic_memories
-                WHERE (title LIKE ? OR trigger_query LIKE ?) AND status = ?
-                ORDER BY start_timestamp DESC LIMIT ?
-            """, (f"%{query}%", f"%{query}%", status, limit))
-        else:
-            cursor.execute("""
-                SELECT episode_id, title, start_timestamp, end_timestamp,
-                       trigger_query, importance, status
-                FROM episodic_memories
-                WHERE status = ?
-                ORDER BY start_timestamp DESC LIMIT ?
-            """, (status, limit))
+            if query:
+                cursor.execute("""
+                    SELECT episode_id, title, start_timestamp, end_timestamp,
+                           trigger_query, importance, status
+                    FROM episodic_memories
+                    WHERE (title LIKE ? OR trigger_query LIKE ?) AND status = ?
+                    ORDER BY start_timestamp DESC LIMIT ?
+                """, (f"%{query}%", f"%{query}%", status, limit))
+            else:
+                cursor.execute("""
+                    SELECT episode_id, title, start_timestamp, end_timestamp,
+                           trigger_query, importance, status
+                    FROM episodic_memories
+                    WHERE status = ?
+                    ORDER BY start_timestamp DESC LIMIT ?
+                """, (status, limit))
 
-        return [Episode(*row) for row in cursor.fetchall()]
+            rows = cursor.fetchall()
+        return [Episode(*row) for row in rows]
 
     def get_episode_memories(self, episode_id: str) -> List[Dict]:
         """Obter memórias de um episódio"""
         if not self.hierarchical_memory:
             return []
 
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT memory_id, relevance_score
-            FROM episodic_memory_links
-            WHERE episode_id = ?
-        """, (episode_id,))
+        with self.db_lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT memory_id, relevance_score
+                FROM episodic_memory_links
+                WHERE episode_id = ?
+            """, (episode_id,))
+            links = cursor.fetchall()
 
         memories = []
-        for mem_id, relevance in cursor.fetchall():
+        for mem_id, relevance in links:
             mem = self.hierarchical_memory.get_memory_by_id(mem_id)
             if mem:
                 memories.append({
@@ -2046,14 +2055,17 @@ class RealEpisodicMemory:
         return memories
 
     def get_statistics(self) -> Dict:
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM episodic_memory_links")
-        total_links = int(cursor.fetchone()[0])
-        cursor.execute("SELECT AVG(importance) FROM episodic_memories")
-        avg_importance = cursor.fetchone()[0]
+        with self.db_lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM episodic_memory_links")
+            total_links = int(cursor.fetchone()[0])
+            cursor.execute("SELECT AVG(importance) FROM episodic_memories")
+            avg_importance = cursor.fetchone()[0]
+            episodes_created = self.episodes_created
+            episodes_closed = self.episodes_closed
         return {
-            "episodes_created": self.episodes_created,
-            "episodes_closed": self.episodes_closed,
+            "episodes_created": episodes_created,
+            "episodes_closed": episodes_closed,
             "total_links": total_links,
             "avg_importance": float(avg_importance) if avg_importance is not None else 0.0,
         }

@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 113
+tests: 114
 bandit_low: 131
 -->
 
@@ -42,6 +42,7 @@ bandit_low: 131
 - `test_multimodal_backend_contract.py`: contratos de backends opcionais de visão/áudio e fallbacks de demonstração.
 - `test_swarm_statistics_contract.py`: contrato de médias observadas do swarm e rejeição de deliberação sem agentes.
 - `test_episodic_memory_statistics_contract.py`: contrato de contagem de vínculos, média de importância e fechamento de episódios.
+- `test_episodic_memory_concurrency_contract.py`: contrato de ciclo de vida concorrente em uma conexão SQLite compartilhada.
 - `test_attention_signal_contract.py`: contrato de sinais opcionais de contraste/movimento e fallbacks heurísticos da atenção.
 - `test_integration_synergy_contract.py`: contrato da média aritmética de sinergia sobre todas as integrações registradas.
 - `test_knowledge_graph_contract.py`: contrato de identidade única, média de confiança e reclassificação de tipo no grafo.
@@ -65,7 +66,7 @@ bandit_low: 131
 
 ## Gates locais desta rodada
 
-- **113 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral local; o contrato MCTS cobre a distinção entre ações padrão e espaço vazio.
+- **114 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral local; os contratos MCTS e SQLite cobrem, respectivamente, espaço de ações vazio e serialização concorrente da memória episódica.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
 - **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **131 achados LOW** após o hardening do B607 em `tools/state_manifest.py`; a triagem classifica 16 B311 como `simulation_only_random_review`, 111 B101 como `embedded_demo_assert_review` e 4 subprocessos como `controlled_subprocess_review`, sem `manual_review` residual. Isso não é clearance de segurança.
@@ -79,6 +80,7 @@ bandit_low: 131
 - **Segurança:** LOW permanece triado e informativo; qualquer MEDIUM/HIGH no Bandit bloqueia o workflow após a triagem.
 - **Auditor B101:** 111 achados restantes, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26510`; compilação de módulos, ferramentas e testes passou.
 - **Inventário de lacunas:** propagação, adaptação e atualização gerativa registram contratos mínimos observáveis; ferramenta registrada sem executor retorna falha estruturada. O inventário AST agora registra `pass_only_count=0` e `not_implemented_count=0`.
+- **Memória episódica:** a conexão compartilhada usa `RLock` para serializar DDL, escritas, leituras e contadores; o teste concorrente cobre criação, vínculo, fechamento, estatísticas e busca.
 - **Telemetria GPU:** `monitor_hardware` tenta NVML, depois memória reservada CUDA como proxy; sem backend retorna `0.0` sem afirmar disponibilidade.
 - **Contrafactuais:** `_predict_outcome` usa `world_model.predict_outcome` somente quando o protocolo existe; `_build_causal_chain` usa `extract_causal_relations` somente quando disponível.
 - **Multimodal:** `VisionProcessor` usa `detect_objects`/`analyze_scene` do backend opcional; `AudioProcessor` usa `transcribe_speech`; sem backend, os fallbacks permanecem explicitamente demonstrativos.
@@ -94,7 +96,7 @@ bandit_low: 131
 - **Reminiscência:** `is_typical` é `true` somente quando o bucket de maior densidade está entre 10 e 30 anos; picos fora da faixa continuam sendo retornados, mas marcados como atípicos.
 - **Correção:** descrições malformadas de mínimo/máximo retornam imediatamente o conteúdo original, preservando o comportamento seguro já testado.
 - **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
-- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; o estado operacional atual deve ser lido do manifesto do CI associado ao `HEAD`, que registra 113 testes e 131 findings LOW.
+- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; o estado operacional atual deve ser lido do manifesto do CI associado ao `HEAD`, que registra 114 testes e 131 findings LOW.
 - **Manifesto factual:** o CI associado ao `HEAD` gera e retém `nexus-state-manifest`; commits e métricas sem esse artefato são classificados como não verificados.
 
 ## Gates do workflow local

@@ -3,11 +3,11 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 113
+tests: 114
 bandit_low: 131
 -->
 
-Estado de referência operacional: use o artefato `nexus-state-manifest` do CI. O commit e o run exatos são resolvidos pelo manifesto associado ao `HEAD`, com 113 testes.
+Estado de referência operacional: use o artefato `nexus-state-manifest` do CI. O commit e o run exatos são resolvidos pelo manifesto associado ao `HEAD`, com 114 testes.
 Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e não devem ser usados como estado atual.
 
 | Área | Estado | Evidência verificável | Limitação |
@@ -15,7 +15,7 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Fila | verificado no contrato | testes de prioridade, retry, capacidade, snapshot e atomicidade | sem carga distribuída ou exactly-once |
 | Diagnósticos | verificado no contrato | schema versionado, validação e dashboard | estrutura não prova correção cognitiva |
 | Memória SQL | parcial/verificado no fallback | testes adversariais e queries parametrizadas | busca semântica opcional não estava disponível |
-| Memória episódica | verificado no contrato | estatísticas derivadas do SQLite e teste independente | escopo local |
+| Memória episódica | verificado no contrato | estatísticas derivadas do SQLite, ciclo de vida concorrente serializado e testes independentes | escopo local; sem locking distribuído ou exactly-once |
 | CentralRouter | verificado no contrato | contadores, cache hit rate e latência | cenários internos |
 | Swarm | verificado no contrato | consenso/diversidade derivados de deliberações | não demonstra inteligência coletiva geral |
 | Multimodalidade | parcial | protocolos de backend e fallbacks testados | sem backend não há percepção/transcrição real |
