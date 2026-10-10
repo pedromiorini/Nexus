@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 117
+tests: 169
 bandit_low: 131
 -->
 
@@ -69,15 +69,15 @@ bandit_low: 131
 
 ## Gates locais desta rodada
 
-- **117 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral local; os contratos MCTS, memória episódica e Vita cobrem espaço de ações vazio, concorrência na mesma conexão e concorrência entre conexões SQLite.
-- **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
-- **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
+- **169 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails/segurança/higiene:** passaram na suíte integral local; os contratos MCTS, memória episódica e Vita cobrem espaço de ações vazio, concorrência na mesma conexão e concorrência entre conexões SQLite.
+- **Cobertura branch (testes + suíte integrada):** fila **98%** (piso 90%); guard de VRAM **94%** (piso 90%); bridge Vita **74%** (piso 70%); `core/constitutional_brain.py` **66%** (piso 62%; só com testes unitários eram 23%).
+- **Mutation testing:** **28/28 mutações mortas, 0 sobreviventes, 100%** (fila, bridge, guard de VRAM, log imutável e detector de jailbreak), aplicadas em cópia temporária do repositório.
 - **Bandit:** **131 achados LOW** após o hardening do B607 em `tools/state_manifest.py`; a triagem classifica 16 B311 como `simulation_only_random_review`, 111 B101 como `embedded_demo_assert_review` e 4 subprocessos como `controlled_subprocess_review`, sem `manual_review` residual. Isso não é clearance de segurança.
 - **Auditoria de realidade:** executada sem elevar claims cognitivos.
 - **Dashboard:** snapshot válido renderizado; payload inválido rejeitado pelos testes.
 - **Compilação Python:** passou para módulos, ferramentas e testes alterados.
 - **CI alinhado nesta rodada:** `test_vram_defense_guard.py` agora é compilado, incluído na medição de cobertura e executado explicitamente pelo workflow.
-- **CI modernizado nesta rodada:** runner fixado em `ubuntu-24.04`; `checkout@v5`, `setup-python@v6` e `upload-artifact@v7` removem a dependência das versões legadas que geravam avisos de Node.js 20.
+- **CI modernizado nesta rodada:** runner fixado em `ubuntu-24.04`; actions fixadas por SHA de commit (`checkout` v5.1.0, `setup-python` v6.3.0, `upload-artifact` v7.0.2) com `persist-credentials: false`; o Dependabot propõe as atualizações.
 - **State consistency gate:** o workflow agora compila e testa o auditor, gera `state-consistency.json` após o manifesto e falha em claims atuais divergentes.
 - **Manifesto final:** a suíte integrada e o resumo completo unittest agora terminam antes da geração de `STATE_MANIFEST.json`; `discovered_static` não é apresentado como execução.
 - **Segurança:** LOW permanece triado e informativo; qualquer MEDIUM/HIGH no Bandit bloqueia o workflow após a triagem.
@@ -102,7 +102,7 @@ bandit_low: 131
 - **Reminiscência:** `is_typical` é `true` somente quando o bucket de maior densidade está entre 10 e 30 anos; picos fora da faixa continuam sendo retornados, mas marcados como atípicos.
 - **Correção:** descrições malformadas de mínimo/máximo retornam imediatamente o conteúdo original, preservando o comportamento seguro já testado.
 - **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
-- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; o estado operacional atual deve ser lido do manifesto do CI associado ao `HEAD`, que registra 117 testes e 131 findings LOW.
+- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; o estado operacional atual deve ser lido do manifesto do CI associado ao `HEAD`, que registra 169 testes e 131 findings LOW.
 - **Manifesto factual:** o CI associado ao `HEAD` gera e retém `nexus-state-manifest`; commits e métricas sem esse artefato são classificados como não verificados.
 
 ## Gates do workflow local
@@ -127,8 +127,13 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o contrato de média de sinergia junto com a suíte expandida.
 - executar o contrato de ações do MCTS junto com a suíte expandida.
 - executar o contrato de consistência do estado e o gate contra o manifesto da mesma execução.
+- instalar dependências com versão fixa (`requirements-dev.txt`) e falhar em ruff (F, E9, B904, B006), actionlint ou zizmor.
+- regenerar os relatórios de realidade e falhar se `AUDIT_REALITY_REPORT.md`/`audit_reality.json` versionados divergirem; conferir `SECURITY_TRIAGE.md` com `--check`.
+- medir uma única cobertura (testes + suíte integrada) com pisos para fila, guard de VRAM, bridge e núcleo.
+- rodar a suíte e a suíte integrada em Python 3.12 e 3.13 com `-X dev -W error` (job `python-compat`).
+- falhar se o diretório de trabalho ganhar bancos SQLite ou se arquivos versionados mudarem durante a execução.
 
-O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; as actions estão em versões Node24 e o runner está fixado em `ubuntu-24.04`.
+O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; as actions estão fixadas por SHA e o runner em `ubuntu-24.04`.
 
 ## Limites e decisões
 
@@ -144,12 +149,17 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 - O primeiro assert migrado preserva a falha explícita da demonstração; a garantia comportamental agora vive em `test_central_router_contract.py`.
 - Relatórios gerados (`coverage.xml`, JSON de mutation, SQLite temporário e saídas Bandit) não devem ser commitados.
 - Não expor tokens, credenciais ou conteúdo de `.env`.
+- O detector de jailbreak é heurístico (primeira camada); `EthicsGuard` e `RealCognitiveBudgetEnforcer` também são baseados em palavras-chave e não foram reescritos nesta rodada.
+- O log imutável detecta adulteração e remoção no meio da cadeia; truncar o final exige ancorar o `head` fora do banco.
+- Nomes de classe `Real*` e com termos de consciência/emoção foram mantidos (renomear quebraria a API); os textos que afirmavam capacidade foram removidos e o auditor passou a escanear o código.
+- `think()` e `_wire_dependencies` seguem com complexidade ciclomática muito alta; o fatiamento por fase é a próxima refatoração estrutural.
 
 ## Histórico de checkpoints
 
+- **2026-10-08 — 169 testes:** auditoria de código e hardening (D-013 a D-015); o run do CI correspondente é registrado pelo manifesto após o merge.
 - **2026-10-05 — 105 testes:** run `37258732531`, marco anterior preservado para proveniência.
 - **Bootstrap — 86 testes:** run `37097334156`, snapshot histórico; não representa o estado atual.
 
 ## Próxima ação
 
-Manter os documentos canônicos sincronizados com o código e executar mutation testing direcionado antes de qualquer alteração no núcleo monolítico. Não tratar os banners da suíte integrada como evidência independente de capacidade cognitiva.
+Decidir e adicionar a licença (`LICENSE`); habilitar no GitHub proteção de branch, Dependabot alerts, secret scanning e relato privado de vulnerabilidades; remover o ramo remoto `master` (obsoleto, ancestral de `main`). Em código: renomear ou isolar classes com termos de consciência/emoção (com aliases de compatibilidade), fatiar `think()` por fase, mover os testes para `tests/` e revisar `EthicsGuard` e `RealCognitiveBudgetEnforcer`. Manter os documentos canônicos sincronizados com o código e não tratar os banners da suíte integrada como evidência independente de capacidade cognitiva.

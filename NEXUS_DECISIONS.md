@@ -97,3 +97,30 @@
 - **Evidência:** `tools/test_summary.py`, `test_state_manifest.py` e o passo `Enforce security severity policy` no workflow.
 - **Limitação:** a contagem executada continua dependente do runner unittest; não mede cobertura semântica nem substitui revisão manual.
 - **Reversibilidade:** fácil.
+
+## D-013 — Segurança heurística com limites explícitos e testes adversariais
+
+- **Decisão:** `RealJailbreakDetector` normaliza Unicode e usa frases-alvo com fronteira de palavra (EN/PT) e pesos; `sensitivity` ajusta só sinais fracos. `RealImmutableLog` ganha `verify_chain()`, triggers append-only, retomada da cadeia ao reabrir o banco e leitura do hash anterior dentro de `BEGIN IMMEDIATE`.
+- **Contexto:** a busca por substring bloqueava português comum (`ajudando`, `mudança`, `dança`) em `think()` e ignorava ofuscações triviais; o log "imutável" não era verificável e recomeçava do hash gênesis a cada instância.
+- **Motivo:** reduzir falsos positivos e negativos sem alegar robustez e tornar a integridade do log reproduzível.
+- **Evidência:** `test_jailbreak_detector_contract.py`, `test_immutable_log_contract.py` e 13 mutantes dedicados (log e detector) no gate de mutação.
+- **Limitação:** heurística de primeira camada (OWASP LLM01 não conhece mitigação infalível); truncar o fim do log exige ancorar o `head` fora do banco.
+- **Reversibilidade:** média (muda decisões de bloqueio em `think()`).
+
+## D-014 — Supply chain do CI e relatórios sem deriva
+
+- **Decisão:** actions fixadas por SHA, dependências com versão fixa em `requirements-dev.txt`, Dependabot semanal, `persist-credentials: false`, zizmor e actionlint como gate, relatórios de realidade conferidos por `git diff`, triagem conferida por `--check` e agrupada por escopo (sem números de linha), cobertura única com pisos e job de compatibilidade Python 3.12/3.13.
+- **Contexto:** tags móveis e `pip install` sem versões; relatórios versionados defasados (26.685 contra 26.697 linhas) e triagem presa a números de linha que mudavam a cada edição.
+- **Motivo:** reprodutibilidade e detecção de deriva sem fricção por deslocamento de linhas.
+- **Evidência:** workflow validado por actionlint e zizmor sem achados; `test_security_triage.py` e `test_reality_audit.py`.
+- **Limitação:** proteção de branch, alertas de segurança e relato privado dependem de configurações do GitHub; zizmor roda offline e não consulta advisories.
+- **Reversibilidade:** fácil.
+
+## D-015 — Saída verificável: banner factual, traces atrás de flag e auditor sem falso positivo
+
+- **Decisão:** a suíte integrada conta marcadores executados e pulados, falha se algum marcador presente no fonte não executar e recusa `python -O`; traces de depuração ficam atrás de `NEXUS_DEBUG=1`; frases que afirmavam autoconsciência e funcionalidade total foram removidas e o auditor passou a escanear o código; a negação do README é avaliada por sentença; "retorno constante" estrito (só literais) é separado de "literal dinâmico".
+- **Contexto:** o banner dizia "ALL TESTS PASSED" mesmo com `-O` (asserts removidos) ou blocos não executados; 78 linhas ❌ de trace pareciam falhas; o auditor tratava a própria ressalva do README ("não constituem") como alegação e contava getters como stubs.
+- **Motivo:** tornar a saída verificável e coerente com a postura conservadora do projeto.
+- **Evidência:** `test_core_hygiene_contract.py` e `test_reality_audit.py`.
+- **Limitação:** nomes de classe `Real*` e com termos de consciência permanecem (renomear quebra a API); o gate só captura as frases listadas.
+- **Reversibilidade:** fácil.

@@ -3,11 +3,11 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 117
+tests: 169
 bandit_low: 131
 -->
 
-Estado de referência operacional: use o artefato `nexus-state-manifest` do CI. O commit e o run exatos são resolvidos pelo manifesto associado ao `HEAD`, com 117 testes.
+Estado de referência operacional: use o artefato `nexus-state-manifest` do CI. O commit e o run exatos são resolvidos pelo manifesto associado ao `HEAD`, com 169 testes.
 Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e não devem ser usados como estado atual.
 
 | Área | Estado | Evidência verificável | Limitação |
@@ -25,6 +25,9 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Planejamento MCTS | parcial/verificado no contrato | `None` usa ações padrão e lista vazia permanece vazia | recompensas e rollouts continuam heurísticos; não é prova de planejamento geral |
 | Telemetria | parcial/verificado | Vita, audit log SQLite serializado e guard de VRAM | dependente do ambiente; sem locking distribuído ou exactly-once |
 | Segurança | parcial | Bandit 131 LOW, triagem, auditorias AST e testes negativos | não substitui threat model ou revisão manual completa |
+| Detector de jailbreak | parcial | heurística EN/PT com normalização Unicode, corpus malicioso/benigno, propriedades e mutantes; falsos positivos por substring removidos | primeira camada por palavras-chave; não é classificador semântico e não cobre paráfrases inéditas ou outros idiomas |
+| Log imutável | verificado no contrato | cadeia por hash, triggers append-only, `verify_chain()`, retomada após reabrir e múltiplos escritores | truncar o fim do log só é detectável com o `head` ancorado fora do banco |
+| Supply chain do CI | parcial | actions fixadas por SHA, dependências com versão fixa, Dependabot, zizmor e actionlint sem achados | proteção de branch, alertas e relato privado dependem de configuração do repositório |
 | CI | verificado | run associado ao `HEAD` com sucesso; o manifesto foi retido como artefato | qualquer novo commit exige leitura do manifesto correspondente |
 | Autonomia geral | não demonstrada | nenhuma evidência válida no repositório | não fazer esse claim |
 | AGI/ASI/consciência | não demonstradas | explicitamente negadas pela documentação | nomes e banners não contam como evidência |
