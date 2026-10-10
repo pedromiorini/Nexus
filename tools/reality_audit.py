@@ -23,9 +23,46 @@ CLAIMS = {
     "autonomia/soberania": r"sistema autônomo|autonomous|sovereign|soberania",
 }
 
+# Frases assertivas no código-fonte (docstrings, prints, banners) que contradizem a postura
+# conservadora do README. Nomes de classes e rótulos neutros não entram aqui.
+CODE_OVERCLAIMS = {
+    "autoconsciência afirmada": r"REAL\s+Self-?Awareness|is\s+self-aware|self-aware!",
+    "funcionalidade total afirmada": r"SYSTEM\s+100%\s+FUNCTIONAL|100%\s+FUNCTIONAL\s+SYSTEM",
+    "consciência genuína afirmada": r"genuine(?:ly)?\s+(?:conscious|sentient|aware)|truly\s+(?:conscious|sentient|self-aware)",
+}
+
+# Negação na mesma sentença que antecede a menção ("não reivindica", "não constituem prova de",
+# "sem reivindicar", "without claiming"...).
+NEGATION = re.compile(
+    r"\b(?:não|nao|sem|nem|without|not|no|never)\b[^.\n;]{0,80}?\b(?:reivindic\w*|afirm\w*|demonstr\w*|constitu\w*|claim\w*|prova\w*|garant\w*)",
+    re.IGNORECASE,
+)
+
 
 def parse_python(path: Path) -> ast.AST:
     return ast.parse(path.read_text(encoding="utf-8", errors="replace"), filename=str(path))
+
+
+def iter_functions(tree: ast.AST):
+    """Percorre as funções com nome qualificado (Classe.metodo), estável a edições acima delas."""
+    def walk(node: ast.AST, prefix: str):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.ClassDef):
+                yield from walk(child, f"{prefix}{child.name}.")
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                yield f"{prefix}{child.name}", child
+                yield from walk(child, f"{prefix}{child.name}.<locals>.")
+            else:
+                yield from walk(child, prefix)
+    yield from walk(tree, "")
+
+
+def is_pure_literal(node: ast.AST) -> bool:
+    try:
+        ast.literal_eval(node)
+    except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+        return False
+    return True
 
 
 def collect_static_evidence() -> dict:
@@ -33,19 +70,25 @@ def collect_static_evidence() -> dict:
     classes = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
     functions = [node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))]
     passes = [node for node in functions if len([item for item in node.body if not (isinstance(item, ast.Expr) and isinstance(getattr(item, "value", None), ast.Constant) and isinstance(item.value.value, str))]) == 1 and isinstance([item for item in node.body if not (isinstance(item, ast.Expr) and isinstance(getattr(item, "value", None), ast.Constant) and isinstance(item.value.value, str))][0], ast.Pass)]
-    constant_returns = []
+    qualnames = {id(node): name for name, node in iter_functions(tree)}
+    strict_constants = []
+    dynamic_literals = []
     for node in functions:
         body = [item for item in node.body if not (isinstance(item, ast.Expr) and isinstance(getattr(item, "value", None), ast.Constant) and isinstance(item.value.value, str))]
         if len(body) == 1 and isinstance(body[0], ast.Return) and isinstance(body[0].value, (ast.Constant, ast.Dict, ast.List, ast.Tuple)):
-            constant_returns.append({"name": node.name, "line": node.lineno, "value": ast.unparse(body[0].value)})
+            if is_pure_literal(body[0].value):
+                strict_constants.append({"qualname": qualnames[id(node)], "value": ast.unparse(body[0].value)})
+            else:
+                dynamic_literals.append(qualnames[id(node)])
     source = CORE.read_text(encoding="utf-8", errors="replace")
     embedded_tests = len(re.findall(r"TEST \d+ PASSED", source))
     return {
         "core_lines": len(source.splitlines()),
         "classes": len(classes),
         "functions": len(functions),
-        "pass_only_functions": [{"name": node.name, "line": node.lineno} for node in passes],
-        "constant_return_functions": constant_returns,
+        "pass_only_functions": [{"qualname": qualnames[id(node)]} for node in passes],
+        "constant_return_functions": strict_constants,
+        "dynamic_literal_return_functions": sorted(dynamic_literals),
         "embedded_test_markers": embedded_tests,
         "optional_dependency_warnings": [
             dependency for dependency, marker in (("psutil", "psutil not available"), ("FAISS/SentenceTransformers", "FAISS/SentenceTransformers not available")) if marker in source
@@ -53,14 +96,19 @@ def collect_static_evidence() -> dict:
     }
 
 
-def audit_claims() -> list[dict]:
-    text = README.read_text(encoding="utf-8", errors="replace")
+def sentence_start(text: str, position: int) -> int:
+    return max(text.rfind(".", 0, position), text.rfind("\n", 0, position), text.rfind(";", 0, position)) + 1
+
+
+def audit_claims(text: str | None = None) -> list[dict]:
+    if text is None:
+        text = README.read_text(encoding="utf-8", errors="replace")
     findings = []
     for label, pattern in CLAIMS.items():
         matches = list(re.finditer(pattern, text, flags=re.IGNORECASE))
         positive_matches = [
             match for match in matches
-            if not re.search(r"não\s+(reivindica|afirma|demonstra)|não\s+constitui", text[max(0, match.start() - 180):match.start()], re.IGNORECASE)
+            if not NEGATION.search(text[sentence_start(text, match.start()):match.start()])
         ]
         if positive_matches:
             findings.append({
@@ -79,6 +127,22 @@ def audit_claims() -> list[dict]:
     return findings
 
 
+def audit_code_overclaims(source: str | None = None) -> list[dict]:
+    if source is None:
+        source = CORE.read_text(encoding="utf-8", errors="replace")
+    findings = []
+    for label, pattern in CODE_OVERCLAIMS.items():
+        occurrences = len(re.findall(pattern, source, flags=re.IGNORECASE))
+        if occurrences:
+            findings.append({
+                "claim": label,
+                "occurrences": occurrences,
+                "status": "overclaim_in_code",
+                "reason": "Texto do código afirma uma capacidade que os testes do repositório não demonstram.",
+            })
+    return findings
+
+
 def referenced_paths() -> list[dict]:
     text = README.read_text(encoding="utf-8", errors="replace")
     references = re.findall(r"(?<![A-Za-z0-9_./-])([A-Za-z0-9_./-]+\.py)", text)
@@ -88,20 +152,27 @@ def referenced_paths() -> list[dict]:
 def build_report() -> dict:
     evidence = collect_static_evidence()
     claims = audit_claims()
+    code_claims = audit_code_overclaims()
     paths = referenced_paths()
+    risks = []
+    if any(item["status"] == "unsubstantiated_by_software_tests" for item in claims):
+        risks.append("README contains capability claims stronger than the measured evidence.")
+    if code_claims:
+        risks.append("Source strings assert capabilities stronger than the measured evidence (see code_claims).")
+    risks.extend([
+        "Embedded demonstration tests are not independent contract or adversarial tests.",
+        "Constant-return functions and pass-only functions require manual review.",
+        "Optional dependency fallbacks can change behavior and guarantees.",
+    ])
     return {
-        "audit_version": "1.0",
+        "audit_version": "1.1",
         "scope": "conservative reality audit",
         "principle": "names, banners and demo asserts are not proof of general intelligence or production readiness",
         "static_evidence": evidence,
         "claims": claims,
+        "code_claims": code_claims,
         "referenced_paths": paths,
-        "risks": [
-            "README contains capability claims stronger than the measured evidence.",
-            "Embedded demonstration tests are not independent contract or adversarial tests.",
-            "Constant-return functions and pass-only functions require manual review.",
-            "Optional dependency fallbacks can change behavior and guarantees.",
-        ],
+        "risks": risks,
         "next_actions": [
             "Maintain independent contract tests for critical interfaces.",
             "Add property-based tests for queue invariants.",
@@ -127,11 +198,15 @@ def markdown(report: dict) -> str:
         f"| Testes embutidos marcados | {evidence['embedded_test_markers']} | Evidência de demos internas, não de capacidade geral |",
     ]
     lines.append(f"| Funções somente com `pass` | {len(evidence['pass_only_functions'])} | Lacunas explícitas que exigem revisão |")
-    lines.append(f"| Funções com retorno constante | {len(evidence['constant_return_functions'])} | Possíveis heurísticas, stubs ou simplificações |")
+    lines.append(f"| Funções com retorno constante (estrito: só literais) | {len(evidence['constant_return_functions'])} | Possíveis heurísticas, stubs ou simplificações |")
+    lines.append(f"| Funções que retornam dict/list/tuple literal com valores dinâmicos | {len(evidence['dynamic_literal_return_functions'])} | Em geral getters e estatísticas; não são stubs por si só |")
+    lines.append(f"| Alegações assertivas no código-fonte | {sum(item['occurrences'] for item in report['code_claims'])} | Deve ser zero; ver seção de alegações |")
     lines.append(f"| Dependências opcionais sinalizadas | {len(evidence['optional_dependency_warnings'])} | Fallbacks podem alterar o comportamento |")
-    lines.extend(["", "## Alegações não comprovadas", ""])
-    for claim in report["claims"]:
+    lines.extend(["", "## Alegações (README e código-fonte)", ""])
+    for claim in report["claims"] + report["code_claims"]:
         lines.append(f"- **{claim['claim']}**: {claim['status']}. {claim['reason']}")
+    if not any(item["status"] != "explicitly_disclaimed" for item in report["claims"] + report["code_claims"]):
+        lines.append("- Nenhuma alegação assertiva sem ressalva foi encontrada no README nem no código-fonte.")
     lines.extend(["", "## Referências quebradas ou verificadas", ""])
     for item in report["referenced_paths"]:
         lines.append(f"- `{item['path']}`: {'existe' if item['exists'] else 'não encontrado'}.")

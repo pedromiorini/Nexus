@@ -4,19 +4,22 @@
 
 ## Evidência estrutural
 
-O núcleo analisado possui **26685 linhas**, **267 classes** e **843 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **59** funções com retorno constante simples e **30** marcadores de testes embutidos.
+O núcleo analisado possui **26895 linhas**, **268 classes** e **862 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **2** funções com retorno constante simples e **30** marcadores de testes embutidos.
 
 | Área | Resultado | Interpretação |
 |---|---:|---|
 | Testes embutidos marcados | 30 | Evidência de demos internas, não de capacidade geral |
 | Funções somente com `pass` | 0 | Lacunas explícitas que exigem revisão |
-| Funções com retorno constante | 59 | Possíveis heurísticas, stubs ou simplificações |
+| Funções com retorno constante (estrito: só literais) | 2 | Possíveis heurísticas, stubs ou simplificações |
+| Funções que retornam dict/list/tuple literal com valores dinâmicos | 57 | Em geral getters e estatísticas; não são stubs por si só |
+| Alegações assertivas no código-fonte | 0 | Deve ser zero; ver seção de alegações |
 | Dependências opcionais sinalizadas | 2 | Fallbacks podem alterar o comportamento |
 
-## Alegações não comprovadas
+## Alegações (README e código-fonte)
 
 - **AGI/ASI**: explicitly_disclaimed. A documentação nega explicitamente que o projeto reivindique essa capacidade.
-- **consciência/autoconsciência**: unsubstantiated_by_software_tests. A documentação contém a alegação, mas os testes do repositório não constituem evidência suficiente dessa capacidade.
+- **consciência/autoconsciência**: explicitly_disclaimed. A documentação nega explicitamente que o projeto reivindique essa capacidade.
+- Nenhuma alegação assertiva sem ressalva foi encontrada no README nem no código-fonte.
 
 ## Referências quebradas ou verificadas
 
@@ -34,17 +37,17 @@ O núcleo analisado possui **26685 linhas**, **267 classes** e **843 funções**
 - `test_integration_synergy_contract.py`: existe.
 - `test_knowledge_graph_contract.py`: existe.
 - `test_mcts_action_contract.py`: existe.
-- `test_recovery_diagnostics_contract.py`: existe.
-- `test_deferred_task_queue.py`: existe.
 - `core/constitutional_brain.py`: existe.
 - `tools/reality_audit.py`: existe.
 - `test_deferred_task_snapshot.py`: existe.
 - `test_memory_sql_contract.py`: existe.
+- `test_jailbreak_detector_contract.py`: existe.
 - `tools/reality_audit.py`: existe.
+- `tools/reality_audit.py`: existe.
+- `tools/security_triage.py`: existe.
 
 ## Riscos prioritários
 
-- README contains capability claims stronger than the measured evidence.
 - Embedded demonstration tests are not independent contract or adversarial tests.
 - Constant-return functions and pass-only functions require manual review.
 - Optional dependency fallbacks can change behavior and guarantees.
