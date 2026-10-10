@@ -1,6 +1,6 @@
 import unittest
 
-from core.vram_defense_guard import DefenseDecision, VramDefenseGuard, VramSnapshot
+from core.vram_defense_guard import VramDefenseGuard, VramSnapshot
 from core.constitutional_brain import CentralRouter
 
 

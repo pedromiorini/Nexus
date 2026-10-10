@@ -1,4 +1,3 @@
-import json
 import unittest
 
 from tools.embedded_assert_audit import audit

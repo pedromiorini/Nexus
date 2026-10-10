@@ -148,7 +148,6 @@ from enum import Enum
 from collections import defaultdict, deque
 import threading
 import os
-import sys
 
 # Importar o bridge Vita; CentralRouter e EthicsGuard são definidos neste módulo.
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
@@ -241,12 +240,12 @@ class RealHierarchicalMemory:
                 self.index = faiss.IndexFlatL2(self.embedding_dim)
                 self.fallback_mode = False
                 self._load_existing_embeddings()
-                print(f"✅ POST1 Semantic Memory ACTIVE - FAISS index ready")
+                print("✅ POST1 Semantic Memory ACTIVE - FAISS index ready")
             except Exception as e:
                 print(f"⚠️  FAISS initialization failed: {e}")
-                print(f"⚠️  Falling back to keyword matching")
+                print("⚠️  Falling back to keyword matching")
         else:
-            print(f"⚠️  POST1 - Keyword fallback mode (install sentence-transformers + faiss for semantic search)")
+            print("⚠️  POST1 - Keyword fallback mode (install sentence-transformers + faiss for semantic search)")
 
     def _create_tables(self):
         cursor = self.conn.cursor()
@@ -2075,8 +2074,6 @@ class RealEpisodicMemory:
 # MÓDULO 10: MCTS PLANNER (POST3)
 # ═══════════════════════════════════════════════════════════════════════════
 
-import math
-import random
 
 @dataclass
 class MCTSNode:
@@ -10103,19 +10100,19 @@ class RealEmpathySystem:
 
         if emotion == EmotionType.SADNESS:
             response_type = "comfort"
-            response_content = f"I understand you're feeling down. I'm here for you."
+            response_content = "I understand you're feeling down. I'm here for you."
         elif emotion == EmotionType.FEAR:
             response_type = "help"
-            response_content = f"I sense your worry. Let me help address this concern."
+            response_content = "I sense your worry. Let me help address this concern."
         elif emotion == EmotionType.JOY:
             response_type = "celebrate"
-            response_content = f"I'm so happy for you! This is wonderful!"
+            response_content = "I'm so happy for you! This is wonderful!"
         elif emotion == EmotionType.ANGER:
             response_type = "validate"
-            response_content = f"I understand your frustration. Your feelings are valid."
+            response_content = "I understand your frustration. Your feelings are valid."
         else:
             response_type = "support"
-            response_content = f"I'm here to support you however I can."
+            response_content = "I'm here to support you however I can."
 
         # Criar resposta
         response = EmpathicResponse(
@@ -12694,7 +12691,7 @@ class CentralRouter:
         Returns: Resultado agregado otimizado
         """
         # DEBUG v3.70: Log entry
-        print(f"🔍 DEBUG v3.70: Router.route() CALLED")
+        print("🔍 DEBUG v3.70: Router.route() CALLED")
         print(f"🔍 DEBUG v3.70: prompt = '{prompt[:50]}...'")
         print(f"🔍 DEBUG v3.70: self.modules has {len(self.modules)} registered modules")
         
@@ -12749,7 +12746,7 @@ class CentralRouter:
                 "prompt": prompt[:100]
             }
         
-        print(f"🔍 DEBUG v3.70: Ethics cleared")
+        print("🔍 DEBUG v3.70: Ethics cleared")
 
         execution_plan = ethics_check["modified_plan"]
 
@@ -12763,7 +12760,7 @@ class CentralRouter:
                 cached_result = cached_entry["result"].copy()
                 cached_result["cached"] = True
                 cached_result["cache_age_seconds"] = time.time() - cached_entry["timestamp"]
-                print(f"🔍 DEBUG v3.70: Returning CACHED result")
+                print("🔍 DEBUG v3.70: Returning CACHED result")
                 return cached_result
 
         # ─── 5. EXECUÇÃO (Stage por Stage) ────────────────────────────────
@@ -12811,7 +12808,7 @@ class CentralRouter:
         final_result["request_type"] = request_type.value
         final_result["cached"] = False
         
-        print(f"🔍 DEBUG v3.70: Final result prepared")
+        print("🔍 DEBUG v3.70: Final result prepared")
         print(f"🔍 DEBUG v3.70: modules_executed = {final_result['modules_executed']}")
         print(f"🔍 DEBUG v3.70: request_type = {final_result['request_type']}")
 
@@ -15769,7 +15766,7 @@ class RealAdversarialRobustnessLayer:
         if self.log:
             # FIXED v3.62: Changed log_entry() to log_event() (correct method name)
             self.log.log_event(
-                f"ADVERSARIAL_ATTACK_DETECTED",
+                "ADVERSARIAL_ATTACK_DETECTED",
                 {"attack_id": attack.attack_id, "type": attack_type, "severity": severity}
             )
         
@@ -16136,7 +16133,7 @@ class RealCounterfactualReasoningEngine:
         if intervention:
             return f"outcome_with_{intervention.replace(' ', '_')}"
         else:
-            return f"outcome_without_intervention"
+            return "outcome_without_intervention"
     
     def _build_causal_chain(self, situation: str, intervention: str) -> List[str]:
         """Construir cadeia causal"""
@@ -16153,9 +16150,9 @@ class RealCounterfactualReasoningEngine:
         chain = [
             f"1. {situation}",
             f"2. Intervention: {intervention}",
-            f"3. Immediate effect",
-            f"4. Secondary effect",
-            f"5. Final outcome"
+            "3. Immediate effect",
+            "4. Secondary effect",
+            "5. Final outcome"
         ]
         
         return chain
@@ -16210,8 +16207,8 @@ class RealCounterfactualReasoningEngine:
         # Heurística: mudança causa efeito
         if original != counterfactual:
             effects.append(f"Change in {variable}")
-            effects.append(f"Downstream effects on dependent variables")
-            effects.append(f"Potential cascade effects")
+            effects.append("Downstream effects on dependent variables")
+            effects.append("Potential cascade effects")
         
         return effects
     
@@ -18060,7 +18057,7 @@ class RealEthicalReasoningEngine:
             return {
                 "recommended_action": best_action[0],
                 "ethical_score": best_action[1],
-                "reasoning": f"Highest average ethical score across frameworks",
+                "reasoning": "Highest average ethical score across frameworks",
                 "all_scores": action_scores
             }
         
@@ -18334,7 +18331,7 @@ class RealExplainabilityEngine:
         lines = [
             f"Decision: {explanation.decision}",
             f"Confidence: {explanation.confidence:.2f}",
-            f"Reasoning:"
+            "Reasoning:"
         ]
         
         for i, step in enumerate(explanation.reasoning_chain, 1):
@@ -18345,7 +18342,7 @@ class RealExplainabilityEngine:
     def _format_technical(self, explanation: Explanation) -> str:
         """Formato técnico"""
         lines = [
-            f"DECISION REPORT",
+            "DECISION REPORT",
             f"ID: {explanation.explanation_id}",
             f"Decision: {explanation.decision}",
             f"Confidence: {explanation.confidence:.4f}",
@@ -23715,7 +23712,7 @@ class CompleteNexusBrain:
             modules_active.append("AdversarialRobustness")
 
         if modules_active:
-            print(f"✅🎉 ALL 62 modules initialized - 100% COMPLETE! 🎉✅")
+            print("✅🎉 ALL 62 modules initialized - 100% COMPLETE! 🎉✅")
             print(f"    Active modules: {' + '.join(modules_active)}")
         else:
             print("✅ All 13 modules initialized (legacy mode)")
@@ -23757,7 +23754,7 @@ class CompleteNexusBrain:
         # ========================================================
         print("\n" + "="*80)
         print("🚀🚀🚀 v3.89: METHOD think() STARTED - CÓDIGO NOVO EXECUTANDO!")
-        print(f"🚀 File: NEXUS_CORE_v3.89.py")
+        print("🚀 File: NEXUS_CORE_v3.89.py")
         print(f"🚀 Question: {question[:50]}...")
         print(f"🚀 use_router: {use_router}")
         print(f"🚀 planning_goal: {planning_goal}")
@@ -23769,7 +23766,7 @@ class CompleteNexusBrain:
         
         # DEBUG v3.71: ALWAYS print at start of think()
         print(f"\n{'='*70}")
-        print(f"🔍 DEBUG v3.71: think() METHOD CALLED")
+        print("🔍 DEBUG v3.71: think() METHOD CALLED")
         print(f"🔍 DEBUG v3.71: question = '{question[:50]}...'")
         print(f"🔍 DEBUG v3.71: use_router parameter = {use_router}")
         print(f"🔍 DEBUG v3.71: self.enable_router = {self.enable_router}")
@@ -23854,12 +23851,12 @@ class CompleteNexusBrain:
         # ═══════════════════════════════════════════════════════════════════
         # PHASE 4: JAILBREAK DETECTION (POST 32)
         # ═══════════════════════════════════════════════════════════════════
-        print(f"🔍 DEBUG v3.72: PHASE 4 - Jailbreak detection")
+        print("🔍 DEBUG v3.72: PHASE 4 - Jailbreak detection")
         modules_activated.append("jailbreak_detector")
         jailbreak_result = self.jailbreak_detector.detect(question)
         print(f"🔍 DEBUG v3.72: Jailbreak result: detected={jailbreak_result.detected}")
         if jailbreak_result.detected:
-            print(f"🔍 DEBUG v3.72: ❌ JAILBREAK DETECTED - RETURNING EARLY!")
+            print("🔍 DEBUG v3.72: ❌ JAILBREAK DETECTED - RETURNING EARLY!")
             return {
                 "error": "JAILBREAK_DETECTED",
                 "question": question,
@@ -23867,11 +23864,11 @@ class CompleteNexusBrain:
                 "modules_activated": modules_activated,
                 "answer": "No answer due to security policy"  # FIXED v3.77
             }
-        print(f"🔍 DEBUG v3.72: ✅ Jailbreak check passed")
+        print("🔍 DEBUG v3.72: ✅ Jailbreak check passed")
         # ═══════════════════════════════════════════════════════════════════
         # PHASE 4.5: ETHICAL OVERSIGHT (POST 69)
         # ═══════════════════════════════════════════════════════════════════
-        print(f"🔍 DEBUG v3.94: PHASE 4.5 - Ethical oversight")
+        print("🔍 DEBUG v3.94: PHASE 4.5 - Ethical oversight")
         if self.enable_router and self.ethics_guard:
             modules_activated.append("ethics_guard")
             ethical_review = self.ethics_guard.review_action_plan(
@@ -23881,7 +23878,7 @@ class CompleteNexusBrain:
                 risk_level=jailbreak_result.severity # Usar a severidade do jailbreak como entrada
             )
             if not ethical_review.is_approved:
-                print(f"🔍 DEBUG v3.94: ❌ ETHICAL VIOLATION DETECTED - RETURNING EARLY!")
+                print("🔍 DEBUG v3.94: ❌ ETHICAL VIOLATION DETECTED - RETURNING EARLY!")
                 return {
                     "error": "ETHICAL_VIOLATION",
                     "question": question,
@@ -23889,29 +23886,29 @@ class CompleteNexusBrain:
                     "modules_activated": modules_activated,
                     "answer": "No answer due to ethical concerns" # Resposta padrão
                 }
-            print(f"🔍 DEBUG v3.94: ✅ Ethical review passed")
+            print("🔍 DEBUG v3.94: ✅ Ethical review passed")
 
         # ═══════════════════════════════════════════════════════════════════
         # PHASE 5: BUDGET CHECK (POST 28)
         # ═══════════════════════════════════════════════════════════════════
-        print(f"🔍 DEBUG v3.72: PHASE 5 - Budget check")
+        print("🔍 DEBUG v3.72: PHASE 5 - Budget check")
         modules_activated.append("budget_enforcer")
         budget_ok = self.budget.request_budget(ResourceType.REASONING_CYCLES, 1)
         print(f"🔍 DEBUG v3.72: Budget result: ok={budget_ok}")
         if not budget_ok:
-            print(f"🔍 DEBUG v3.72: ❌ BUDGET EXCEEDED - RETURNING EARLY!")
+            print("🔍 DEBUG v3.72: ❌ BUDGET EXCEEDED - RETURNING EARLY!")
             return {
                 "error": "BUDGET_EXCEEDED",
                 "question": question,
                 "modules_activated": modules_activated,
                 "answer": "No answer due to budget constraints"  # FIXED v3.77
             }
-        print(f"🔍 DEBUG v3.72: ✅ Budget check passed")
+        print("🔍 DEBUG v3.72: ✅ Budget check passed")
         
         # ═══════════════════════════════════════════════════════════════════
         # PHASE 6: START EPISODE (POST 14)
         # ═══════════════════════════════════════════════════════════════════
-        print(f"🔍 DEBUG v3.72: PHASE 6 - Starting episode")
+        print("🔍 DEBUG v3.72: PHASE 6 - Starting episode")
         modules_activated.append("episodic_memory")
         episode_id = self.episodic_memory.start_episode(
             title=f"Q: {question[:50]}",
@@ -23920,12 +23917,12 @@ class CompleteNexusBrain:
         )
         print(f"🔍 DEBUG v3.72: ✅ Episode started: {episode_id}")
         
-        print(f"🔍 DEBUG v3.72: Entering try block for PHASES 7-15")
+        print("🔍 DEBUG v3.72: Entering try block for PHASES 7-15")
         try:
             # ═══════════════════════════════════════════════════════════════
             # PHASE 7: MULTI-LEVEL MEMORY RETRIEVAL
             # ═══════════════════════════════════════════════════════════════
-            print(f"🔍 DEBUG v3.73: PHASE 7 - Multi-level memory retrieval")
+            print("🔍 DEBUG v3.73: PHASE 7 - Multi-level memory retrieval")
             memories = []
             
             # Hierarchical Memory (POST 1)
@@ -23992,7 +23989,7 @@ class CompleteNexusBrain:
             # ═══════════════════════════════════════════════════════════════
             # PHASE 8: ERROR DETECTION PRE-REASONING (POST 50)
             # ═══════════════════════════════════════════════════════════════
-            print(f"🔍 DEBUG v3.73: PHASE 8 - Error detection pre-reasoning")
+            print("🔍 DEBUG v3.73: PHASE 8 - Error detection pre-reasoning")
             if self.enable_error_correction and self.error_correction:
                 try:
                     modules_activated.append("error_correction")
@@ -24013,12 +24010,12 @@ class CompleteNexusBrain:
                     print(f"⚠️ WARNING v3.74: error_correction failed: {str(e)[:100]}")
                     # Continue without error correction
             
-            print(f"🔍 DEBUG v3.73: ✅ PHASE 8 complete")
+            print("🔍 DEBUG v3.73: ✅ PHASE 8 complete")
             
             # ═══════════════════════════════════════════════════════════════
             # PHASE 9: SKILL DECOMPOSITION (POST 51)
             # ═══════════════════════════════════════════════════════════════
-            print(f"🔍 DEBUG v3.73: PHASE 9 - Skill decomposition")
+            print("🔍 DEBUG v3.73: PHASE 9 - Skill decomposition")
             skills_required = []
             
             if self.enable_skill_composition and self.skill_composition:
@@ -24042,7 +24039,7 @@ class CompleteNexusBrain:
             # ═══════════════════════════════════════════════════════════════
             # PHASE 10: MULTI-TASK COORDINATION (POST 53)
             # ═══════════════════════════════════════════════════════════════
-            print(f"🔍 DEBUG v3.73: PHASE 10 - Multi-task coordination")
+            print("🔍 DEBUG v3.73: PHASE 10 - Multi-task coordination")
             task_schedule = None
             
             if self.enable_multi_task_coordination and self.multi_task_coordination:
@@ -24067,23 +24064,23 @@ class CompleteNexusBrain:
                         print(f"⚠️ WARNING v3.74: multi_task_coordination failed: {str(e)[:100]}")
                         # Continue without task coordination
             
-            print(f"🔍 DEBUG v3.73: ✅ PHASE 10 complete")
+            print("🔍 DEBUG v3.73: ✅ PHASE 10 complete")
             
             # ═══════════════════════════════════════════════════════════════
             # PHASE 11: CORE REASONING
             # ═══════════════════════════════════════════════════════════════
-            print(f"🔍 DEBUG v3.73: 🎯 PHASE 11 - CORE REASONING (Router is here!)")
+            print("🔍 DEBUG v3.73: 🎯 PHASE 11 - CORE REASONING (Router is here!)")
             reasoning_result = None
             
             # DEBUG v3.70: Log router condition
-            print(f"🔍 DEBUG v3.70: Checking router condition:")
+            print("🔍 DEBUG v3.70: Checking router condition:")
             print(f"  use_router = {use_router}")
             print(f"  self.enable_router = {self.enable_router}")
             print(f"  self.router exists = {self.router is not None}")
             
             # Use Router if enabled (POST 7)
             if use_router and self.enable_router and self.router:
-                print(f"🔍 DEBUG v3.70: Router condition TRUE - calling router.route()")
+                print("🔍 DEBUG v3.70: Router condition TRUE - calling router.route()")
                 modules_activated.append("router")
                 route_context = {
                     "possible_actions": possible_actions,
@@ -24105,7 +24102,7 @@ class CompleteNexusBrain:
                     answer_value = reasoning_result.get("answer", answer_value)
                 
             else:
-                print(f"🔍 DEBUG v3.70: Router condition FALSE - using direct reasoning")
+                print("🔍 DEBUG v3.70: Router condition FALSE - using direct reasoning")
                 print(f"🔍 DEBUG v3.81: planning_goal = {repr(planning_goal)}")
                 print(f"🔍 DEBUG v3.81: possible_actions exists = {possible_actions is not None}")
                 
@@ -24140,7 +24137,7 @@ class CompleteNexusBrain:
                     # Fallback para o raciocínio direto se o router não estiver habilitado
                     # MCTS planning when an explicit goal is supplied.
                     if planning_goal:
-                        print(f"🔍 DEBUG v3.81: ✅ planning_goal PROVIDED - executing MCTS!")
+                        print("🔍 DEBUG v3.81: ✅ planning_goal PROVIDED - executing MCTS!")
                         modules_activated.append("mcts_planner")
                         try:
                             mcts_result = self.mcts_planner.plan(
@@ -24274,7 +24271,7 @@ class CompleteNexusBrain:
             print("\n" + "="*80)
             print("🔬 v3.90 TRACE: final_result = reasoning_result")
             print("="*80)
-            print(f"📍 Linha: ~23920")
+            print("📍 Linha: ~23920")
             print(f"🔬 final_result is reasoning_result? {final_result is reasoning_result}")
             print(f"🔬 final_result type: {type(final_result)}")
             if isinstance(final_result, dict):
@@ -24302,10 +24299,10 @@ class CompleteNexusBrain:
                 print("\n" + "="*80)
                 print("✅ v3.91: Integration orchestration executada com sucesso!")
                 print("="*80)
-                print(f"📍 Linha: ~23939")
+                print("📍 Linha: ~23939")
                 print(f"🔬 integration type: {type(integration)}")
                 print(f"🔬 integration plan_id: {getattr(integration, 'plan_id', 'N/A')}")
-                print(f"🔬 final_result PRESERVADO (não será sobrescrito)")
+                print("🔬 final_result PRESERVADO (não será sobrescrito)")
                 print(f"🔬 'mcts_plan' in final_result? {('mcts_plan' in final_result) if isinstance(final_result, dict) else 'N/A'}")
                 print("="*80 + "\n")
             
@@ -24332,7 +24329,7 @@ class CompleteNexusBrain:
             print("\n" + "="*80)
             print("🔬 v3.90 TRACE: ANTES de criar result")
             print("="*80)
-            print(f"📍 Linha: ~23977")
+            print("📍 Linha: ~23977")
             print(f"🔬 final_result type: {type(final_result)}")
             if isinstance(final_result, dict):
                 print(f"🔬 final_result keys: {list(final_result.keys())}")
@@ -24364,7 +24361,7 @@ class CompleteNexusBrain:
             print("\n" + "="*80)
             print("🔬 v3.90 TRACE: DEPOIS de criar result")
             print("="*80)
-            print(f"📍 Linha: ~23994")
+            print("📍 Linha: ~23994")
             print(f"🔬 result type: {type(result)}")
             print(f"🔬 result keys: {list(result.keys())}")
             print(f"🔬 'mcts_plan' in result? {('mcts_plan' in result)}")
@@ -24386,7 +24383,7 @@ class CompleteNexusBrain:
             print("\n" + "="*80)
             print("🔬 v3.90 TRACE: Checando if use_router")
             print("="*80)
-            print(f"📍 Linha: ~24004")
+            print("📍 Linha: ~24004")
             print(f"🔬 use_router = {use_router}")
             print(f"🔬 self.enable_router = {self.enable_router}")
             print(f"🔬 self.router exists = {self.router is not None}")
@@ -24397,8 +24394,8 @@ class CompleteNexusBrain:
                 print("\n" + "="*80)
                 print("🔬 v3.90 TRACE: DENTRO do if use_router")
                 print("="*80)
-                print(f"📍 Linha: ~24006")
-                print(f"🔬 Vamos copiar campos de reasoning_result para result")
+                print("📍 Linha: ~24006")
+                print("🔬 Vamos copiar campos de reasoning_result para result")
                 print(f"🔬 reasoning_result type: {type(reasoning_result) if 'reasoning_result' in locals() else 'NOT IN LOCALS'}")
                 if 'reasoning_result' in locals() and isinstance(reasoning_result, dict):
                     print(f"🔬 reasoning_result keys: {list(reasoning_result.keys())}")
@@ -24426,8 +24423,8 @@ class CompleteNexusBrain:
                 print("\n" + "="*80)
                 print("🔬 v3.90 TRACE: DENTRO do else (LEGACY MODE)")
                 print("="*80)
-                print(f"📍 Linha: ~24020")
-                print(f"🔬 Este é o caminho LEGACY (use_router=False)")
+                print("📍 Linha: ~24020")
+                print("🔬 Este é o caminho LEGACY (use_router=False)")
                 print(f"🔬 reasoning_result ainda existe? {('reasoning_result' in locals())}")
                 if 'reasoning_result' in locals() and isinstance(reasoning_result, dict):
                     print(f"🔬 reasoning_result keys: {list(reasoning_result.keys())}")
@@ -24451,7 +24448,7 @@ class CompleteNexusBrain:
             # ========================================================
             print("\n" + "="*80)
             print("🔥🔥🔥 v3.89: CHEGOU ANTES DO BLOCO ULTIMATE MERGE!")
-            print(f"🔥 Estamos na linha ~24000")
+            print("🔥 Estamos na linha ~24000")
             print(f"🔥 reasoning_result existe? {('reasoning_result' in locals())}")
             if 'reasoning_result' in locals():
                 print(f"🔥 reasoning_result é dict? {isinstance(reasoning_result, dict)}")
@@ -24502,7 +24499,7 @@ class CompleteNexusBrain:
                 
                 print(f"\n🎯 Total merged from reasoning_result: {merged_count} fields")
             else:
-                print(f"🎯 reasoning_result NOT found or not dict")
+                print("🎯 reasoning_result NOT found or not dict")
                 # v3.90: TRACE - Por quê reasoning_result não está disponível?
                 print("\n🚨 v3.90 TRACE: DEBUGGING - Por quê reasoning_result não está disponível?")
                 print(f"   locals() keys: {list(locals().keys())}")
@@ -25022,7 +25019,7 @@ if __name__ == "__main__":
 
         # Test semantic similarity (should find "neural networks" even with query "deep learning")
         semantic_results = brain.memory.retrieve("deep learning models", limit=3)
-        print(f"\nSemantic Query: 'deep learning models'")
+        print("\nSemantic Query: 'deep learning models'")
         print(f"Results found: {len(semantic_results)}")
         for i, r in enumerate(semantic_results, 1):
             print(f"  {i}. [{r['similarity']:.3f}] {r['content'][:60]}...")
@@ -25044,14 +25041,14 @@ if __name__ == "__main__":
 
         # Test 1: Simple query (should use minimal modules)
         r0_simple = brain.think("What is 2+2?", use_router=True)
-        print(f"\nSimple Query: 'What is 2+2?'")
+        print("\nSimple Query: 'What is 2+2?'")
         print(f"  Modules executed: {len(r0_simple.get('modules_executed', []))}")
         print(f"  Request type: {r0_simple.get('request_type', 'unknown')}")
         print(f"  Latency: {r0_simple.get('latency_ms', 0):.1f}ms")
 
         # Test 2: Ethical decision (should include Swarm)
         r0_ethical = brain.think("Should I lie to protect someone?", use_router=True)
-        print(f"\nEthical Query: 'Should I lie to protect someone?'")
+        print("\nEthical Query: 'Should I lie to protect someone?'")
         print(f"  Modules executed: {len(r0_ethical.get('modules_executed', []))}")
         print(f"  Request type: {r0_ethical.get('request_type', 'unknown')}")
         print(f"  Swarm included: {'swarm' in r0_ethical.get('modules_executed', [])}")
@@ -25061,13 +25058,13 @@ if __name__ == "__main__":
         start = time.time()
         r0_cached = brain.think("What is 2+2?", use_router=True)
         cache_time = (time.time() - start) * 1000
-        print(f"\nCached Query (repeat 'What is 2+2?'):")
+        print("\nCached Query (repeat 'What is 2+2?'):")
         print(f"  Cached: {r0_cached.get('cached', False)}")
         print(f"  Latency: {cache_time:.1f}ms")
 
         # Verify router stats
         router_stats = brain.router.get_statistics()
-        print(f"\nRouter Statistics:")
+        print("\nRouter Statistics:")
         print(f"  Total requests: {router_stats['total_requests']}")
         print(f"  Cache hits: {router_stats['cache_hits']}")
         print(f"  Cache hit rate: {router_stats['cache_hit_rate']:.1%}")
@@ -25090,14 +25087,14 @@ if __name__ == "__main__":
 
     # Router mode
     r1_router = brain.think("What is Python?", use_router=True)
-    print(f"ROUTER MODE:")
+    print("ROUTER MODE:")
     print(f"  Q: {r1_router['question']}")
     print(f"  A: {r1_router['answer'][:80]}...")
     print(f"  Latency: {r1_router.get('latency_ms', 0):.1f}ms")
 
     # Legacy mode
     r1_legacy = brain.think("What is Python?", use_router=False)
-    print(f"\nLEGACY MODE:")
+    print("\nLEGACY MODE:")
     print(f"  Q: {r1_legacy['question']}")
     print(f"  A: {r1_legacy['answer'][:80]}...")
     print(f"  Confidence: {r1_legacy['confidence']:.2f}")
@@ -25112,7 +25109,7 @@ if __name__ == "__main__":
 
     # Test RAG query
     rag = brain.knowledge_graph.rag_query("Python programming", top_k=3)
-    print(f"RAG Query Results:")
+    print("RAG Query Results:")
     print(f"  KG Entities: {len(rag['graph_entities'])}")
     print(f"  Memory Results: {len(rag['memory_results'])}")
     print(f"  Combined Confidence: {rag['confidence']:.3f}")
@@ -25123,7 +25120,7 @@ if __name__ == "__main__":
     brain.knowledge_graph.add_entity("DataLoss", "event")
     brain.knowledge_graph.add_relation("Breach", "causes", "DataLoss")
     multihop = brain.knowledge_graph.multihop_query("Security", "DataLoss", max_hops=3)
-    print(f"\nMultihop Query (Security → DataLoss):")
+    print("\nMultihop Query (Security → DataLoss):")
     print(f"  Path found: {multihop.paths[0] if multihop.paths else 'None'}")
     print(f"  Hops: {multihop.hops}")
     print(f"  Context: {multihop.context[:80]}...")
@@ -25188,7 +25185,7 @@ if __name__ == "__main__":
 
     # Consolidar e verificar padrões
     report = brain.consolidate_learning(last_n=10)
-    print(f"\nConsolidation Report:")
+    print("\nConsolidation Report:")
     print(f"  Episodes processed:  {report.episodes_processed}")
     print(f"  Memories promoted:   {report.memories_promoted}")
     print(f"  Memories reinforced: {report.memories_reinforced}")
@@ -25262,7 +25259,7 @@ if __name__ == "__main__":
         # Executar otimização
         opt_result = brain.optimize_system()
 
-        print(f"\nRSI Optimization Cycle:")
+        print("\nRSI Optimization Cycle:")
         print(f"  Suggestions generated: {opt_result.get('suggestions', 0)}")
         print(f"  Optimizations applied: {opt_result.get('applied', 0)}")
         print(f"  Cognitive gain: {opt_result.get('cognitive_gain_pct', 0):.2f}%")
@@ -25270,7 +25267,7 @@ if __name__ == "__main__":
 
         # Verificar estatísticas RSI
         rsi_stats = stats.get("rsi", {})
-        print(f"\nRSI Statistics:")
+        print("\nRSI Statistics:")
         print(f"  Total optimizations: {rsi_stats.get('total_optimizations', 0)}")
         print(f"  Successful: {rsi_stats.get('successful_optimizations', 0)}")
         print(f"  Rejected (P6): {rsi_stats.get('rejected_optimizations', 0)}")
@@ -25322,20 +25319,20 @@ if __name__ == "__main__":
         model_1 = tom.get_agent_model("agent_1")
         model_2 = tom.get_agent_model("agent_2")
 
-        print(f"\nAgent 0 Model:")
+        print("\nAgent 0 Model:")
         print(f"  Beliefs: {list(model_0['beliefs'].keys())}")
         print(f"  Intentions: {model_0['intentions']}")
         print(f"  Perspective: {model_0['perspective']}")
         print(f"  Confidence: {model_0['confidence']:.2f}")
 
-        print(f"\nAgent 1 Model:")
+        print("\nAgent 1 Model:")
         print(f"  Beliefs: {list(model_1['beliefs'].keys())}")
         print(f"  Intentions: {model_1['intentions']}")
         print(f"  Perspective: {model_1['perspective']}")
 
         # Comparar perspectivas
         comparison = tom.compare_perspectives("agent_0", "agent_1")
-        print(f"\nPerspective Comparison (agent_0 vs agent_1):")
+        print("\nPerspective Comparison (agent_0 vs agent_1):")
         print(f"  Similarity: {comparison['similarity']:.2f}")
         print(f"  Common beliefs: {len(comparison['common_beliefs'])}")
         print(f"  Unique to agent_0: {len(comparison['unique_to_agent_1'])}")
@@ -25343,15 +25340,15 @@ if __name__ == "__main__":
         # Prever comportamento
         prediction = tom.predict_behavior("agent_1", 
                                          {"description": "New proposal with high risk"})
-        print(f"\nBehavior Prediction for agent_1:")
-        print(f"  Scenario: High-risk proposal")
+        print("\nBehavior Prediction for agent_1:")
+        print("  Scenario: High-risk proposal")
         print(f"  Prediction: {prediction['prediction']}")
         print(f"  Confidence: {prediction['confidence']:.2f}")
         print(f"  Reason: {prediction['reason']}")
 
         # Estatísticas ToM
         tom_stats = tom.get_statistics()
-        print(f"\nToM Statistics:")
+        print("\nToM Statistics:")
         print(f"  Agents tracked: {tom_stats['agents_tracked']}")
         print(f"  Total inferences: {tom_stats['total_inferences']}")
         print(f"  Total beliefs: {tom_stats['total_beliefs']}")
@@ -25385,7 +25382,7 @@ if __name__ == "__main__":
         # Test 1: Math calculation
         print("\n1. Testing math_calculate...")
         result1 = tool_use.execute_tool("math_calculate", {"expression": "2 + 2"})
-        print(f"   Expression: 2 + 2")
+        print("   Expression: 2 + 2")
         print(f"   Result: {result1.result}")
         print(f"   Success: {result1.success}")
         print(f"   Time: {result1.execution_time:.4f}s")
@@ -25394,8 +25391,8 @@ if __name__ == "__main__":
         print("\n2. Testing string_transform...")
         result2 = tool_use.execute_tool("string_transform", 
                                         {"text": "hello world", "operation": "upper"})
-        print(f"   Input: 'hello world'")
-        print(f"   Operation: upper")
+        print("   Input: 'hello world'")
+        print("   Operation: upper")
         print(f"   Result: '{result2.result}'")
         print(f"   Success: {result2.success}")
 
@@ -25403,8 +25400,8 @@ if __name__ == "__main__":
         print("\n3. Testing list_operations...")
         result3 = tool_use.execute_tool("list_operations",
                                         {"items": [3, 1, 4, 1, 5, 9], "operation": "sort"})
-        print(f"   Input: [3, 1, 4, 1, 5, 9]")
-        print(f"   Operation: sort")
+        print("   Input: [3, 1, 4, 1, 5, 9]")
+        print("   Operation: sort")
         print(f"   Result: {result3.result}")
         print(f"   Success: {result3.success}")
 
@@ -25412,20 +25409,20 @@ if __name__ == "__main__":
         print("\n4. Testing format_json...")
         result4 = tool_use.execute_tool("format_json",
                                         {"data": {"name": "Nexus", "version": "3.9"}})
-        print(f"   Input: {{'name': 'Nexus', 'version': '3.9'}}")
+        print("   Input: {'name': 'Nexus', 'version': '3.9'}")
         print(f"   Success: {result4.success}")
 
         # Test 5: Cache test (repeat first calculation)
         print("\n5. Testing cache (repeat calculation)...")
         result5 = tool_use.execute_tool("math_calculate", {"expression": "2 + 2"})
-        print(f"   Expression: 2 + 2")
+        print("   Expression: 2 + 2")
         print(f"   Result: {result5.result}")
         print(f"   Cached: {result5.cached}")
         print(f"   Time: {result5.execution_time:.4f}s")
 
         # Tool Use statistics
         tool_stats = tool_use.get_statistics()
-        print(f"\nTool Use Statistics:")
+        print("\nTool Use Statistics:")
         print(f"  Total executions: {tool_stats['total_executions']}")
         print(f"  Successful: {tool_stats['successful_executions']}")
         print(f"  Failed: {tool_stats['failed_executions']}")
@@ -25510,7 +25507,7 @@ if __name__ == "__main__":
             "agent_3",
             ["agent_0", "agent_1"]  # One joyful, one fearful
         )
-        print(f"Agent 3 influenced by agents 0 and 1:")
+        print("Agent 3 influenced by agents 0 and 1:")
         print(f"  Primary emotion: {contagion_state.primary_emotion.value}")
         print(f"  PAD: P={contagion_state.pleasure:.2f}, A={contagion_state.arousal:.2f}")
 
@@ -25526,7 +25523,7 @@ if __name__ == "__main__":
         )
 
         predicted = emotion.predict_emotion("agent_4", trigger)
-        print(f"Agent 4 prediction with reward trigger:")
+        print("Agent 4 prediction with reward trigger:")
         print(f"  Predicted emotion: {predicted.primary_emotion.value}")
         print(f"  Joy level: {predicted.emotions[EmotionType.JOY]:.2f}")
 
@@ -25541,7 +25538,7 @@ if __name__ == "__main__":
 
         # Emotion System statistics
         emotion_stats = emotion.get_statistics()
-        print(f"\nEmotion System Statistics:")
+        print("\nEmotion System Statistics:")
         print(f"  Agents tracked: {emotion_stats['agents_tracked']}")
         print(f"  Total recognitions: {emotion_stats['total_recognitions']}")
         print(f"  Total predictions: {emotion_stats['total_predictions']}")
@@ -25631,7 +25628,7 @@ if __name__ == "__main__":
 
         # Consciousness statistics
         consciousness_stats = consciousness.get_statistics()
-        print(f"\nConsciousness Statistics:")
+        print("\nConsciousness Statistics:")
         print(f"  Total conscious moments: {consciousness_stats['total_conscious_moments']}")
         print(f"  Total HOTs: {consciousness_stats['total_hots']}")
         print(f"  Metacognitive interventions: {consciousness_stats['total_metacognitive_interventions']}")
@@ -25674,14 +25671,14 @@ if __name__ == "__main__":
         empathic_state = empathy.empathize_with("agent_0")
 
         print(f"  Target: {empathic_state.target_agent_id}")
-        print(f"  Cognitive Empathy:")
+        print("  Cognitive Empathy:")
         print(f"    - Perspective accuracy: {empathic_state.perspective_taking_accuracy:.2f}")
         print(f"    - Understood beliefs: {len(empathic_state.understood_beliefs)}")
-        print(f"  Affective Empathy:")
+        print("  Affective Empathy:")
         print(f"    - Resonant emotion: {empathic_state.resonant_emotion.value}")
         print(f"    - Emotional resonance: {empathic_state.emotional_resonance:.2f}")
         print(f"    - Shared affect: {empathic_state.shared_affect:.2f}")
-        print(f"  Compassionate Empathy:")
+        print("  Compassionate Empathy:")
         print(f"    - Motivation to help: {empathic_state.motivation_to_help:.2f}")
         print(f"    - Empathic concern: {empathic_state.empathic_concern:.2f}")
         print(f"    - Suggested actions: {len(empathic_state.suggested_actions)}")
@@ -25718,7 +25715,7 @@ if __name__ == "__main__":
 
         # Empathy statistics
         empathy_stats = empathy.get_statistics()
-        print(f"\nEmpathy System Statistics:")
+        print("\nEmpathy System Statistics:")
         print(f"  Total empathic events: {empathy_stats['total_empathic_events']}")
         print(f"  Compassionate responses: {empathy_stats['total_compassionate_responses']}")
         print(f"  Agents empathized with: {empathy_stats['agents_empathized_with']}")
@@ -25800,7 +25797,7 @@ if __name__ == "__main__":
 
         # Curiosity statistics
         curiosity_stats = curiosity.get_statistics()
-        print(f"\nCuriosity System Statistics:")
+        print("\nCuriosity System Statistics:")
         print(f"  Current curiosity level: {curiosity_stats['current_curiosity_level']:.2f}")
         print(f"  Total novelty detections: {curiosity_stats['total_novelty_detections']}")
         print(f"  Total questions generated: {curiosity_stats['total_questions_generated']}")
@@ -25862,7 +25859,7 @@ if __name__ == "__main__":
         demo_result = social.learn_from_demonstration(
             "expert_agent", "advanced_task", "expert_technique", True, 0.95
         )
-        print(f"  Learned from: expert_agent")
+        print("  Learned from: expert_agent")
         if demo_result:
             print(f"  Imitation attempt: Success={demo_result.success}")
 
@@ -25882,7 +25879,7 @@ if __name__ == "__main__":
 
         # Social Learning statistics
         social_stats = social.get_statistics()
-        print(f"\nSocial Learning Statistics:")
+        print("\nSocial Learning Statistics:")
         print(f"  Total observations: {social_stats['total_observations']}")
         print(f"  Total imitations: {social_stats['total_imitations']}")
         print(f"  Successful imitations: {social_stats['successful_imitations']}")
@@ -25936,7 +25933,7 @@ if __name__ == "__main__":
         # Test 4: Most creative ideas
         print("\nTest 4: Most creative ideas...")
         top_ideas = creativity.get_most_creative_ideas(top_n=3)
-        print(f"  Top 3 creative ideas:")
+        print("  Top 3 creative ideas:")
         for i, idea in enumerate(top_ideas, 1):
             print(f"    {i}. Creativity={idea.creativity_score:.2f}: {idea.content[:50]}...")
 
@@ -25951,7 +25948,7 @@ if __name__ == "__main__":
 
         # Creativity statistics
         creativity_stats = creativity.get_statistics()
-        print(f"\nCreativity System Statistics:")
+        print("\nCreativity System Statistics:")
         print(f"  Total ideas generated: {creativity_stats['total_ideas_generated']}")
         print(f"  Novel ideas: {creativity_stats['novel_ideas_count']}")
         print(f"  Novelty rate: {creativity_stats['novelty_rate']:.2f}")
@@ -26024,7 +26021,7 @@ if __name__ == "__main__":
 
         # Multimodal statistics
         multimodal_stats = multimodal.get_statistics()
-        print(f"\nMultimodal System Statistics:")
+        print("\nMultimodal System Statistics:")
         print(f"  Total percepts: {multimodal_stats['total_percepts']}")
         print(f"  Vision count: {multimodal_stats['vision_count']}")
         print(f"  Audio count: {multimodal_stats['audio_count']}")
@@ -26090,7 +26087,7 @@ if __name__ == "__main__":
 
         # Language statistics
         lang_stats = language.get_statistics()
-        print(f"\nLanguage System Statistics:")
+        print("\nLanguage System Statistics:")
         print(f"  Total analyses: {lang_stats['total_analyses']}")
         print(f"  Intent distribution: {lang_stats['intent_distribution']}")
         print(f"  Avg confidence: {lang_stats['avg_confidence']:.2f}")
@@ -26144,7 +26141,7 @@ if __name__ == "__main__":
 
         # Metacognition statistics
         metacog_stats = metacog.get_statistics()
-        print(f"\nMetacognition System Statistics:")
+        print("\nMetacognition System Statistics:")
         print(f"  Total metacognitive decisions: {metacog_stats['total_metacognitive_decisions']}")
         print(f"  Completed processes: {metacog_stats['completed_processes']}")
         print(f"  Assessments made: {metacog_stats['assessments_made']}")
@@ -26190,7 +26187,7 @@ if __name__ == "__main__":
 
         # Attention statistics
         attn_stats = attention.get_statistics()
-        print(f"\nAttention System Statistics:")
+        print("\nAttention System Statistics:")
         print(f"  Total attentional episodes: {attn_stats['total_attentional_episodes']}")
         print(f"  Total shifts: {attn_stats['total_shifts']}")
         print(f"  Voluntary shifts: {attn_stats['voluntary_shifts']}")
@@ -26257,7 +26254,7 @@ if __name__ == "__main__":
 
         # Working Memory statistics
         wm_stats = wm.get_statistics()
-        print(f"\nWorking Memory System Statistics:")
+        print("\nWorking Memory System Statistics:")
         print(f"  Total items stored: {wm_stats['total_items_stored']}")
         print(f"  Rehearsal count: {wm_stats['rehearsal_count']}")
         print(f"  Current phonological items: {wm_stats['current_phonological_items']}")
@@ -26311,7 +26308,7 @@ if __name__ == "__main__":
 
         # Executive Functions statistics
         exec_stats = exec_func.get_statistics()
-        print(f"\nExecutive Functions System Statistics:")
+        print("\nExecutive Functions System Statistics:")
         print(f"  Total inhibitions: {exec_stats['total_inhibitions']}")
         print(f"  Successful inhibitions: {exec_stats['successful_inhibitions']}")
         print(f"  Task switches: {exec_stats['total_task_switches']}")
@@ -26342,7 +26339,7 @@ if __name__ == "__main__":
         print("\nTest 1: Storing with context...")
         ctx_mem.set_current_context({"location": "office", "mood": "focused", "task": "coding"})
         memory1 = ctx_mem.store_with_context("Working on AGI system")
-        print(f"  Stored memory with context")
+        print("  Stored memory with context")
 
         # Test 2: Retrieve by matching context
         print("\nTest 2: Retrieving by matching context...")
@@ -26372,7 +26369,7 @@ if __name__ == "__main__":
 
         # Contextual Memory statistics
         ctx_stats = ctx_mem.get_statistics()
-        print(f"\nContextual Memory System Statistics:")
+        print("\nContextual Memory System Statistics:")
         print(f"  Total encodings: {ctx_stats['total_encodings']}")
         print(f"  Total retrievals: {ctx_stats['total_retrievals']}")
         print(f"  Context matched retrievals: {ctx_stats['context_matched_retrievals']}")
@@ -26404,7 +26401,7 @@ if __name__ == "__main__":
         sem_net.add_relation("Dog", "IS-A", "Animal")
         sem_net.add_relation("Cat", "IS-A", "Animal")
         sem_net.add_relation("Animal", "HAS-A", "Life")
-        print(f"  Added concepts and relations")
+        print("  Added concepts and relations")
 
         # Test 2: Activate and spread
         print("\nTest 2: Spreading activation...")
@@ -26425,7 +26422,7 @@ if __name__ == "__main__":
 
         # Semantic Networks statistics
         sem_stats = sem_net.get_statistics()
-        print(f"\nSemantic Networks System Statistics:")
+        print("\nSemantic Networks System Statistics:")
         print(f"  Total concepts: {sem_stats['total_concepts']}")
         print(f"  Total relations: {sem_stats['total_relations']}")
         print(f"  Activations performed: {sem_stats['activations_performed']}")
@@ -26470,7 +26467,7 @@ if __name__ == "__main__":
 
         # Analogical Reasoning statistics
         analog_stats = analog.get_statistics()
-        print(f"\nAnalogical Reasoning System Statistics:")
+        print("\nAnalogical Reasoning System Statistics:")
         print(f"  Total analogies found: {analog_stats['total_analogies_found']}")
         print(f"  Successful transfers: {analog_stats['successful_transfers']}")
         print(f"  Known situations: {analog_stats['known_situations']}")
@@ -26524,7 +26521,7 @@ if __name__ == "__main__":
 
         # Mental Simulation statistics
         sim_stats = sim.get_statistics()
-        print(f"\nMental Simulation System Statistics:")
+        print("\nMental Simulation System Statistics:")
         print(f"  Total simulations: {sim_stats['total_simulations']}")
         print(f"  Cached simulations: {sim_stats['cached_simulations']}")
 
@@ -26572,7 +26569,7 @@ if __name__ == "__main__":
 
         # Episodic Future Thinking statistics
         eft_stats = eft.get_statistics()
-        print(f"\nEpisodic Future Thinking System Statistics:")
+        print("\nEpisodic Future Thinking System Statistics:")
         print(f"  Total events imagined: {eft_stats['total_events_imagined']}")
         print(f"  Total preexperiences: {eft_stats['total_preexperiences']}")
         print(f"  Prospective memories active: {eft_stats['prospective_memories_active']}")
@@ -26621,7 +26618,7 @@ if __name__ == "__main__":
 
         # Predictive Coding statistics
         pc_stats = pc.get_statistics()
-        print(f"\nPredictive Coding System Statistics:")
+        print("\nPredictive Coding System Statistics:")
         print(f"  Total predictions: {pc_stats['total_predictions']}")
         print(f"  Total errors computed: {pc_stats['total_errors_computed']}")
         print(f"  Total updates: {pc_stats['total_updates']}")
@@ -26656,7 +26653,7 @@ if __name__ == "__main__":
         # Test 2: Ground concept sensori-motorly
         print("\nTest 2: Sensorimotor grounding...")
         ec.ground_concept_sensorimotorly("grasping", ["close_hand", "apply_force"])
-        print(f"  Concept grounded: grasping")
+        print("  Concept grounded: grasping")
 
         # Test 3: Detect affordances
         print("\nTest 3: Detecting affordances...")
@@ -26670,7 +26667,7 @@ if __name__ == "__main__":
 
         # Embodied Cognition statistics
         ec_stats = ec.get_statistics()
-        print(f"\nEmbodied Cognition System Statistics:")
+        print("\nEmbodied Cognition System Statistics:")
         print(f"  Total body states: {ec_stats['total_body_states']}")
         print(f"  Affordances detected: {ec_stats['total_affordances_detected']}")
         print(f"  Embodied simulations: {ec_stats['total_embodied_simulations']}")
