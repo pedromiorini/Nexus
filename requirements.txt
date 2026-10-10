@@ -1,0 +1,9 @@
+# Dependências de execução do Nexus.
+# Testado: numpy 1.26.4 e 2.0.2 no Python 3.11; numpy 2.4.6 nos Pythons 3.11, 3.12 e 3.13; numpy 2.5.3 no Python 3.13.
+numpy>=1.26,<3
+
+# Opcionais: o núcleo usa fallbacks quando ausentes (ver "optional_dependency_warnings" em
+# AUDIT_REALITY_REPORT.md). Instale à parte apenas se quiser os recursos correspondentes:
+#   psutil
+#   faiss-cpu
+#   sentence-transformers

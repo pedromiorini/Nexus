@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Mantém as actions fixadas por SHA atualizadas (o Dependabot também atualiza o comentário de versão).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+
+  # Mantém requirements.txt e requirements-dev.txt atualizados.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps"

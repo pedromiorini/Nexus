@@ -9,85 +9,66 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   contract-gate:
     name: Contract and regression gate
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: .
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.11'
 
-      - name: Install runtime dependencies
-        run: python -m pip install --upgrade pip numpy coverage hypothesis bandit
+      - name: Install pinned dependencies
+        run: python -m pip install -r requirements-dev.txt
 
-      - name: Compile changed Python modules
+      - name: Keep generated databases out of the workspace
+        run: echo "NEXUS_AUDIT_DB=$RUNNER_TEMP/nexus_audit.sqlite3" >> "$GITHUB_ENV"
+
+      - name: Lint Python (ruff)
+        run: ruff check core vita tools test_*.py
+
+      - name: Install actionlint (pinned, checksum-verified)
         run: |
-          python -m py_compile \
-            core/constitutional_brain.py \
-            core/deferred_task_queue.py \
-            vita/nexus_constitutional_bridge_v3.py \
-            test_deferred_task_queue.py \
-            test_recovery_diagnostics_contract.py \
-            test_reality_audit.py \
-            test_deferred_task_properties.py \
-            test_deferred_task_snapshot.py \
-            test_memory_sql_contract.py \
-            test_security_triage.py \
-            test_error_correction_contract.py \
-            test_embedded_assert_audit.py \
-            test_central_router_contract.py \
-            test_vram_defense_guard.py \
-            test_implementation_gap_audit.py \
-            test_explicit_gap_contract.py \
-            test_working_memory_contract.py \
-            test_hardware_telemetry_contract.py \
-            test_counterfactual_contract.py \
-            test_multimodal_backend_contract.py \
-            test_swarm_statistics_contract.py \
-            test_episodic_memory_statistics_contract.py \
-            test_episodic_memory_concurrency_contract.py \
-            test_vita_audit_concurrency_contract.py \
-            test_vita_audit_cross_connection_contract.py \
-            test_attention_signal_contract.py \
-            test_integration_synergy_contract.py \
-            test_knowledge_graph_contract.py \
-            test_sensorimotor_multimodal_contract.py \
-            test_consensus_application_contract.py \
-            test_shadow_clone_reintegration_contract.py \
-            test_reminiscence_bump_contract.py \
-            test_state_manifest.py \
-            test_mcts_action_contract.py \
-            test_state_consistency_audit.py \
-            tools/test_summary.py \
-            tools/diagnostics_dashboard.py \
-            tools/security_triage.py \
-            tools/embedded_assert_audit.py \
-            tools/targeted_mutation.py \
-            tools/implementation_gap_audit.py \
-            tools/state_manifest.py \
-            tools/state_consistency_audit.py
+          version=1.7.12
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$archive" "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
-      - name: Run schema contract tests
-        env:
-          PYTHONPATH: .
-        run: python -m unittest -v test_recovery_diagnostics_contract.py
+      - name: Lint workflows (actionlint and zizmor)
+        run: |
+          actionlint .github/workflows/*.yml
+          zizmor --offline --no-progress .github/workflows
 
-      - name: Run reality audit tests
-        env:
-          PYTHONPATH: .
-        run: python -m unittest -v test_reality_audit.py
+      - name: Compile all Python modules
+        run: python -m compileall -q core vita tools test_*.py
 
       - name: Generate reality audit report
         run: python tools/reality_audit.py
 
+      - name: Verify committed reality reports are current
+        run: |
+          if ! git diff --exit-code -- AUDIT_REALITY_REPORT.md audit_reality.json; then
+            echo "::error::Relatorios de realidade desatualizados. Rode 'python tools/reality_audit.py' e faca commit dos arquivos."
+            exit 1
+          fi
+
       - name: Retain reality audit report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nexus-reality-audit
           path: |
@@ -96,65 +77,49 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Measure contract and regression coverage
-        env:
-          PYTHONPATH: .
+      - name: Run all tests with coverage (contract suite, then integrated suite)
         run: |
-          coverage run --branch -m unittest test_recovery_diagnostics_contract.py test_deferred_task_queue.py test_deferred_task_snapshot.py test_memory_sql_contract.py test_reality_audit.py test_deferred_task_properties.py test_security_triage.py test_error_correction_contract.py test_embedded_assert_audit.py test_central_router_contract.py test_vram_defense_guard.py test_implementation_gap_audit.py test_explicit_gap_contract.py test_working_memory_contract.py test_hardware_telemetry_contract.py test_counterfactual_contract.py test_multimodal_backend_contract.py test_swarm_statistics_contract.py test_episodic_memory_statistics_contract.py test_episodic_memory_concurrency_contract.py test_vita_audit_concurrency_contract.py test_vita_audit_cross_connection_contract.py test_attention_signal_contract.py test_integration_synergy_contract.py test_knowledge_graph_contract.py test_sensorimotor_multimodal_contract.py test_consensus_application_contract.py test_shadow_clone_reintegration_contract.py test_reminiscence_bump_contract.py test_state_manifest.py test_mcts_action_contract.py
-          coverage report --fail-under=0
-          coverage report --include='core/deferred_task_queue.py' --fail-under=90
-          coverage report --include='vita/nexus_constitutional_bridge_v3.py' --fail-under=70
-          coverage xml -o coverage.xml
+          python -W error -m coverage run -m unittest discover -v -p 'test_*.py'
+          python -W error -m coverage run -a core/constitutional_brain.py
+
+      - name: Enforce coverage gates
+        run: |
+          python -m coverage report
+          python -m coverage report --include='core/deferred_task_queue.py' --fail-under=90
+          python -m coverage report --include='core/vram_defense_guard.py' --fail-under=90
+          python -m coverage report --include='vita/nexus_constitutional_bridge_v3.py' --fail-under=70
+          python -m coverage report --include='core/constitutional_brain.py' --fail-under=62
+          python -m coverage xml -o coverage.xml
 
       - name: Retain coverage report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nexus-contract-coverage
           path: coverage.xml
           if-no-files-found: error
           retention-days: 14
 
-      - name: Run deferred queue snapshot contract tests
-        env:
-          PYTHONPATH: .
-        run: python -m unittest -v test_deferred_task_snapshot.py
-      - name: Run expanded contract tests
-        env:
-          PYTHONPATH: .
-        run: python -m unittest -v test_memory_sql_contract.py test_security_triage.py test_error_correction_contract.py test_embedded_assert_audit.py test_central_router_contract.py test_implementation_gap_audit.py test_explicit_gap_contract.py test_working_memory_contract.py test_hardware_telemetry_contract.py test_counterfactual_contract.py test_multimodal_backend_contract.py test_swarm_statistics_contract.py test_episodic_memory_statistics_contract.py test_episodic_memory_concurrency_contract.py test_vita_audit_concurrency_contract.py test_vita_audit_cross_connection_contract.py test_attention_signal_contract.py test_integration_synergy_contract.py test_knowledge_graph_contract.py test_sensorimotor_multimodal_contract.py test_consensus_application_contract.py test_shadow_clone_reintegration_contract.py test_reminiscence_bump_contract.py test_state_manifest.py test_mcts_action_contract.py
-
-      - name: Run state consistency contract tests
-        env:
-          PYTHONPATH: .
-        run: python -m unittest -v test_state_consistency_audit.py
-
       - name: Run targeted mutation gate
-        env:
-          PYTHONPATH: .
         run: python tools/targeted_mutation.py
-      - name: Run deferred queue regression tests
-        env:
-          PYTHONPATH: .
-        run: python -m unittest -v test_deferred_task_queue.py
 
-      - name: Run deferred queue property tests
-        env:
-          PYTHONPATH: .
-        run: python -m unittest -v test_deferred_task_properties.py
-
-      - name: Run VRAM defense guard tests
-        env:
-          PYTHONPATH: .
-        run: python -m unittest -v test_vram_defense_guard.py
+      - name: Retain mutation report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nexus-mutation-report
+          path: targeted_mutation_report.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Run static security scan
-        run: bandit -r core vita tools -f json -o bandit-report.json || true
+        run: bandit -r core vita tools -f json -o bandit-report.json || [ -s bandit-report.json ]
 
-      - name: Generate security triage
+      - name: Generate security triage and audits
         run: |
           python tools/security_triage.py bandit-report.json security-triage-generated.md
+          python tools/security_triage.py bandit-report.json SECURITY_TRIAGE.md --check
           python tools/embedded_assert_audit.py bandit-report.json core/constitutional_brain.py
           python tools/implementation_gap_audit.py core/constitutional_brain.py --output implementation-gaps.json
+
       - name: Enforce security severity policy
         run: |
           python - <<'PY'
@@ -166,8 +131,9 @@ jobs:
               raise SystemExit(f'Untriaged MEDIUM/HIGH Bandit findings: {len(severe)}')
           print('Bandit severity policy passed: no MEDIUM/HIGH findings')
           PY
+
       - name: Retain security scan report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nexus-bandit-report
           path: |
@@ -177,33 +143,24 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Run integrated Nexus suite
-        env:
-          PYTHONPATH: .
-        run: python core/constitutional_brain.py
-
       - name: Run final full test suite summary
-        env:
-          PYTHONPATH: .
         run: python tools/test_summary.py --output test-summary.json
 
       - name: Generate current state manifest
         env:
-          PYTHONPATH: .
+          CI_STATUS: ${{ job.status }}
         run: >-
           python tools/state_manifest.py
           --output STATE_MANIFEST.json
           --test-result passed
           --test-command "python -m unittest discover -p 'test_*.py'"
-          --ci-status success
+          --ci-status "$CI_STATUS"
 
       - name: Run state consistency gate
-        env:
-          PYTHONPATH: .
         run: python tools/state_consistency_audit.py --manifest STATE_MANIFEST.json --output state-consistency.json
 
       - name: Retain current state manifest
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nexus-state-manifest
           path: STATE_MANIFEST.json
@@ -211,20 +168,50 @@ jobs:
           retention-days: 14
 
       - name: Retain state consistency report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nexus-state-consistency
           path: state-consistency.json
           if-no-files-found: error
           retention-days: 14
 
-      - name: Verify clean generated artifacts
+      - name: Verify clean workspace
         run: |
-          rm -f nexus_audit.sqlite3
-          rm -f STATE_MANIFEST.json
-          rm -f state-consistency.json
-          rm -f test-summary.json
-          if find . -type f \( -name '*.sqlite3' -o -name '*.db' \) -print -quit | grep -q .; then
+          if find . -path ./.git -prune -o -type f \( -name '*.sqlite3' -o -name '*.db' \) -print -quit | grep -q .; then
             echo 'Unexpected database artifact detected'
             exit 1
           fi
+          git diff --exit-code
+
+  python-compat:
+    name: Python compatibility (${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13']
+    env:
+      PYTHONPATH: .
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install pinned dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Keep generated databases out of the workspace
+        run: echo "NEXUS_AUDIT_DB=$RUNNER_TEMP/nexus_audit.sqlite3" >> "$GITHUB_ENV"
+
+      - name: Run tests with development-mode checks
+        run: python -X dev -W error -m unittest discover -p 'test_*.py'
+
+      - name: Run integrated suite with development-mode checks
+        run: python -X dev -W error core/constitutional_brain.py

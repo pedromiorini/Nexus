@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Caches de teste, cobertura e lint
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+.ruff_cache/
+.mypy_cache/
+
+# Artefatos locais gerados pelos testes, pela suíte integrada e pelo CI
+*.sqlite3
+*.db
+*.log
+STATE_MANIFEST.json
+state-consistency.json
+test-summary.json
+bandit-report.json
+security-triage-generated.md
+implementation-gaps.json
+targeted_mutation_report.json
