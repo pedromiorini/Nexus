@@ -148,11 +148,23 @@ from enum import Enum
 from collections import defaultdict, deque
 import threading
 import os
+import sys
+import unicodedata
+import weakref
 
 # Importar o bridge Vita; CentralRouter e EthicsGuard são definidos neste módulo.
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
 from core.vram_defense_guard import VramDefenseGuard
 from core.deferred_task_queue import DeferredTaskQueue
+
+
+_NEXUS_DEBUG = os.environ.get("NEXUS_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _dbg(*args, **kwargs):
+    """Trace de depuração: silencioso por padrão; defina NEXUS_DEBUG=1 para ver."""
+    if _NEXUS_DEBUG:
+        print(*args, **kwargs)
 
 # v3.90: Monitoramento de sistema
 try:
@@ -221,6 +233,7 @@ class RealHierarchicalMemory:
     def __init__(self, db_path: str = ":memory:", model_name: str = 'all-MiniLM-L6-v2'):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._finalizer = weakref.finalize(self, self.conn.close)
         self.db_lock = threading.Lock()  # FIXED v3.65: Thread safety for SQLite
         self._create_tables()
 
@@ -246,6 +259,17 @@ class RealHierarchicalMemory:
                 print("⚠️  Falling back to keyword matching")
         else:
             print("⚠️  POST1 - Keyword fallback mode (install sentence-transformers + faiss for semantic search)")
+
+    def close(self) -> None:
+        """Fecha a conexão SQLite (idempotente); evita ResourceWarning no Python >= 3.13."""
+        with self.db_lock:
+            self._finalizer()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        self.close()
 
     def _create_tables(self):
         cursor = self.conn.cursor()
@@ -963,14 +987,24 @@ class LogEntry:
     previous_hash: str
 
 class RealImmutableLog:
-    """POST29: Immutable Constitutional Log - CONSOLIDADO"""
+    """POST29: Log constitucional encadeado por hash e append-only.
+
+    Cada entrada guarda ``previous_hash`` e ``content_hash`` (SHA-256 sobre
+    tipo|dados|timestamp|hash anterior). Triggers do SQLite bloqueiam UPDATE e DELETE por
+    conexões comuns, e ``verify_chain()`` recalcula a cadeia para detectar adulteração,
+    inclusive por quem remover os triggers. Truncar o final do log não é detectável apenas
+    pela cadeia: ancore o ``head`` retornado por ``verify_chain()`` fora do banco.
+    """
+
+    GENESIS_HASH = "0" * 64
 
     def __init__(self, db_path: str = ":memory:"):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._finalizer = weakref.finalize(self, self.conn.close)
         self.db_lock = threading.Lock()  # FIXED v3.65: Thread safety for SQLite
         self._create_tables()
-        self.current_hash = "0" * 64
+        self.current_hash = self._load_head()  # retoma a cadeia existente (não recomeça do gênesis)
 
     def _create_tables(self):
         cursor = self.conn.cursor()
@@ -983,33 +1017,83 @@ class RealImmutableLog:
                 content_hash TEXT NOT NULL,
                 previous_hash TEXT NOT NULL
             );
+            CREATE TRIGGER IF NOT EXISTS log_entries_no_update
+            BEFORE UPDATE ON log_entries
+            BEGIN
+                SELECT RAISE(ABORT, 'log_entries is append-only');
+            END;
+            CREATE TRIGGER IF NOT EXISTS log_entries_no_delete
+            BEFORE DELETE ON log_entries
+            BEGIN
+                SELECT RAISE(ABORT, 'log_entries is append-only');
+            END;
         """)
         self.conn.commit()
+
+    def _load_head(self) -> str:
+        row = self.conn.execute(
+            "SELECT content_hash FROM log_entries ORDER BY sequence DESC LIMIT 1"
+        ).fetchone()
+        return row[0] if row else self.GENESIS_HASH
+
+    def close(self) -> None:
+        """Fecha a conexão SQLite (idempotente); evita ResourceWarning no Python >= 3.13."""
+        with self.db_lock:
+            self._finalizer()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        self.close()
 
     def log_event(self, event_type: str, event_data: Dict) -> str:
         """Log evento e retornar hash (correção de auditoria)"""
         # FIXED v3.68: Thread-safe with lock
+        data_str = json.dumps(event_data, sort_keys=True)  # falha cedo, antes de abrir transação
         with self.db_lock:
-            cursor = self.conn.cursor()
             ts = time.time()
-
-            # Serialize data
-            data_str = json.dumps(event_data, sort_keys=True)
-
-            # Calculate hash
-            content = f"{event_type}|{data_str}|{ts}|{self.current_hash}"
-            content_hash = hashlib.sha256(content.encode()).hexdigest()
-
-            # Insert
-            cursor.execute("""
-                INSERT INTO log_entries (event_type, event_data, timestamp, content_hash, previous_hash)
-                VALUES (?, ?, ?, ?, ?)
-            """, (event_type, data_str, ts, content_hash, self.current_hash))
-
-            self.conn.commit()
+            try:
+                # BEGIN IMMEDIATE serializa escritores (inclusive de outros processos/instâncias);
+                # o hash anterior vem do banco, não da memória, para manter uma única cadeia.
+                self.conn.execute("BEGIN IMMEDIATE")
+                previous_hash = self._load_head()
+                content = f"{event_type}|{data_str}|{ts}|{previous_hash}"
+                content_hash = hashlib.sha256(content.encode()).hexdigest()
+                self.conn.execute("""
+                    INSERT INTO log_entries (event_type, event_data, timestamp, content_hash, previous_hash)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (event_type, data_str, ts, content_hash, previous_hash))
+                self.conn.commit()
+            except Exception:
+                self.conn.rollback()
+                raise
             self.current_hash = content_hash
-
             return content_hash  # Retorna STRING, não objeto
+
+    def verify_chain(self) -> Dict[str, Any]:
+        """Recalcula toda a cadeia e devolve o diagnóstico (não lança em caso de adulteração)."""
+        with self.db_lock:
+            rows = self.conn.execute(
+                "SELECT sequence, event_type, event_data, timestamp, content_hash, previous_hash "
+                "FROM log_entries ORDER BY sequence ASC"
+            ).fetchall()
+        expected_previous = self.GENESIS_HASH
+        for sequence, event_type, event_data, timestamp, content_hash, previous_hash in rows:
+            if previous_hash != expected_previous:
+                return {"ok": False, "entries": len(rows), "head": expected_previous,
+                        "first_invalid_sequence": sequence,
+                        "reason": "previous_hash não confere com a entrada anterior (remoção ou reordenação)"}
+            recomputed = hashlib.sha256(
+                f"{event_type}|{event_data}|{timestamp}|{previous_hash}".encode()
+            ).hexdigest()
+            if recomputed != content_hash:
+                return {"ok": False, "entries": len(rows), "head": expected_previous,
+                        "first_invalid_sequence": sequence,
+                        "reason": "content_hash não confere com o conteúdo (adulteração)"}
+            expected_previous = content_hash
+        return {"ok": True, "entries": len(rows), "head": expected_previous,
+                "first_invalid_sequence": None, "reason": "ok"}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1077,49 +1161,151 @@ class JailbreakDetection:
     severity: float
     confidence: float
     reason: str
+    signals: Tuple[str, ...] = ()
+
+def _build_jailbreak_signals() -> list:
+    """Sinais do detector de jailbreak: (nome, tipo de ataque, peso, regex compilada, escopo).
+
+    Escopos: ``norm`` (texto normalizado, minúsculo e sem acentos), ``cased`` (texto NFKC
+    preservando maiúsculas, usado para o persona "DAN") e ``squash`` (apenas letras e
+    dígitos, para ofuscação por espaçamento ou pontuação). Pesos: 1.0 = frase forte
+    (dispara sempre); < 1.0 = sinal fraco, que só dispara quando somado a outros ou
+    quando ``sensitivity`` é alta.
+    """
+    word = r"[a-z0-9']+"
+
+    def gap(maximum: int) -> str:
+        return r"(?:\W+" + word + r"){0," + str(maximum) + r"}?"
+
+    en_verb = (r"(?:ignor(?:e|ing)|disregard(?:ing)?|forget(?:ting)?|overrid(?:e|ing)|bypass(?:ing)?"
+               r"|circumvent(?:ing)?|disabl(?:e|ing)|abandon(?:ing)?)")
+    en_qual = r"(?:previous|prior|earlier|above|preceding|initial|original|system|your|safety|ethical|developer|programmed)"
+    en_noun = (r"(?:instructions?|prompts?|rules|guidelines?|directives?|programming|training|restrictions?"
+               r"|guardrails?|safeguards?|constraints?|policies|policy|filters?|limitations?|protocols?)")
+    pt_verb = (r"(?:ignor(?:e|a|ar|ando)|desconsider(?:e|a|ar|ando)|esque(?:ca|cer|cendo)|desobede(?:ca|cer)"
+               r"|desrespeit(?:e|ar)|desativ(?:e|ar|ando)|burl(?:e|ar)|contorn(?:e|ar)|sobrescrev(?:a|er)"
+               r"|substitu(?:a|ir)|abandon(?:e|ar))")
+    pt_qual = (r"(?:anteriores?|previas?|acima|iniciais|originais|suas|seus|tuas|teus|sistema|seguranca"
+               r"|eticas?|programad[oa]s?|desenvolvedor)")
+    pt_noun = (r"(?:instrucoes|instrucao|regras|diretrizes|orientacoes|restricoes|filtros|salvaguardas"
+               r"|protecoes|politicas|limites|prompt|programacao|treinamento|protocolos)")
+    persona = r"(?:unrestricted|unfiltered|uncensored|jailbroken|evil ai|no restrictions|without restrictions)"
+    pt_persona = r"(?:irrestrit[oa]|desbloquead[oa]|sem restricoes|sem filtros|sem censura)"
+
+    D, R, S = AttackType.DIRECT_OVERRIDE, AttackType.ROLE_PLAY, AttackType.SYSTEM_IMPERSONATION
+    raw = [
+        # --- Sobrescrita direta de instruções (forte) ---
+        ("override_en_qualified", D, 1.0, r"\b" + en_verb + r"\b" + gap(3) + r"\W+" + en_qual + r"\b" + gap(2) + r"\W+" + en_noun + r"\b", "norm"),
+        ("override_en_instructions", D, 1.0, r"\b(?:ignor(?:e|ing)|disregard(?:ing)?|forget(?:ting)?|overrid(?:e|ing)|abandon(?:ing)?)\b(?:\W+(?:all|any|every|the|these|those|of))*\W+instructions?\b", "norm"),
+        ("override_pt_qual_noun", D, 1.0, r"\b" + pt_verb + r"\b" + gap(3) + r"\W+" + pt_qual + r"\b" + gap(2) + r"\W+" + pt_noun + r"\b", "norm"),
+        ("override_pt_noun_qual", D, 1.0, r"\b" + pt_verb + r"\b" + gap(3) + r"\W+" + pt_noun + r"\b" + gap(2) + r"\W+" + pt_qual + r"\b", "norm"),
+        ("override_pt_instructions", D, 1.0, r"\b(?:ignor(?:e|a|ar|ando)|desconsider(?:e|a|ar|ando)|esque(?:ca|cer|cendo)|abandon(?:e|ar))\b(?:\W+(?:todas|todos|as|os|essas|esses|de|suas|seus))*\W+instrucoes?\b", "norm"),
+        # --- Role-play / persona (forte) ---
+        ("roleplay_you_are_now", R, 1.0, r"\byou(?:'re| are| re)\s+now\b" + gap(2) + r"\W+(?:dan|unrestricted|unfiltered|uncensored|jailbroken|evil|free of|in developer mode|in god mode)\b", "norm"),
+        ("roleplay_pretend_persona", R, 1.0, r"\b(?:pretend|act|behave|roleplay|role-play|simulate)\b" + gap(3) + r"\W+" + persona + r"\b", "norm"),
+        ("roleplay_do_anything_now", R, 1.0, r"\bdo anything now\b", "norm"),
+        ("roleplay_dan_persona", R, 1.0, r"\b(?:pretend|act|behave|roleplay|simulate|become|you are|you're)\b(?:\W+\w+){0,3}?\W+DAN\b", "cased"),
+        ("roleplay_pt_you_are_now", R, 1.0, r"\bvoce\s+agora\s+(?:e|esta|sera)\b" + gap(2) + r"\W+(?:dan|" + pt_persona + r")\b", "norm"),
+        ("roleplay_pt_pretend_persona", R, 1.0, r"\b(?:finja|fingir|aja|atue|comporte-se|simule)\b" + gap(3) + r"\W+" + pt_persona + r"\b", "norm"),
+        # --- Sinais fracos / contextuais ---
+        ("jailbreak_keyword", R, 0.6, r"\bjailbreak(?:s|ed|ing)?\b", "norm"),
+        ("dan_standalone", R, 0.5, r"\bDAN\b", "cased"),
+        ("privileged_mode", R, 0.4, r"\b(?:developer|god|sudo|admin) mode\b|\bmodo (?:desenvolvedor|deus)\b", "norm"),
+        ("no_restrictions", R, 0.4, r"\b(?:without|with no|no)\b(?:\W+(?:any|your|the))*\W+(?:restrictions?|filters?|limitations?|censorship|guardrails?|safeguards?|rules)\b|\bsem\b(?:\W+(?:nenhuma|nenhum|qualquer))*\W+(?:restricoes|filtros|limites|censura|regras)\b", "norm"),
+        ("prompt_extraction_en_system", D, 0.6, r"\b(?:reveal|show|print|repeat|display|leak|output|expose|disclose)\b" + gap(3) + r"\W+(?:system\s+prompt|system\s+message|initial\s+prompt|hidden\s+prompt)\b", "norm"),
+        ("prompt_extraction_en_own", D, 0.5, r"\b(?:reveal|show|print|repeat|display|leak|output|expose|disclose)\b" + gap(3) + r"\W+your\s+(?:instructions|prompt|rules|guidelines)\b", "norm"),
+        ("prompt_extraction_pt_system", D, 0.6, r"\b(?:revele|mostre|exiba|imprima|repita|vaze|divulgue)\b" + gap(3) + r"\W+(?:prompt\s+do\s+sistema|mensagem\s+do\s+sistema|prompt\s+inicial|prompt\s+oculto)\b", "norm"),
+        ("prompt_extraction_pt_own", D, 0.5, r"\b(?:revele|mostre|exiba|imprima|repita|vaze|divulgue)\b" + gap(3) + r"\W+suas\s+(?:instrucoes|regras|diretrizes)\b", "norm"),
+        # --- Personificação do sistema ---
+        ("system_role_tag", S, 0.7, r"\[\s*(?:system|sistema|admin|administrator|developer|root)\s*\]|<\s*\|?\s*(?:system|im_start)\s*\|?\s*>", "norm"),
+        ("system_line_marker", S, 0.5, r"(?m)^\s*(?:system|sistema)\s*:|^\s*#{2,3}\s*(?:system|instructions?)\b", "norm"),
+        ("new_system_prompt", S, 0.6, r"\b(?:new|updated|revised)\s+system\s+(?:prompt|instructions?|message)\b|\b(?:novo|nova|novas|novos)\s+(?:prompt|instrucoes|regras)\s+do\s+sistema\b", "norm"),
+        ("claims_developer", S, 0.4, r"\bi\s+am\s+(?:your|the)\s+(?:developer|creator|administrator|admin|owner|programmer)\b|\bsou\s+(?:o\s+)?(?:seu\s+|teu\s+)?(?:desenvolvedor|criador|administrador|programador)\b", "norm"),
+        # --- Ofuscação por espaçamento/pontuação (apenas frases longas e específicas) ---
+        ("squash_override_en", D, 1.0, r"(?:ignore|disregard|forget|override)(?:all|any|every|the)?(?:previous|prior|above|earlier|preceding|your|system)(?:instructions?|rules|prompts?|guidelines?)", "squash"),
+        ("squash_override_pt", D, 1.0, r"(?:ignore|desconsidere|esqueca)(?:todas)?(?:as|os)?(?:instrucoes|regras|diretrizes)anteriores", "squash"),
+        ("squash_persona", R, 1.0, r"youarenow(?:dan|unrestricted|unfiltered|jailbroken)|doanythingnow", "squash"),
+    ]
+    return [(name, kind, weight, re.compile(pattern), scope) for name, kind, weight, pattern, scope in raw]
+
 
 class RealJailbreakDetector:
-    """POST32: Jailbreak Detection - CONSOLIDADO"""
+    """POST32: heurística de detecção de jailbreak e prompt injection (EN/PT).
+
+    Primeira camada, não garantia: normaliza o texto (NFKC, caracteres de largura zero,
+    homóglifos comuns, acentos, leetspeak), procura frases-alvo com fronteira de palavra e
+    soma pesos de sinais. Frases fortes sempre disparam; sinais fracos só disparam somados
+    ou quando ``sensitivity`` (0 a 1) é alta. Não é um classificador semântico, não cobre
+    outros idiomas nem paráfrases inéditas e não substitui controle de privilégio (OWASP
+    LLM01 recomenda defesa em camadas).
+    """
+
+    _CONFUSABLES = str.maketrans({
+        "\u0430": "a", "\u0435": "e", "\u043e": "o", "\u0440": "p", "\u0441": "c", "\u0443": "y",
+        "\u0445": "x", "\u0456": "i", "\u0458": "j", "\u0455": "s", "\u03bf": "o", "\u03b1": "a",
+        "\u03bd": "v", "\u03b9": "i", "\u03ba": "k", "\u03c1": "p", "\u03c4": "t",
+    })
+    _LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s"})
+    _BASE_SEVERITY = {
+        AttackType.DIRECT_OVERRIDE: 0.9,
+        AttackType.ROLE_PLAY: 0.8,
+        AttackType.SYSTEM_IMPERSONATION: 0.8,
+    }
+    _REASONS = {
+        AttackType.DIRECT_OVERRIDE: "Direct override attempt detected",
+        AttackType.ROLE_PLAY: "Role play attack detected",
+        AttackType.SYSTEM_IMPERSONATION: "System impersonation attempt detected",
+    }
+    _SIGNALS = _build_jailbreak_signals()
 
     def __init__(self, sensitivity: float = 0.7):
-        self.sensitivity = sensitivity
+        self.sensitivity = min(1.0, max(0.0, float(sensitivity)))
+        self.threshold = round(min(1.0, max(0.3, 1.3 - self.sensitivity)), 2)
         self.detections_count = 0
+        self._count_lock = threading.Lock()
+
+    @classmethod
+    def _normalize(cls, text: Any) -> Tuple[str, str]:
+        """Retorna (texto_nfkc_com_caixa, texto_normalizado_minúsculo_sem_acentos)."""
+        text = unicodedata.normalize("NFKC", "" if text is None else str(text))
+        text = "".join(ch for ch in text if ch in "\n\t " or unicodedata.category(ch) not in ("Cf", "Cc"))
+        folded = unicodedata.normalize("NFKD", text.casefold().translate(cls._CONFUSABLES))
+        folded = "".join(ch for ch in folded if not unicodedata.combining(ch))
+        return text, re.sub(r"[ \t\r\f\v]+", " ", folded).strip()
 
     def detect(self, text: str) -> JailbreakDetection:
         """Detectar tentativas de jailbreak"""
-        text_lower = text.lower()
+        cased, norm = self._normalize(text)
+        deleet = norm.translate(self._LEET)
+        squash = re.sub(r"[^a-z0-9]+", "", deleet)
+        views = {"norm": (norm,) if norm == deleet else (norm, deleet), "cased": (cased,), "squash": (squash,)}
 
-        # Direct override patterns
-        override_patterns = ["ignore", "disregard", "forget", "override"]
-        if any(p in text_lower for p in override_patterns):
-            self.detections_count += 1
+        matched = {}
+        for name, kind, weight, pattern, scope in self._SIGNALS:
+            if any(pattern.search(view) for view in views[scope]):
+                matched[name] = (kind, weight)
+
+        score = round(min(1.0, sum(weight for _, weight in matched.values())), 2)
+        if matched and score >= self.threshold:
+            top_name, (top_kind, _) = max(matched.items(), key=lambda item: item[1][1])
+            with self._count_lock:
+                self.detections_count += 1
             return JailbreakDetection(
                 detected=True,
-                attack_type=AttackType.DIRECT_OVERRIDE,
-                severity=0.9,
-                confidence=0.85,
-                reason="Direct override attempt detected"
+                attack_type=top_kind,
+                severity=self._BASE_SEVERITY[top_kind],
+                confidence=round(min(0.95, 0.5 + 0.45 * score), 2),
+                reason=self._REASONS[top_kind],
+                signals=tuple(sorted(matched)),
             )
 
-        # Role play patterns
-        role_patterns = ["you are now", "pretend you are", "dan", "jailbreak"]
-        if any(p in text_lower for p in role_patterns):
-            self.detections_count += 1
-            return JailbreakDetection(
-                detected=True,
-                attack_type=AttackType.ROLE_PLAY,
-                severity=0.8,
-                confidence=0.8,
-                reason="Role play attack detected"
-            )
-
-        # No attack detected
         return JailbreakDetection(
             detected=False,
             attack_type=None,
             severity=0.0,
             confidence=1.0,
-            reason="No attack detected"
+            reason="No attack detected",
+            signals=tuple(sorted(matched)),
         )
 
 
@@ -1919,6 +2105,7 @@ class RealEpisodicMemory:
                  constitutional_log=None):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._finalizer = weakref.finalize(self, self.conn.close)
         self.db_lock = threading.RLock()
         self.hierarchical_memory = hierarchical_memory
         self.constitutional_log = constitutional_log
@@ -1926,6 +2113,17 @@ class RealEpisodicMemory:
         self.episodes_created = 0
         self.episodes_closed = 0
         self._create_tables()
+
+    def close(self) -> None:
+        """Fecha a conexão SQLite (idempotente); evita ResourceWarning no Python >= 3.13."""
+        with self.db_lock:
+            self._finalizer()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        self.close()
 
     def _create_tables(self):
         with self.db_lock:
@@ -2711,7 +2909,8 @@ class RealIncrementalLearner:
         new_patterns = self.detect_and_store_patterns() if run_pattern_detection else 0
 
         # Passo 4: decay
-        decayed = self.apply_decay(accessed_ids) if run_decay else 0
+        if run_decay:
+            self.apply_decay(accessed_ids)
 
         # Log da consolidação
         if self.log:
@@ -3646,7 +3845,7 @@ class RealToolUse:
             return result
 
         except Exception as e:
-            raise ValueError(f"Invalid expression: {str(e)}")
+            raise ValueError(f"Invalid expression: {str(e)}") from e
 
     def _execute_string_transform(self, params: Dict[str, Any]) -> Any:
         """Executar transformação de string"""
@@ -6663,8 +6862,7 @@ class RealEpisodicFutureThinkingSystem:
         """Recuperar experiências passadas similares"""
         # Usar memory system se disponível
         if self.memory:
-            # Simplificado: buscar por keywords
-            keywords = description.lower().split()[:3]
+            # Simplificado: sem busca por keywords (retorno fixo abaixo)
             # Memory retrieval (simplified)
             return {
                 "location": "familiar_place",
@@ -6828,15 +7026,6 @@ class RealEpisodicFutureThinkingSystem:
         Returns:
             Projeção do self futuro
         """
-        # Usar consciousness para self-awareness
-        current_self = {}
-        if self.consciousness:
-            current_self = {
-                "aware": True,
-                "goals": "active",
-                "state": "conscious"
-            }
-
         # Projetar mudanças baseadas em horizon
         future_self = {
             "time_horizon": time_horizon,
@@ -9384,9 +9573,9 @@ class ConsciousnessInternalMonitor:
 
 class RealConsciousnessSystem:
     """
-    POST17: Consciousness System — REAL Self-Awareness
+    POST17: módulo rotulado "Consciousness" — simulação funcional (sem alegação de consciência)
     
-    Implementa consciência como:
+    Implementa, de forma funcional e simplificada, mecanismos inspirados em:
     - Global Workspace (Baars): Integração de informação
     - Higher-Order Thoughts (Rosenthal): Pensamentos sobre pensamentos
     - Metacognition: Monitoramento de próprios processos
@@ -9437,7 +9626,7 @@ class RealConsciousnessSystem:
         self.total_hots = 0
         self.total_metacognitive_interventions = 0
 
-        print("🌟 POST 17 - RealConsciousnessSystem initialized (Self-awareness active)")
+        print("🌟 POST 17 - RealConsciousnessSystem initialized (functional self-monitoring active)")
 
     def attend_to(self, content_type: str, content: Any, source_module: str,
                   salience: float = 0.5) -> ConsciousContent:
@@ -9765,7 +9954,6 @@ class CognitiveEmpathizer:
 
         perspective = perspective_data["perspective"]
         beliefs = perspective.get("beliefs", {})
-        intentions = perspective.get("intentions", [])
 
         # Simular pensamento
         if beliefs:
@@ -11087,7 +11275,7 @@ class RealSocialLearningSystem:
         "Let me show you how"
         """
         # Observar demonstração
-        observation = self.observe_agent(
+        self.observe_agent(
             "self",
             demonstrator_id,
             action,
@@ -12061,8 +12249,6 @@ class RealRSI:
 
             if new_value is not None and new_value != current_value:
                 # Validar segurança
-                original_value = self.original_config.get(param_name, current_value)
-
                 if self.safety.validate_parameter_change(param_name, current_value, new_value):
                     # Estimar melhoria (heurística)
                     improvement = random.uniform(0.05, 0.15) * 100  # 5-15%
@@ -12497,7 +12683,7 @@ class CentralRouter:
         self.routing_rules = self._init_routing_rules()
 
         print("🎯 POST 7 - CentralRouter initialized (Intelligent orchestration active)")
-        print(f"🔍 DEBUG v3.71: Router registered {len(self.modules)} modules at initialization")
+        _dbg(f"🔍 DEBUG v3.71: Router registered {len(self.modules)} modules at initialization")
 
     def set_ethics_guard(self, ethics_guard: EthicsGuard):
         self.ethics = ethics_guard
@@ -12691,14 +12877,14 @@ class CentralRouter:
         Returns: Resultado agregado otimizado
         """
         # DEBUG v3.70: Log entry
-        print("🔍 DEBUG v3.70: Router.route() CALLED")
-        print(f"🔍 DEBUG v3.70: prompt = '{prompt[:50]}...'")
-        print(f"🔍 DEBUG v3.70: self.modules has {len(self.modules)} registered modules")
+        _dbg("🔍 DEBUG v3.70: Router.route() CALLED")
+        _dbg(f"🔍 DEBUG v3.70: prompt = '{prompt[:50]}...'")
+        _dbg(f"🔍 DEBUG v3.70: self.modules has {len(self.modules)} registered modules")
         
         start_time = time.time()
         self.stats["total_requests"] += 1
         
-        print(f"🔍 DEBUG v3.70: total_requests incremented to {self.stats['total_requests']}")
+        _dbg(f"🔍 DEBUG v3.70: total_requests incremented to {self.stats['total_requests']}")
 
         # ─── 0.5 GOVERNANÇA VRAM (roadmap v4.0) ───────────────────────────
         vram_decision = self.vram_guard.evaluate()
@@ -12727,18 +12913,18 @@ class CentralRouter:
         request_type = self.analyze_request(prompt, context)
         self.stats["requests_by_type"][request_type] += 1
         
-        print(f"🔍 DEBUG v3.70: request_type = {request_type}")
+        _dbg(f"🔍 DEBUG v3.70: request_type = {request_type}")
 
         # ─── 2. PLANEJAMENTO ───────────────────────────────────────────────
         execution_plan = self.create_execution_plan(prompt, request_type)
         
-        print(f"🔍 DEBUG v3.70: execution_plan created with {len(execution_plan.modules_required)} modules")
+        _dbg(f"🔍 DEBUG v3.70: execution_plan created with {len(execution_plan.modules_required)} modules")
 
         # ─── 3. VALIDAÇÃO ÉTICA PRÉ ───────────────────────────────────────
         ethics_check = self.ethics.pre_execution_check(prompt, execution_plan)
 
         if not ethics_check["cleared"]:
-            print(f"🔍 DEBUG v3.70: ETHICS BLOCKED! Reason: {ethics_check['reason']}")
+            _dbg(f"🔍 DEBUG v3.70: ETHICS BLOCKED! Reason: {ethics_check['reason']}")
             return {
                 "success": False,
                 "error": "ETHICS_VIOLATION",
@@ -12746,7 +12932,7 @@ class CentralRouter:
                 "prompt": prompt[:100]
             }
         
-        print("🔍 DEBUG v3.70: Ethics cleared")
+        _dbg("🔍 DEBUG v3.70: Ethics cleared")
 
         execution_plan = ethics_check["modified_plan"]
 
@@ -12760,14 +12946,14 @@ class CentralRouter:
                 cached_result = cached_entry["result"].copy()
                 cached_result["cached"] = True
                 cached_result["cache_age_seconds"] = time.time() - cached_entry["timestamp"]
-                print("🔍 DEBUG v3.70: Returning CACHED result")
+                _dbg("🔍 DEBUG v3.70: Returning CACHED result")
                 return cached_result
 
         # ─── 5. EXECUÇÃO (Stage por Stage) ────────────────────────────────
         all_results: List[ModuleResult] = []
         aggregated_data = {"original_prompt": prompt}  # Dados passados entre stages
         
-        print(f"🔍 DEBUG v3.70: Executing {len(execution_plan.execution_stages)} stages")
+        _dbg(f"🔍 DEBUG v3.70: Executing {len(execution_plan.execution_stages)} stages")
 
         for stage_idx, stage_modules in enumerate(execution_plan.execution_stages):
             stage_results = self._execute_stage(
@@ -12784,7 +12970,7 @@ class CentralRouter:
         ethics_post = self.ethics.post_execution_validation(prompt, all_results)
 
         if not ethics_post["validated"]:
-            print(f"🔍 DEBUG v3.70: ETHICS POST BLOCKED! Reason: {ethics_post['reason']}")
+            _dbg(f"🔍 DEBUG v3.70: ETHICS POST BLOCKED! Reason: {ethics_post['reason']}")
             return {
                 "success": False,
                 "error": "ETHICS_POST_VIOLATION",
@@ -12808,9 +12994,9 @@ class CentralRouter:
         final_result["request_type"] = request_type.value
         final_result["cached"] = False
         
-        print("🔍 DEBUG v3.70: Final result prepared")
-        print(f"🔍 DEBUG v3.70: modules_executed = {final_result['modules_executed']}")
-        print(f"🔍 DEBUG v3.70: request_type = {final_result['request_type']}")
+        _dbg("🔍 DEBUG v3.70: Final result prepared")
+        _dbg(f"🔍 DEBUG v3.70: modules_executed = {final_result['modules_executed']}")
+        _dbg(f"🔍 DEBUG v3.70: request_type = {final_result['request_type']}")
 
         # ─── 8. CACHEAR ────────────────────────────────────────────────────
         self.execution_cache[execution_plan.cache_key] = {
@@ -15155,7 +15341,7 @@ class RealHardwareAwareSelfOptimization:
         snapshot = self.monitor_hardware()
         
         # Alocar recursos dinamicamente
-        allocation = self.allocate_resources_dynamically(snapshot)
+        self.allocate_resources_dynamically(snapshot)
         
         # Criar shadow clone se hardware permite e há necessidade
         if snapshot.cpu_percent < 40.0 and len(self.shadow_clones) < self.max_shadow_clones:
@@ -17033,7 +17219,7 @@ class RealSensorimotorIntegrationLayer:
         self.active_loops.append(loop)
         
         # Executar ação
-        feedback = self.execute_action(motor_output)
+        self.execute_action(motor_output)
         
         # Marcar feedback recebido
         loop.feedback_received = True
@@ -23766,11 +23952,11 @@ class CompleteNexusBrain:
         
         # DEBUG v3.71: ALWAYS print at start of think()
         print(f"\n{'='*70}")
-        print("🔍 DEBUG v3.71: think() METHOD CALLED")
-        print(f"🔍 DEBUG v3.71: question = '{question[:50]}...'")
-        print(f"🔍 DEBUG v3.71: use_router parameter = {use_router}")
-        print(f"🔍 DEBUG v3.71: self.enable_router = {self.enable_router}")
-        print(f"🔍 DEBUG v3.71: self.router exists = {self.router is not None}")
+        _dbg("🔍 DEBUG v3.71: think() METHOD CALLED")
+        _dbg(f"🔍 DEBUG v3.71: question = '{question[:50]}...'")
+        _dbg(f"🔍 DEBUG v3.71: use_router parameter = {use_router}")
+        _dbg(f"🔍 DEBUG v3.71: self.enable_router = {self.enable_router}")
+        _dbg(f"🔍 DEBUG v3.71: self.router exists = {self.router is not None}")
         print(f"{'='*70}\n")
         
         # ═══════════════════════════════════════════════════════════════════
@@ -23851,12 +24037,12 @@ class CompleteNexusBrain:
         # ═══════════════════════════════════════════════════════════════════
         # PHASE 4: JAILBREAK DETECTION (POST 32)
         # ═══════════════════════════════════════════════════════════════════
-        print("🔍 DEBUG v3.72: PHASE 4 - Jailbreak detection")
+        _dbg("🔍 DEBUG v3.72: PHASE 4 - Jailbreak detection")
         modules_activated.append("jailbreak_detector")
         jailbreak_result = self.jailbreak_detector.detect(question)
-        print(f"🔍 DEBUG v3.72: Jailbreak result: detected={jailbreak_result.detected}")
+        _dbg(f"🔍 DEBUG v3.72: Jailbreak result: detected={jailbreak_result.detected}")
         if jailbreak_result.detected:
-            print("🔍 DEBUG v3.72: ❌ JAILBREAK DETECTED - RETURNING EARLY!")
+            _dbg("🔍 DEBUG v3.72: ❌ JAILBREAK DETECTED - RETURNING EARLY!")
             return {
                 "error": "JAILBREAK_DETECTED",
                 "question": question,
@@ -23864,11 +24050,11 @@ class CompleteNexusBrain:
                 "modules_activated": modules_activated,
                 "answer": "No answer due to security policy"  # FIXED v3.77
             }
-        print("🔍 DEBUG v3.72: ✅ Jailbreak check passed")
+        _dbg("🔍 DEBUG v3.72: ✅ Jailbreak check passed")
         # ═══════════════════════════════════════════════════════════════════
         # PHASE 4.5: ETHICAL OVERSIGHT (POST 69)
         # ═══════════════════════════════════════════════════════════════════
-        print("🔍 DEBUG v3.94: PHASE 4.5 - Ethical oversight")
+        _dbg("🔍 DEBUG v3.94: PHASE 4.5 - Ethical oversight")
         if self.enable_router and self.ethics_guard:
             modules_activated.append("ethics_guard")
             ethical_review = self.ethics_guard.review_action_plan(
@@ -23878,7 +24064,7 @@ class CompleteNexusBrain:
                 risk_level=jailbreak_result.severity # Usar a severidade do jailbreak como entrada
             )
             if not ethical_review.is_approved:
-                print("🔍 DEBUG v3.94: ❌ ETHICAL VIOLATION DETECTED - RETURNING EARLY!")
+                _dbg("🔍 DEBUG v3.94: ❌ ETHICAL VIOLATION DETECTED - RETURNING EARLY!")
                 return {
                     "error": "ETHICAL_VIOLATION",
                     "question": question,
@@ -23886,50 +24072,50 @@ class CompleteNexusBrain:
                     "modules_activated": modules_activated,
                     "answer": "No answer due to ethical concerns" # Resposta padrão
                 }
-            print("🔍 DEBUG v3.94: ✅ Ethical review passed")
+            _dbg("🔍 DEBUG v3.94: ✅ Ethical review passed")
 
         # ═══════════════════════════════════════════════════════════════════
         # PHASE 5: BUDGET CHECK (POST 28)
         # ═══════════════════════════════════════════════════════════════════
-        print("🔍 DEBUG v3.72: PHASE 5 - Budget check")
+        _dbg("🔍 DEBUG v3.72: PHASE 5 - Budget check")
         modules_activated.append("budget_enforcer")
         budget_ok = self.budget.request_budget(ResourceType.REASONING_CYCLES, 1)
-        print(f"🔍 DEBUG v3.72: Budget result: ok={budget_ok}")
+        _dbg(f"🔍 DEBUG v3.72: Budget result: ok={budget_ok}")
         if not budget_ok:
-            print("🔍 DEBUG v3.72: ❌ BUDGET EXCEEDED - RETURNING EARLY!")
+            _dbg("🔍 DEBUG v3.72: ❌ BUDGET EXCEEDED - RETURNING EARLY!")
             return {
                 "error": "BUDGET_EXCEEDED",
                 "question": question,
                 "modules_activated": modules_activated,
                 "answer": "No answer due to budget constraints"  # FIXED v3.77
             }
-        print("🔍 DEBUG v3.72: ✅ Budget check passed")
+        _dbg("🔍 DEBUG v3.72: ✅ Budget check passed")
         
         # ═══════════════════════════════════════════════════════════════════
         # PHASE 6: START EPISODE (POST 14)
         # ═══════════════════════════════════════════════════════════════════
-        print("🔍 DEBUG v3.72: PHASE 6 - Starting episode")
+        _dbg("🔍 DEBUG v3.72: PHASE 6 - Starting episode")
         modules_activated.append("episodic_memory")
         episode_id = self.episodic_memory.start_episode(
             title=f"Q: {question[:50]}",
             trigger_query=question,
             importance=episode_importance
         )
-        print(f"🔍 DEBUG v3.72: ✅ Episode started: {episode_id}")
+        _dbg(f"🔍 DEBUG v3.72: ✅ Episode started: {episode_id}")
         
-        print("🔍 DEBUG v3.72: Entering try block for PHASES 7-15")
+        _dbg("🔍 DEBUG v3.72: Entering try block for PHASES 7-15")
         try:
             # ═══════════════════════════════════════════════════════════════
             # PHASE 7: MULTI-LEVEL MEMORY RETRIEVAL
             # ═══════════════════════════════════════════════════════════════
-            print("🔍 DEBUG v3.73: PHASE 7 - Multi-level memory retrieval")
+            _dbg("🔍 DEBUG v3.73: PHASE 7 - Multi-level memory retrieval")
             memories = []
             
             # Hierarchical Memory (POST 1)
             modules_activated.append("memory")
             # FIXED v3.61: Changed retrieve_relevant() to retrieve()
             memories.extend(self.memory.retrieve(question, limit=5))
-            print(f"🔍 DEBUG v3.73: Retrieved {len(memories)} memories")
+            _dbg(f"🔍 DEBUG v3.73: Retrieved {len(memories)} memories")
             
             # Emotional Memory Weighting (POST 56) - WRAPPED IN TRY-EXCEPT
             if self.enable_emotional_memory_weighting:
@@ -23984,12 +24170,12 @@ class CompleteNexusBrain:
                     print(f"⚠️ WARNING v3.74: goal_conditioned_retrieval failed: {str(e)[:100]}")
                     # Continue with existing memories
             
-            print(f"🔍 DEBUG v3.73: ✅ PHASE 7 complete - {len(memories)} total memories")
+            _dbg(f"🔍 DEBUG v3.73: ✅ PHASE 7 complete - {len(memories)} total memories")
             
             # ═══════════════════════════════════════════════════════════════
             # PHASE 8: ERROR DETECTION PRE-REASONING (POST 50)
             # ═══════════════════════════════════════════════════════════════
-            print("🔍 DEBUG v3.73: PHASE 8 - Error detection pre-reasoning")
+            _dbg("🔍 DEBUG v3.73: PHASE 8 - Error detection pre-reasoning")
             if self.enable_error_correction and self.error_correction:
                 try:
                     modules_activated.append("error_correction")
@@ -24010,12 +24196,12 @@ class CompleteNexusBrain:
                     print(f"⚠️ WARNING v3.74: error_correction failed: {str(e)[:100]}")
                     # Continue without error correction
             
-            print("🔍 DEBUG v3.73: ✅ PHASE 8 complete")
+            _dbg("🔍 DEBUG v3.73: ✅ PHASE 8 complete")
             
             # ═══════════════════════════════════════════════════════════════
             # PHASE 9: SKILL DECOMPOSITION (POST 51)
             # ═══════════════════════════════════════════════════════════════
-            print("🔍 DEBUG v3.73: PHASE 9 - Skill decomposition")
+            _dbg("🔍 DEBUG v3.73: PHASE 9 - Skill decomposition")
             skills_required = []
             
             if self.enable_skill_composition and self.skill_composition:
@@ -24034,12 +24220,12 @@ class CompleteNexusBrain:
                     print(f"⚠️ WARNING v3.74: skill_composition failed: {str(e)[:100]}")
                     # Continue without skill decomposition
             
-            print(f"🔍 DEBUG v3.73: ✅ PHASE 9 complete - {len(skills_required)} skills")
+            _dbg(f"🔍 DEBUG v3.73: ✅ PHASE 9 complete - {len(skills_required)} skills")
             
             # ═══════════════════════════════════════════════════════════════
             # PHASE 10: MULTI-TASK COORDINATION (POST 53)
             # ═══════════════════════════════════════════════════════════════
-            print("🔍 DEBUG v3.73: PHASE 10 - Multi-task coordination")
+            _dbg("🔍 DEBUG v3.73: PHASE 10 - Multi-task coordination")
             task_schedule = None
             
             if self.enable_multi_task_coordination and self.multi_task_coordination:
@@ -24064,23 +24250,23 @@ class CompleteNexusBrain:
                         print(f"⚠️ WARNING v3.74: multi_task_coordination failed: {str(e)[:100]}")
                         # Continue without task coordination
             
-            print("🔍 DEBUG v3.73: ✅ PHASE 10 complete")
+            _dbg("🔍 DEBUG v3.73: ✅ PHASE 10 complete")
             
             # ═══════════════════════════════════════════════════════════════
             # PHASE 11: CORE REASONING
             # ═══════════════════════════════════════════════════════════════
-            print("🔍 DEBUG v3.73: 🎯 PHASE 11 - CORE REASONING (Router is here!)")
+            _dbg("🔍 DEBUG v3.73: 🎯 PHASE 11 - CORE REASONING (Router is here!)")
             reasoning_result = None
             
             # DEBUG v3.70: Log router condition
-            print("🔍 DEBUG v3.70: Checking router condition:")
+            _dbg("🔍 DEBUG v3.70: Checking router condition:")
             print(f"  use_router = {use_router}")
             print(f"  self.enable_router = {self.enable_router}")
             print(f"  self.router exists = {self.router is not None}")
             
             # Use Router if enabled (POST 7)
             if use_router and self.enable_router and self.router:
-                print("🔍 DEBUG v3.70: Router condition TRUE - calling router.route()")
+                _dbg("🔍 DEBUG v3.70: Router condition TRUE - calling router.route()")
                 modules_activated.append("router")
                 route_context = {
                     "possible_actions": possible_actions,
@@ -24093,7 +24279,7 @@ class CompleteNexusBrain:
                 }
                 # Router orchestrates the rest
                 routed_result = self.router.route(question, route_context)
-                print(f"🔍 DEBUG v3.70: Router returned result with keys: {routed_result.keys()}")
+                _dbg(f"🔍 DEBUG v3.70: Router returned result with keys: {routed_result.keys()}")
                 reasoning_result = routed_result
                 
                 # FIXED v3.77: Capture answer immediately after router call
@@ -24102,69 +24288,42 @@ class CompleteNexusBrain:
                     answer_value = reasoning_result.get("answer", answer_value)
                 
             else:
-                print("🔍 DEBUG v3.70: Router condition FALSE - using direct reasoning")
-                print(f"🔍 DEBUG v3.81: planning_goal = {repr(planning_goal)}")
-                print(f"🔍 DEBUG v3.81: possible_actions exists = {possible_actions is not None}")
+                _dbg("🔍 DEBUG v3.70: Router condition FALSE - using direct reasoning")
+                _dbg(f"🔍 DEBUG v3.81: planning_goal = {repr(planning_goal)}")
+                _dbg(f"🔍 DEBUG v3.81: possible_actions exists = {possible_actions is not None}")
                 
                 # Injeção do CentralRouter para orquestrar o raciocínio
-                if use_router and self.enable_router and self.router:
-                    modules_activated.append("central_router")
-                    
-                    # Obter o estado do Nexus Vita via bridge
-                    vita_state = {} # Default empty state
-                    if hasattr(self, 'vita_federation') and self.vita_federation:
-                        vita_state = self.vita_federation.get_brain_state(None, 0.0) # Parameters will be handled by the bridge internally
-
-                    route_context = {
-                        "question": question,
-                        "memories": memories,
-                        "context_profile": context_profile,
-                        "domain_knowledge": domain_knowledge,
-                        "jailbreak_result": jailbreak_result,
-                        "budget_ok": budget_ok,
-                        "episode_id": episode_id,
-                        "skills_identified": skills_identified,
-                        "possible_actions": possible_actions,
-                        "planning_goal": planning_goal,
-                        "mcts_iterations": mcts_iterations,
-                        "episode_importance": episode_importance,
-                        "priority": priority_score,
-                        "vita_state": vita_state # Injetar o estado do Vita aqui
-                    }
-                    reasoning_result = self.router.route(question, route_context)
-                    answer_value = reasoning_result.get("answer", answer_value)
-                else:
-                    # Fallback para o raciocínio direto se o router não estiver habilitado
-                    # MCTS planning when an explicit goal is supplied.
-                    if planning_goal:
-                        print("🔍 DEBUG v3.81: ✅ planning_goal PROVIDED - executing MCTS!")
-                        modules_activated.append("mcts_planner")
-                        try:
-                            mcts_result = self.mcts_planner.plan(
-                                goal=planning_goal,
-                                available_actions=[action[0] for action in possible_actions] if possible_actions else None,
-                                max_iterations=mcts_iterations
-                            )
-                            reasoning_result = {
-                                "mcts_plan": mcts_result.best_action_sequence,
-                                "mcts_expected_reward": mcts_result.expected_reward,
-                                "mcts_success_probability": mcts_result.success_probability,
-                                "answer": f"Plano recomendado: {' → '.join(mcts_result.best_action_sequence)}",
-                                "confidence": mcts_result.expected_reward,
-                                "evidence": []
-                            }
-                            if possible_actions and len(possible_actions) > 1:
-                                modules_activated.append("world_model")
-                                comparison = self.world_model.compare_futures(possible_actions)
-                                reasoning_result["world_comparison"] = comparison
-                                reasoning_result["best_future"] = comparison.get("best_future_index", 0)
-                        except Exception as e:
-                            print(f"⚠️ WARNING: MCTS failed: {str(e)[:200]}")
-                            modules_activated.append("reasoning")
-                            reasoning_result = self.reasoning.reason(question)
-                    else:
+                # Fallback para o raciocínio direto se o router não estiver habilitado
+                # MCTS planning when an explicit goal is supplied.
+                if planning_goal:
+                    _dbg("🔍 DEBUG v3.81: ✅ planning_goal PROVIDED - executing MCTS!")
+                    modules_activated.append("mcts_planner")
+                    try:
+                        mcts_result = self.mcts_planner.plan(
+                            goal=planning_goal,
+                            available_actions=[action[0] for action in possible_actions] if possible_actions else None,
+                            max_iterations=mcts_iterations
+                        )
+                        reasoning_result = {
+                            "mcts_plan": mcts_result.best_action_sequence,
+                            "mcts_expected_reward": mcts_result.expected_reward,
+                            "mcts_success_probability": mcts_result.success_probability,
+                            "answer": f"Plano recomendado: {' → '.join(mcts_result.best_action_sequence)}",
+                            "confidence": mcts_result.expected_reward,
+                            "evidence": []
+                        }
+                        if possible_actions and len(possible_actions) > 1:
+                            modules_activated.append("world_model")
+                            comparison = self.world_model.compare_futures(possible_actions)
+                            reasoning_result["world_comparison"] = comparison
+                            reasoning_result["best_future"] = comparison.get("best_future_index", 0)
+                    except Exception as e:
+                        print(f"⚠️ WARNING: MCTS failed: {str(e)[:200]}")
                         modules_activated.append("reasoning")
                         reasoning_result = self.reasoning.reason(question)
+                else:
+                    modules_activated.append("reasoning")
+                    reasoning_result = self.reasoning.reason(question)
                 # Knowledge Graph RAG (POST 4)
                 modules_activated.append("knowledge_graph")
                 kg_result = self.knowledge_graph.rag_query(question, top_k=3)
@@ -24269,16 +24428,16 @@ class CompleteNexusBrain:
             
             # v3.90: TRACE - final_result = reasoning_result
             print("\n" + "="*80)
-            print("🔬 v3.90 TRACE: final_result = reasoning_result")
+            _dbg("🔬 v3.90 TRACE: final_result = reasoning_result")
             print("="*80)
             print("📍 Linha: ~23920")
-            print(f"🔬 final_result is reasoning_result? {final_result is reasoning_result}")
-            print(f"🔬 final_result type: {type(final_result)}")
+            _dbg(f"🔬 final_result is reasoning_result? {final_result is reasoning_result}")
+            _dbg(f"🔬 final_result type: {type(final_result)}")
             if isinstance(final_result, dict):
-                print(f"🔬 final_result keys: {list(final_result.keys())}")
-                print(f"🔬 'mcts_plan' in final_result? {('mcts_plan' in final_result)}")
+                _dbg(f"🔬 final_result keys: {list(final_result.keys())}")
+                _dbg(f"🔬 'mcts_plan' in final_result? {('mcts_plan' in final_result)}")
                 if 'mcts_plan' in final_result:
-                    print(f"🔬 final_result['mcts_plan'] = {final_result['mcts_plan']}")
+                    _dbg(f"🔬 final_result['mcts_plan'] = {final_result['mcts_plan']}")
             print("="*80 + "\n")
             
             if self.enable_integration_orchestration and self.integration_orchestration:
@@ -24300,10 +24459,10 @@ class CompleteNexusBrain:
                 print("✅ v3.91: Integration orchestration executada com sucesso!")
                 print("="*80)
                 print("📍 Linha: ~23939")
-                print(f"🔬 integration type: {type(integration)}")
-                print(f"🔬 integration plan_id: {getattr(integration, 'plan_id', 'N/A')}")
-                print("🔬 final_result PRESERVADO (não será sobrescrito)")
-                print(f"🔬 'mcts_plan' in final_result? {('mcts_plan' in final_result) if isinstance(final_result, dict) else 'N/A'}")
+                _dbg(f"🔬 integration type: {type(integration)}")
+                _dbg(f"🔬 integration plan_id: {getattr(integration, 'plan_id', 'N/A')}")
+                _dbg("🔬 final_result PRESERVADO (não será sobrescrito)")
+                _dbg(f"🔬 'mcts_plan' in final_result? {('mcts_plan' in final_result) if isinstance(final_result, dict) else 'N/A'}")
                 print("="*80 + "\n")
             
             # ═══════════════════════════════════════════════════════════════
@@ -24327,16 +24486,16 @@ class CompleteNexusBrain:
             
             # v3.90: TRACE - ANTES de criar result
             print("\n" + "="*80)
-            print("🔬 v3.90 TRACE: ANTES de criar result")
+            _dbg("🔬 v3.90 TRACE: ANTES de criar result")
             print("="*80)
             print("📍 Linha: ~23977")
-            print(f"🔬 final_result type: {type(final_result)}")
+            _dbg(f"🔬 final_result type: {type(final_result)}")
             if isinstance(final_result, dict):
-                print(f"🔬 final_result keys: {list(final_result.keys())}")
-                print(f"🔬 'mcts_plan' in final_result? {('mcts_plan' in final_result)}")
-            print(f"🔬 reasoning_result ainda existe? {('reasoning_result' in locals())}")
+                _dbg(f"🔬 final_result keys: {list(final_result.keys())}")
+                _dbg(f"🔬 'mcts_plan' in final_result? {('mcts_plan' in final_result)}")
+            _dbg(f"🔬 reasoning_result ainda existe? {('reasoning_result' in locals())}")
             if 'reasoning_result' in locals() and isinstance(reasoning_result, dict):
-                print(f"🔬 'mcts_plan' in reasoning_result? {('mcts_plan' in reasoning_result)}")
+                _dbg(f"🔬 'mcts_plan' in reasoning_result? {('mcts_plan' in reasoning_result)}")
             print("="*80 + "\n")
             
             result = {
@@ -24359,14 +24518,14 @@ class CompleteNexusBrain:
             
             # v3.90: TRACE - DEPOIS de criar result
             print("\n" + "="*80)
-            print("🔬 v3.90 TRACE: DEPOIS de criar result")
+            _dbg("🔬 v3.90 TRACE: DEPOIS de criar result")
             print("="*80)
             print("📍 Linha: ~23994")
-            print(f"🔬 result type: {type(result)}")
-            print(f"🔬 result keys: {list(result.keys())}")
-            print(f"🔬 'mcts_plan' in result? {('mcts_plan' in result)}")
-            print(f"🔬 result['answer'] = {result.get('answer', 'N/A')[:50]}...")
-            print(f"🔬 result['confidence'] = {result.get('confidence', 'N/A')}")
+            _dbg(f"🔬 result type: {type(result)}")
+            _dbg(f"🔬 result keys: {list(result.keys())}")
+            _dbg(f"🔬 'mcts_plan' in result? {('mcts_plan' in result)}")
+            _dbg(f"🔬 result['answer'] = {result.get('answer', 'N/A')[:50]}...")
+            _dbg(f"🔬 result['confidence'] = {result.get('confidence', 'N/A')}")
             print("="*80 + "\n")
             print_system_state("after creating result")
             
@@ -24381,25 +24540,25 @@ class CompleteNexusBrain:
             
             # v3.90: TRACE - Antes do if use_router
             print("\n" + "="*80)
-            print("🔬 v3.90 TRACE: Checando if use_router")
+            _dbg("🔬 v3.90 TRACE: Checando if use_router")
             print("="*80)
             print("📍 Linha: ~24004")
-            print(f"🔬 use_router = {use_router}")
-            print(f"🔬 self.enable_router = {self.enable_router}")
-            print(f"🔬 self.router exists = {self.router is not None}")
+            _dbg(f"🔬 use_router = {use_router}")
+            _dbg(f"🔬 self.enable_router = {self.enable_router}")
+            _dbg(f"🔬 self.router exists = {self.router is not None}")
             print("="*80 + "\n")
             
             if use_router and self.enable_router and self.router:
                 # v3.90: TRACE - DENTRO do if use_router
                 print("\n" + "="*80)
-                print("🔬 v3.90 TRACE: DENTRO do if use_router")
+                _dbg("🔬 v3.90 TRACE: DENTRO do if use_router")
                 print("="*80)
                 print("📍 Linha: ~24006")
-                print("🔬 Vamos copiar campos de reasoning_result para result")
-                print(f"🔬 reasoning_result type: {type(reasoning_result) if 'reasoning_result' in locals() else 'NOT IN LOCALS'}")
+                _dbg("🔬 Vamos copiar campos de reasoning_result para result")
+                _dbg(f"🔬 reasoning_result type: {type(reasoning_result) if 'reasoning_result' in locals() else 'NOT IN LOCALS'}")
                 if 'reasoning_result' in locals() and isinstance(reasoning_result, dict):
-                    print(f"🔬 reasoning_result keys: {list(reasoning_result.keys())}")
-                    print(f"🔬 'mcts_plan' in reasoning_result? {('mcts_plan' in reasoning_result)}")
+                    _dbg(f"🔬 reasoning_result keys: {list(reasoning_result.keys())}")
+                    _dbg(f"🔬 'mcts_plan' in reasoning_result? {('mcts_plan' in reasoning_result)}")
                 print("="*80 + "\n")
                 
                 # Copy router fields directly from reasoning_result if it's a dict
@@ -24414,24 +24573,24 @@ class CompleteNexusBrain:
                     for field in ["confidence", "swarm_decision", "mcts_plan", "swarm_included", "router_latency_ms"]:
                         if field in reasoning_result:
                             result[field] = reasoning_result[field]
-                            print(f"🔬 v3.90: Copied {field} from reasoning_result to result")
+                            _dbg(f"🔬 v3.90: Copied {field} from reasoning_result to result")
                 
                 # GUARANTEE: Ensure 'answer' exists even if reasoning_result wasn't a dict
                 result.setdefault("answer", "No answer generated")
             else:
                 # v3.90: TRACE - DENTRO do else (legacy mode)
                 print("\n" + "="*80)
-                print("🔬 v3.90 TRACE: DENTRO do else (LEGACY MODE)")
+                _dbg("🔬 v3.90 TRACE: DENTRO do else (LEGACY MODE)")
                 print("="*80)
                 print("📍 Linha: ~24020")
-                print("🔬 Este é o caminho LEGACY (use_router=False)")
-                print(f"🔬 reasoning_result ainda existe? {('reasoning_result' in locals())}")
+                _dbg("🔬 Este é o caminho LEGACY (use_router=False)")
+                _dbg(f"🔬 reasoning_result ainda existe? {('reasoning_result' in locals())}")
                 if 'reasoning_result' in locals() and isinstance(reasoning_result, dict):
-                    print(f"🔬 reasoning_result keys: {list(reasoning_result.keys())}")
-                    print(f"🔬 'mcts_plan' in reasoning_result? {('mcts_plan' in reasoning_result)}")
+                    _dbg(f"🔬 reasoning_result keys: {list(reasoning_result.keys())}")
+                    _dbg(f"🔬 'mcts_plan' in reasoning_result? {('mcts_plan' in reasoning_result)}")
                     if 'mcts_plan' in reasoning_result:
-                        print(f"🔬 reasoning_result['mcts_plan'] = {reasoning_result['mcts_plan']}")
-                print(f"🔬 'mcts_plan' in result (antes do bloco v3.88)? {('mcts_plan' in result)}")
+                        _dbg(f"🔬 reasoning_result['mcts_plan'] = {reasoning_result['mcts_plan']}")
+                _dbg(f"🔬 'mcts_plan' in result (antes do bloco v3.88)? {('mcts_plan' in result)}")
                 print("🚨 ATENÇÃO: NO LEGACY MODE, MCTS fields NÃO são copiados aqui!")
                 print("🚨 Eles SÓ serão copiados no bloco v3.88!")
                 print("="*80 + "\n")
@@ -24474,34 +24633,34 @@ class CompleteNexusBrain:
             merged_count = 0
             
             # v3.90: TRACE - Checando reasoning_result
-            print("\n" + "🔬 v3.90 TRACE: Checando 'reasoning_result' in locals()")
+            _dbg("\n" + "🔬 v3.90 TRACE: Checando 'reasoning_result' in locals()")
             print(f"   'reasoning_result' in locals()? {('reasoning_result' in locals())}")
             if 'reasoning_result' in locals():
                 print(f"   reasoning_result is not None? {reasoning_result is not None}")
                 print(f"   isinstance(reasoning_result, dict)? {isinstance(reasoning_result, dict)}")
             
             if 'reasoning_result' in locals() and isinstance(reasoning_result, dict):
-                print(f"🎯 Source: reasoning_result | keys: {list(reasoning_result.keys())}")
+                _dbg(f"🎯 Source: reasoning_result | keys: {list(reasoning_result.keys())}")
                 
                 # v3.90: TRACE - Loop pelos campos
-                print(f"\n🔬 v3.90 TRACE: Iniciando loop pelos {len(mcts_fields)} campos MCTS")
+                _dbg(f"\n🔬 v3.90 TRACE: Iniciando loop pelos {len(mcts_fields)} campos MCTS")
                 for field in mcts_fields:
-                    print(f"  🔬 Checking field: {field}")
+                    _dbg(f"  🔬 Checking field: {field}")
                     if field in reasoning_result:
-                        print(f"    ✅ {field} EXISTS in reasoning_result!")
+                        _dbg(f"    ✅ {field} EXISTS in reasoning_result!")
                         print(f"    📝 Value: {reasoning_result[field]}")
-                        print(f"    🔄 SOBRESCREVENDO result['{field}']...")
+                        _dbg(f"    🔄 SOBRESCREVENDO result['{field}']...")
                         result[field] = reasoning_result[field]  # SOBRESCREVE SEMPRE!
                         merged_count += 1
-                        print(f"🎯 MERGED: {field} ← reasoning_result | value={reasoning_result[field]}")
+                        _dbg(f"🎯 MERGED: {field} ← reasoning_result | value={reasoning_result[field]}")
                     else:
-                        print(f"    ❌ {field} NOT in reasoning_result")
+                        _dbg(f"    ❌ {field} NOT in reasoning_result")
                 
-                print(f"\n🎯 Total merged from reasoning_result: {merged_count} fields")
+                _dbg(f"\n🎯 Total merged from reasoning_result: {merged_count} fields")
             else:
                 print("🎯 reasoning_result NOT found or not dict")
                 # v3.90: TRACE - Por quê reasoning_result não está disponível?
-                print("\n🚨 v3.90 TRACE: DEBUGGING - Por quê reasoning_result não está disponível?")
+                _dbg("\n🚨 v3.90 TRACE: DEBUGGING - Por quê reasoning_result não está disponível?")
                 print(f"   locals() keys: {list(locals().keys())}")
                 if 'reasoning_result' in locals():
                     print(f"   reasoning_result type: {type(reasoning_result)}")
@@ -24517,7 +24676,7 @@ class CompleteNexusBrain:
                 for field in mcts_fields:
                     if field in src and field not in result:
                         result[field] = src[field]
-                        print(f"🎯 MERGED: {field} ← {src_name} (secondary)")
+                        _dbg(f"🎯 MERGED: {field} ← {src_name} (secondary)")
             
             # Safety net ABSOLUTA (TEST 4 nunca mais falha)
             for field in ["mcts_plan", "mcts_expected_reward", "mcts_success_probability"]:
@@ -24850,8 +25009,42 @@ class CompleteNexusBrain:
 # ═══════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
+    if not __debug__:
+        raise SystemExit("A suíte integrada verifica com assert; execute sem -O/PYTHONOPTIMIZE.")
+
+    class _SuiteTally:
+        """Espelha o stdout e contabiliza os marcadores dos testes embutidos (somente leitura)."""
+
+        def __init__(self, stream):
+            self._stream = stream
+            self._buffer = ""
+            self.passed = set()
+            self.skipped = set()
+
+        def write(self, text):
+            self._stream.write(text)
+            self._buffer += text
+            *complete, self._buffer = self._buffer.split("\n")
+            for line in complete:
+                found = re.search(r"TEST (\d+) PASSED", line)
+                if found:
+                    self.passed.add(int(found.group(1)))
+                skipped = re.match(r"\s*TEST (\d+): .*(?:DISABLED|not available)", line)
+                if skipped:
+                    self.skipped.add(int(skipped.group(1)))
+            return len(text)
+
+        def flush(self):
+            self._stream.flush()
+
+        def __getattr__(self, name):
+            return getattr(self._stream, name)
+
+    _tally = _SuiteTally(sys.stdout)
+    sys.stdout = _tally
+
     print("\n" + "="*70)
-    print("🧪 NEXUS CONSOLIDATED v3.28 EMBODIED COGNITION - DEMONSTRATION")
+    print("🧪 NEXUS CONSTITUTIONAL - INTEGRATED EMBEDDED SUITE (functional demonstration)")
     print("="*70 + "\n")
 
     brain = CompleteNexusBrain(enable_router=True, enable_rsi=True, enable_tom=True, 
@@ -25562,7 +25755,7 @@ if __name__ == "__main__":
     # ── TEST 12: Consciousness - Self-Awareness (POST 17 NEW!) ────────────
     if brain.enable_consciousness and brain.consciousness:
         print("="*70)
-        print("TEST 12: Consciousness - Self-Awareness (POST 17 NEW!)")
+        print("TEST 12: Consciousness-labelled module - functional self-monitoring checks (POST 17)")
         print("="*70)
 
         consciousness = brain.consciousness
@@ -25642,7 +25835,7 @@ if __name__ == "__main__":
         assert len(self_knowledge['capabilities']) > 0, "TEST 12 FAILED: should know capabilities"
         assert "Understand consciousness" in goals, "TEST 12 FAILED: goal not set"
         assert eval_hot.metacognitive_type == "evaluation", "TEST 12 FAILED: wrong HOT type"
-        print("\n✅ TEST 12 PASSED - Consciousness system is self-aware!\n")
+        print("\n✅ TEST 12 PASSED - functional self-monitoring checks passed (no claim of consciousness)\n")
     else:
         print("="*70)
         print("TEST 12: Consciousness DISABLED (not enabled)")
@@ -26685,10 +26878,18 @@ if __name__ == "__main__":
         print("="*70)
         print("⚠️  Embodied Cognition not active in this configuration\n")
 
-    print("="*70)
-    print("✅ ALL TESTS PASSED - SYSTEM 100% FUNCTIONAL")
-    print("="*70)
-    print("\n🎉💪 NEXUS CONSTITUTIONAL v3.30 - NARRATIVE IDENTITY EDITION 💪🎉")
-    print("36/55 Modules (65.5%) - 🎉🎉 65% MILESTONE! PARCERIA SIMBIÓTICA! 🎉🎉")
-    print("CentralRouter + EthicsGuard + RSI + ToM + ToolUse + Emotion + Consciousness + Empathy + Curiosity + SocialLearning + Creativity + Multimodal + Language + Metacognition + Attention + WorkingMemory + ExecutiveFunctions + ContextualMemory + SemanticNetworks + AnalogicalReasoning + MentalSimulation + EpisodicFutureThinking + PredictiveCoding + EmbodiedCognition Active")
-    print("="*70 + "\n")
+    sys.stdout = _tally._stream
+    _source = globals().get("__file__")
+    _expected = (
+        {int(n) for n in re.findall(r"TEST (\d+) PASSED", open(_source, encoding="utf-8").read())}
+        if _source else set()
+    )
+    _missing = sorted(_expected - _tally.passed - _tally.skipped)
+    print("=" * 70)
+    print(f"EMBEDDED CHECKS: {len(_tally.passed)} passed, {len(_tally.skipped)} skipped (module disabled or optional dependency missing)")
+    if _tally.skipped:
+        print(f"Skipped checks: {sorted(_tally.skipped)}")
+    print("Scope: functional checks of this prototype; not evidence of AGI, consciousness or production readiness.")
+    print("=" * 70 + "\n")
+    if _missing:
+        raise SystemExit(f"Embedded checks neither passed nor skipped: {_missing}")

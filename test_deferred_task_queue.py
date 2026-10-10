@@ -8,7 +8,7 @@ from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
 class DeferredTaskQueueTests(unittest.TestCase):
     def test_priority_order(self):
         queue = DeferredTaskQueue()
-        low = queue.enqueue("low", priority=1)
+        queue.enqueue("low", priority=1)
         high = queue.enqueue("high", priority=10)
         first = queue.recheck_and_pop(False)
         self.assertEqual(first.task_id, high.task_id)

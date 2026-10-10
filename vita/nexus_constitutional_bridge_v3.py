@@ -3,6 +3,7 @@ import os
 import sqlite3
 import threading
 import time
+import weakref
 import numpy as np
 from typing import Dict, List, Optional, Any
 
@@ -22,6 +23,7 @@ class NexusConstitutionalBridge:
         self.reprocessing_telemetry: List[dict] = []
         self.audit_db_path = audit_db_path or os.environ.get("NEXUS_AUDIT_DB", "nexus_audit.sqlite3")
         self._audit_db = sqlite3.connect(self.audit_db_path, check_same_thread=False)
+        self._audit_db_finalizer = weakref.finalize(self, self._audit_db.close)
         self._audit_db_lock = threading.RLock()
         with self._audit_db_lock:
             self._audit_db.execute("PRAGMA busy_timeout = 5000")
@@ -32,6 +34,17 @@ class NexusConstitutionalBridge:
             "discard_rate": 0.10,
             "avg_latency_ms": 1000.0,
         }
+
+    def close(self) -> None:
+        """Fecha a conexão de auditoria (idempotente); evita ResourceWarning no Python >= 3.13."""
+        with self._audit_db_lock:
+            self._audit_db_finalizer()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        self.close()
 
     def record_reprocessing_telemetry(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
         """Registra métricas do fluxo adiado e produz alertas operacionais determinísticos."""
@@ -203,7 +216,7 @@ class NexusConstitutionalBridge:
         all_inst = fed._all_instances()
 
         # Valores padrão (Fase 50 defaults)
-        avg_fit = 0.0; avg_acc = 0.0; avg_rules = 0.0; avg_mcs = 0.0
+        avg_fit = 0.0; avg_acc = 0.0; avg_mcs = 0.0
         total_ltm = 0; total_coll = 0; avg_creat = 0.0; avg_anomaly = 0.0
         avg_rd_u_var = 0.0; avg_rd_u_mean = 0.0; lang_alignment = 0.0
         gw_active = False; shared_symbols = 0; stm_total = 0; sleep_cycles = 0
@@ -214,7 +227,6 @@ class NexusConstitutionalBridge:
         if all_inst:
             avg_fit = float(np.mean([inst.fitness for inst in all_inst]))
             avg_acc = float(np.mean([inst.predictor.recent_accuracy for inst in all_inst]))
-            avg_rules = float(np.mean([inst.rules.n_rules() for inst in all_inst]))
             avg_mcs = float(np.mean([inst.meta_cognition for inst in all_inst]))
             total_ltm = sum(inst.ltm.size for inst in all_inst)
             total_coll = sum(len(inst.ltm.collective_episodes()) for inst in all_inst)
