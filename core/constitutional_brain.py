@@ -26880,11 +26880,23 @@ if __name__ == "__main__":
 
     sys.stdout = _tally._stream
     _source = globals().get("__file__")
-    _expected = (
-        {int(n) for n in re.findall(r"TEST (\d+) PASSED", open(_source, encoding="utf-8").read())}
-        if _source else set()
-    )
+    _expected = set()
+    if _source:
+        with open(_source, encoding="utf-8") as _source_file:
+            _expected = {int(n) for n in re.findall(r"TEST (\d+) PASSED", _source_file.read())}
     _missing = sorted(_expected - _tally.passed - _tally.skipped)
+    _summary_path = os.environ.get("NEXUS_INTEGRATED_SUMMARY")
+    if _summary_path:  # resumo legível por máquina (lido por tools/state_manifest.py)
+        with open(_summary_path, "w", encoding="utf-8") as _summary_file:
+            json.dump({
+                "scope": "embedded checks of core/constitutional_brain.py (integrated suite)",
+                "expected": sorted(_expected),
+                "passed": sorted(_tally.passed),
+                "skipped": sorted(_tally.skipped),
+                "missing": _missing,
+                "result": "failed" if _missing else "passed",
+            }, _summary_file, indent=2)
+            _summary_file.write("\n")
     print("=" * 70)
     print(f"EMBEDDED CHECKS: {len(_tally.passed)} passed, {len(_tally.skipped)} skipped (module disabled or optional dependency missing)")
     if _tally.skipped:

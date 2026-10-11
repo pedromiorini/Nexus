@@ -8,6 +8,7 @@ import ast
 import contextlib
 import gc
 import io
+import json
 import os
 import sqlite3
 import subprocess
@@ -106,6 +107,30 @@ class IntegratedSuiteGuardTests(unittest.TestCase):
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("PYTHONOPTIMIZE", completed.stderr + completed.stdout)
         self.assertNotIn("PASSED", completed.stdout)
+
+
+class IntegratedSuiteRunTests(unittest.TestCase):
+    def test_integrated_suite_runs_clean_in_dev_mode_and_writes_a_summary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            summary_path = Path(directory) / "summary.json"
+            completed = subprocess.run(
+                [sys.executable, "-X", "dev", "-W", "error", str(ROOT / "core" / "constitutional_brain.py")],
+                cwd=ROOT,
+                env={**os.environ, "PYTHONPATH": str(ROOT), "NEXUS_AUDIT_DB": str(Path(directory) / "audit.sqlite3"),
+                     "NEXUS_INTEGRATED_SUMMARY": str(summary_path)},
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr[-2000:])
+            # ResourceWarning em __del__/encerramento não muda o código de saída: verificar o texto.
+            self.assertNotIn("ResourceWarning", completed.stderr)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        self.assertEqual(summary["result"], "passed")
+        self.assertEqual(summary["missing"], [])
+        self.assertEqual(set(summary["passed"]) | set(summary["skipped"]), set(summary["expected"]))
+        self.assertGreaterEqual(len(summary["passed"]), 29)
+        self.assertIn("EMBEDDED CHECKS", completed.stdout)
 
 
 class StaticHygieneTests(unittest.TestCase):
