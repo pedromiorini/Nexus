@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 169
+tests: 177
 bandit_low: 131
 -->
 
@@ -28,8 +28,8 @@ Conflitos não devem ser resolvidos silenciosamente.
 - Branch: `main`.
 - Commit local/remoto: `HEAD` — o SHA exato é resolvido pelo manifesto do CI desta execução.
 - CI do mesmo commit: o run associado ao manifesto, com sucesso; o artefato `nexus-state-manifest` foi gerado após os gates.
-- Suíte atual: **169 testes**, todos passando no gate.
-- Mutation testing direcionado: **10/10 mutações mortas**.
+- Suíte atual: **177 testes** (`unittest`), todos passando no gate; os checks embutidos da suíte integrada são reportados à parte.
+- Mutation testing direcionado: **28/28 mutações mortas** (28 mutantes escolhidos; o score vale só para eles).
 - Bandit após o hardening do B607: **131 achados LOW**, sem MEDIUM; a triagem classifica 16 B311, 111 B101 e 4 subprocessos controlados, sem `manual_review` residual.
 - Auditoria AST: 0 funções somente com `pass`, 0 `NotImplementedError`, 61 retornos constantes simples.
 - Os números de 105 testes/run `37258732531` e 86 testes/run `37097334156` permanecem apenas como histórico de marcos anteriores.

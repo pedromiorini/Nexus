@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 169
+tests: 177
 bandit_low: 131
 -->
 
@@ -27,7 +27,7 @@ bandit_low: 131
 - `tools/diagnostics_dashboard.py`: dashboard CLI determinístico que valida snapshots antes de renderizar métricas observáveis.
 - `tools/security_triage.py` e `SECURITY_TRIAGE.md`: inventário conservador dos achados Bandit, sem supressão automática.
 - `test_memory_sql_contract.py`: teste adversarial para a fronteira SQL do fallback parametrizado da memória.
-- `tools/targeted_mutation.py`: mutation testing direcionado para fila, Vita e schema.
+- `tools/targeted_mutation.py`: mutation testing direcionado (28 mutantes escolhidos) para fila, Vita, guard de VRAM, log imutável e detector de jailbreak.
 - `core/deferred_task_queue.py`: snapshot versionado `nexus.deferred_task_queue.v1`, exportação JSON/objeto, restauração atômica, validação de tipos/capacidade/IDs e opção `replace=True`.
 - `test_deferred_task_snapshot.py`: contrato de round-trip, ordem, atomicidade, limites, tipos inválidos e ausência de execução durante restauração.
 - Auditoria de realidade em `tools/reality_audit.py`.
@@ -69,9 +69,9 @@ bandit_low: 131
 
 ## Gates locais desta rodada
 
-- **169 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails/segurança/higiene:** passaram na suíte integral local; os contratos MCTS, memória episódica e Vita cobrem espaço de ações vazio, concorrência na mesma conexão e concorrência entre conexões SQLite.
+- **177 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails/segurança/higiene:** passaram na suíte integral local; os contratos MCTS, memória episódica e Vita cobrem espaço de ações vazio, concorrência na mesma conexão e concorrência entre conexões SQLite.
 - **Cobertura branch (testes + suíte integrada):** fila **98%** (piso 90%); guard de VRAM **94%** (piso 90%); bridge Vita **74%** (piso 70%); `core/constitutional_brain.py` **66%** (piso 62%; só com testes unitários eram 23%).
-- **Mutation testing:** **28/28 mutações mortas, 0 sobreviventes, 100%** (fila, bridge, guard de VRAM, log imutável e detector de jailbreak), aplicadas em cópia temporária do repositório.
+- **Mutation testing:** **28/28 mutações mortas, 0 sobreviventes, 100%** (fila, bridge, guard de VRAM, log imutável e detector de jailbreak), aplicadas em cópia temporária do repositório. O score vale só para esses 28 mutantes; não é mutation testing do núcleo.
 - **Bandit:** **131 achados LOW** após o hardening do B607 em `tools/state_manifest.py`; a triagem classifica 16 B311 como `simulation_only_random_review`, 111 B101 como `embedded_demo_assert_review` e 4 subprocessos como `controlled_subprocess_review`, sem `manual_review` residual. Isso não é clearance de segurança.
 - **Auditoria de realidade:** executada sem elevar claims cognitivos.
 - **Dashboard:** snapshot válido renderizado; payload inválido rejeitado pelos testes.
@@ -127,11 +127,13 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o contrato de média de sinergia junto com a suíte expandida.
 - executar o contrato de ações do MCTS junto com a suíte expandida.
 - executar o contrato de consistência do estado e o gate contra o manifesto da mesma execução.
-- instalar dependências com versão fixa (`requirements-dev.txt`) e falhar em ruff (F, E9, B904, B006), actionlint ou zizmor.
+- instalar dependências com versão fixa (`requirements-dev.txt`) e falhar em ruff (F, E9, B904, B006), actionlint (binário oficial 1.7.12 verificado por SHA-256 no workflow; o Dependabot não o atualiza) ou zizmor.
 - regenerar os relatórios de realidade e falhar se `AUDIT_REALITY_REPORT.md`/`audit_reality.json` versionados divergirem; conferir `SECURITY_TRIAGE.md` com `--check`.
 - medir uma única cobertura (testes + suíte integrada) com pisos para fila, guard de VRAM, bridge e núcleo.
 - rodar a suíte e a suíte integrada em Python 3.12 e 3.13 com `-X dev -W error` (job `python-compat`).
 - falhar se o diretório de trabalho ganhar bancos SQLite ou se arquivos versionados mudarem durante a execução.
+- gravar o resumo da suíte integrada (`NEXUS_INTEGRATED_SUMMARY`) e reportá-lo no manifesto em `verification.integrated`, separado de `verification.tests` (que conta só o `unittest`).
+- falhar o job `python-compat` se `ResourceWarning` aparecer na saída (ele não altera o código de saída).
 
 O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; as actions estão fixadas por SHA e o runner em `ubuntu-24.04`.
 
@@ -153,10 +155,13 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 - O log imutável detecta adulteração e remoção no meio da cadeia; truncar o final exige ancorar o `head` fora do banco.
 - Nomes de classe `Real*` e com termos de consciência/emoção foram mantidos (renomear quebraria a API); os textos que afirmavam capacidade foram removidos e o auditor passou a escanear o código.
 - `think()` e `_wire_dependencies` seguem com complexidade ciclomática muito alta; o fatiamento por fase é a próxima refatoração estrutural.
+- Os trechos (needles) do gate de mutação são texto exato do código: depois de uma refatoração, um mutante `not_applied` significa que o trecho mudou e o mutante deve ser reescrito, não ignorado.
+- `tests` no manifesto e nos documentos conta apenas a suíte `unittest`; os checks embutidos da suíte integrada (29 + 1 condicional) são reportados à parte.
+- O auditor de realidade separa padrões proibidos (gate zero), frases fortes de capacidade (inventário com limite que só diminui), terminologia científica (informativo) e identificadores `Real*` (neutro); zero padrões proibidos não significa ausência de linguagem de capacidade (restam frases de ênfase como "REAL <Capacidade>").
 
 ## Histórico de checkpoints
 
-- **2026-10-08 — 169 testes:** auditoria de código e hardening (D-013 a D-015); o run do CI correspondente é registrado pelo manifesto após o merge.
+- **2026-10-08 — 177 testes:** auditoria de código, hardening e revisão independente (D-013 a D-016); o run do CI correspondente é registrado pelo manifesto após o merge.
 - **2026-10-05 — 105 testes:** run `37258732531`, marco anterior preservado para proveniência.
 - **Bootstrap — 86 testes:** run `37097334156`, snapshot histórico; não representa o estado atual.
 

@@ -110,7 +110,7 @@
 ## D-014 — Supply chain do CI e relatórios sem deriva
 
 - **Decisão:** actions fixadas por SHA, dependências com versão fixa em `requirements-dev.txt`, Dependabot semanal, `persist-credentials: false`, zizmor e actionlint como gate, relatórios de realidade conferidos por `git diff`, triagem conferida por `--check` e agrupada por escopo (sem números de linha), cobertura única com pisos e job de compatibilidade Python 3.12/3.13.
-- **Contexto:** tags móveis e `pip install` sem versões; relatórios versionados defasados (26.685 contra 26.697 linhas) e triagem presa a números de linha que mudavam a cada edição.
+- **Contexto:** tags móveis e `pip install` sem versões; relatórios versionados defasados (no commit-base, 26.685 linhas no relatório contra 26.697 no código; o estado atual é o do relatório regenerado) e triagem presa a números de linha que mudavam a cada edição.
 - **Motivo:** reprodutibilidade e detecção de deriva sem fricção por deslocamento de linhas.
 - **Evidência:** workflow validado por actionlint e zizmor sem achados; `test_security_triage.py` e `test_reality_audit.py`.
 - **Limitação:** proteção de branch, alertas de segurança e relato privado dependem de configurações do GitHub; zizmor roda offline e não consulta advisories.
@@ -123,4 +123,13 @@
 - **Motivo:** tornar a saída verificável e coerente com a postura conservadora do projeto.
 - **Evidência:** `test_core_hygiene_contract.py` e `test_reality_audit.py`.
 - **Limitação:** nomes de classe `Real*` e com termos de consciência permanecem (renomear quebra a API); o gate só captura as frases listadas.
+- **Reversibilidade:** fácil.
+
+## D-016 — Revisão independente: fechamento de arquivo, alegações por nível e suíte integrada no manifesto
+
+- **Decisão:** o arquivo-fonte lido pela suíte integrada passa a ser fechado com `with`; o job `python-compat` falha se `ResourceWarning` aparecer na saída; o auditor de realidade ganha um inventário por nível (frase forte de capacidade com limite que só diminui, terminologia científica, identificador `Real*`); a suíte integrada grava `NEXUS_INTEGRATED_SUMMARY` e o manifesto reporta `verification.integrated` separado de `verification.tests`.
+- **Contexto:** uma revisão independente mostrou `ResourceWarning: unclosed file` no encerramento da suíte integrada (o código de saída continuava 0), que "0 alegações no código" cobria só os padrões listados (restavam 51 frases de ênfase como "REAL Multimodal Perception") e que o número de testes não incluía os checks embutidos.
+- **Motivo:** evitar que uma afirmação estreita ("0 avisos", "0 alegações", "N testes") pareça global.
+- **Evidência:** `test_core_hygiene_contract.py` (falha se o `with` for removido), `test_reality_audit.py`, `test_state_manifest.py`, `test_state_consistency_audit.py`.
+- **Limitação:** as frases de ênfase permanecem (a reescrita fica para o plano de renomeação de classes); o inventário só impede que cresçam.
 - **Reversibilidade:** fácil.

@@ -78,9 +78,12 @@ jobs:
           retention-days: 14
 
       - name: Run all tests with coverage (contract suite, then integrated suite)
+        env:
+          NEXUS_INTEGRATED_SUMMARY: integrated-summary.json
         run: |
           python -W error -m coverage run -m unittest discover -v -p 'test_*.py'
           python -W error -m coverage run -a core/constitutional_brain.py
+          test -s integrated-summary.json
 
       - name: Enforce coverage gates
         run: |
@@ -163,7 +166,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nexus-state-manifest
-          path: STATE_MANIFEST.json
+          path: |
+            STATE_MANIFEST.json
+            integrated-summary.json
           if-no-files-found: error
           retention-days: 14
 
@@ -211,7 +216,13 @@ jobs:
         run: echo "NEXUS_AUDIT_DB=$RUNNER_TEMP/nexus_audit.sqlite3" >> "$GITHUB_ENV"
 
       - name: Run tests with development-mode checks
-        run: python -X dev -W error -m unittest discover -p 'test_*.py'
+        run: |
+          python -X dev -W error -m unittest discover -p 'test_*.py' 2> dev-tests.log || { cat dev-tests.log; exit 1; }
+          cat dev-tests.log
+          if grep -q 'ResourceWarning' dev-tests.log; then echo '::error::ResourceWarning detected in the test run'; exit 1; fi
 
       - name: Run integrated suite with development-mode checks
-        run: python -X dev -W error core/constitutional_brain.py
+        run: |
+          python -X dev -W error core/constitutional_brain.py > dev-integrated.log 2>&1 || { cat dev-integrated.log; exit 1; }
+          tail -8 dev-integrated.log
+          if grep -q 'ResourceWarning' dev-integrated.log; then echo '::error::ResourceWarning detected in the integrated suite'; exit 1; fi

@@ -3,11 +3,11 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 169
+tests: 177
 bandit_low: 131
 -->
 
-Estado de referência operacional: use o artefato `nexus-state-manifest` do CI. O commit e o run exatos são resolvidos pelo manifesto associado ao `HEAD`, com 169 testes.
+Estado de referência operacional: use o artefato `nexus-state-manifest` do CI. O commit e o run exatos são resolvidos pelo manifesto associado ao `HEAD`, com 177 testes.
 Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e não devem ser usados como estado atual.
 
 | Área | Estado | Evidência verificável | Limitação |
@@ -28,6 +28,9 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Detector de jailbreak | parcial | heurística EN/PT com normalização Unicode, corpus malicioso/benigno, propriedades e mutantes; falsos positivos por substring removidos | primeira camada por palavras-chave; não é classificador semântico e não cobre paráfrases inéditas ou outros idiomas |
 | Log imutável | verificado no contrato | cadeia por hash, triggers append-only, `verify_chain()`, retomada após reabrir e múltiplos escritores | truncar o fim do log só é detectável com o `head` ancorado fora do banco |
 | Supply chain do CI | parcial | actions fixadas por SHA, dependências com versão fixa, Dependabot, zizmor e actionlint sem achados | proteção de branch, alertas e relato privado dependem de configuração do repositório |
+| Suíte integrada (checks embutidos) | verificação funcional | marcadores contados; resumo gravado e reportado no manifesto separado dos testes unittest; falha se um marcador do fonte não executar | são checks do próprio projeto, não testes independentes |
+| Mutation testing | parcial | 28 mutantes escolhidos (fila, bridge, VRAM, log, detector), todos mortos, em cópia isolada | o score vale só para esses mutantes; não é mutation testing do núcleo |
+| Alegações no código | parcial | padrões proibidos (gate zero) e inventário por nível com limite que só diminui | ainda há linguagem de ênfase ("REAL <Capacidade>"); a reescrita fica junto do plano de renomeação de classes |
 | CI | verificado | run associado ao `HEAD` com sucesso; o manifesto foi retido como artefato | qualquer novo commit exige leitura do manifesto correspondente |
 | Autonomia geral | não demonstrada | nenhuma evidência válida no repositório | não fazer esse claim |
 | AGI/ASI/consciência | não demonstradas | explicitamente negadas pela documentação | nomes e banners não contam como evidência |

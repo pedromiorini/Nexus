@@ -23,4 +23,5 @@ test-summary.json
 bandit-report.json
 security-triage-generated.md
 implementation-gaps.json
+integrated-summary.json
 targeted_mutation_report.json

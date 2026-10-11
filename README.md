@@ -16,7 +16,7 @@ O Nexus Constitutional é um **protótipo experimental de arquitetura neuro-simb
 | Fila de tarefas adiadas | 16 testes unitários e de integração | Cobre contratos da fila e reprocessamento, não carga distribuída de produção |
 | Diagnóstico de recuperação | Exportação versionada `nexus.recovery.diagnostics.v1` e validador formal | O schema garante estrutura, não a correção de decisões cognitivas |
 | Auditoria Vita | Eventos, transições e métricas persistidos em SQLite | A análise é local e limitada ao histórico disponível |
-| CI | Workflow executa lint (ruff, actionlint, zizmor), compilação, testes de contrato e regressão, suíte integrada, cobertura com pisos, mutation testing (28 mutantes) e auditorias de segurança e de realidade, com ações fixadas por SHA; um segundo job roda Python 3.12 e 3.13 | A execução depende do ambiente e das dependências instaladas no runner |
+| CI | Workflow executa lint (ruff, actionlint, zizmor), compilação, testes de contrato e regressão, suíte integrada, cobertura com pisos, mutation testing (28 mutantes escolhidos; o score vale só para eles) e auditorias de segurança e de realidade, com ações fixadas por SHA; um segundo job roda Python 3.12 e 3.13 | A execução depende do ambiente e das dependências instaladas no runner |
 | Cobertura | Relatório de branches (testes + suíte integrada) é retido por 14 dias; pisos: fila 90%, guard de VRAM 90%, bridge Vita 70%, núcleo 62% | Cobertura não substitui testes de propriedades, segurança ou mutation testing |
 
 ## Componentes principais
@@ -107,6 +107,8 @@ As próximas prioridades são elevar a cobertura dos componentes críticos, adic
 Execute `python3 tools/reality_audit.py` para gerar `AUDIT_REALITY_REPORT.md` e `audit_reality.json`. O auditor compara alegações documentais, caminhos referenciados, estrutura AST, funções somente com `pass`, retornos constantes, testes embutidos e dependências opcionais. Ele é deliberadamente conservador: sinaliza alegações que precisam de evidência, mas não tenta concluir capacidades cognitivas a partir de nomes ou banners.
 
 O CI regenera esses relatórios e falha se os arquivos versionados divergirem (`git diff`): depois de editar o núcleo, rode `python3 tools/reality_audit.py` e faça commit de `AUDIT_REALITY_REPORT.md` e `audit_reality.json`. A triagem `SECURITY_TRIAGE.md` agrupa os achados por escopo (sem números de linha) e é conferida por `tools/security_triage.py --check`.
+
+O auditor separa padrões proibidos no código (gate: zero), frases fortes de capacidade ("REAL <Capacidade>", "REAL e FUNCIONAL"; inventário com limite que só diminui, em `test_reality_audit.py`), terminologia científica (informativa) e identificadores `Real*` (neutro): zero padrões proibidos não significa ausência de linguagem de capacidade. Com `NEXUS_INTEGRATED_SUMMARY=arquivo.json` a suíte integrada grava um resumo legível por máquina, que o manifesto reporta em `verification.integrated`, separado de `verification.tests` (só `unittest`).
 
 ## Manifesto factual e conhecimento
 
