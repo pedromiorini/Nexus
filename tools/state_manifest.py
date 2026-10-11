@@ -56,6 +56,32 @@ def _test_summary() -> dict[str, Any]:
         return {"status": "not_generated"}
 
 
+def _integrated_summary() -> dict[str, Any]:
+    """Resultado dos checks embutidos de core/constitutional_brain.py (suíte integrada).
+
+    É um mecanismo de verificação diferente do ``unittest discover``: os números de
+    ``verification.tests`` NÃO incluem estes checks. O arquivo é gravado pela suíte integrada
+    quando NEXUS_INTEGRATED_SUMMARY aponta para ele.
+    """
+    path = ROOT / "integrated-summary.json"
+    try:
+        summary = json.loads(path.read_text(encoding="utf-8"))
+        required = ("expected", "passed", "skipped", "missing", "result")
+        if not all(key in summary for key in required):
+            return {"status": "invalid_summary"}
+        return {
+            "status": "generated",
+            "scope": summary.get("scope", "embedded checks"),
+            "discovered_static": len(summary["expected"]),
+            "passed": len(summary["passed"]),
+            "skipped": len(summary["skipped"]),
+            "failed": len(summary["missing"]),
+            "result": summary["result"],
+        }
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {"status": "not_generated"}
+
+
 def _document_commits() -> dict[str, str]:
     names = [
         "NEXUS_CONSTITUTION.md", "NEXUS_KNOWLEDGE.md", "NEXUS_ARCHITECTURE.md",
@@ -109,6 +135,7 @@ def _ast_summary() -> dict[str, Any]:
             "functions": evidence.get("functions"),
             "constant_returns": len(evidence.get("constant_return_functions", [])),
             "pass_only": len(evidence.get("pass_only_functions", [])),
+            "strong_capability_claims": reality.get("code_claim_inventory", {}).get("by_level", {}).get("strong_capability_claim"),
         }
     except (OSError, json.JSONDecodeError, KeyError, TypeError):
         pass
@@ -127,6 +154,7 @@ def build_manifest(test_result: str = "not_run", test_command: str | None = None
     run_id = os.environ.get("GITHUB_RUN_ID")
     test_summary = _test_summary()
     tests = {
+        "scope": "unittest discover (test_*.py); embedded checks are under verification.integrated",
         "discovered_static": _test_count(),
         **test_summary,
         "command": test_command or "not_run",
@@ -138,6 +166,7 @@ def build_manifest(test_result: str = "not_run", test_command: str | None = None
         "repository": {"branch": branch, "commit": commit, "worktree": "clean_required"},
         "verification": {
             "tests": tests,
+            "integrated": _integrated_summary(),
             "ast": _ast_summary(),
         },
         "security": {"bandit": _bandit_summary()},

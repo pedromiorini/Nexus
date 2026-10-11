@@ -109,10 +109,19 @@ def audit(manifest_path: Path, root: Path = ROOT) -> dict[str, Any]:
                     })
         except (OSError, ValueError) as exc:
             errors.append(str(exc))
+    integrated = manifest.get("verification", {}).get("integrated")
+    if isinstance(integrated, dict) and integrated.get("status") == "generated" and integrated.get("result") != "passed":
+        conflicts.append({
+            "document": "STATE_MANIFEST.json",
+            "field": "integrated",
+            "document_value": "passed",
+            "manifest_value": str(integrated.get("result")),
+        })
     status = "pass" if not conflicts and not errors else "fail"
     return {
         "schema_version": 1,
         "status": status,
+        "integrated": integrated if isinstance(integrated, dict) else {"status": "not_generated"},
         "manifest": expected,
         "documents": documents,
         "conflicts": conflicts,

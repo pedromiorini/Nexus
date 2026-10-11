@@ -3,6 +3,7 @@ import unittest
 
 from tools.reality_audit import (
     audit_claims,
+    audit_code_claim_inventory,
     audit_code_overclaims,
     build_report,
     collect_static_evidence,
@@ -10,6 +11,10 @@ from tools.reality_audit import (
     parse_python,
     CORE,
 )
+
+# Limite do inventário de frases fortes de capacidade: só pode DIMINUIR. Ao reescrever textos de
+# ênfase ("REAL <Capacidade>", "REAL e FUNCIONAL"...), reduza este número; nunca aumente.
+STRONG_CLAIM_BASELINE = 51
 
 
 class RealityAuditTests(unittest.TestCase):
@@ -107,6 +112,34 @@ class StaticEvidenceShapeTests(unittest.TestCase):
             self.assertNotIn("line", item, "números de linha tornam o relatório instável a cada edição")
             ast.literal_eval(item["value"])
         self.assertGreater(len(evidence["dynamic_literal_return_functions"]), len(evidence["constant_return_functions"]))
+
+
+class ClaimInventoryTests(unittest.TestCase):
+    def test_levels_are_separated_and_sql_real_is_ignored(self):
+        source = (
+            'class RealMCTSPlanner:\n'
+            '    """REAL Multimodal Perception"""\n'
+            '    SQL = "score REAL NOT NULL"\n'
+            '    # REAL e FUNCIONAL\n'
+            '    # consciousness\n'
+        )
+        inventory = audit_code_claim_inventory(source)
+        self.assertEqual(
+            inventory["by_level"],
+            {"strong_capability_claim": 2, "scientific_terminology": 1, "neutral_identifier": 1},
+        )
+        labels = {item["label"] for item in inventory["items"]}
+        self.assertIn("classes com prefixo Real", labels)
+
+    def test_strong_capability_claims_do_not_grow(self):
+        total = audit_code_claim_inventory()["by_level"]["strong_capability_claim"]
+        self.assertLessEqual(total, STRONG_CLAIM_BASELINE, "novas frases fortes de capacidade foram adicionadas ao código")
+
+    def test_inventory_is_part_of_the_report_without_line_numbers(self):
+        inventory = build_report()["code_claim_inventory"]
+        self.assertEqual(set(inventory["by_level"]), {"strong_capability_claim", "scientific_terminology", "neutral_identifier"})
+        for item in inventory["items"]:
+            self.assertNotIn("line", item)
 
 
 if __name__ == "__main__":

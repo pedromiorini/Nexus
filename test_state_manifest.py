@@ -41,6 +41,34 @@ class StateManifestTests(unittest.TestCase):
             self.assertEqual(tests["failed"], 1)
             self.assertEqual(tests["result"], "failed")
 
+    def _manifest_with(self, files):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, content in files.items():
+                (root / name).write_text(content, encoding="utf-8")
+            with patch("tools.state_manifest.ROOT", root), patch("tools.state_manifest._git", return_value="fixture"), patch("tools.state_manifest._document_commits", return_value={}):
+                return build_manifest("passed")
+
+    def test_manifest_reports_integrated_suite_separately_from_unittest(self):
+        manifest = self._manifest_with({
+            "test-summary.json": '{"executed": 7, "passed": 7, "failed": 0, "skipped": 0, "result": "passed"}',
+            "integrated-summary.json": json.dumps({"scope": "embedded", "expected": [0, 1, 2, 3], "passed": [1, 2, 3], "skipped": [0], "missing": [], "result": "passed"}),
+        })
+        verification = manifest["verification"]
+        self.assertEqual(verification["tests"]["executed"], 7)
+        self.assertIn("unittest", verification["tests"]["scope"])
+        self.assertEqual(
+            verification["integrated"],
+            {"status": "generated", "scope": "embedded", "discovered_static": 4, "passed": 3, "skipped": 1, "failed": 0, "result": "passed"},
+        )
+
+    def test_missing_or_invalid_integrated_summary_is_reported_not_assumed(self):
+        cases = ((None, "not_generated"), ('{"passed": []}', "invalid_summary"), ("not json", "not_generated"))
+        for content, status in cases:
+            with self.subTest(status=status):
+                files = {} if content is None else {"integrated-summary.json": content}
+                self.assertEqual(self._manifest_with(files)["verification"]["integrated"], {"status": status})
+
 
 if __name__ == "__main__":
     unittest.main()

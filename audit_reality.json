@@ -3,7 +3,7 @@
   "scope": "conservative reality audit",
   "principle": "names, banners and demo asserts are not proof of general intelligence or production readiness",
   "static_evidence": {
-    "core_lines": 26895,
+    "core_lines": 26907,
     "classes": 268,
     "functions": 862,
     "pass_only_functions": [],
@@ -97,6 +97,81 @@
     }
   ],
   "code_claims": [],
+  "code_claim_inventory": {
+    "by_level": {
+      "strong_capability_claim": 51,
+      "scientific_terminology": 233,
+      "neutral_identifier": 63
+    },
+    "items": [
+      {
+        "level": "strong_capability_claim",
+        "label": "ênfase 'REAL <Capacidade>'",
+        "occurrences": 46,
+        "examples": [
+          "POST12: Multimodal Processing System — REAL Multimodal Perception",
+          "POST10: Theory of Mind — REAL Mental State Modeling",
+          "POST16: Tool Use — REAL External Action Capability"
+        ]
+      },
+      {
+        "level": "strong_capability_claim",
+        "label": "'REAL e FUNCIONAL'",
+        "occurrences": 3,
+        "examples": [
+          "POST4: Knowledge Graph Híbrido — REAL e FUNCIONAL",
+          "POST3: Monte Carlo Tree Search Planner — REAL e FUNCIONAL",
+          "POST12: Incremental Learner — REAL e FUNCIONAL"
+        ]
+      },
+      {
+        "level": "strong_capability_claim",
+        "label": "'100% funcional'",
+        "occurrences": 1,
+        "examples": [
+          "- MCTS 100% functional (v3.91 preserved) ✅"
+        ]
+      },
+      {
+        "level": "strong_capability_claim",
+        "label": "máquina bayesiana afirmada",
+        "occurrences": 1,
+        "examples": [
+          "print(\"🧠📊 POST 33 - RealPredictiveCodingSystem initialized (Bayesian p"
+        ]
+      },
+      {
+        "level": "scientific_terminology",
+        "label": "consciência/consciousness",
+        "occurrences": 203,
+        "examples": [
+          "• × POST17 (Consciousness): Consciência perceptual",
+          "def __init__(self, memory=None, consciousness=None):",
+          "self.consciousness = consciousness"
+        ]
+      },
+      {
+        "level": "scientific_terminology",
+        "label": "teorias nomeadas",
+        "occurrences": 30,
+        "examples": [
+          "POST10: Theory of Mind — REAL Mental State Modeling",
+          "\"\"\"Estatísticas do Theory of Mind\"\"\"",
+          "POST33: Predictive Coding System — REAL Bayesian Prediction Machine"
+        ]
+      },
+      {
+        "level": "neutral_identifier",
+        "label": "classes com prefixo Real",
+        "occurrences": 63,
+        "examples": [
+          "class RealHierarchicalMemory:",
+          "class RealKnowledgeGraph:",
+          "class RealNeuroSymbolicReasoning:"
+        ]
+      }
+    ]
+  },
   "referenced_paths": [
     {
       "path": "core/constitutional_brain.py",
@@ -184,6 +259,10 @@
     },
     {
       "path": "tools/security_triage.py",
+      "exists": true
+    },
+    {
+      "path": "test_reality_audit.py",
       "exists": true
     }
   ],

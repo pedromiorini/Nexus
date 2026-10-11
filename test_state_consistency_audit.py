@@ -77,6 +77,23 @@ class StateConsistencyAuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit(manifest, directory)
 
+    def test_failed_integrated_suite_is_a_conflict(self):
+        directory, manifest_path = self._write_fixture()
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["verification"]["integrated"] = {"status": "generated", "result": "failed", "failed": 2}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        report = audit(manifest_path, directory)
+        self.assertEqual(report["status"], "fail")
+        self.assertIn("integrated", {item["field"] for item in report["conflicts"]})
+
+    def test_passed_or_absent_integrated_summary_is_not_a_conflict(self):
+        directory, manifest_path = self._write_fixture()
+        self.assertEqual(audit(manifest_path, directory)["integrated"], {"status": "not_generated"})
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["verification"]["integrated"] = {"status": "generated", "result": "passed"}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        self.assertEqual(audit(manifest_path, directory)["status"], "pass")
+
 
 if __name__ == "__main__":
     unittest.main()

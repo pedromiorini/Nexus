@@ -31,6 +31,22 @@ CODE_OVERCLAIMS = {
     "consciência genuína afirmada": r"genuine(?:ly)?\s+(?:conscious|sentient|aware)|truly\s+(?:conscious|sentient|self-aware)",
 }
 
+# Inventário por nível (não é gate por ocorrência; o limite de "strong_capability_claim" fica em
+# test_reality_audit.py e só pode diminuir). Níveis:
+#   strong_capability_claim  ênfase de capacidade ("REAL <Capacidade>", "REAL e FUNCIONAL", "100% funcional")
+#   scientific_terminology   nomes de teorias/constructos modelados (informativo, não é alegação por si só)
+#   neutral_identifier       nomes históricos de classe (renomear exige alias de compatibilidade)
+CODE_CLAIM_LEVELS = (
+    ("strong_capability_claim", "ênfase 'REAL <Capacidade>'", r"\bREAL\s+(?=[A-Z][a-z])"),
+    ("strong_capability_claim", "'REAL e FUNCIONAL'", r"\bREAL\s+e\s+FUNCIONAL\b"),
+    ("strong_capability_claim", "'100% funcional'", r"100%\s+(?:functional|funcional)"),
+    ("strong_capability_claim", "máquina bayesiana afirmada", r"Bayesian prediction machine"),
+    ("scientific_terminology", "consciência/consciousness", r"(?i)\b(?:consciousness|consci[êe]ncia)\b"),
+    ("scientific_terminology", "teorias nomeadas", r"\b(?:Global Workspace|Higher[- ]Order Thought|Predictive Coding|Integrated Information|Theory of Mind)\b"),
+    ("neutral_identifier", "classes com prefixo Real", r"\bclass\s+Real[A-Z]\w*"),
+)
+CLAIM_LEVELS = ("strong_capability_claim", "scientific_terminology", "neutral_identifier")
+
 # Negação na mesma sentença que antecede a menção ("não reivindica", "não constituem prova de",
 # "sem reivindicar", "without claiming"...).
 NEGATION = re.compile(
@@ -143,6 +159,29 @@ def audit_code_overclaims(source: str | None = None) -> list[dict]:
     return findings
 
 
+def audit_code_claim_inventory(source: str | None = None) -> dict:
+    if source is None:
+        source = CORE.read_text(encoding="utf-8", errors="replace")
+    items = []
+    totals = {level: 0 for level in CLAIM_LEVELS}
+    for level, label, pattern in CODE_CLAIM_LEVELS:
+        matches = list(re.finditer(pattern, source))
+        if not matches:
+            continue
+        examples: list[str] = []
+        for match in matches:
+            start = source.rfind("\n", 0, match.start()) + 1
+            end = source.find("\n", match.end())
+            line = source[start:end if end != -1 else len(source)].strip()[:70]
+            if line not in examples:
+                examples.append(line)
+            if len(examples) == 3:
+                break
+        items.append({"level": level, "label": label, "occurrences": len(matches), "examples": examples})
+        totals[level] += len(matches)
+    return {"by_level": totals, "items": items}
+
+
 def referenced_paths() -> list[dict]:
     text = README.read_text(encoding="utf-8", errors="replace")
     references = re.findall(r"(?<![A-Za-z0-9_./-])([A-Za-z0-9_./-]+\.py)", text)
@@ -153,6 +192,7 @@ def build_report() -> dict:
     evidence = collect_static_evidence()
     claims = audit_claims()
     code_claims = audit_code_overclaims()
+    inventory = audit_code_claim_inventory()
     paths = referenced_paths()
     risks = []
     if any(item["status"] == "unsubstantiated_by_software_tests" for item in claims):
@@ -171,6 +211,7 @@ def build_report() -> dict:
         "static_evidence": evidence,
         "claims": claims,
         "code_claims": code_claims,
+        "code_claim_inventory": inventory,
         "referenced_paths": paths,
         "risks": risks,
         "next_actions": [
@@ -200,7 +241,11 @@ def markdown(report: dict) -> str:
     lines.append(f"| Funções somente com `pass` | {len(evidence['pass_only_functions'])} | Lacunas explícitas que exigem revisão |")
     lines.append(f"| Funções com retorno constante (estrito: só literais) | {len(evidence['constant_return_functions'])} | Possíveis heurísticas, stubs ou simplificações |")
     lines.append(f"| Funções que retornam dict/list/tuple literal com valores dinâmicos | {len(evidence['dynamic_literal_return_functions'])} | Em geral getters e estatísticas; não são stubs por si só |")
-    lines.append(f"| Alegações assertivas no código-fonte | {sum(item['occurrences'] for item in report['code_claims'])} | Deve ser zero; ver seção de alegações |")
+    lines.append(f"| Padrões proibidos de alegação no código (gate: zero) | {sum(item['occurrences'] for item in report['code_claims'])} | Cobre só as frases listadas em CODE_OVERCLAIMS; não significa ausência de linguagem de capacidade |")
+    levels = report["code_claim_inventory"]["by_level"]
+    lines.append(f"| Frases fortes de capacidade no código (inventário; só pode diminuir) | {levels['strong_capability_claim']} | Ênfase \"REAL <Capacidade>\", \"REAL e FUNCIONAL\", \"100% funcional\"; limite em test_reality_audit.py |")
+    lines.append(f"| Terminologia científica no código (informativo) | {levels['scientific_terminology']} | Nomes de constructos modelados; não são alegações por si só |")
+    lines.append(f"| Classes com prefixo Real (identificadores) | {levels['neutral_identifier']} | Nome histórico; renomear exige alias de compatibilidade |")
     lines.append(f"| Dependências opcionais sinalizadas | {len(evidence['optional_dependency_warnings'])} | Fallbacks podem alterar o comportamento |")
     lines.extend(["", "## Alegações (README e código-fonte)", ""])
     for claim in report["claims"] + report["code_claims"]:
