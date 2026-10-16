@@ -47,12 +47,12 @@ class Mutation:
 
 
 MUTATIONS = [
-    Mutation("queue_capacity_guard", "core/deferred_task_queue.py", "max_attempts < 1 or max_size < 1", "max_attempts < 0 or max_size < 1"),
+    Mutation("queue_capacity_guard", "core/deferred_task_queue.py", "max_attempts < 1", "max_attempts < 0"),
     Mutation("queue_priority_direction", "core/deferred_task_queue.py", "(-self.priority, self.created_at)", "(self.priority, self.created_at)"),
     Mutation("queue_pressure_guard", "core/deferred_task_queue.py", "if pressure_critical or not self._heap:", "if pressure_critical and not self._heap:"),
     Mutation("queue_retry_limit", "core/deferred_task_queue.py", "task.attempts >= task.max_attempts", "task.attempts > task.max_attempts"),
     Mutation("queue_success_branch", "core/deferred_task_queue.py", "if ok:\n                if self.complete(task.task_id):", "if not ok:\n                if self.complete(task.task_id):"),
-    Mutation("queue_batch_validation", "core/deferred_task_queue.py", "if max_batch < 1:", "if max_batch < 0:"),
+    Mutation("queue_batch_validation", "core/deferred_task_queue.py", "max_batch < 1", "max_batch < 0"),
     Mutation("vita_failure_threshold_boundary", "vita/nexus_constitutional_bridge_v3.py", "failure_rate >= self.reprocessing_thresholds[\"failure_rate\"]", "failure_rate > self.reprocessing_thresholds[\"failure_rate\"]"),
     Mutation("vita_audit_order", "vita/nexus_constitutional_bridge_v3.py", "reversed(rows)", "rows"),
     Mutation("schema_version_compatibility", "vita/nexus_constitutional_bridge_v3.py", "schema == self.RECOVERY_SCHEMA", "schema != self.RECOVERY_SCHEMA"),
