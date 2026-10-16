@@ -1,0 +1,30 @@
+# Python bytecode and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Test, coverage, and lint caches
+.pytest_cache/
+.hypothesis/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Local databases and logs
+*.sqlite3
+*.db
+*.log
+
+# Generated CI reports and summaries
+STATE_MANIFEST.json
+state-consistency.json
+test-summary.json
+integrated-summary.json
+bandit-report.json
+security-triage-generated.md
+implementation-gaps.json
+targeted_mutation_report.json
