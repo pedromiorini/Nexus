@@ -13,14 +13,29 @@ ROOT = Path(__file__).resolve().parent.parent
 class SummaryResult(unittest.TextTestResult):
     """Resultado unittest com contagens explícitas para consumo pelo CI."""
 
+    @staticmethod
+    def _case_id(test: object) -> int:
+        return id(getattr(test, "test_case", test))
+
     @property
     def summary(self) -> dict[str, int | str]:
+        failed_cases = {
+            self._case_id(test)
+            for test, _ in (*self.failures, *self.errors)
+        }
+        unexpected_successes = {self._case_id(test) for test in self.unexpectedSuccesses}
+        failed_cases.update(unexpected_successes)
+        skipped_cases = {self._case_id(test) for test, _ in self.skipped}
+        skipped_cases.difference_update(failed_cases)
+        failed = len(failed_cases)
+        skipped = len(skipped_cases)
         return {
             "executed": self.testsRun,
-            "passed": self.testsRun - len(self.failures) - len(self.errors) - len(self.skipped),
-            "failed": len(self.failures) + len(self.errors),
-            "skipped": len(self.skipped),
-            "result": "passed" if not self.failures and not self.errors else "failed",
+            "passed": self.testsRun - failed - skipped,
+            "failed": failed,
+            "skipped": skipped,
+            "unexpected_successes": len(unexpected_successes),
+            "result": "passed" if self.wasSuccessful() else "failed",
         }
 
 

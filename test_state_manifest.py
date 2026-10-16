@@ -31,7 +31,7 @@ class StateManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "test-summary.json").write_text(
-                '{"executed": 11, "passed": 10, "failed": 1, "skipped": 0, "result": "failed"}',
+                '{"executed": 11, "passed": 10, "failed": 1, "skipped": 0, "unexpected_successes": 1, "result": "failed"}',
                 encoding="utf-8",
             )
             with patch("tools.state_manifest.ROOT", root), patch("tools.state_manifest._git", return_value="fixture"), patch("tools.state_manifest._document_commits", return_value={}):
@@ -39,13 +39,15 @@ class StateManifestTests(unittest.TestCase):
             tests = manifest["verification"]["tests"]
             self.assertEqual(tests["executed"], 11)
             self.assertEqual(tests["failed"], 1)
+            self.assertEqual(tests["unexpected_successes"], 1)
             self.assertEqual(tests["result"], "failed")
 
     def test_manifest_rejects_inconsistent_test_summary(self):
         invalid_summaries = (
-            '{"executed": 2, "passed": 2, "failed": 1, "skipped": 0, "result": "passed"}',
-            '{"executed": true, "passed": 1, "failed": 0, "skipped": 0, "result": "passed"}',
-            '{"executed": 1, "passed": 0, "failed": 0, "skipped": 0, "result": "passed"}',
+            '{"executed": 2, "passed": 2, "failed": 1, "skipped": 0, "unexpected_successes": 0, "result": "passed"}',
+            '{"executed": true, "passed": 1, "failed": 0, "skipped": 0, "unexpected_successes": 0, "result": "passed"}',
+            '{"executed": 1, "passed": 0, "failed": 0, "skipped": 0, "unexpected_successes": 0, "result": "passed"}',
+            '{"executed": 1, "passed": 1, "failed": 0, "skipped": 0, "unexpected_successes": 1, "result": "passed"}',
         )
         for content in invalid_summaries:
             with self.subTest(content=content), tempfile.TemporaryDirectory() as directory:
