@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 246
+tests: 249
 bandit_low: 131
 -->
 
@@ -79,3 +79,14 @@ Os seis testes em `test_tool_definition_contract.py` cobrem limites inclusivos, 
 O evento é diagnóstico pós-execução, não deadline nem cancelamento. A documentação oficial de `Future.cancel()` informa que chamada em execução não é cancelada; `Process.terminate()` pode corromper pipes/queues ou tornar locks indisponíveis: https://docs.python.org/3.12/library/concurrent.futures.html e https://docs.python.org/3.12/library/multiprocessing.html. Interrupção segura segue exigindo um contrato cooperativo ou runner isolado.
 
 Os números são locais; a CI do head candidato ainda deve confirmá-los.
+
+
+## Autoauditoria da fronteira de `RealToolUse.execute_tool` — 2026-10-16
+
+Base local: `main` pós-PR #25, commit `675f5aa95416c3a92998a34dd2f905f529b90980`; branch isolada `feat/post-pr25-hardening-2026-10-16`.
+
+Antes da correção, a chamada `execute_tool("list_operations", None)` reproduziu `TypeError("argument of type 'NoneType' is not iterable")` dentro de `validate_parameters`, antes do `try` do executor; portanto a exceção escapava em vez de virar o `ToolExecutionResult` de falha previsto. A reprodução local também confirmou que um dicionário vazio continua produzindo diagnóstico de parâmetro obrigatório ausente e que a forma válida executa normalmente.
+
+A guarda inicial agora exige `isinstance(params, dict)` e registra `TOOL_PARAM_TYPE_MISMATCH` (`parameter=params`, `expected=dict`, `actual=<tipo>`), fazendo a chamada retornar `success=false`, `error="Parameter validation failed"` e sem invocar o executor. Três novos testes verificam tipos externos inválidos, dicionário incompleto e dicionário válido; um mutante que desativa a guarda é detectado.
+
+Validação local Python 3.12.3: 249/249 testes; integração 30 aprovações/1 skip FAISS; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 34/34 mortas, nenhum sobrevivente/não aplicado; Ruff, actionlint, zizmor, compileall, auditorias AST, capability benchmark e POMDP v2 passaram; Bandit 131 LOW, nenhum MEDIUM/HIGH. Os dados permanecem locais até validação oficial do head pela CI.

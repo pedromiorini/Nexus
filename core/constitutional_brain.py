@@ -3637,6 +3637,14 @@ class ToolValidator:
     def validate_parameters(self, tool: ToolDefinition, params: Dict[str, Any]) -> bool:
         """Validar parâmetros de execução"""
 
+        if not isinstance(params, dict):
+            self.log.log_event("TOOL_PARAM_TYPE_MISMATCH", {
+                "tool": tool.name,
+                "parameter": "params",
+                "expected": "dict",
+                "actual": type(params).__name__,
+            })
+            return False
         # 1. Verificar parâmetros obrigatórios
         for param_name, param_def in tool.parameters.items():
             if param_def.get("required", False) and param_name not in params:

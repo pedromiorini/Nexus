@@ -2,7 +2,8 @@
 
 As mutações são explícitas, pequenas e sempre revertidas. O objetivo é medir se os
 testes detectam alterações semânticas em pontos críticos (fila, ponte Vita, guard de
-VRAM, log imutável e detector de jailbreak), não mutar o núcleo monolítico inteiro.
+VRAM, log imutável, detector de jailbreak e fronteiras de ferramenta), não mutar o
+núcleo monolítico inteiro.
 
 Segurança operacional: as mutações são aplicadas em uma CÓPIA TEMPORÁRIA do repositório;
 a árvore de trabalho nunca é modificada (antes, um processo interrompido podia deixar
@@ -31,6 +32,7 @@ VRAM = ("test_vram_defense_guard.py",)
 LOG = ("test_immutable_log_contract.py",)
 JB = ("test_jailbreak_detector_contract.py",)
 TIMEOUT = ("test_tool_definition_contract.py",)
+TOOL_PARAMS = ("test_tool_parameter_contract.py",)
 COPY_IGNORE = shutil.ignore_patterns(
     ".git", "__pycache__", ".venv", "venv", ".hypothesis", ".ruff_cache", ".mypy_cache",
     "*.sqlite3", "*.db", ".coverage*", "coverage.xml", "targeted_mutation_report.json",
@@ -81,6 +83,13 @@ MUTATIONS = [
     Mutation('tool_timeout_reject_boolean', 'core/constitutional_brain.py', 'isinstance(timeout, bool)', 'False', tests=TIMEOUT),
     Mutation('tool_timeout_reject_non_integer', 'core/constitutional_brain.py', 'not isinstance(timeout, int)', 'False', tests=TIMEOUT),
     Mutation('tool_overrun_does_not_claim_cancellation', 'core/constitutional_brain.py', '"cancelled": False', '"cancelled": True', tests=TIMEOUT),
+    Mutation(
+        "tool_params_reject_non_dict",
+        "core/constitutional_brain.py",
+        'if not isinstance(params, dict):\n            self.log.log_event("TOOL_PARAM_TYPE_MISMATCH", {',
+        'if False:\n            self.log.log_event("TOOL_PARAM_TYPE_MISMATCH", {',
+        tests=TOOL_PARAMS,
+    ),
 ]
 
 

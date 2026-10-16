@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 246
+tests: 249
 bandit_low: 131
 -->
 
@@ -11,13 +11,13 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta rodada:** `main` pós-PR #24, commit `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`; branch isolada `feat/post-pr24-contract-hardening-2026-10-16`.
-- **Estado da revisão:** melhoria local ainda não mesclada; qualquer merge exige autorização específica do usuário. A CI oficial deve validar o head candidato.
-- **Mudança:** `ToolDefinition.timeout_seconds` agora exige inteiro não booleano em `[1, 60]` no registro e antes da execução; executores síncronos usam `time.monotonic()` para emitir `TOOL_EXECUTION_OVERRUN` ao terminar além do orçamento, por retorno ou exceção, sem alegar cancelamento.
-- **Validação local (não CI):** 246/246 testes; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 33/33 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall e auditorias AST passaram.
-- **Limite do timeout:** não há deadline rígida nem interrupção segura dos executores genéricos. `Future.cancel()` não cancela trabalho já em execução; `Process.terminate()` pode corromper IPC ou quebrar locks. Um runner isolado ou API cooperativa é uma lacuna arquitetural futura. O cache ainda limita payload estimado, não a memória global.
+- **Base desta rodada:** `main` pós-PR #25, commit `675f5aa95416c3a92998a34dd2f905f529b90980`; branch isolada `feat/post-pr25-hardening-2026-10-16`.
+- **Estado da revisão:** melhoria candidata ainda não mesclada; qualquer merge exige autorização específica do usuário. A CI oficial deve validar este head.
+- **Mudança:** `ToolValidator.validate_parameters` exige agora um `params` do tipo `dict` antes de percorrer o schema; tipos externos inválidos emitem `TOOL_PARAM_TYPE_MISMATCH` e `execute_tool` retorna falha estruturada sem chamar o executor.
+- **Validação local (não CI):** 249/249 testes; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 34/34 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall e auditorias AST passaram.
+- **Limite desta mudança:** subclasses de `dict` permanecem aceitas; conteúdo aninhado e chaves adicionais não recebem validação profunda nesta rodada. O timeout segue diagnóstico, não cancelamento; o cache limita payload estimado, não memória global.
 - **POMDP herdado:** a PR #24 foi mesclada com ambos os checks oficiais aprovados; o filtro de um passo recebe modelo explícito, sem alegar aprendizagem ou planejamento. O protocolo v1 continua inalterado e mantém `unsupported_interface` para observação parcial.
-- **Hardening herdado:** as PRs #23 e #24 foram mescladas em `main`; a PR #23 limitou `math_calculate` e isolou aliases de cache.
+- **Hardening herdado:** a PR #25 foi mesclada em `main` no commit `675f5aa95416c3a92998a34dd2f905f529b90980`, com 2 checks oficiais aprovados; a PR #23 limitou `math_calculate` e isolou aliases de cache.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
 
