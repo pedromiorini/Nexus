@@ -144,3 +144,22 @@
 - **Evidência:** `test_tool_parameter_contract.py` cobre contêineres não-dict, dicionário incompleto e execução válida; `tools/targeted_mutation.py` mata um mutante que remove a guarda.
 - **Limitação:** não valida recursivamente valores, serialização JSON ou chaves desconhecidas; esses contratos permanecem separados.
 - **Reversibilidade:** simples; nenhuma forma válida de parâmetro `dict` muda de comportamento.
+
+## D-018 — `format_json` emite apenas JSON estrito
+
+- **Decisão:** serializar `format_json` com `json.dumps(..., allow_nan=False)`; valores não finitos resultam em falha estruturada, sem conversão silenciosa para texto ou `null`.
+- **Contexto:** o padrão permissivo do encoder Python produz os tokens `NaN`, `Infinity` e `-Infinity`, que não pertencem à gramática numérica JSON.
+- **Motivo:** a ferramenta anuncia formato/validação JSON, então seu resultado textual deve ser JSON interoperável; entradas finitas mantêm exatamente a formatação anterior.
+- **Evidência:** `test_format_json_contract.py` cobre valores finitos, NaN, os dois infinitos e dados não serializáveis; a mutação que restaura `allow_nan=True` é morta.
+- **Base normativa:** [documentação Python 3.12 de `json`](https://docs.python.org/3.12/library/json.html) e [RFC 8259, §6](https://www.rfc-editor.org/rfc/rfc8259).
+- **Limitação:** a mudança não implementa validação profunda de schema nem resolve questões de interoperabilidade de números finitos fora da faixa de consumidores.
+- **Reversibilidade:** fácil; somente entradas que antes geravam tokens inválidos deixam de retornar sucesso.
+
+## D-019 — Falha de serialização da cache key é cache miss, não interrupção
+
+- **Decisão:** construir cache key apenas para ferramentas cacheáveis. Se a serialização de parâmetros falhar com `TypeError`, `ValueError`, `OverflowError` ou `RecursionError`, emitir `TOOL_CACHE_KEY_UNAVAILABLE`, ignorar lookup/store e executar o executor normalmente.
+- **Contexto:** a chave era gerada antes do `try` do executor; parâmetros não serializáveis podiam lançar ao chamador, inclusive uma extensão extra que o schema ignorava. A mesma serialização era tentada mesmo com cache desativado.
+- **Motivo:** a infraestrutura opcional de cache não deve alterar a semântica do executor nem rejeitar chaves extras que a API legada aceita; entradas não representáveis no cache simplesmente não são cacheadas.
+- **Evidência:** `test_tool_cache_key_contract.py` verifica execução válida repetida sem cache e ausência de serialização para ferramenta não cacheável; mutações que removem o bypass e a guarda são mortas.
+- **Limitação:** não restringe o custo da serialização de parâmetros muito grandes que são representáveis nem valida recursivamente os valores.
+- **Reversibilidade:** fácil; chamadas afetadas só deixam de obter cache hit/store.

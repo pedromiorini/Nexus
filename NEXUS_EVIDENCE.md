@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 249
+tests: 254
 bandit_low: 131
 -->
 
@@ -90,3 +90,19 @@ Antes da correção, a chamada `execute_tool("list_operations", None)` reproduzi
 A guarda inicial agora exige `isinstance(params, dict)` e registra `TOOL_PARAM_TYPE_MISMATCH` (`parameter=params`, `expected=dict`, `actual=<tipo>`), fazendo a chamada retornar `success=false`, `error="Parameter validation failed"` e sem invocar o executor. Três novos testes verificam tipos externos inválidos, dicionário incompleto e dicionário válido; um mutante que desativa a guarda é detectado.
 
 Validação local Python 3.12.3: 249/249 testes; integração 30 aprovações/1 skip FAISS; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 34/34 mortas, nenhum sobrevivente/não aplicado; Ruff, actionlint, zizmor, compileall, auditorias AST, capability benchmark e POMDP v2 passaram; Bandit 131 LOW, nenhum MEDIUM/HIGH. Os dados permanecem locais até validação oficial do head pela CI.
+
+## JSON estrito e falha da chave de cache — 2026-10-16
+
+Base local: `main` pós-PR #26, commit `508020d77d5705f99c76eaca4df05e8e265662f7`; branch `feat/post-pr26-tool-input-boundary-2026-10-16`.
+
+Antes da alteração, `format_json` retornava sucesso com texto contendo `NaN`, `Infinity` e `-Infinity`, pois a serialização Python usava o valor padrão permissivo de `allow_nan`. Também reproduzi `TypeError: Object of type object is not JSON serializable` escapando de `execute_tool` ao serializar a chave do cache antes do `try` do executor. O exemplo usou parâmetros válidos de `list_operations` e uma extensão extra ignorada pelo schema; uma ferramenta marcada como não cacheável também tentava construir uma chave.
+
+O formatador agora define `allow_nan=False`; os valores não finitos se tornam falhas estruturadas pelo tratamento de exceções já existente. A chave é construída somente para ferramentas cacheáveis; `TypeError`, `ValueError`, `OverflowError` ou `RecursionError` no encoder emitem `TOOL_CACHE_KEY_UNAVAILABLE`, ignoram leitura e armazenamento no cache e deixam o executor seguir. Assim, a extensão extra continua ignorada como antes e uma operação válida continua retornando seu resultado sem cache. O caso de dado não serializável enviado ao próprio `format_json` falha de forma estruturada no executor, sem exceção escapar.
+
+Os contratos `test_format_json_contract.py` e `test_tool_cache_key_contract.py` passaram após reproduzirem as falhas antes do patch. O gate direcionado adicionou um mutante para desfazer `allow_nan=False` e dois mutantes para remover o bypass/serialização condicional.
+
+Validação local em Python 3.12: 254/254 testes; suíte integrada 30 aprovados, 1 skip FAISS opcional e 0 falhas; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation testing 37/37 mortas, 0 sobreviventes ou não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST e CLIs dos benchmarks de capacidade e POMDP v2 passaram. Relatórios de realidade foram regenerados. Esta evidência é local e não substitui os checks oficiais da PR.
+
+Fundamento: a [documentação Python 3.12 de `json`](https://docs.python.org/3.12/library/json.html) descreve o padrão permissivo e o efeito estrito de `allow_nan=False`; a [RFC 8259, seção 6](https://www.rfc-editor.org/rfc/rfc8259) não permite Infinity/NaN na gramática numérica JSON. Não houve normalização silenciosa para strings ou `null`.
+
+Limites: não foi introduzida validação recursiva de schema nem rejeição de chaves desconhecidas. O bypass não limita custo de parâmetros grandes porém serializáveis, e o tamanho estimado do cache não é limite global de memória. O diagnóstico de falha de cache não é falha da ferramenta; exceções reais do executor continuam seguindo seu tratamento original.

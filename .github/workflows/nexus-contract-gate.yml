@@ -136,6 +136,16 @@ jobs:
           PYTHONPATH: .
         run: python -m unittest -v test_tool_parameter_contract.py
 
+      - name: Run strict JSON format contract tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v test_format_json_contract.py
+
+      - name: Run tool cache key boundary contract tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v test_tool_cache_key_contract.py
+
       - name: Run state consistency contract tests
         env:
           PYTHONPATH: .
