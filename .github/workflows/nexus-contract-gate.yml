@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -31,6 +33,7 @@ jobs:
           python -m py_compile \
             core/constitutional_brain.py \
             core/deferred_task_queue.py \
+            core/integrated_suite_summary.py \
             vita/nexus_constitutional_bridge_v3.py \
             test_deferred_task_queue.py \
             test_recovery_diagnostics_contract.py \
@@ -64,11 +67,13 @@ jobs:
             test_shadow_clone_reintegration_contract.py \
             test_reminiscence_bump_contract.py \
             test_state_manifest.py \
+            test_integrated_suite_summary.py \
             test_mcts_action_contract.py \
             test_state_consistency_audit.py \
             tools/test_summary.py \
             tools/diagnostics_dashboard.py \
             tools/security_triage.py \
+            tools/reality_audit.py \
             tools/embedded_assert_audit.py \
             tools/targeted_mutation.py \
             tools/implementation_gap_audit.py \
@@ -188,7 +193,10 @@ jobs:
       - name: Run integrated Nexus suite
         env:
           PYTHONPATH: .
-        run: python core/constitutional_brain.py
+          NEXUS_INTEGRATED_SUMMARY: integrated-summary.json
+        run: |
+          python core/constitutional_brain.py
+          test -s integrated-summary.json
 
       - name: Run final full test suite summary
         env:
@@ -201,6 +209,7 @@ jobs:
           name: nexus-state-manifest-inputs
           path: |
             test-summary.json
+            integrated-summary.json
             bandit-report.json
             targeted_mutation_report.json
             audit_reality.json
@@ -212,6 +221,7 @@ jobs:
         run: |
           rm -f nexus_audit.sqlite3
           rm -f test-summary.json
+          rm -f integrated-summary.json
           if find . -type f \( -name '*.sqlite3' -o -name '*.db' \) -print -quit | grep -q .; then
             echo 'Unexpected database artifact detected'
             exit 1
@@ -230,6 +240,8 @@ jobs:
     steps:
       - name: Checkout verified commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0

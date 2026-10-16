@@ -3,7 +3,7 @@
   "scope": "conservative reality audit",
   "principle": "names, banners and demo asserts are not proof of general intelligence or production readiness",
   "static_evidence": {
-    "core_lines": 26876,
+    "core_lines": 26901,
     "classes": 267,
     "functions": 851,
     "pass_only_functions": [],
@@ -300,11 +300,11 @@
       },
       {
         "name": "test_task",
-        "line": 26305,
+        "line": 26311,
         "value": "True"
       }
     ],
-    "embedded_test_markers": 30,
+    "embedded_test_markers": 31,
     "optional_dependency_warnings": [
       "psutil",
       "FAISS/SentenceTransformers"

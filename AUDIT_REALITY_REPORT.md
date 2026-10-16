@@ -4,11 +4,11 @@
 
 ## Evidência estrutural
 
-O núcleo analisado possui **26876 linhas**, **267 classes** e **851 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **59** funções com retorno constante simples e **30** marcadores de testes embutidos.
+O núcleo analisado possui **26901 linhas**, **267 classes** e **851 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **59** funções com retorno constante simples e **31** marcadores de testes embutidos.
 
 | Área | Resultado | Interpretação |
 |---|---:|---|
-| Testes embutidos marcados | 30 | Evidência de demos internas, não de capacidade geral |
+| Testes embutidos marcados | 31 | Evidência de demos internas, não de capacidade geral |
 | Funções somente com `pass` | 0 | Lacunas explícitas que exigem revisão |
 | Funções com retorno constante | 59 | Possíveis heurísticas, stubs ou simplificações |
 | Dependências opcionais sinalizadas | 2 | Fallbacks podem alterar o comportamento |

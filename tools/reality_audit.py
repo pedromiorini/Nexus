@@ -39,7 +39,7 @@ def collect_static_evidence() -> dict:
         if len(body) == 1 and isinstance(body[0], ast.Return) and isinstance(body[0].value, (ast.Constant, ast.Dict, ast.List, ast.Tuple)):
             constant_returns.append({"name": node.name, "line": node.lineno, "value": ast.unparse(body[0].value)})
     source = CORE.read_text(encoding="utf-8", errors="replace")
-    embedded_tests = len(re.findall(r"TEST \d+ PASSED", source))
+    embedded_tests = len(re.findall(r"TEST \d+(?:\.\d+)? PASSED", source))
     return {
         "core_lines": len(source.splitlines()),
         "classes": len(classes),

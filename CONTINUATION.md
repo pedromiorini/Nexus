@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 159
+tests: 169
 bandit_low: 131
 -->
 
@@ -11,12 +11,12 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Branch de trabalho:** `fix/audit-hardening-2026-10-16`, baseada em `origin/main` (`7c8a187`).
-- **Base remota sincronizada:** `origin/main` contém o gerador de manifesto e a reconciliação documental; use o artefato `nexus-state-manifest` do CI para o SHA exato verificado.
-- **Marco desta rodada:** o manifesto final agora é produzido em job posterior ao gate, com `gates_status` vinculado ao resultado concluído; o auditor exige testes aprovados, zero falhas e SHA coerente.
+- **Branch de trabalho:** `fix/audit-followup-2026-10-16`, baseada em `origin/main` (`e3aa5ec`).
+- **Base remota sincronizada:** `origin/main` já inclui as PRs #4, #5 e #6; a PR #3 permanece separada e sem alterações nesta continuidade.
+- **Marco desta rodada:** a suíte integrada gera resumo estruturado com IDs inteiros e decimais, o manifesto valida o resumo e o auditor falha se a evidência estiver ausente ou inconsistente.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
-- **Validação local desta rodada — base `7c8a187`, 2026-10-16 (não é CI):** Python 3.11.16 com o lockfile do CI e Python 3.12.3; 159 testes passaram em ambos; cobertura branch de `core/deferred_task_queue.py` 96% (gate 90%) e da ponte Vita 74% (gate 70%); mutação direcionada 10/10 mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH; auditor de consistência do manifesto passou no cenário local. `compileall`, integração do Nexus, YAML do workflow e `git diff --check` passaram. A validação oficial de cada commit deve ser lida no manifesto de CI correspondente.
+- **Validação local desta branch — 2026-10-16 (não é CI):** 169 testes unitários passaram; a suíte integrada marcou 30 aprovações e 1 skip opcional; Bandit 131 LOW, sem MEDIUM/HIGH; snapshots de realidade e triagem atualizados. O workflow e os módulos alterados passaram pela validação sintática local. Cobertura e mutação desta branch aguardam os gates do CI; o artefato do commit será a fonte oficial.
 
 ## O que está implementado
 
@@ -64,14 +64,25 @@ bandit_low: 131
 - `NEXUS_DECISIONS.md`: decisões arquiteturais com contexto e evidência.
 - `NEXUS_ROADMAP.md`: prioridades técnicas orientadas por risco.
 - `NEXUS_BOOTSTRAP_AUDIT.md`: auditoria de bootstrap e reconciliação documental.
+- `core/integrated_suite_summary.py`: contabiliza e serializa resultados da suíte integrada sem confundi-los com `unittest`.
 - `tools/state_manifest.py`: gerador determinístico do manifesto factual por execução.
-- `test_state_manifest.py`: contrato do schema básico e da proveniência do manifesto.
+- `test_state_manifest.py`: contrato do schema, da proveniência e do resumo integrado do manifesto.
+- `test_integrated_suite_summary.py`: contrato de aprovação, skip, ausência, conflito e IDs decimais dos checks integrados.
 - `test_mcts_action_contract.py`: contrato da distinção entre ações padrão (`None`) e espaço de ações vazio (`[]`).
 - `tools/state_consistency_audit.py`: compara claims atuais estruturados com o manifesto factual e ignora histórico fora do bloco.
-- `test_state_consistency_audit.py`: contratos de sincronização, divergência, ausência de marcador e manifesto inválido.
+- `test_state_consistency_audit.py`: contratos de sincronização, divergência, ausência de marcador e manifesto inválido, incluindo a evidência integrada.
 - `tools/test_summary.py`: executa a suíte final e registra `executed`, `passed`, `failed` e `skipped` para o manifesto.
 
-## Gates locais desta rodada
+## Validação local da branch de acompanhamento — 2026-10-16
+
+- **Suíte unitária:** 169 executados, 169 aprovados, 0 falhas e 0 skips.
+- **Suíte integrada:** 31 IDs inventariados, 30 aprovados e 1 skip explícito por dependência FAISS opcional ausente; resumo estruturado validado pelo manifesto.
+- **Bandit:** 131 LOW, sem MEDIUM/HIGH; a triagem versionada corresponde às linhas atuais.
+- **Auditoria de realidade:** snapshot regenerado com 31 marcadores integrados, 0 funções `pass`-only e 59 retornos constantes simples.
+- **Validação de arquivos:** compilação Python, parsing YAML do workflow e `git diff --check` passaram.
+- **Ainda pendente:** cobertura e mutação desta branch serão confirmadas pelos gates de CI; os resultados da branch base não são reutilizados como resultado desta branch.
+
+## Histórico de gates locais da base `7c8a187`
 
 - **121 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral local; os contratos MCTS, memória episódica e Vita cobrem espaço de ações vazio, contagem idempotente de fechamentos, concorrência na mesma conexão e concorrência entre conexões SQLite.
 - **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
@@ -106,7 +117,7 @@ bandit_low: 131
 - **Reminiscência:** `is_typical` é `true` somente quando o bucket de maior densidade está entre 10 e 30 anos; picos fora da faixa continuam sendo retornados, mas marcados como atípicos.
 - **Correção:** descrições malformadas de mínimo/máximo retornam imediatamente o conteúdo original, preservando o comportamento seguro já testado.
 - **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 59 retornos constantes simples restantes.
-- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; esta branch registrou 159 testes e 131 findings LOW na validação local; o estado oficial de cada `HEAD` deve ser confirmado pelo manifesto do CI associado.
+- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; a branch anterior registrou 159 testes e 131 findings LOW na validação local; o estado oficial de cada `HEAD` deve ser confirmado pelo manifesto do CI associado.
 - **Manifesto factual:** o CI associado ao `HEAD` gera e retém `nexus-state-manifest`; commits e métricas sem esse artefato são classificados como não verificados.
 
 ## Gates do workflow local

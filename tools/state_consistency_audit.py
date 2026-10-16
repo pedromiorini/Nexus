@@ -108,6 +108,22 @@ def _operational_errors(manifest: dict[str, Any]) -> list[str]:
         elif tests["executed"] != tests["passed"] + tests["failed"] + tests["skipped"]:
             errors.append("manifesto: contagens dos testes são inconsistentes")
 
+    integrated = verification.get("integrated") if isinstance(verification, dict) else None
+    if not isinstance(integrated, dict):
+        errors.append("manifesto: verification.integrated ausente ou inválido")
+    else:
+        if integrated.get("status") != "generated":
+            errors.append("manifesto: resumo da suíte integrada não foi gerado")
+        if integrated.get("result") != "passed":
+            errors.append("manifesto: verification.integrated.result deve ser 'passed'")
+        counts = ("discovered_static", "passed", "skipped", "failed", "unexpected")
+        if any(type(integrated.get(key)) is not int or integrated[key] < 0 for key in counts):
+            errors.append("manifesto: contagens da suíte integrada inválidas")
+        elif integrated["failed"] != 0 or integrated["unexpected"] != 0:
+            errors.append("manifesto: suíte integrada contém verificações sem sucesso")
+        elif integrated["discovered_static"] != integrated["passed"] + integrated["skipped"]:
+            errors.append("manifesto: contagens da suíte integrada são inconsistentes")
+
     ci = manifest.get("ci")
     repository = manifest.get("repository")
     if not isinstance(ci, dict) or ci.get("gates_status") != "success":
@@ -153,6 +169,10 @@ def audit(manifest_path: Path, root: Path = ROOT) -> dict[str, Any]:
             else None,
             "gates_status": manifest.get("ci", {}).get("gates_status")
             if isinstance(manifest.get("ci"), dict)
+            else None,
+            "integrated_result": manifest.get("verification", {}).get("integrated", {}).get("result")
+            if isinstance(manifest.get("verification"), dict)
+            and isinstance(manifest["verification"].get("integrated"), dict)
             else None,
         },
         "documents": documents,
