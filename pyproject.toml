@@ -1,0 +1,17 @@
+# Somente configuração de ferramentas: o Nexus não é distribuído como pacote instalável.
+
+[tool.ruff]
+target-version = "py311"
+extend-exclude = [".venv", "venv"]
+
+[tool.ruff.lint]
+# F = pyflakes (nomes indefinidos, imports e variáveis não usados, f-strings vazias),
+# E9 = erros de sintaxe, B904 = raise sem "from" dentro de except, B006 = default mutável.
+select = ["F", "E9", "B904", "B006"]
+
+[tool.coverage.run]
+branch = true
+source = ["core", "vita", "tools"]
+
+[tool.coverage.report]
+skip_empty = true

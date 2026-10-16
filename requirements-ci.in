@@ -5,3 +5,4 @@ numpy
 coverage
 hypothesis
 bandit
+ruff==0.16.10

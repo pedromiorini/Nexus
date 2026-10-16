@@ -185,6 +185,7 @@ def _ast_summary() -> dict[str, Any]:
             "functions": evidence.get("functions"),
             "constant_returns": len(evidence.get("constant_return_functions", [])),
             "pass_only": len(evidence.get("pass_only_functions", [])),
+            "strong_capability_claims": reality.get("code_claim_inventory", {}).get("by_level", {}).get("strong_capability_claim"),
         }
     except (OSError, json.JSONDecodeError, KeyError, TypeError):
         pass
@@ -203,6 +204,7 @@ def build_manifest(test_result: str = "not_run", test_command: str | None = None
     run_id = os.environ.get("GITHUB_RUN_ID")
     test_summary = _test_summary()
     tests = {
+        "scope": "unittest discover (test_*.py); embedded checks are under verification.integrated",
         "discovered_static": _test_count(),
         **test_summary,
         "command": test_command or "not_run",

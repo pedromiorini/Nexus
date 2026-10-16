@@ -1,5 +1,4 @@
 import json
-import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from core.deferred_task_queue import DeferredTaskQueue
@@ -10,7 +9,7 @@ from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
 class DeferredTaskQueueTests(unittest.TestCase):
     def test_priority_order(self):
         queue = DeferredTaskQueue()
-        low = queue.enqueue("low", priority=1)
+        queue.enqueue("low", priority=1)
         high = queue.enqueue("high", priority=10)
         first = queue.recheck_and_pop(False)
         self.assertEqual(first.task_id, high.task_id)
@@ -66,7 +65,7 @@ class DeferredTaskQueueTests(unittest.TestCase):
 
     def test_requeue_rejects_duplicate_reentry_and_capacity_overflow(self):
         queue = DeferredTaskQueue(max_size=2)
-        task = queue.enqueue("retry")
+        queue.enqueue("retry")
         popped = queue.recheck_and_pop(False)
         self.assertTrue(queue.requeue(popped, "first retry"))
         self.assertFalse(queue.requeue(popped, "duplicate retry"))

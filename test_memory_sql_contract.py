@@ -1,4 +1,3 @@
-import sqlite3
 import unittest
 
 from core.constitutional_brain import RealHierarchicalMemory

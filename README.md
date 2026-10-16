@@ -12,12 +12,12 @@ O Nexus Constitutional é um **protótipo experimental de arquitetura neuro-simb
 
 | Área | Evidência | Limite da afirmação |
 |---|---|---|
-| Núcleo constitucional | A suíte integrada local executa 29 verificações embutidas | São verificações do próprio projeto, não uma avaliação externa de capacidade geral |
-| Fila de tarefas adiadas | 14 testes unitários e de integração | Cobre contratos da fila e reprocessamento, não carga distribuída de produção |
+| Núcleo constitucional | A suíte integrada local executa 29 verificações embutidas; a de FAISS é pulada sem a dependência e o banner final informa quantas passaram e quantas foram puladas | São verificações do próprio projeto, não uma avaliação externa de capacidade geral |
+| Fila de tarefas adiadas | 16 testes unitários e de integração | Cobre contratos da fila e reprocessamento, não carga distribuída de produção |
 | Diagnóstico de recuperação | Exportação versionada `nexus.recovery.diagnostics.v1` e validador formal | O schema garante estrutura, não a correção de decisões cognitivas |
 | Auditoria Vita | Eventos, transições e métricas persistidos em SQLite | A análise é local e limitada ao histórico disponível |
-| CI | Workflow executa compilação, contrato, regressão, suíte integrada e cobertura | A execução depende do ambiente e das dependências instaladas no runner |
-| Cobertura | Relatório de branches é retido como artefato por 14 dias | Cobertura não substitui testes de propriedades, segurança ou mutation testing |
+| CI | Workflow executa lint (ruff, actionlint, zizmor), compilação, testes de contrato e regressão, suíte integrada, cobertura com pisos, mutation testing (28 mutantes escolhidos; o score vale só para eles) e auditorias de segurança e de realidade, com ações fixadas por SHA; um segundo job roda Python 3.12 e 3.13 | A execução depende do ambiente e das dependências instaladas no runner |
+| Cobertura | Relatório de branches (testes + suíte integrada) é retido por 14 dias; pisos: fila 90%, guard de VRAM 90%, bridge Vita 70%, núcleo 62% | Cobertura não substitui testes de propriedades, segurança ou mutation testing |
 
 ## Componentes principais
 
@@ -45,14 +45,18 @@ No `RealMCTSPlanner`, `available_actions=None` usa o espaço padrão, enquanto `
 
 ## Como executar
 
-Use Python 3.11 ou versão compatível, defina o caminho de importação e execute:
+Use Python 3.11 a 3.13 (o CI usa 3.11 como gate principal e 3.12/3.13 como verificação de compatibilidade), instale as dependências, defina o caminho de importação e execute:
 
 ```bash
+python3 -m pip install -r requirements.txt      # execução (numpy)
+python3 -m pip install -r requirements-dev.txt  # testes e CI local (hypothesis, coverage, bandit, ruff...)
 export PYTHONPATH=.
-python3 -m unittest -v test_recovery_diagnostics_contract.py test_deferred_task_queue.py
-python3 core/constitutional_brain.py
-python3 tools/reality_audit.py
+python3 -m unittest discover -v -p 'test_*.py'  # todos os testes
+python3 core/constitutional_brain.py            # suíte integrada embutida (recusa python -O)
+python3 tools/reality_audit.py                  # regenera os relatórios de realidade
 ```
+
+Os traces de depuração do núcleo ficam silenciosos por padrão; defina `NEXUS_DEBUG=1` para vê-los. `NEXUS_AUDIT_DB` define o caminho do banco de auditoria Vita (padrão: `nexus_audit.sqlite3` no diretório atual).
 
 Dependências opcionais podem ativar caminhos adicionais de telemetria ou recuperação. Quando não estão disponíveis, o código pode usar fallbacks; portanto, os resultados devem registrar quais dependências estavam presentes.
 
@@ -94,6 +98,10 @@ A busca por palavras do fallback da memória usa consultas SQL estáticas, uma p
 
 O teste adversarial `test_memory_sql_contract.py` cobre tokens SQL como dados, busca OR por múltiplas palavras e respeito ao limite. A busca semântica opcional continua sujeita às limitações e aos fallbacks documentados.
 
+## Segurança heurística
+
+O `RealJailbreakDetector` é uma **primeira camada heurística** (EN/PT): normaliza Unicode (NFKC, caracteres de largura zero, homóglifos, acentos, leetspeak), usa frases-alvo com fronteira de palavra e soma pesos de sinais; `sensitivity` (0 a 1) ajusta apenas os sinais fracos. Não é classificador semântico nem substitui controle de privilégio; o corpus de regressão está em `test_jailbreak_detector_contract.py` e contornos novos devem entrar lá. O `RealImmutableLog` é encadeado por hash e *append-only* (triggers SQLite); `verify_chain()` recalcula a cadeia e detecta adulteração, mas truncar o fim do log só é detectável se o `head` retornado for ancorado fora do banco. Relate vulnerabilidades conforme [`SECURITY.md`](SECURITY.md).
+
 ## Limitações conhecidas
 
 O núcleo ainda é monolítico e contém componentes experimentais, heurísticas, retornos constantes e caminhos de fallback que exigem revisão individual. A presença de uma classe ou método com nome cognitivo não demonstra a capacidade descrita pelo nome. A suíte integrada é valiosa como teste de não regressão, mas não é uma avaliação independente, adversarial ou científica de inteligência.
@@ -103,6 +111,10 @@ As próximas prioridades são elevar a cobertura dos componentes críticos, adic
 ## Auditoria de realidade
 
 Execute `python3 tools/reality_audit.py` para gerar `AUDIT_REALITY_REPORT.md` e `audit_reality.json`. O auditor compara alegações documentais, caminhos referenciados, estrutura AST, funções somente com `pass`, retornos constantes, testes embutidos e dependências opcionais. Ele é deliberadamente conservador: sinaliza alegações que precisam de evidência, mas não tenta concluir capacidades cognitivas a partir de nomes ou banners.
+
+O CI regenera esses relatórios e falha se os arquivos versionados divergirem (`git diff`): depois de editar o núcleo, rode `python3 tools/reality_audit.py` e faça commit de `AUDIT_REALITY_REPORT.md` e `audit_reality.json`. A triagem `SECURITY_TRIAGE.md` agrupa os achados por escopo (sem números de linha) e é conferida por `tools/security_triage.py --check`.
+
+O auditor separa padrões proibidos no código (gate: zero), frases fortes de capacidade ("REAL <Capacidade>", "REAL e FUNCIONAL"; inventário com limite que só diminui, em `test_reality_audit.py`), terminologia científica (informativa) e identificadores `Real*` (neutro): zero padrões proibidos não significa ausência de linguagem de capacidade. Com `NEXUS_INTEGRATED_SUMMARY=arquivo.json` a suíte integrada grava um resumo legível por máquina, que o manifesto reporta em `verification.integrated`, separado de `verification.tests` (só `unittest`).
 
 ## Manifesto factual e conhecimento
 
