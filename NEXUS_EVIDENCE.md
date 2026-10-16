@@ -7,7 +7,7 @@ tests: 200
 bandit_low: 131
 -->
 
-Estado oficial de referência: use o artefato `nexus-state-manifest` associado ao `HEAD`. Nesta branch, 173/173 testes passaram localmente; a cobertura da fila foi 96%, a do bridge Vita 74% e a suíte integrada registrou 30 aprovados e 1 ignorado. O benchmark v1 (seed `20261016`) mediu acerto composicional exato 1,0 em 39 casos, F1=0,667 na extração lexical causal, F1=0,667 nas alegações de efeito downstream, Brier=0,1849 e ECE=0,01684 na trilha que recebe probabilidades como entrada; observação parcial foi marcada `unsupported_interface`, sem acurácia inventada. Esses resultados locais não substituem o manifesto de CI do commit.
+Estado oficial de referência para `main` imediatamente antes desta atualização: manifesto `nexus-state-manifest` do commit `5b8bed8125002e25eb066620af67d3a65d44e59f` (CI run `38907987512`), com 200/200 testes `unittest`, 31 verificações integradas inventariadas (30 aprovadas, 1 ignorada por FAISS opcional ausente e 0 falhas) e 131 achados Bandit LOW (0 MEDIUM/HIGH). A execução local de `unittest` reproduziu 200/200. Os resultados locais do benchmark v1, descritos na tabela abaixo, são específicos à branch de avaliação e ao protocolo; não substituem o manifesto de CI do commit atual.
 Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e não devem ser usados como estado atual.
 
 | Área | Estado | Evidência verificável | Limitação |

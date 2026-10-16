@@ -11,12 +11,13 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Branch de trabalho:** `feat/reproducible-scientific-benchmark`, criada a partir do `main` exatamente em `5f53a9922b71d6ef3c565a31630f56091a454671` (após a PR #9).
-- **Estado de PRs conhecido:** PRs #4–#9 estão mescladas; PR #3 continua aberta e conflitante, fora deste escopo.
-- **Marco desta rodada:** protocolo `nexus.capability-benchmark.v1` com tarefas sintéticas determinísticas para composição, relações/intervenções causais, incerteza e observação parcial; relatório JSON com SHA-256 é executado e retido no CI.
+- **Base desta atualização:** `main` no commit `5b8bed8125002e25eb066620af67d3a65d44e59f`, merge da PR #11; branch documental desta rodada: `docs/refresh-current-project-state-2026-10-16`.
+- **Estado de PRs no início desta rodada:** PR #11 mesclada; PRs #12 (Ruff), #13 (Hypothesis) e #14 (NumPy) abertas, mergeáveis e com os checks de contrato e atestação aprovados; nenhuma issue aberta.
+- **CI oficial de referência:** execução `38907987512` passou para o commit `5b8bed8125002e25eb066620af67d3a65d44e59f`. O manifesto registrou 200/200 testes `unittest`, 30 verificações integradas aprovadas e 1 ignorada (31 inventariadas; 0 falhas), além de 131 achados Bandit LOW e nenhum MEDIUM/HIGH.
+- **Marco desta rodada:** sincronizar o README e este handoff com as métricas verificadas de `main`, sem duplicar a correção de dependências constitucionais já presente no commit atual.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
-- **Validação local desta branch — 2026-10-16 (não é CI):** 173/173 testes passaram; cobertura da fila 96% e Vita 74%; suíte integrada 30 aprovações e 1 skip opcional; mutation direcionada 10/10; Bandit 131 LOW, sem MEDIUM/HIGH. O benchmark com seed `20261016` mediu composição 39/39, extração lexical causal F1=0,667, alegações de intervenção F1=0,667 (8 falsos positivos), Brier=0,1849 e ECE=0,01684 para probabilidades fornecidas pelo taskset; a trilha POMDP permaneceu `unsupported_interface`. O CI do commit será a referência oficial.
+- **Validação local de `main` antes desta atualização (não é CI):** 200/200 testes `unittest` passaram; a suíte integrada registrou 30 aprovações, 1 skip opcional de FAISS e nenhuma falha. `psutil`, FAISS e SentenceTransformers estavam indisponíveis; os fallbacks correspondentes foram usados. Para status oficial, prevalece o manifesto de CI acima.
 
 ## O que está implementado
 
@@ -171,7 +172,7 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 - Nomes de classe `Real*` e com termos de consciência/emoção foram mantidos (renomear quebraria a API); os textos que afirmavam capacidade foram removidos e o auditor passou a escanear o código.
 - `think()` e `_wire_dependencies` seguem com complexidade ciclomática muito alta; o fatiamento por fase é a próxima refatoração estrutural.
 - Os trechos (needles) do gate de mutação são texto exato do código: depois de uma refatoração, um mutante `not_applied` significa que o trecho mudou e o mutante deve ser reescrito, não ignorado.
-- `tests` no manifesto e nos documentos conta apenas a suíte `unittest`; os checks embutidos da suíte integrada (29 + 1 condicional) são reportados à parte.
+- `tests` no manifesto e nos documentos conta apenas a suíte `unittest`; os checks embutidos da suíte integrada são reportados à parte (no manifesto de referência de `main`: 31 inventariados, 30 aprovados e 1 skip opcional).
 - O auditor de realidade separa padrões proibidos (gate zero), frases fortes de capacidade (inventário com limite que só diminui), terminologia científica (informativo) e identificadores `Real*` (neutro); zero padrões proibidos não significa ausência de linguagem de capacidade (restam frases de ênfase como "REAL <Capacidade>").
 
 ## Histórico de checkpoints
