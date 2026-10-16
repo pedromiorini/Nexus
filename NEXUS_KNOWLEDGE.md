@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 246
+tests: 249
 bandit_low: 131
 -->
 
@@ -118,3 +118,13 @@ Números de testes, cobertura, findings e commits devem ser confirmados por exec
 O `state_consistency_audit.py` exige exatamente um bloco estruturado `NEXUS-CURRENT-STATE` e rejeita chaves duplicadas; referências históricas fora dele são preservadas e ignoradas pelo gate.
 
 O manifesto distingue `discovered_static` (inventário AST) de `executed`, `passed`, `failed` e `skipped` obtidos pelo resumo da suíte final. O gate usa `executed` para comparar o claim atual de testes.
+
+
+## Validação da fronteira de parâmetros de ferramentas — 2026-10-16
+
+- Base local: `main` pós-PR #25, commit `675f5aa95416c3a92998a34dd2f905f529b90980`; branch isolada `feat/post-pr25-hardening-2026-10-16`.
+- Falha reproduzida: `RealToolUse.execute_tool("list_operations", None)` levantava `TypeError` na verificação de membership dos parâmetros obrigatórios, antes do bloco que converte exceções do executor em `ToolExecutionResult`.
+- Correção: `ToolValidator.validate_parameters` verifica primeiro se a entrada externa é uma instância de `dict`; caso contrário registra `TOOL_PARAM_TYPE_MISMATCH` com o tipo observado e retorna `False`. A chamada pública responde com falha estruturada sem acessar cache nem executor.
+- Três testes independentes cobrem `None`/lista/string, dicionário sem parâmetros obrigatórios e execução normal com dicionário válido. Um mutante que remove a guarda é morto pelo mutation gate.
+- Validação local em Python 3.12.3: 249/249 testes; suíte integrada 30 aprovados e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 34/34 mortas, sem sobreviventes/não aplicadas; Ruff, actionlint, zizmor, compileall, auditorias AST e consistência documental passaram. Bandit: 131 LOW, nenhum MEDIUM/HIGH.
+- Limite: a alteração valida apenas o tipo externo; não restringe subclasses de `dict`, valores aninhados nem chaves extras. Os resultados são locais; a CI do head candidato permanece a referência oficial.

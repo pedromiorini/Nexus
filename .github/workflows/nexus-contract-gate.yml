@@ -131,6 +131,11 @@ jobs:
           PYTHONPATH: .
         run: python -m unittest -v test_tool_definition_contract.py
 
+      - name: Run tool parameter boundary contract tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v test_tool_parameter_contract.py
+
       - name: Run state consistency contract tests
         env:
           PYTHONPATH: .

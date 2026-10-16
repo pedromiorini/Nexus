@@ -134,3 +134,13 @@
 - **Base técnica:** `Future.cancel()` falha em cancelar uma chamada já em execução; `Process.terminate()` pode corromper pipes/queues ou deixar locks indisponíveis ([`concurrent.futures`, Python 3.12](https://docs.python.org/3.12/library/concurrent.futures.html), [`multiprocessing`, Python 3.12](https://docs.python.org/3.12/library/multiprocessing.html)).
 - **Limitação:** o evento é pós-execução, não uma deadline nem isolamento. Interrupção segura exige um contrato cooperativo ou runner/processo isolado sem recursos compartilhados perigosos.
 - **Reversibilidade:** fácil; não altera os protocolos dos benchmarks nem o resultado dos executores built-in.
+
+
+## D-017 — `execute_tool` exige parâmetros externos do tipo dict
+
+- **Decisão:** `ToolValidator.validate_parameters` aceita somente uma instância de `dict` (incluindo subclasses) como contêiner externo de `params`; outros tipos geram `TOOL_PARAM_TYPE_MISMATCH` com tipo esperado/observado e são convertidos em falha estruturada por `execute_tool` antes da iteração do schema.
+- **Contexto:** `execute_tool` anuncia um resultado `ToolExecutionResult`, mas `params=None` fazia a validação de campos obrigatórios levantar `TypeError` antes do tratamento de exceções do executor.
+- **Motivo:** preservar a fronteira de falha estruturada para entrada malformada sem alterar o processamento de dicionários válidos nem permitir que a exceção escape ao chamador.
+- **Evidência:** `test_tool_parameter_contract.py` cobre contêineres não-dict, dicionário incompleto e execução válida; `tools/targeted_mutation.py` mata um mutante que remove a guarda.
+- **Limitação:** não valida recursivamente valores, serialização JSON ou chaves desconhecidas; esses contratos permanecem separados.
+- **Reversibilidade:** simples; nenhuma forma válida de parâmetro `dict` muda de comportamento.
