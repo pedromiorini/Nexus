@@ -3,12 +3,12 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 240
+tests: 246
 bandit_low: 131
 -->
 
 Snapshot histórico: manifesto `nexus-state-manifest` do commit `5b8bed8125002e25eb066620af67d3a65d44e59f` (CI run `38907987512`), com 200/200 testes `unittest`, 31 verificações integradas inventariadas (30 aprovadas, 1 ignorada por FAISS opcional ausente e 0 falhas) e 131 achados Bandit LOW (0 MEDIUM/HIGH). Esse snapshot e os resultados locais do benchmark v1 não representam o estado atual.
-Esta rodada POMDP parte do `main` pós-PR #23 (`e3cc760597aa1782aef9879a8f88ee6f48032348`). Os 238/238 testes e as demais métricas desta branch são locais; ainda não substituem o manifesto de CI associado ao head da revisão.
+A PR #24 partiu do `main` pós-PR #23 (`e3cc760597aa1782aef9879a8f88ee6f48032348`) e foi mesclada em `main` como `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`; os dois checks oficiais passaram. Seus resultados locais de 240/240 testes permanecem históricos; a branch seguinte registra a nova validação em seção própria.
 Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e não devem ser usados como estado atual.
 
 | Área | Estado | Evidência verificável | Limitação |
@@ -47,7 +47,7 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 - O patch rejeita constantes não numéricas, expressões acima de 256 caracteres, AST acima de 64 nós, expoentes acima de 1024 e resultados fora dos limites numéricos; a expressão longa é rejeitada antes de serializar a chave de cache.
 - O cache agora expurga TTL vencido, limita 128 entradas, 1 MiB de payload estimado e 64 KiB por resultado; armazena e devolve cópias profundas para impedir que o chamador mutile a entrada após a medição. Resultados grandes de outras ferramentas ainda são retornados ao chamador, mas não armazenados no cache.
 - Contratos: 9 novos testes cobrem aritmética comum, string/boolean/NaN, comprimento/complexidade/expoente, rejeição antes da cache key, TTL, alias mutável, limite por resultado e capacidade total. Suíte: 222/222; integração: 30 aprovados/1 skip FAISS; cobertura: fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation: 28/28 mortos, 0 sobreviventes/não aplicadas; Bandit: 131 LOW, nenhum MEDIUM/HIGH.
-- Limites remanescentes: `ToolDefinition.timeout_seconds` ainda é declarativo para executores genéricos; o cache limita payload estimado via `sys.getsizeof`, não a memória total do processo; o estado é local e aguarda CI oficial.
+- Limites remanescentes naquela rodada: `ToolDefinition.timeout_seconds` não interrompia executores; o cache limita payload estimado via `sys.getsizeof`, não a memória total do processo; o estado local aguardava CI oficial. A validação e telemetria advisory de overrun foram implementadas na rodada subsequente.
 
 ## Filtro de crença POMDP e benchmark v2 — 2026-10-16
 
@@ -56,7 +56,7 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 - Contratos locais: 10 testes do filtro e 8 do benchmark; suíte total 240/240, sem falhas/skips/XPASS; integrada 30 aprovações e 1 skip FAISS opcional. Cobertura: fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation 28/28 mortas, 0 sobreviventes/não aplicadas.
 - Benchmark v2 local: 128 casos gerados pela seed `20261016`, 635 probabilidades, MAE `3.001891167837976e-17`, erro máximo `2.7755575615628914e-16`, 128/128 dentro da tolerância e quatro controles negativos rejeitados; taskset SHA-256 `232371d0e8e948f4b0a004261e3d271b1003aed8d0de8c931d3439f9d370d025`.
 - A seed fixa do CI (`20261016`) passa explicitamente a precisão e os quatro controles negativos; teste injetando posterior incorreto verifica que a CLI grava o relatório e retorna código 1, cobrindo a falha fechada.
-- O benchmark v1 continuou com status `unsupported_interface` para observação parcial e sua implementação/protocolo não foram alterados. Todos os resultados acima são locais; o CI do head da revisão é a confirmação oficial pendente.
+- O benchmark v1 continuou com status `unsupported_interface` para observação parcial e sua implementação/protocolo não foram alterados. As métricas detalhadas acima são locais; posteriormente, a PR #24 foi mesclada após ambos os checks oficiais passarem.
 
 ## Categorias de resultado
 
@@ -65,3 +65,17 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 - **Inferência:** risco arquitetural derivado do tamanho e acoplamento do núcleo.
 - **Hipótese:** benefício futuro de modularização ainda não medido.
 - **Intenção:** itens do roadmap, não funcionalidades presentes.
+
+## Autoauditoria de `ToolDefinition.timeout_seconds` — 2026-10-16
+
+Base local: `main` pós-PR #24, commit `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`; branch isolada `feat/post-pr24-contract-hardening-2026-10-16`.
+
+Antes da correção, o registro aceitava timeout zero, negativo, booleano, float e `NaN`; um valor string podia lançar `TypeError`. A execução síncrona não consultava o orçamento: uma revisão independente reproduziu um executor de cerca de 30 ms com budget de 1 ms retornando sucesso sem sinalizar o excesso.
+
+O novo contrato exige inteiro não booleano em `[1, 60]`, no registro e antes de cada execução, inclusive para detectar mutação da definição depois do registro. O executor é cronometrado com `time.monotonic()`; ao terminar além do budget, por retorno ou exceção, emite `TOOL_EXECUTION_OVERRUN`. Resultados bem-sucedidos são preservados, exceções continuam falhas estruturadas, e o evento informa `execution_completed=true` e `cancelled=false`.
+
+Os seis testes em `test_tool_definition_contract.py` cobrem limites inclusivos, valores inválidos, mutação pós-registro, execução dentro do budget, overrun bem-sucedido e overrun com exceção; cinco mutantes específicos foram adicionados ao mutation gate. Validação local Python 3.12.3: 246/246 testes; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation 33/33 mortas, 0 sobreviventes/não aplicadas; Ruff, actionlint, zizmor, compileall e auditorias AST passaram; Bandit 131 LOW, nenhum MEDIUM/HIGH.
+
+O evento é diagnóstico pós-execução, não deadline nem cancelamento. A documentação oficial de `Future.cancel()` informa que chamada em execução não é cancelada; `Process.terminate()` pode corromper pipes/queues ou tornar locks indisponíveis: https://docs.python.org/3.12/library/concurrent.futures.html e https://docs.python.org/3.12/library/multiprocessing.html. Interrupção segura segue exigindo um contrato cooperativo ou runner isolado.
+
+Os números são locais; a CI do head candidato ainda deve confirmá-los.

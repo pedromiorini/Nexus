@@ -3591,6 +3591,22 @@ class ToolValidator:
 
         return False
 
+    def validate_timeout_seconds(self, tool: ToolDefinition) -> bool:
+        """Validar que o orçamento declarado é um inteiro entre 1 e 60 s."""
+        timeout = tool.timeout_seconds
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, int)
+            or not 1 <= timeout <= 60
+        ):
+            self.log.log_event("TOOL_VALIDATION_FAILED", {
+                "tool": tool.name,
+                "reason": "timeout_seconds must be an integer from 1 to 60",
+                "timeout_type": type(timeout).__name__,
+            })
+            return False
+        return True
+
     def validate_tool_definition(self, tool: ToolDefinition) -> bool:
         """Validar que definição de ferramenta é segura"""
 
@@ -3612,13 +3628,8 @@ class ToolValidator:
             })
             return False
 
-        # 3. Verificar timeout razoável (não > 60s)
-        if tool.timeout_seconds > 60:
-            self.log.log_event("TOOL_VALIDATION_WARNING", {
-                "tool": tool.name,
-                "reason": "Timeout too long",
-                "timeout": tool.timeout_seconds
-            })
+        # 3. Validar orçamento; executores síncronos não são interrompidos.
+        if not self.validate_timeout_seconds(tool):
             return False
 
         return True
@@ -4094,6 +4105,17 @@ class RealToolUse:
                 error=f"Tool '{tool_name}' not found"
             )
 
+        # A definição é mutável; revalidar o orçamento antes de cada chamada.
+        if not self.validator.validate_timeout_seconds(tool):
+            self.failed_executions += 1
+            return ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error="Tool timeout validation failed",
+                execution_time=time.time() - start_time,
+            )
+        timeout_seconds = tool.timeout_seconds
         # 2. Validar parâmetros
         if not self.validator.validate_parameters(tool, params):
             self.failed_executions += 1
@@ -4160,8 +4182,20 @@ class RealToolUse:
                 })
                 return execution_result
 
-            result = executors[tool_name](params)
-
+            executor_started = time.monotonic()
+            try:
+                result = executors[tool_name](params)
+            finally:
+                executor_duration = time.monotonic() - executor_started
+                if executor_duration > timeout_seconds:
+                    # Diagnóstico, não interrupção; abrange retorno e exceção.
+                    self.log.log_event("TOOL_EXECUTION_OVERRUN", {
+                        "tool": tool_name,
+                        "timeout_seconds": timeout_seconds,
+                        "executor_duration_seconds": executor_duration,
+                        "execution_completed": True,
+                        "cancelled": False,
+                    })
             execution_time = time.time() - start_time
 
             execution_result = ToolExecutionResult(
