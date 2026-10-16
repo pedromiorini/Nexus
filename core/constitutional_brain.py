@@ -1043,24 +1043,6 @@ class RealImmutableLog:
         return row[0] if row else self.GENESIS_HASH
 
     def close(self) -> None:
-        """Fecha a conexão SQLite de modo idempotente."""
-        with self.db_lock:
-            if self._finalizer.alive:
-                self._finalizer()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, traceback):
-        self.close()
-
-    def _load_head(self) -> str:
-        row = self.conn.execute(
-            "SELECT content_hash FROM log_entries ORDER BY sequence DESC LIMIT 1"
-        ).fetchone()
-        return row[0] if row else self.GENESIS_HASH
-
-    def close(self) -> None:
         """Fecha a conexão SQLite (idempotente); evita ResourceWarning no Python >= 3.13."""
         with self.db_lock:
             self._finalizer()
@@ -1094,36 +1076,6 @@ class RealImmutableLog:
                 raise
             self.current_hash = content_hash
             return content_hash
-
-    def verify_chain(self) -> Dict[str, Any]:
-        """Recalcula a cadeia inteira e retorna a primeira inconsistência, se houver."""
-        with self.db_lock:
-            rows = self.conn.execute(
-                "SELECT sequence, event_type, event_data, timestamp, content_hash, previous_hash "
-                "FROM log_entries ORDER BY sequence ASC"
-            ).fetchall()
-        expected_previous = self.GENESIS_HASH
-        for sequence, event_type, event_data, timestamp, content_hash, previous_hash in rows:
-            if previous_hash != expected_previous:
-                return {
-                    "ok": False, "entries": len(rows), "head": expected_previous,
-                    "first_invalid_sequence": sequence,
-                    "reason": "previous_hash não confere com a entrada anterior (remoção ou reordenação)",
-                }
-            recomputed = hashlib.sha256(
-                f"{event_type}|{event_data}|{timestamp}|{previous_hash}".encode()
-            ).hexdigest()
-            if recomputed != content_hash:
-                return {
-                    "ok": False, "entries": len(rows), "head": expected_previous,
-                    "first_invalid_sequence": sequence,
-                    "reason": "content_hash não confere com o conteúdo (adulteração)",
-                }
-            expected_previous = content_hash
-        return {
-            "ok": True, "entries": len(rows), "head": expected_previous,
-            "first_invalid_sequence": None, "reason": "ok",
-        }
 
     def verify_chain(self) -> Dict[str, Any]:
         """Recalcula toda a cadeia e devolve o diagnóstico (não lança em caso de adulteração)."""

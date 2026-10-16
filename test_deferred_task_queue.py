@@ -65,7 +65,7 @@ class DeferredTaskQueueTests(unittest.TestCase):
 
     def test_requeue_rejects_duplicate_reentry_and_capacity_overflow(self):
         queue = DeferredTaskQueue(max_size=2)
-        task = queue.enqueue("retry")
+        queue.enqueue("retry")
         popped = queue.recheck_and_pop(False)
         self.assertTrue(queue.requeue(popped, "first retry"))
         self.assertFalse(queue.requeue(popped, "duplicate retry"))
