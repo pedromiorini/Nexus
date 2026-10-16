@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 213
+tests: 222
 bandit_low: 131
 -->
 
@@ -11,13 +11,15 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta rodada:** `main` pós-PR #21 no commit `b14123593861b1406e6f6f7b0204fe50630b0f8c`; branch local: `fix/router-deferral-memory-links-2026-10-16`.
-- **Estado de PRs no início desta rodada:** PR #21 mesclada; as correções desta branch ainda não foram publicadas nem mescladas.
-- **CI oficial de referência:** os checks da PR #21 passaram no head `830dc1a21b7839405da26b412925cb439b465e00`; seu commit de merge em `main` é `b14123593861b1406e6f6f7b0204fe50630b0f8c`. Os resultados descritos nesta rodada são locais; consultar os checks e o manifesto do head associado à PR para estado oficial desta branch.
-- **Marco desta rodada:** impedir que contexto caller-controlled suprima o enqueue de uma tarefa adiada; rejeitar IDs de memória inexistentes quando há backend resolutor; preservar links opacos quando o backend não está configurado.
+- **Base desta rodada:** `main` pós-PR #22, commit `27299281b636deddb5555173a9f191dd01e65013`; branch local `fix/math-calculate-resource-limits-2026-10-16`.
+- **Estado da revisão:** sem merge; o status oficial depende dos checks do head da PR. A aprovação de merge continua específica a cada PR.
+- **Achado de segurança:** a calculadora aceitava literais string e operadores sem budgets; entrada do tipo `"x" * 1000000` retornava e cacheava um milhão de caracteres; potências grandes eram aceitas; TTL vencido não removia resultados antigos.
+- **Mitigações nesta branch:** a calculadora aceita somente números reais finitos, limita expressão/AST/expoente/magnitude; cache remove expirados, limita quantidade/payload e armazena/devolve cópias profundas para isolamento de aliases. O benchmark e os relatórios v1 não foram alterados.
+- **Validação local (não CI):** 222/222 testes, 30 aprovações + 1 skip FAISS opcional na suíte integrada; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation 28/28 mortos, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall e requisitos constitucionais passaram.
+- **Limites remanescentes:** `timeout_seconds` não cancela executores arbitrários; o byte-budget do cache é estimado por payload e não substitui limite de memória do processo. O manifesto dos checks do head da PR é a fonte do status oficial.
+- **Próxima trilha independente:** POMDP/belief-state v2 está isolada em outra worktree/branch; não faz parte desta revisão de segurança; v1 permanece `unsupported_interface`.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
-- **Validação local da branch atual (não é CI):** 213/213 testes `unittest` passaram; a suíte integrada registrou 30 aprovações, 1 skip opcional de FAISS e nenhuma falha (31 IDs); `psutil`, FAISS e SentenceTransformers estavam indisponíveis.
 
 ## O que está implementado
 

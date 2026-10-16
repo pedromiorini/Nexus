@@ -11,6 +11,7 @@
 - Migrar incrementalmente asserts do bloco demonstrativo para contratos independentes.
 - Manter auditoria AST impedindo novos asserts fora do bloco permitido.
 - Fazer revisão manual de entradas externas, subprocessos e fronteiras SQLite.
+- Revisar budgets de ferramentas: `math_calculate` agora limita tamanho/complexidade e resultados numéricos; cache expurga TTL, limita entradas/payload e isola resultados mutáveis. `ToolDefinition.timeout_seconds` ainda não interrompe executores genéricos e segue como lacuna arquitetural explícita.
 
 ## Prioridade 2 — reduzir risco do núcleo monolítico
 

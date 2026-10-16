@@ -3,12 +3,12 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 213
+tests: 222
 bandit_low: 131
 -->
 
-Estado oficial de referência para `main` imediatamente antes desta atualização: manifesto `nexus-state-manifest` do commit `5b8bed8125002e25eb066620af67d3a65d44e59f` (CI run `38907987512`), com 200/200 testes `unittest`, 31 verificações integradas inventariadas (30 aprovadas, 1 ignorada por FAISS opcional ausente e 0 falhas) e 131 achados Bandit LOW (0 MEDIUM/HIGH). A execução local de `unittest` reproduziu 200/200. Os resultados locais do benchmark v1, descritos na tabela abaixo, são específicos à branch de avaliação e ao protocolo; não substituem o manifesto de CI do commit atual.
-Esta auditoria parte do `main` pós-PR #21 (`b14123593861b1406e6f6f7b0204fe50630b0f8c`). A branch de correção passou localmente com 213/213 testes; o manifesto desta reprodução identifica `ci_run=not_ci`, portanto os resultados locais não substituem o manifesto de CI associado ao head da PR.
+Snapshot histórico: manifesto `nexus-state-manifest` do commit `5b8bed8125002e25eb066620af67d3a65d44e59f` (CI run `38907987512`), com 200/200 testes `unittest`, 31 verificações integradas inventariadas (30 aprovadas, 1 ignorada por FAISS opcional ausente e 0 falhas) e 131 achados Bandit LOW (0 MEDIUM/HIGH). Esse snapshot e os resultados locais do benchmark v1 não representam o estado atual.
+Esta auditoria de segurança parte do `main` pós-PR #22 (`27299281b636deddb5555173a9f191dd01e65013`). Os 222/222 testes e as demais métricas desta branch são locais; ainda não substituem o manifesto de CI associado ao head da revisão.
 Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e não devem ser usados como estado atual.
 
 | Área | Estado | Evidência verificável | Limitação |
@@ -40,6 +40,14 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 - Cobertura: fila 95%, VRAM 94%, Vita 76% e núcleo 67%; mutation testing: 28/28 mortos, 0 sobreviventes/não aplicados; Bandit: 131 LOW e 0 MEDIUM/HIGH.
 - Ruff, actionlint, zizmor, compileall, auditorias AST e checks de requirements passaram localmente. `AUDIT_REALITY_REPORT.md` e `audit_reality.json` foram regenerados e refletem 26.946 linhas e 859 funções no núcleo.
 - POMDP continua não suportado e sem score no protocolo v1; não foi inferido posterior nem alterado o resultado do benchmark.
+
+## Autoauditoria de recursos do `RealToolUse` — 2026-10-16
+
+- Antes do patch, `execute_tool("math_calculate", {"expression": '"x" * 1000000'})` retornou sucesso com 1.000.000 caracteres e reteve o valor no cache; `2 ** 10000` também retornou sucesso. Depois de marcar uma entrada expirada e fazer outra chamada, a entrada antiga continuou retida.
+- O patch rejeita constantes não numéricas, expressões acima de 256 caracteres, AST acima de 64 nós, expoentes acima de 1024 e resultados fora dos limites numéricos; a expressão longa é rejeitada antes de serializar a chave de cache.
+- O cache agora expurga TTL vencido, limita 128 entradas, 1 MiB de payload estimado e 64 KiB por resultado; armazena e devolve cópias profundas para impedir que o chamador mutile a entrada após a medição. Resultados grandes de outras ferramentas ainda são retornados ao chamador, mas não armazenados no cache.
+- Contratos: 9 novos testes cobrem aritmética comum, string/boolean/NaN, comprimento/complexidade/expoente, rejeição antes da cache key, TTL, alias mutável, limite por resultado e capacidade total. Suíte: 222/222; integração: 30 aprovados/1 skip FAISS; cobertura: fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation: 28/28 mortos, 0 sobreviventes/não aplicadas; Bandit: 131 LOW, nenhum MEDIUM/HIGH.
+- Limites remanescentes: `ToolDefinition.timeout_seconds` ainda é declarativo para executores genéricos; o cache limita payload estimado via `sys.getsizeof`, não a memória total do processo; o estado é local e aguarda CI oficial.
 
 ## Categorias de resultado
 
