@@ -113,6 +113,41 @@ MUTATIONS = [
         "if True:\n            try:\n                cache_key = self._make_cache_key(tool_name, params)",
         tests=TOOL_CACHE_KEY,
     ),
+    Mutation(
+        "tool_cache_key_byte_budget",
+        "core/constitutional_brain.py",
+        "if next_size > self.MAX_CACHE_KEY_BYTES:",
+        "if False:",
+        tests=TOOL_CACHE_KEY,
+    ),
+    Mutation(
+        "tool_cache_key_depth_budget",
+        "core/constitutional_brain.py",
+        "if depth > self.MAX_CACHE_KEY_DEPTH:",
+        "if False:",
+        tests=TOOL_CACHE_KEY,
+    ),
+    Mutation(
+        "tool_cache_key_node_budget",
+        "core/constitutional_brain.py",
+        "if visited_nodes > self.MAX_CACHE_KEY_NODES:",
+        "if False:",
+        tests=TOOL_CACHE_KEY,
+    ),
+    Mutation(
+        "tool_cache_key_container_item_budget",
+        "core/constitutional_brain.py",
+        "if item_count > self.MAX_CACHE_KEY_CONTAINER_ITEMS:",
+        "if False:",
+        tests=TOOL_CACHE_KEY,
+    ),
+    Mutation(
+        "tool_cache_key_cycle_guard",
+        "core/constitutional_brain.py",
+        "if value_id in active_containers:",
+        "if False:",
+        tests=TOOL_CACHE_KEY,
+    ),
 ]
 
 

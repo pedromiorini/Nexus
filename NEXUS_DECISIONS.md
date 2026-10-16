@@ -163,3 +163,15 @@
 - **Evidência:** `test_tool_cache_key_contract.py` verifica execução válida repetida sem cache e ausência de serialização para ferramenta não cacheável; mutações que removem o bypass e a guarda são mortas.
 - **Limitação:** não restringe o custo da serialização de parâmetros muito grandes que são representáveis nem valida recursivamente os valores.
 - **Reversibilidade:** fácil; chamadas afetadas só deixam de obter cache hit/store.
+
+
+## D-020 — Orçamento prévio para geração de cache key
+
+- **Decisão:** antes de `json.dumps`, percorrer iterativamente os parâmetros de ferramentas cacheáveis, estimando o texto JSON no formato padrão mais o prefixo do nome da ferramenta. Limites: 64 KiB, profundidade 64, 4.096 ocorrências/nós e 1.024 itens por contêiner; detectar ciclos. A pré-verificação só percorre tipos Python nativos exatos aceitos pelo encoder padrão (`dict`, `list`, `tuple`, strings, números, booleanos e `None`).
+- **Falha/bypass:** excesso, ciclo ou tipo não percorrido em segurança emite `TOOL_CACHE_KEY_UNAVAILABLE`, ignora lookup/store e deixa o executor rodar; não rejeita a chamada nem valida schema recursivamente. `cacheable=False` continua evitando toda a geração da chave.
+- **Compatibilidade:** para parâmetros elegíveis, manter `json.dumps(params, sort_keys=True)` e a fórmula SHA-256 existentes, preservando a identidade de chaves pequenas. Subclasses de `dict` continuam aceitas pela fronteira externa e pelo executor, mas bypassam cache; chaves extras continuam ignoradas conforme o contrato legado.
+- **Contexto/motivo:** os limites de entrada do validator eram superficiais, e o orçamento de resultado armazenado não protegia o custo proporcional da ordenação/serialização da chave. A documentação Python 3.12 não define limites gerais de tamanho/profundidade do encoder nem limite máximo para fragmentos de `iterencode`; o preflight precisa ocorrer antes dele.
+- **Evidência:** `test_tool_cache_key_contract.py` cobre compatibilidade de hash/hit, bypass sem chamar o encoder para bytes, profundidade, nós, cardinalidade de contêiner e ciclos, preservação de execução, subclass de `dict`, valor não serializável e ferramenta não cacheável. Cinco mutantes das guardas/detecção são mortos; validação local: 257/257 testes e mutation 42/42.
+- **Limitação:** o budget cobre somente trabalho de formação da cache key; não restringe memória/custo do executor, nem limita a memória total do processo. A CI da PR ainda é a referência oficial do commit publicado.
+- **Fonte:** [documentação oficial Python 3.12 do módulo `json`](https://docs.python.org/3.12/library/json.html).
+- **Reversibilidade:** simples; entradas sobre o budget deixam de obter cache hit/store, mas continuam seguindo a execução normal.

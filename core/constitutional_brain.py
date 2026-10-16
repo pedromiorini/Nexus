@@ -3815,6 +3815,16 @@ class RealToolUse:
     MAX_CACHE_ENTRY_BYTES = 64 * 1024
     MAX_CACHE_CONTAINER_ITEMS = 1024
     MAX_CACHE_OBJECTS = 4096
+    # Limits for optional cache-key work; exceeding one never rejects execution.
+    MAX_CACHE_KEY_BYTES = 64 * 1024
+    MAX_CACHE_KEY_DEPTH = 64
+    MAX_CACHE_KEY_NODES = 4096
+    MAX_CACHE_KEY_CONTAINER_ITEMS = 1024
+
+    class _CacheKeyBudgetExceeded(ValueError):
+        def __init__(self, reason: str):
+            super().__init__(reason)
+            self.reason = reason
     MAX_MATH_EXPRESSION_LENGTH = 256
     MAX_MATH_AST_NODES = 64
     MAX_MATH_INTEGER_BITS = 4096
@@ -3935,9 +3945,120 @@ class RealToolUse:
             self._result_cache_entry_sizes[cache_key] = result_size
             self._result_cache_bytes += result_size
 
+    def _add_cache_key_size(self, current_size: int, additional_size: int) -> int:
+        next_size = current_size + additional_size
+        if next_size > self.MAX_CACHE_KEY_BYTES:
+            raise self._CacheKeyBudgetExceeded("byte_limit")
+        return next_size
+
+    def _cache_key_json_string_size(self, value: str) -> int:
+        """Estimate the exact default JSON string length without building it."""
+        if len(value) > self.MAX_CACHE_KEY_BYTES:
+            raise self._CacheKeyBudgetExceeded("byte_limit")
+        size = 2  # opening and closing quotes
+        short_escapes = {"\b", "\f", "\n", "\r", "\t"}
+        for character in value:
+            codepoint = ord(character)
+            if character in {'"', "\\"} or character in short_escapes:
+                character_size = 2
+            elif codepoint < 0x20:
+                character_size = 6  # \u00xx
+            elif codepoint <= 0x7F:
+                character_size = 1
+            elif codepoint <= 0xFFFF:
+                character_size = 6  # ensure_ascii=True escapes BMP characters
+            else:
+                character_size = 12  # UTF-16 surrogate pair escapes
+            size = self._add_cache_key_size(size, character_size)
+        return size
+
+    def _check_cache_key_budget(self, tool_name: str, params: Dict[str, Any]) -> None:
+        """Bound cache-key traversal before invoking the recursive JSON encoder."""
+        if type(tool_name) is not str:
+            raise TypeError("tool name must be a string")
+        if len(tool_name) > self.MAX_CACHE_KEY_BYTES:
+            raise self._CacheKeyBudgetExceeded("byte_limit")
+        prefix_size = len(tool_name.encode("utf-8")) + 1
+        total_size = self._add_cache_key_size(0, prefix_size)
+        pending = [(params, 0, False, False)]
+        active_containers = set()
+        visited_nodes = 0
+
+        while pending:
+            value, depth, is_key, exiting = pending.pop()
+            if exiting:
+                active_containers.discard(id(value))
+                continue
+
+            visited_nodes += 1
+            if visited_nodes > self.MAX_CACHE_KEY_NODES:
+                raise self._CacheKeyBudgetExceeded("node_limit")
+            if depth > self.MAX_CACHE_KEY_DEPTH:
+                raise self._CacheKeyBudgetExceeded("depth_limit")
+
+            value_type = type(value)
+            if is_key and value_type not in (str, int, float, bool, type(None)):
+                raise TypeError(
+                    f"keys must be str, int, float, bool or None, not {value_type.__name__}"
+                )
+
+            if value_type in (dict, list, tuple):
+                if is_key:
+                    raise TypeError(
+                        f"keys must be str, int, float, bool or None, not {value_type.__name__}"
+                    )
+                value_id = id(value)
+                if value_id in active_containers:
+                    raise self._CacheKeyBudgetExceeded("cycle")
+                item_count = len(value)
+                if item_count > self.MAX_CACHE_KEY_CONTAINER_ITEMS:
+                    raise self._CacheKeyBudgetExceeded("container_item_limit")
+                active_containers.add(value_id)
+                pending.append((value, depth, False, True))
+                if value_type is dict:
+                    # json.dumps defaults to comma-space and colon-space separators.
+                    punctuation_size = 2 + 2 * item_count + 2 * max(0, item_count - 1)
+                    total_size = self._add_cache_key_size(total_size, punctuation_size)
+                    for key, nested_value in value.items():
+                        pending.append((nested_value, depth + 1, False, False))
+                        pending.append((key, depth + 1, True, False))
+                else:
+                    punctuation_size = 2 + 2 * max(0, item_count - 1)
+                    total_size = self._add_cache_key_size(total_size, punctuation_size)
+                    for nested_value in value:
+                        pending.append((nested_value, depth + 1, False, False))
+            elif value_type is str:
+                total_size = self._add_cache_key_size(
+                    total_size, self._cache_key_json_string_size(value)
+                )
+            elif value_type is bool:
+                value_size = 4 if value else 5
+                total_size = self._add_cache_key_size(
+                    total_size, value_size + (2 if is_key else 0)
+                )
+            elif value is None:
+                total_size = self._add_cache_key_size(
+                    total_size, 4 + (2 if is_key else 0)
+                )
+            elif value_type is int:
+                bit_count = value.bit_length()
+                digit_count = 1 if bit_count == 0 else (bit_count * 302 + 999) // 1000
+                value_size = digit_count + (1 if value < 0 else 0) + (2 if is_key else 0)
+                total_size = self._add_cache_key_size(total_size, value_size)
+            elif value_type is float:
+                # Python float JSON representations, including non-finite tokens, are < 32 chars.
+                total_size = self._add_cache_key_size(
+                    total_size, 32 + (2 if is_key else 0)
+                )
+            else:
+                raise TypeError(
+                    f"Object of type {value_type.__name__} is not JSON serializable"
+                )
+
     def _make_cache_key(self, tool_name: str, params: Dict[str, Any]) -> str:
-        """Criar chave de cache para resultado"""
+        """Create the legacy cache key only after bounded preflight."""
         import json
+        self._check_cache_key_budget(tool_name, params)
         params_str = json.dumps(params, sort_keys=True)
         return hashlib.sha256(f"{tool_name}:{params_str}".encode()).hexdigest()
 
@@ -4157,7 +4278,7 @@ class RealToolUse:
                 cache_key = None
                 self.log.log_event("TOOL_CACHE_KEY_UNAVAILABLE", {
                     "tool": tool_name,
-                    "reason": type(exc).__name__,
+                    "reason": getattr(exc, "reason", type(exc).__name__),
                     "cache_bypassed": True,
                 })
         if tool.cacheable and cache_key is not None:
