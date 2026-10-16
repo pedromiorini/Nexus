@@ -3,11 +3,11 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 159
+tests: 169
 bandit_low: 131
 -->
 
-Estado oficial de referência: use o artefato `nexus-state-manifest` associado ao `HEAD`. A validação local desta rodada passou com 159 testes; esse resultado não substitui o manifesto de CI do commit.
+Estado oficial de referência: use o artefato `nexus-state-manifest` associado ao `HEAD`. A validação local desta branch passou com 169 testes unitários; a suíte integrada registrou 30 aprovados e 1 ignorado. Esses resultados locais não substituem o manifesto de CI do commit.
 Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e não devem ser usados como estado atual.
 
 | Área | Estado | Evidência verificável | Limitação |

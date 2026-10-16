@@ -15,6 +15,9 @@ class StateConsistencyAuditTests(unittest.TestCase):
             "verification": {"tests": {
                 "status": "generated", "executed": tests, "passed": tests,
                 "failed": 0, "skipped": 0, "result": "passed",
+            }, "integrated": {
+                "status": "generated", "discovered_static": 3, "passed": 2,
+                "skipped": 1, "failed": 0, "unexpected": 0, "result": "passed",
             }},
             "security": {"bandit": {"severity": {"LOW": bandit_low}}},
             "ci": {"run_id": "12345", "commit": commit, "gates_status": "success"},
@@ -115,6 +118,23 @@ class StateConsistencyAuditTests(unittest.TestCase):
             report = audit(manifest_path, directory)
             self.assertEqual(report["status"], "fail")
             self.assertTrue(any(expected_error in error for error in report["errors"]))
+
+    def test_missing_or_failed_integrated_summary_fails_closed(self):
+        directory, manifest_path = self._write_fixture()
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        del manifest["verification"]["integrated"]
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        report = audit(manifest_path, directory)
+        self.assertEqual(report["status"], "fail")
+        self.assertTrue(any("verification.integrated" in error for error in report["errors"]))
+
+        directory, manifest_path = self._write_fixture()
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["verification"]["integrated"].update(result="failed", failed=1)
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        report = audit(manifest_path, directory)
+        self.assertEqual(report["status"], "fail")
+        self.assertTrue(any("verification.integrated.result" in error for error in report["errors"]))
 
 
 if __name__ == "__main__":

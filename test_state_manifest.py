@@ -55,5 +55,62 @@ class StateManifestTests(unittest.TestCase):
                     self.assertEqual(build_manifest()["verification"]["tests"]["status"], "invalid_summary")
 
 
+    def _manifest_with_files(self, files):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, content in files.items():
+                (root / name).write_text(content, encoding="utf-8")
+            with patch("tools.state_manifest.ROOT", root), patch("tools.state_manifest._git", return_value="fixture"), patch("tools.state_manifest._document_commits", return_value={}):
+                return build_manifest("passed")
+
+    def test_manifest_reports_integrated_checks_separately_from_unittest(self):
+        summary = {
+            "schema_version": 1,
+            "scope": "embedded checks",
+            "expected": ["1", "2", "3"],
+            "passed": ["1", "2"],
+            "skipped": ["3"],
+            "missing": [],
+            "unexpected": [],
+            "conflicting": [],
+            "result": "passed",
+        }
+        manifest = self._manifest_with_files({"integrated-summary.json": json.dumps(summary)})
+        self.assertEqual(
+            manifest["verification"]["integrated"],
+            {
+                "status": "generated", "scope": "embedded checks",
+                "discovered_static": 3, "passed": 2, "skipped": 1,
+                "failed": 0, "unexpected": 0, "result": "passed",
+            },
+        )
+
+    def test_missing_or_invalid_integrated_summary_is_not_assumed(self):
+        cases = (
+            ({}, "not_generated"),
+            ({"integrated-summary.json": "not json"}, "invalid_summary"),
+            ({"integrated-summary.json": "{}"}, "invalid_summary"),
+        )
+        for files, status in cases:
+            with self.subTest(status=status):
+                manifest = self._manifest_with_files(files)
+                self.assertEqual(manifest["verification"]["integrated"], {"status": status})
+
+    def test_inconsistent_integrated_summary_is_invalid(self):
+        summary = {
+            "schema_version": 1,
+            "scope": "embedded checks",
+            "expected": ["1", "2"],
+            "passed": ["1"],
+            "skipped": [],
+            "missing": [],
+            "unexpected": [],
+            "conflicting": [],
+            "result": "passed",
+        }
+        manifest = self._manifest_with_files({"integrated-summary.json": json.dumps(summary)})
+        self.assertEqual(manifest["verification"]["integrated"], {"status": "invalid_summary"})
+
+
 if __name__ == "__main__":
     unittest.main()

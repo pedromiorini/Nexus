@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 159
+tests: 169
 bandit_low: 131
 -->
 
@@ -34,10 +34,11 @@ Conflitos não devem ser resolvidos silenciosamente.
 - Auditoria AST: 0 funções somente com `pass`, 0 `NotImplementedError`, 61 retornos constantes simples.
 - Os números de 105 testes/run `37258732531` e 86 testes/run `37097334156` permanecem apenas como histórico de marcos anteriores.
 
-## Validação local em 2026-10-16
+## Validação local da branch de acompanhamento em 2026-10-16
 
-- A suíte integral executada nesta continuidade passou com **121 testes**.
-- O Bandit encontrou **131 achados LOW**, sem MEDIUM/HIGH.
+- A suíte unitária executada nesta branch passou com **169 testes**.
+- A suíte integrada registrou **30 verificações aprovadas e 1 explicitamente ignorada** por dependência FAISS opcional indisponível.
+- O Bandit encontrou **131 achados LOW**, sem MEDIUM/HIGH; a triagem e o snapshot de realidade foram regenerados após as mudanças.
 - `RealEpisodicMemory.close_episode` incrementa `episodes_closed` somente quando o SQLite confirma a transição de um episódio aberto para fechado; repetição e ID inexistente não incrementam.
 - Esses resultados são locais; o estado oficial do commit é determinado pelo manifesto de CI associado ao `HEAD`.
 

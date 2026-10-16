@@ -25032,6 +25032,12 @@ class CompleteNexusBrain:
 # ═══════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
+    from core.integrated_suite_summary import IntegratedSuiteTally
+
+    _original_stdout = sys.stdout
+    _suite_tally = IntegratedSuiteTally(_original_stdout)
+    sys.stdout = _suite_tally
+
     print("\n" + "="*70)
     print("🧪 NEXUS CONSOLIDATED v3.28 EMBODIED COGNITION - DEMONSTRATION")
     print("="*70 + "\n")
@@ -26866,6 +26872,25 @@ if __name__ == "__main__":
         print("TEST 29: Embodied Cognition DISABLED (not enabled)")
         print("="*70)
         print("⚠️  Embodied Cognition not active in this configuration\n")
+
+    _suite_tally.flush()
+    sys.stdout = _original_stdout
+    _integrated_summary = _suite_tally.build_summary(__file__)
+    _summary_path = os.environ.get("NEXUS_INTEGRATED_SUMMARY")
+    if _summary_path:
+        _suite_tally.write_summary(_integrated_summary, _summary_path)
+    print(
+        f"EMBEDDED CHECKS: {len(_integrated_summary['passed'])} passed, "
+        f"{len(_integrated_summary['skipped'])} skipped, "
+        f"{len(_integrated_summary['missing'])} missing"
+    )
+    if _integrated_summary["result"] != "passed":
+        raise SystemExit(
+            "Embedded checks missing, unexpected or conflicting: "
+            f"missing={_integrated_summary['missing']}, "
+            f"unexpected={_integrated_summary['unexpected']}, "
+            f"conflicting={_integrated_summary['conflicting']}"
+        )
 
     print("="*70)
     print("✅ ALL TESTS PASSED - SYSTEM 100% FUNCTIONAL")

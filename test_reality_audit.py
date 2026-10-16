@@ -1,6 +1,9 @@
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
-from tools.reality_audit import build_report
+from tools.reality_audit import build_report, collect_static_evidence
 
 
 class RealityAuditTests(unittest.TestCase):
@@ -18,6 +21,20 @@ class RealityAuditTests(unittest.TestCase):
         self.assertGreater(evidence["classes"], 0)
         self.assertGreater(evidence["functions"], 0)
         self.assertGreater(evidence["embedded_test_markers"], 0)
+
+    def test_embedded_marker_inventory_includes_fractional_ids(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "constitutional_brain.py"
+            source.write_text(
+                'class Demo:\n    pass\n'
+                'print("TEST 2 PASSED")\n'
+                'print("TEST 2.5 PASSED")\n',
+                encoding="utf-8",
+            )
+            with patch("tools.reality_audit.CORE", source):
+                evidence = collect_static_evidence()
+
+        self.assertEqual(evidence["embedded_test_markers"], 2)
 
     def test_claims_are_conservatively_classified(self):
         statuses = {item["status"] for item in self.report["claims"]}
@@ -37,4 +54,3 @@ class RealityAuditTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
