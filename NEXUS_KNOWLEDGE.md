@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 213
+tests: 222
 bandit_low: 131
 -->
 
@@ -61,11 +61,20 @@ Conflitos não devem ser resolvidos silenciosamente.
 - Observação parcial: 8 tarefas, nenhum output de distribuição de crença e posterior sem nota (`unsupported_interface`); a API atual não oferece um estado de crença comparável.
 - Resultados são locais e específicos ao protocolo. Não há treino composicional, previsão probabilística gerada pelo Nexus, descoberta causal ou validação de teorias; o CI do commit é a referência oficial.
 
+## Autoauditoria de recursos do `RealToolUse` — 2026-10-16
+
+- Base local: `main` pós-PR #22, commit `27299281b636deddb5555173a9f191dd01e65013`; branch isolada `fix/math-calculate-resource-limits-2026-10-16`.
+- Achado reproduzido antes da correção: `math_calculate` aceitava literais string e repetição, podia devolver/cachear um milhão de caracteres, aceitava potências grandes e mantinha entradas expiradas.
+- Mitigação implementada: expressões numéricas somente, até 256 caracteres/64 nós AST, limites de expoente/inteiro/magnitude, TTL expurgado e cache limitado a 128 entradas, 1 MiB agregado estimado e 64 KiB por payload. O cache guarda uma cópia profunda e devolve cópias nos hits.
+- Validação local: 222/222 testes, 31 marcadores integrados (30 aprovados, 1 skip FAISS opcional), cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; 28/28 mutações direcionadas mortas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor e compileall passaram.
+- Estes resultados são locais e ainda não são CI do head da PR. `timeout_seconds` segue sem execução/cancelamento genérico; o limite de bytes do cache usa `sys.getsizeof` e não é um limite global de memória do processo.
+
 ## Componentes
 
 - `core/constitutional_brain.py`: núcleo monolítico, roteamento e componentes experimentais.
 - `core/deferred_task_queue.py`: fila priorizada, retry, descarte, callbacks e snapshots versionados.
 - `core/vram_defense_guard.py`: decisões conservadoras de pressão de memória.
+- `RealToolUse`: calculadora numérica com budgets explícitos e cache com expiração/capacidade limitadas.
 - `vita/nexus_constitutional_bridge_v3.py`: telemetria, auditoria SQLite e diagnósticos de recuperação.
 - `tools/`: auditoria de realidade, triagem de segurança, mutation testing, auditoria AST e dashboard.
 - `tools/state_manifest.py`: gera o manifesto factual por execução; o arquivo `STATE_MANIFEST.json` é artefato de CI, não snapshot manual versionado.

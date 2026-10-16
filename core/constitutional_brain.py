@@ -3789,6 +3789,18 @@ class RealToolUse:
     • × POST15 (RSI): Otimiza seleção de ferramentas
     """
 
+    MAX_CACHE_ENTRIES = 128
+    MAX_CACHE_BYTES = 1_048_576
+    MAX_CACHE_ENTRY_BYTES = 64 * 1024
+    MAX_CACHE_CONTAINER_ITEMS = 1024
+    MAX_CACHE_OBJECTS = 4096
+    MAX_MATH_EXPRESSION_LENGTH = 256
+    MAX_MATH_AST_NODES = 64
+    MAX_MATH_INTEGER_BITS = 4096
+    MAX_MATH_EXPONENT = 1024
+    MAX_MATH_ABS_RESULT = 1e100
+    MAX_MATH_ROUND_DIGITS = 100
+
     def __init__(self, constitutional_log):
         self.log = constitutional_log
 
@@ -3798,6 +3810,9 @@ class RealToolUse:
 
         # Cache de resultados
         self.result_cache: Dict[str, ToolExecutionResult] = {}
+        self._result_cache_entry_sizes: Dict[str, int] = {}
+        self._result_cache_bytes = 0
+        self._result_cache_lock = threading.RLock()
 
         # Estatísticas
         self.total_executions = 0
@@ -3807,6 +3822,98 @@ class RealToolUse:
 
         print("🔧 POST 16 - RealToolUse initialized (Safe external action capability)")
 
+    def _remove_cached_result(self, cache_key: str) -> None:
+        self.result_cache.pop(cache_key, None)
+        removed_size = self._result_cache_entry_sizes.pop(cache_key, 0)
+        self._result_cache_bytes = max(0, self._result_cache_bytes - removed_size)
+
+    def _prune_result_cache(self, now: Optional[float] = None) -> None:
+        current_time = time.time() if now is None else now
+        with self._result_cache_lock:
+            for cache_key, cached_result in list(self.result_cache.items()):
+                tool = self.registry.get_tool(cached_result.tool_name)
+                ttl = getattr(tool, "cache_ttl", 0)
+                valid_ttl_type = not isinstance(ttl, bool) and isinstance(ttl, (int, float))
+                try:
+                    ttl_seconds = float(ttl) if valid_ttl_type else 0.0
+                except (OverflowError, TypeError, ValueError):
+                    ttl_seconds = 0.0
+                age = current_time - cached_result.timestamp
+                if (
+                    not math.isfinite(ttl_seconds)
+                    or ttl_seconds <= 0
+                    or age < 0
+                    or age >= ttl_seconds
+                ):
+                    self._remove_cached_result(cache_key)
+
+    def _estimate_cache_value_size(self, value: Any) -> Optional[int]:
+        """Bound retained cache payloads without serializing/copying large values."""
+        size = 0
+        visited = set()
+        pending = [value]
+        while pending:
+            item = pending.pop()
+            item_id = id(item)
+            if item_id in visited:
+                continue
+            visited.add(item_id)
+            if len(visited) > self.MAX_CACHE_OBJECTS:
+                return None
+            if type(item) is dict:
+                if len(item) > self.MAX_CACHE_CONTAINER_ITEMS:
+                    return None
+                size += sys.getsizeof(item)
+                for key, nested_value in item.items():
+                    pending.append(key)
+                    pending.append(nested_value)
+            elif type(item) in (list, tuple, set, frozenset):
+                if len(item) > self.MAX_CACHE_CONTAINER_ITEMS:
+                    return None
+                size += sys.getsizeof(item)
+                pending.extend(item)
+            elif type(item) in (str, bytes, bytearray, int, float, bool, type(None)):
+                size += sys.getsizeof(item)
+            else:
+                return None
+            if size > self.MAX_CACHE_ENTRY_BYTES:
+                return None
+        return size
+
+    def _store_cached_result(
+        self, cache_key: str, result: ToolExecutionResult, tool: ToolDefinition
+    ) -> None:
+        if (
+            not result.success
+            or not tool.cacheable
+            or isinstance(tool.cache_ttl, bool)
+            or not isinstance(tool.cache_ttl, (int, float))
+        ):
+            return
+        try:
+            ttl_seconds = float(tool.cache_ttl)
+        except (OverflowError, TypeError, ValueError):
+            return
+        if not math.isfinite(ttl_seconds) or ttl_seconds <= 0:
+            return
+        result_size = self._estimate_cache_value_size(result.result)
+        if result_size is None or result_size > self.MAX_CACHE_ENTRY_BYTES:
+            return
+        cached_copy = copy.deepcopy(result)
+        with self._result_cache_lock:
+            self._prune_result_cache(time.time())
+            if cache_key in self.result_cache:
+                self._remove_cached_result(cache_key)
+            while self.result_cache and (
+                len(self.result_cache) >= self.MAX_CACHE_ENTRIES
+                or self._result_cache_bytes + result_size > self.MAX_CACHE_BYTES
+            ):
+                oldest_key = next(iter(self.result_cache))
+                self._remove_cached_result(oldest_key)
+            self.result_cache[cache_key] = cached_copy
+            self._result_cache_entry_sizes[cache_key] = result_size
+            self._result_cache_bytes += result_size
+
     def _make_cache_key(self, tool_name: str, params: Dict[str, Any]) -> str:
         """Criar chave de cache para resultado"""
         import json
@@ -3814,11 +3921,18 @@ class RealToolUse:
         return hashlib.sha256(f"{tool_name}:{params_str}".encode()).hexdigest()
 
     def _execute_math_calculate(self, params: Dict[str, Any]) -> Any:
-        """Executar cálculo matemático seguro"""
+        """Evaluate bounded numeric expressions without constructing large objects."""
         import ast
         import operator
 
-        # Operadores permitidos (seguro)
+        expression = params.get("expression", "")
+        if not isinstance(expression, str):
+            raise ValueError("expression must be a string")
+        if len(expression) > self.MAX_MATH_EXPRESSION_LENGTH:
+            raise ValueError(
+                f"expression exceeds {self.MAX_MATH_EXPRESSION_LENGTH} characters"
+            )
+
         allowed_operators = {
             ast.Add: operator.add,
             ast.Sub: operator.sub,
@@ -3826,58 +3940,90 @@ class RealToolUse:
             ast.Div: operator.truediv,
             ast.Pow: operator.pow,
             ast.Mod: operator.mod,
-            ast.USub: operator.neg
+            ast.USub: operator.neg,
         }
-
-        # Funções matemáticas permitidas
         allowed_functions = {
             "abs": abs,
             "min": min,
             "max": max,
             "round": round,
-            "sum": sum
+            "sum": sum,
         }
 
-        expression = params.get("expression", "")
+        def validate_number(value: Any) -> int | float:
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError("only real numeric values are allowed")
+            if isinstance(value, int) and value.bit_length() > self.MAX_MATH_INTEGER_BITS:
+                raise ValueError("integer result exceeds the supported bit limit")
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ValueError("non-finite numeric results are not allowed")
+            if abs(value) > self.MAX_MATH_ABS_RESULT:
+                raise ValueError("numeric result exceeds the supported magnitude")
+            return value
 
         try:
-            # Parse AST (seguro)
-            tree = ast.parse(expression, mode='eval')
+            tree = ast.parse(expression, mode="eval")
+            if sum(1 for _ in ast.walk(tree)) > self.MAX_MATH_AST_NODES:
+                raise ValueError("expression exceeds the supported AST complexity")
 
-            # Avaliar de forma segura
             def eval_node(node):
                 if isinstance(node, ast.Constant):
-                    # FIXED v3.94: Use ONLY ast.Constant (Python 3.8+ standard)
-                    # Covers all literal types: numbers, strings, bools, None
-                    # COMPLETELY removed ast.Num to eliminate DeprecationWarning
-                    return node.value
-                elif isinstance(node, ast.BinOp):
+                    return validate_number(node.value)
+                if isinstance(node, ast.BinOp):
                     op_type = type(node.op)
                     if op_type not in allowed_operators:
-                        raise ValueError(f"Operator {op_type} not allowed")
+                        raise ValueError(f"operator {op_type} not allowed")
                     left = eval_node(node.left)
                     right = eval_node(node.right)
-                    return allowed_operators[op_type](left, right)
-                elif isinstance(node, ast.UnaryOp):
+                    if op_type is ast.Pow:
+                        if abs(right) > self.MAX_MATH_EXPONENT:
+                            raise ValueError("exponent exceeds the supported limit")
+                        if (
+                            isinstance(left, int)
+                            and isinstance(right, int)
+                            and right > 0
+                            and abs(left) > 1
+                            and left.bit_length() * right > self.MAX_MATH_INTEGER_BITS
+                        ):
+                            raise ValueError("power would exceed the supported integer bit limit")
+                    if (
+                        op_type is ast.Mult
+                        and isinstance(left, int)
+                        and isinstance(right, int)
+                        and left != 0
+                        and right != 0
+                        and left.bit_length() + right.bit_length() > self.MAX_MATH_INTEGER_BITS
+                    ):
+                        raise ValueError("multiplication would exceed the supported integer bit limit")
+                    return validate_number(allowed_operators[op_type](left, right))
+                if isinstance(node, ast.UnaryOp):
                     op_type = type(node.op)
                     if op_type not in allowed_operators:
-                        raise ValueError(f"Operator {op_type} not allowed")
-                    operand = eval_node(node.operand)
-                    return allowed_operators[op_type](operand)
-                elif isinstance(node, ast.Call):
+                        raise ValueError(f"operator {op_type} not allowed")
+                    return validate_number(allowed_operators[op_type](eval_node(node.operand)))
+                if isinstance(node, ast.Call):
+                    if not isinstance(node.func, ast.Name) or node.keywords:
+                        raise ValueError("only positional calls to allowed functions are supported")
                     func_name = node.func.id
                     if func_name not in allowed_functions:
-                        raise ValueError(f"Function {func_name} not allowed")
+                        raise ValueError(f"function {func_name} not allowed")
+                    if len(node.args) > self.MAX_MATH_AST_NODES:
+                        raise ValueError("function call has too many arguments")
                     args = [eval_node(arg) for arg in node.args]
-                    return allowed_functions[func_name](*args)
-                else:
-                    raise ValueError(f"Node type {type(node)} not allowed")
+                    if func_name == "round":
+                        if len(args) not in (1, 2):
+                            raise ValueError("round accepts one or two arguments")
+                        if len(args) == 2 and (
+                            not isinstance(args[1], int)
+                            or abs(args[1]) > self.MAX_MATH_ROUND_DIGITS
+                        ):
+                            raise ValueError("round digits exceed the supported limit")
+                    return validate_number(allowed_functions[func_name](*args))
+                raise ValueError(f"node type {type(node)} not allowed")
 
-            result = eval_node(tree.body)
-            return result
-
-        except Exception as e:
-            raise ValueError(f"Invalid expression: {str(e)}") from e
+            return eval_node(tree.body)
+        except Exception as exc:
+            raise ValueError(f"Invalid expression: {exc}") from exc
 
     def _execute_string_transform(self, params: Dict[str, Any]) -> Any:
         """Executar transformação de string"""
@@ -3956,19 +4102,36 @@ class RealToolUse:
                 error="Parameter validation failed"
             )
 
-        # 3. Verificar cache
+        if tool_name == "math_calculate":
+            expression = params.get("expression", "")
+            if len(expression) > self.MAX_MATH_EXPRESSION_LENGTH:
+                error = f"expression exceeds {self.MAX_MATH_EXPRESSION_LENGTH} characters"
+                self.failed_executions += 1
+                self.log.log_event("TOOL_EXECUTION_FAILED", {"tool": tool_name, "error": error})
+                return ToolExecutionResult(
+                    tool_name=tool_name,
+                    success=False,
+                    result=None,
+                    error=error,
+                    execution_time=time.time() - start_time,
+                )
+        # 3. Verificar cache; entradas expiradas são removidas antes de novo acesso.
+        self._prune_result_cache(time.time())
         cache_key = self._make_cache_key(tool_name, params)
-        if tool.cacheable and cache_key in self.result_cache:
-            cached_result = self.result_cache[cache_key]
-
-            # Verificar TTL
-            age = time.time() - cached_result.timestamp
-            if age < tool.cache_ttl:
-                self.cached_executions += 1
-                self.successful_executions += 1  # Cache hit counts as success
-                cached_result.cached = True
-                return cached_result
-
+        if tool.cacheable:
+            with self._result_cache_lock:
+                cached_result = self.result_cache.get(cache_key)
+                if cached_result is not None:
+                    age = time.time() - cached_result.timestamp
+                    if 0 <= age < tool.cache_ttl:
+                        self.result_cache.pop(cache_key)
+                        self.result_cache[cache_key] = cached_result
+                        cached_copy = copy.deepcopy(cached_result)
+                        self.cached_executions += 1
+                        self.successful_executions += 1
+                        cached_copy.cached = True
+                        return cached_copy
+                    self._remove_cached_result(cache_key)
         # 4. Executar ferramenta
         try:
             # Mapeamento de ferramentas built-in
@@ -4007,9 +4170,8 @@ class RealToolUse:
                 cached=False
             )
 
-            # Cachear resultado
-            if tool.cacheable:
-                self.result_cache[cache_key] = execution_result
+            # Cachear apenas resultados pequenos e respeitando limites globais.
+            self._store_cached_result(cache_key, execution_result, tool)
 
             # Atualizar estatísticas
             self.successful_executions += 1

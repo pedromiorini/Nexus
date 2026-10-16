@@ -106,3 +106,12 @@
 - **Evidência:** `benchmarks/nexus_capability_benchmark.py`, `test_capability_benchmark.py` e `benchmarks/README.md`.
 - **Limitação:** benchmark sintético específico às APIs atuais; não valida aprendizagem composicional, descoberta/identificação causal, geração de probabilidades ou teorias cognitivas.
 - **Reversibilidade:** fácil.
+
+## D-014 — Calculadora e cache têm budgets de recursos explícitos
+
+- **Decisão:** `math_calculate` aceita apenas expressões numéricas finitas com limites de tamanho, complexidade AST, expoente e magnitude; o cache expurga entradas vencidas, limita entradas/payload estimado e isola resultados mutáveis por cópias profundas.
+- **Contexto:** um literal string repetido e potências grandes podiam produzir resultados arbitrariamente grandes; entradas expiradas permaneciam retidas.
+- **Motivo:** reduzir consumo controlável de CPU/memória sem alegar isolamento de processo ou execução com timeout.
+- **Evidência:** `test_math_calculate_resource_limits.py` e reprodução local antes do patch; 222 testes passaram localmente nesta branch.
+- **Limitação:** o payload usa estimativa `sys.getsizeof`; não é limite global do processo. `ToolDefinition.timeout_seconds` continua sem cancelamento genérico.
+- **Reversibilidade:** fácil.
