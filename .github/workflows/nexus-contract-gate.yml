@@ -41,7 +41,7 @@ jobs:
         run: echo "NEXUS_AUDIT_DB=$RUNNER_TEMP/nexus_audit.sqlite3" >> "$GITHUB_ENV"
 
       - name: Lint Python (ruff)
-        run: ruff check core vita tools test_*.py
+        run: ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py
 
       - name: Install actionlint (pinned, checksum-verified)
         run: |
@@ -67,7 +67,7 @@ jobs:
           zizmor --offline --no-progress .github/workflows
 
       - name: Compile all Python modules
-        run: python -m compileall -q core vita tools test_*.py
+        run: python -m compileall -q core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py
 
       - name: Generate reality audit report
         run: python tools/reality_audit.py
@@ -147,6 +147,23 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Run versioned POMDP belief benchmark v2
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest -v test_pomdp_belief_filter_contract.py test_pomdp_benchmark_v2.py
+          python -m benchmarks.nexus_pomdp_benchmark_v2 --seed 20261016 --output pomdp-belief-benchmark-v2.json
+          test -s pomdp-belief-benchmark-v2.json
+
+      - name: Retain POMDP belief benchmark v2 report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nexus-pomdp-belief-benchmark-v2
+          path: pomdp-belief-benchmark-v2.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Run targeted mutation gate
         run: python tools/targeted_mutation.py
 
@@ -214,6 +231,7 @@ jobs:
           rm -f test-summary.json
           rm -f integrated-summary.json
           rm -f capability-benchmark.json
+          rm -f pomdp-belief-benchmark-v2.json
           if find . -type f \( -name '*.sqlite3' -o -name '*.db' \) -print -quit | grep -q .; then
             echo 'Unexpected database artifact detected'
             exit 1

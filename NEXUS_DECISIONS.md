@@ -115,3 +115,12 @@
 - **Evidência:** `test_math_calculate_resource_limits.py` e reprodução local antes do patch; 222 testes passaram localmente nesta branch.
 - **Limitação:** o payload usa estimativa `sys.getsizeof`; não é limite global do processo. `ToolDefinition.timeout_seconds` continua sem cancelamento genérico.
 - **Reversibilidade:** fácil.
+
+## D-015 — Filtro POMDP de um passo com modelo explícito
+
+- **Decisão:** `RealPredictiveCodingSystem.update_belief_state` é uma operação pura que recebe estados, prior, transições e likelihoods; limita o espaço a 128 estados, valida as distribuições e calcula o posterior com log-sum-exp. Evidência realmente nula é rejeitada, sem posterior uniforme.
+- **Contexto:** o benchmark v1 exercita `hierarchical_prediction_cycle`, que não expõe distribuição sobre estados ocultos; adicionar uma nova saída ao ciclo legado mudaria seu contrato.
+- **Motivo:** tornar mensurável a atualização de crença por modelo fornecido sem atribuir ao Nexus aprendizagem de modelo ou planejamento, e sem alterar o protocolo v1.
+- **Evidência:** `test_pomdp_belief_filter_contract.py`, `test_pomdp_benchmark_v2.py` (inclui seed `20261016` e teste de falha injetada), `benchmarks/nexus_pomdp_benchmark_v2.py` e o artefato v2 do workflow. A CLI falha se qualquer posterior ultrapassar `1e-12` ou algum controle inválido for aceito.
+- **Limitação:** o filtro não aprende o prior, a matriz de transição ou o modelo de observação; não resolve políticas nem demonstra inferência em ambiente real. A lacuna da interface de observação parcial do v1 permanece.
+- **Reversibilidade:** fácil; protocolo e schema v2 são independentes do benchmark v1.

@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 222
+tests: 240
 bandit_low: 131
 -->
 
@@ -68,6 +68,15 @@ Conflitos não devem ser resolvidos silenciosamente.
 - Mitigação implementada: expressões numéricas somente, até 256 caracteres/64 nós AST, limites de expoente/inteiro/magnitude, TTL expurgado e cache limitado a 128 entradas, 1 MiB agregado estimado e 64 KiB por payload. O cache guarda uma cópia profunda e devolve cópias nos hits.
 - Validação local: 222/222 testes, 31 marcadores integrados (30 aprovados, 1 skip FAISS opcional), cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; 28/28 mutações direcionadas mortas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor e compileall passaram.
 - Estes resultados são locais e ainda não são CI do head da PR. `timeout_seconds` segue sem execução/cancelamento genérico; o limite de bytes do cache usa `sys.getsizeof` e não é um limite global de memória do processo.
+
+## Filtro de crença POMDP e benchmark v2 — 2026-10-16
+
+- Base local: `main` pós-PR #23, commit `e3cc760597aa1782aef9879a8f88ee6f48032348`; branch isolada `feat/pomdp-belief-filter-v2-post-pr23-2026-10-16`.
+- `RealPredictiveCodingSystem.update_belief_state` implementa uma atualização pura de um passo, valida entradas estocásticas, limita o espaço a 128 estados, usa log-sum-exp e rejeita evidência realmente nula.
+- Protocolo separado `nexus.pomdp-belief-benchmark.v2`: 128 modelos determinísticos de 2–8 estados e 635 probabilidades comparadas com uma referência independente; erro absoluto médio `3.001891167837976e-17`, máximo `2.7755575615628914e-16`, 128/128 dentro de `1e-12`; 4/4 controles inválidos rejeitados. Taskset SHA-256: `232371d0e8e948f4b0a004261e3d271b1003aed8d0de8c931d3439f9d370d025`.
+- Validação local: 240/240 testes, sem falhas/skips/XPASS; suíte integrada 30 aprovadas e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation 28/28 mortas, 0 sobreviventes/não aplicadas; Ruff, compileall, actionlint, zizmor, Bandit (131 LOW, nenhum MEDIUM/HIGH) e auditorias AST passaram.
+- O gate verifica a seed do workflow (`20261016`) e a CLI retorna código 1 se qualquer caso exceder `1e-12` ou um controle inválido for aceito; o relatório da falha é preservado pelo workflow quando gerado.
+- O protocolo v1 permaneceu inalterado: a trilha de observação parcial continua `unsupported_interface`. O v2 recebe o modelo completo e não mede aprendizagem, descoberta de estados ou planejamento; CI oficial do novo head ainda precisa confirmar os resultados locais.
 
 ## Componentes
 

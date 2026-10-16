@@ -25,11 +25,8 @@
 - Registrar disponibilidade e qualidade de backends opcionais.
 - Separar métrica operacional de alegação cognitiva.
 - Manter `benchmarks/` versionado, determinístico e com outputs retidos no CI; comparar números somente entre versões compatíveis do protocolo.
-- Definir um contrato explícito de estado de crença antes de pontuar inferência POMDP no `RealPredictiveCodingSystem`:
-  - atualização `b_{t+1}(s') ∝ O(o|s',a) Σ_s T(s'|s,a)b_t(s)`, seguida de normalização explícita;
-  - espaço de estados finito, prior normalizado, transições por linha estocásticas e likelihoods em `[0,1]` fornecidos como entrada;
-  - rejeitar dimensões incompatíveis, valores negativos/não finitos e evidência de observação zero; não fabricar posterior uniforme;
-  - usar protocolo v2 para qualquer nova pontuação e não alegar que o filtro aprende o modelo ou resolve uma política. Referência: [Ross et al. (2011), JMLR](https://www.jmlr.org/papers/volume12/ross11a/ross11a.pdf).
+- **POMDP/belief state:** o filtro puro de um passo e o benchmark separado `nexus.pomdp-belief-benchmark.v2` estão implementados. O contrato aplica `b_{t+1}(s') ∝ O(o|s',a) Σ_s T(s'|s,a)b_t(s)`, valida prior/transições/likelihoods, limita o espaço a 128 estados, usa log-sum-exp e rejeita evidência nula. O scorer/CLI falha fechado se algum caso exceder a tolerância ou algum controle inválido for aceito; a seed do workflow é coberta diretamente por teste.
+- A trilha de observação parcial do protocolo v1 permanece `unsupported_interface`; o v2 mede somente um modelo explicitamente fornecido e não reivindica aprendizagem, descoberta de estados ou planejamento de política. Referência: [Ross et al. (2011), JMLR](https://www.jmlr.org/papers/volume12/ross11a/ross11a.pdf).
 
 ## Prioridade 4 — dependências opcionais
 
