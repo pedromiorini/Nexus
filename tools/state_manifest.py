@@ -51,6 +51,15 @@ def _test_summary() -> dict[str, Any]:
         required = ("executed", "passed", "failed", "skipped", "result")
         if not all(key in summary for key in required):
             return {"status": "invalid_summary"}
+        counts = ("executed", "passed", "failed", "skipped")
+        if any(type(summary[key]) is not int or summary[key] < 0 for key in counts):
+            return {"status": "invalid_summary"}
+        if summary["passed"] + summary["failed"] + summary["skipped"] != summary["executed"]:
+            return {"status": "invalid_summary"}
+        if summary["result"] not in {"passed", "failed"}:
+            return {"status": "invalid_summary"}
+        if (summary["result"] == "passed") != (summary["failed"] == 0):
+            return {"status": "invalid_summary"}
         return {"status": "generated", **{key: summary[key] for key in required}}
     except (OSError, json.JSONDecodeError, TypeError):
         return {"status": "not_generated"}
@@ -121,7 +130,7 @@ def _ast_summary() -> dict[str, Any]:
     return summary
 
 
-def build_manifest(test_result: str = "not_run", test_command: str | None = None, ci_status: str | None = None) -> dict[str, Any]:
+def build_manifest(test_result: str = "not_run", test_command: str | None = None, gates_status: str | None = None) -> dict[str, Any]:
     commit = os.environ.get("GITHUB_SHA") or _git("rev-parse", "HEAD")
     branch = os.environ.get("GITHUB_REF_NAME") or _git("branch", "--show-current")
     run_id = os.environ.get("GITHUB_RUN_ID")
@@ -133,7 +142,7 @@ def build_manifest(test_result: str = "not_run", test_command: str | None = None
         "result": test_summary.get("result", test_result),
     }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "repository": {"branch": branch, "commit": commit, "worktree": "clean_required"},
         "verification": {
@@ -142,7 +151,12 @@ def build_manifest(test_result: str = "not_run", test_command: str | None = None
         },
         "security": {"bandit": _bandit_summary()},
         "mutation": _mutation_summary(),
-        "ci": {"run_id": run_id or "not_ci", "commit": os.environ.get("GITHUB_SHA", commit), "status": ci_status or "not_ci"},
+        "ci": {
+            "run_id": run_id or "not_ci",
+            "commit": os.environ.get("GITHUB_SHA", commit),
+            # Refere-se ao job de gates já concluído, não à conclusão final deste workflow.
+            "gates_status": gates_status or "not_ci",
+        },
         "optional_dependencies": _optional_dependencies(),
         "documents": {"latest_commits": _document_commits()},
         "provenance": {"generator": "tools/state_manifest.py", "source_of_truth": "generated execution artifact"},
@@ -154,9 +168,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", default="STATE_MANIFEST.json")
     parser.add_argument("--test-result", default="not_run")
     parser.add_argument("--test-command")
-    parser.add_argument("--ci-status")
+    parser.add_argument("--gates-status")
     args = parser.parse_args(argv)
-    manifest = build_manifest(args.test_result, args.test_command, args.ci_status)
+    manifest = build_manifest(args.test_result, args.test_command, args.gates_status)
     output = ROOT / args.output
     output.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps(manifest, indent=2, ensure_ascii=False))

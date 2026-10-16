@@ -1,6 +1,7 @@
 import json
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from core.deferred_task_queue import DeferredTaskQueue
 from core.constitutional_brain import CentralRouter
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
@@ -49,6 +50,58 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(queue.statistics()["retried"], 1)
         self.assertEqual(queue.statistics()["completed"], 1)
 
+    def test_direct_complete_and_discard_remove_pending_tasks_once(self):
+        queue = DeferredTaskQueue()
+        completed = queue.enqueue("complete before pop")
+        discarded = queue.enqueue("discard before pop")
+
+        self.assertTrue(queue.complete(completed.task_id))
+        self.assertFalse(queue.complete(completed.task_id))
+        self.assertTrue(queue.discard(discarded.task_id))
+        self.assertFalse(queue.discard(discarded.task_id))
+        self.assertEqual(queue.statistics()["depth"], 0)
+        self.assertEqual(queue.statistics()["completed"], 1)
+        self.assertEqual(queue.statistics()["discarded"], 1)
+        self.assertIsNone(queue.recheck_and_pop(False))
+
+    def test_requeue_rejects_duplicate_reentry_and_capacity_overflow(self):
+        queue = DeferredTaskQueue(max_size=2)
+        task = queue.enqueue("retry")
+        popped = queue.recheck_and_pop(False)
+        self.assertTrue(queue.requeue(popped, "first retry"))
+        self.assertFalse(queue.requeue(popped, "duplicate retry"))
+        self.assertEqual(queue.statistics()["depth"], 1)
+
+        full = DeferredTaskQueue(max_size=1)
+        full.enqueue("in flight")
+        in_flight = full.recheck_and_pop(False)
+        full.enqueue("fills available slot")
+        self.assertFalse(full.requeue(in_flight))
+        self.assertFalse(full.requeue(in_flight))
+        self.assertEqual(full.statistics()["depth"], 1)
+        self.assertEqual(full.statistics()["discarded"], 1)
+
+    def test_concurrent_consumers_complete_each_task_exactly_once(self):
+        queue = DeferredTaskQueue(max_size=200)
+        for index in range(200):
+            queue.enqueue(f"task-{index}")
+
+        def drain(_worker):
+            while True:
+                task = queue.recheck_and_pop(False)
+                if task is None:
+                    return
+                queue.complete(task.task_id)
+
+        with ThreadPoolExecutor(max_workers=8) as workers:
+            list(workers.map(drain, range(8)))
+
+        stats = queue.statistics()
+        self.assertEqual(stats["depth"], 0)
+        self.assertEqual(stats["retried"], 200)
+        self.assertEqual(stats["completed"], 200)
+        self.assertEqual(stats["discarded"], 0)
+
     def test_consume_batch_completes_tasks(self):
         queue = DeferredTaskQueue()
         queue.enqueue("a", priority=1)
@@ -91,6 +144,32 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(success, ["ok"])
         self.assertEqual(failure, ["bad"])
         self.assertEqual(discarded, ["bad"])
+
+    def test_callback_exceptions_are_reported_without_stopping_the_batch(self):
+        queue = DeferredTaskQueue(max_attempts=1)
+        queue.enqueue("ok")
+        queue.enqueue("bad")
+
+        def broken(_task):
+            raise RuntimeError("callback failed")
+
+        result = queue.consume(
+            lambda task: task.prompt == "ok",
+            max_batch=2,
+            on_success=broken,
+            on_failure=broken,
+            on_discard=broken,
+        )
+
+        self.assertEqual(result["processed"], 2)
+        self.assertEqual(result["completed"], 1)
+        self.assertEqual(result["discarded"], 1)
+        self.assertEqual(queue.statistics()["depth"], 0)
+        self.assertCountEqual(
+            [error["callback"] for error in result["callback_errors"]],
+            ["on_success", "on_failure", "on_discard"],
+        )
+        self.assertTrue(all(error["exception"] == "RuntimeError" for error in result["callback_errors"]))
 
     def test_router_reprocess_preserves_context_and_metrics(self):
         router = CentralRouter.__new__(CentralRouter)

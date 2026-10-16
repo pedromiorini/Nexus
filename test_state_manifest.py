@@ -10,12 +10,12 @@ from tools.state_manifest import build_manifest, main
 class StateManifestTests(unittest.TestCase):
     def test_manifest_contains_current_commit_and_test_inventory(self):
         with patch.dict("os.environ", {"GITHUB_SHA": "abc123", "GITHUB_REF_NAME": "main"}, clear=False):
-            manifest = build_manifest("passed", "python -m unittest discover", "success")
+            manifest = build_manifest("passed", "python -m unittest discover", gates_status="success")
         self.assertEqual(manifest["repository"]["commit"], "abc123")
         self.assertEqual(manifest["repository"]["branch"], "main")
         self.assertEqual(manifest["verification"]["tests"]["result"], "passed")
         self.assertGreaterEqual(manifest["verification"]["tests"]["discovered_static"], 1)
-        self.assertEqual(manifest["ci"]["status"], "success")
+        self.assertEqual(manifest["ci"]["gates_status"], "success")
 
     def test_cli_writes_json_artifact(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -23,7 +23,7 @@ class StateManifestTests(unittest.TestCase):
             with patch("tools.state_manifest.ROOT", Path.cwd()):
                 self.assertEqual(main(["--output", str(output), "--test-result", "passed"]), 0)
             payload = json.loads(output.read_text(encoding="utf-8"))
-            self.assertEqual(payload["schema_version"], 1)
+            self.assertEqual(payload["schema_version"], 2)
             self.assertIn("provenance", payload)
             self.assertIn("discovered_static", payload["verification"]["tests"])
 
@@ -40,6 +40,19 @@ class StateManifestTests(unittest.TestCase):
             self.assertEqual(tests["executed"], 11)
             self.assertEqual(tests["failed"], 1)
             self.assertEqual(tests["result"], "failed")
+
+    def test_manifest_rejects_inconsistent_test_summary(self):
+        invalid_summaries = (
+            '{"executed": 2, "passed": 2, "failed": 1, "skipped": 0, "result": "passed"}',
+            '{"executed": true, "passed": 1, "failed": 0, "skipped": 0, "result": "passed"}',
+            '{"executed": 1, "passed": 0, "failed": 0, "skipped": 0, "result": "passed"}',
+        )
+        for content in invalid_summaries:
+            with self.subTest(content=content), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "test-summary.json").write_text(content, encoding="utf-8")
+                with patch("tools.state_manifest.ROOT", root), patch("tools.state_manifest._git", return_value="fixture"), patch("tools.state_manifest._document_commits", return_value={}):
+                    self.assertEqual(build_manifest()["verification"]["tests"]["status"], "invalid_summary")
 
 
 if __name__ == "__main__":

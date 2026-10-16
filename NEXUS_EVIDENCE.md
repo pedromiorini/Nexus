@@ -3,16 +3,18 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 121
+tests: 159
 bandit_low: 131
 -->
 
-Estado oficial de referência: use o artefato `nexus-state-manifest` associado ao `HEAD`. A validação local desta continuidade passou com 121 testes; esse resultado não substitui o manifesto de CI do commit.
+Estado oficial de referência: use o artefato `nexus-state-manifest` associado ao `HEAD`. A validação local desta rodada passou com 159 testes; esse resultado não substitui o manifesto de CI do commit.
 Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e não devem ser usados como estado atual.
 
 | Área | Estado | Evidência verificável | Limitação |
 |---|---|---|---|
 | Fila | verificado no contrato | testes de prioridade, retry, capacidade, snapshot e atomicidade | sem carga distribuída ou exactly-once |
+| Log imutável | verificado no contrato | triggers append-only, verificação da cadeia, detecção de adulteração/remoção, reabertura e escritores concorrentes | truncamento final ou rehash por quem controla o arquivo exige âncora externa |
+| Detector de jailbreak | testado por regressão EN/PT | corpus benigno/malicioso, NFKC, caracteres invisíveis, homoglifos, leetspeak e entradas longas | heurística, não fronteira de segurança semântica nem substituto de controle de privilégio |
 | Diagnósticos | verificado no contrato | schema versionado, validação, dashboard e fuzzing de payloads JSON | estrutura não prova correção cognitiva nem cobre entradas não-JSON arbitrárias |
 | Memória SQL | parcial/verificado no fallback | testes adversariais e queries parametrizadas | busca semântica opcional não estava disponível |
 | Memória episódica | verificado no contrato | estatísticas derivadas do SQLite, ciclo de vida concorrente serializado, contagem somente em transições `open` → `closed` e testes independentes | escopo local; sem locking distribuído ou exactly-once |

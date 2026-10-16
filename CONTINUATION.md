@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 121
+tests: 159
 bandit_low: 131
 -->
 
@@ -11,12 +11,12 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Branch:** `main`
+- **Branch de trabalho:** `fix/audit-hardening-2026-10-16`, baseada em `origin/main` (`7c8a187`).
 - **Base remota sincronizada:** `origin/main` contém o gerador de manifesto e a reconciliação documental; use o artefato `nexus-state-manifest` do CI para o SHA exato verificado.
-- **Marco desta rodada:** `STATE_MANIFEST.json` passou a ser gerado e retido pelo CI, eliminando a dependência de snapshots manuais para commit, testes, segurança e mutation.
+- **Marco desta rodada:** o manifesto final agora é produzido em job posterior ao gate, com `gates_status` vinculado ao resultado concluído; o auditor exige testes aprovados, zero falhas e SHA coerente.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
-- **Validação local desta continuidade — base `c1bde88`, 2026-10-16 (não é CI):** Python 3.12.3; `PYTHONPATH=. /tmp/nexus-venv/bin/python -m unittest discover -p 'test_*.py' -q` passou com 121 testes; Bandit encontrou 131 LOW e nenhum MEDIUM/HIGH; compilação dos arquivos alterados e `git diff --check` passaram. O teste de memória episódica confirma que apenas uma transição `open` → `closed` incrementa `episodes_closed`; dependências opcionais `psutil`, FAISS e SentenceTransformers permanecem ausentes. A validação oficial de cada commit deve ser lida no manifesto de CI correspondente.
+- **Validação local desta rodada — base `7c8a187`, 2026-10-16 (não é CI):** Python 3.11.16 com o lockfile do CI e Python 3.12.3; 159 testes passaram em ambos; cobertura branch de `core/deferred_task_queue.py` 96% (gate 90%) e da ponte Vita 74% (gate 70%); mutação direcionada 10/10 mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH; auditor de consistência do manifesto passou no cenário local. `compileall`, integração do Nexus, YAML do workflow e `git diff --check` passaram. A validação oficial de cada commit deve ser lida no manifesto de CI correspondente.
 
 ## O que está implementado
 
@@ -30,7 +30,9 @@ bandit_low: 131
 - `tools/security_triage.py` e `SECURITY_TRIAGE.md`: inventário conservador dos achados Bandit, sem supressão automática.
 - `test_memory_sql_contract.py`: teste adversarial para a fronteira SQL do fallback parametrizado da memória.
 - `tools/targeted_mutation.py`: mutation testing direcionado para fila, Vita e schema.
-- `core/deferred_task_queue.py`: snapshot versionado `nexus.deferred_task_queue.v1`, exportação JSON/objeto, restauração atômica, validação de tipos/capacidade/IDs e opção `replace=True`.
+- `core/deferred_task_queue.py`: transições de estado protegidas por `RLock`; conclusão/descarte removem tarefas pendentes do heap, retry é único e limitado, callbacks defeituosos são reportados sem interromper o lote; snapshots versionados continuam atômicos.
+- `RealImmutableLog`: triggers bloqueiam UPDATE/DELETE, o SHA-chain é verificado na inicialização e detecta adulteração/remoção; writes de conexões concorrentes são serializados. Truncamento final ou rehash por quem controla o arquivo ainda exige âncora externa.
+- `RealJailbreakDetector`: normalização Unicode, sinais por frases e fronteiras de palavra reduzem falsos positivos e detectam ofuscações testadas em inglês/português; continua heurístico, não é uma fronteira de segurança.
 - `test_deferred_task_snapshot.py`: contrato de round-trip, ordem, atomicidade, limites, tipos inválidos e ausência de execução durante restauração.
 - Auditoria de realidade em `tools/reality_audit.py`.
 - Hardening do fallback SQL em `RealHierarchicalMemory`: consultas estáticas parametrizadas por termo, sem montagem dinâmica de placeholders.
@@ -103,8 +105,8 @@ bandit_low: 131
 - **Shadow clones:** conhecimento é enviado ao bootstrap apenas via `ingest_knowledge`; ausência do protocolo gera evento `integrated=false` e não é apresentada como treinamento.
 - **Reminiscência:** `is_typical` é `true` somente quando o bucket de maior densidade está entre 10 e 30 anos; picos fora da faixa continuam sendo retornados, mas marcados como atípicos.
 - **Correção:** descrições malformadas de mínimo/máximo retornam imediatamente o conteúdo original, preservando o comportamento seguro já testado.
-- **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
-- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; a validação local desta continuidade registrou 121 testes e 131 findings LOW; o estado oficial de cada `HEAD` deve ser confirmado pelo manifesto do CI associado.
+- **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 59 retornos constantes simples restantes.
+- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; esta branch registrou 159 testes e 131 findings LOW na validação local; o estado oficial de cada `HEAD` deve ser confirmado pelo manifesto do CI associado.
 - **Manifesto factual:** o CI associado ao `HEAD` gera e retém `nexus-state-manifest`; commits e métricas sem esse artefato são classificados como não verificados.
 
 ## Gates do workflow local

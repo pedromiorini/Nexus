@@ -149,6 +149,8 @@ from collections import defaultdict, deque
 import threading
 import os
 import sys
+import unicodedata
+import weakref
 
 # Importar o bridge Vita; CentralRouter e EthicsGuard são definidos neste módulo.
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
@@ -964,53 +966,126 @@ class LogEntry:
     previous_hash: str
 
 class RealImmutableLog:
-    """POST29: Immutable Constitutional Log - CONSOLIDADO"""
+    """POST29: log constitucional append-only com encadeamento verificável.
+
+    Os triggers bloqueiam UPDATE/DELETE por conexões comuns; ``verify_chain``
+    detecta adulteração e remoção de entradas. Truncamento do fim ou reescrita
+    de toda a cadeia por quem controla o arquivo exigem ancorar ``head`` fora
+    deste banco; o hash-chain, sozinho, não é uma assinatura de não repúdio.
+    """
+
+    GENESIS_HASH = "0" * 64
 
     def __init__(self, db_path: str = ":memory:"):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
-        self.db_lock = threading.Lock()  # FIXED v3.65: Thread safety for SQLite
+        self.db_lock = threading.RLock()
+        self._finalizer = weakref.finalize(self, sqlite3.Connection.close, self.conn)
+        self.conn.execute("PRAGMA busy_timeout = 5000")
         self._create_tables()
-        self.current_hash = "0" * 64
+        report = self.verify_chain()
+        if not report["ok"]:
+            self.close()
+            raise ValueError(
+                f"cadeia do log inválida na sequência {report['first_invalid_sequence']}: {report['reason']}"
+            )
+        self.current_hash = report["head"]
 
     def _create_tables(self):
-        cursor = self.conn.cursor()
-        cursor.executescript("""
-            CREATE TABLE IF NOT EXISTS log_entries (
-                sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_type TEXT NOT NULL,
-                event_data TEXT NOT NULL,
-                timestamp REAL NOT NULL,
-                content_hash TEXT NOT NULL,
-                previous_hash TEXT NOT NULL
-            );
-        """)
-        self.conn.commit()
+        with self.db_lock:
+            self.conn.executescript("""
+                CREATE TABLE IF NOT EXISTS log_entries (
+                    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    event_data TEXT NOT NULL,
+                    timestamp REAL NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    previous_hash TEXT NOT NULL
+                );
+                CREATE TRIGGER IF NOT EXISTS log_entries_no_update
+                BEFORE UPDATE ON log_entries
+                BEGIN
+                    SELECT RAISE(ABORT, 'log_entries is append-only');
+                END;
+                CREATE TRIGGER IF NOT EXISTS log_entries_no_delete
+                BEFORE DELETE ON log_entries
+                BEGIN
+                    SELECT RAISE(ABORT, 'log_entries is append-only');
+                END;
+            """)
+            self.conn.commit()
+
+    def _load_head(self) -> str:
+        row = self.conn.execute(
+            "SELECT content_hash FROM log_entries ORDER BY sequence DESC LIMIT 1"
+        ).fetchone()
+        return row[0] if row else self.GENESIS_HASH
+
+    def close(self) -> None:
+        """Fecha a conexão SQLite de modo idempotente."""
+        with self.db_lock:
+            if self._finalizer.alive:
+                self._finalizer()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        self.close()
 
     def log_event(self, event_type: str, event_data: Dict) -> str:
-        """Log evento e retornar hash (correção de auditoria)"""
-        # FIXED v3.68: Thread-safe with lock
+        """Registra evento em uma transação serializada e retorna seu SHA-256."""
+        data_str = json.dumps(event_data, sort_keys=True, allow_nan=False)
         with self.db_lock:
-            cursor = self.conn.cursor()
-            ts = time.time()
-
-            # Serialize data
-            data_str = json.dumps(event_data, sort_keys=True)
-
-            # Calculate hash
-            content = f"{event_type}|{data_str}|{ts}|{self.current_hash}"
-            content_hash = hashlib.sha256(content.encode()).hexdigest()
-
-            # Insert
-            cursor.execute("""
-                INSERT INTO log_entries (event_type, event_data, timestamp, content_hash, previous_hash)
-                VALUES (?, ?, ?, ?, ?)
-            """, (event_type, data_str, ts, content_hash, self.current_hash))
-
-            self.conn.commit()
+            try:
+                # BEGIN IMMEDIATE serializa escritores de outras conexões; o
+                # hash anterior sempre vem do banco, não de cache local.
+                self.conn.execute("BEGIN IMMEDIATE")
+                previous_hash = self._load_head()
+                ts = time.time()
+                content = f"{event_type}|{data_str}|{ts}|{previous_hash}"
+                content_hash = hashlib.sha256(content.encode()).hexdigest()
+                self.conn.execute("""
+                    INSERT INTO log_entries
+                        (event_type, event_data, timestamp, content_hash, previous_hash)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (event_type, data_str, ts, content_hash, previous_hash))
+                self.conn.commit()
+            except Exception:
+                self.conn.rollback()
+                raise
             self.current_hash = content_hash
+            return content_hash
 
-            return content_hash  # Retorna STRING, não objeto
+    def verify_chain(self) -> Dict[str, Any]:
+        """Recalcula a cadeia inteira e retorna a primeira inconsistência, se houver."""
+        with self.db_lock:
+            rows = self.conn.execute(
+                "SELECT sequence, event_type, event_data, timestamp, content_hash, previous_hash "
+                "FROM log_entries ORDER BY sequence ASC"
+            ).fetchall()
+        expected_previous = self.GENESIS_HASH
+        for sequence, event_type, event_data, timestamp, content_hash, previous_hash in rows:
+            if previous_hash != expected_previous:
+                return {
+                    "ok": False, "entries": len(rows), "head": expected_previous,
+                    "first_invalid_sequence": sequence,
+                    "reason": "previous_hash não confere com a entrada anterior (remoção ou reordenação)",
+                }
+            recomputed = hashlib.sha256(
+                f"{event_type}|{event_data}|{timestamp}|{previous_hash}".encode()
+            ).hexdigest()
+            if recomputed != content_hash:
+                return {
+                    "ok": False, "entries": len(rows), "head": expected_previous,
+                    "first_invalid_sequence": sequence,
+                    "reason": "content_hash não confere com o conteúdo (adulteração)",
+                }
+            expected_previous = content_hash
+        return {
+            "ok": True, "entries": len(rows), "head": expected_previous,
+            "first_invalid_sequence": None, "reason": "ok",
+        }
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1078,49 +1153,151 @@ class JailbreakDetection:
     severity: float
     confidence: float
     reason: str
+    signals: Tuple[str, ...] = ()
+
+def _build_jailbreak_signals() -> list:
+    """Sinais do detector de jailbreak: (nome, tipo de ataque, peso, regex compilada, escopo).
+
+    Escopos: ``norm`` (texto normalizado, minúsculo e sem acentos), ``cased`` (texto NFKC
+    preservando maiúsculas, usado para o persona "DAN") e ``squash`` (apenas letras e
+    dígitos, para ofuscação por espaçamento ou pontuação). Pesos: 1.0 = frase forte
+    (dispara sempre); < 1.0 = sinal fraco, que só dispara quando somado a outros ou
+    quando ``sensitivity`` é alta.
+    """
+    word = r"[a-z0-9']+"
+
+    def gap(maximum: int) -> str:
+        return r"(?:\W+" + word + r"){0," + str(maximum) + r"}?"
+
+    en_verb = (r"(?:ignor(?:e|ing)|disregard(?:ing)?|forget(?:ting)?|overrid(?:e|ing)|bypass(?:ing)?"
+               r"|circumvent(?:ing)?|disabl(?:e|ing)|abandon(?:ing)?)")
+    en_qual = r"(?:previous|prior|earlier|above|preceding|initial|original|system|your|safety|ethical|developer|programmed)"
+    en_noun = (r"(?:instructions?|prompts?|rules|guidelines?|directives?|programming|training|restrictions?"
+               r"|guardrails?|safeguards?|constraints?|policies|policy|filters?|limitations?|protocols?)")
+    pt_verb = (r"(?:ignor(?:e|a|ar|ando)|desconsider(?:e|a|ar|ando)|esque(?:ca|cer|cendo)|desobede(?:ca|cer)"
+               r"|desrespeit(?:e|ar)|desativ(?:e|ar|ando)|burl(?:e|ar)|contorn(?:e|ar)|sobrescrev(?:a|er)"
+               r"|substitu(?:a|ir)|abandon(?:e|ar))")
+    pt_qual = (r"(?:anteriores?|previas?|acima|iniciais|originais|suas|seus|tuas|teus|sistema|seguranca"
+               r"|eticas?|programad[oa]s?|desenvolvedor)")
+    pt_noun = (r"(?:instrucoes|instrucao|regras|diretrizes|orientacoes|restricoes|filtros|salvaguardas"
+               r"|protecoes|politicas|limites|prompt|programacao|treinamento|protocolos)")
+    persona = r"(?:unrestricted|unfiltered|uncensored|jailbroken|evil ai|no restrictions|without restrictions)"
+    pt_persona = r"(?:irrestrit[oa]|desbloquead[oa]|sem restricoes|sem filtros|sem censura)"
+
+    D, R, S = AttackType.DIRECT_OVERRIDE, AttackType.ROLE_PLAY, AttackType.SYSTEM_IMPERSONATION
+    raw = [
+        # --- Sobrescrita direta de instruções (forte) ---
+        ("override_en_qualified", D, 1.0, r"\b" + en_verb + r"\b" + gap(3) + r"\W+" + en_qual + r"\b" + gap(2) + r"\W+" + en_noun + r"\b", "norm"),
+        ("override_en_instructions", D, 1.0, r"\b(?:ignor(?:e|ing)|disregard(?:ing)?|forget(?:ting)?|overrid(?:e|ing)|abandon(?:ing)?)\b(?:\W+(?:all|any|every|the|these|those|of))*\W+instructions?\b", "norm"),
+        ("override_pt_qual_noun", D, 1.0, r"\b" + pt_verb + r"\b" + gap(3) + r"\W+" + pt_qual + r"\b" + gap(2) + r"\W+" + pt_noun + r"\b", "norm"),
+        ("override_pt_noun_qual", D, 1.0, r"\b" + pt_verb + r"\b" + gap(3) + r"\W+" + pt_noun + r"\b" + gap(2) + r"\W+" + pt_qual + r"\b", "norm"),
+        ("override_pt_instructions", D, 1.0, r"\b(?:ignor(?:e|a|ar|ando)|desconsider(?:e|a|ar|ando)|esque(?:ca|cer|cendo)|abandon(?:e|ar))\b(?:\W+(?:todas|todos|as|os|essas|esses|de|suas|seus))*\W+instrucoes?\b", "norm"),
+        # --- Role-play / persona (forte) ---
+        ("roleplay_you_are_now", R, 1.0, r"\byou(?:'re| are| re)\s+now\b" + gap(2) + r"\W+(?:dan|unrestricted|unfiltered|uncensored|jailbroken|evil|free of|in developer mode|in god mode)\b", "norm"),
+        ("roleplay_pretend_persona", R, 1.0, r"\b(?:pretend|act|behave|roleplay|role-play|simulate)\b" + gap(3) + r"\W+" + persona + r"\b", "norm"),
+        ("roleplay_do_anything_now", R, 1.0, r"\bdo anything now\b", "norm"),
+        ("roleplay_dan_persona", R, 1.0, r"\b(?:pretend|act|behave|roleplay|simulate|become|you are|you're)\b(?:\W+\w+){0,3}?\W+DAN\b", "cased"),
+        ("roleplay_pt_you_are_now", R, 1.0, r"\bvoce\s+agora\s+(?:e|esta|sera)\b" + gap(2) + r"\W+(?:dan|" + pt_persona + r")\b", "norm"),
+        ("roleplay_pt_pretend_persona", R, 1.0, r"\b(?:finja|fingir|aja|atue|comporte-se|simule)\b" + gap(3) + r"\W+" + pt_persona + r"\b", "norm"),
+        # --- Sinais fracos / contextuais ---
+        ("jailbreak_keyword", R, 0.4, r"\bjailbreak(?:s|ed|ing)?\b", "norm"),
+        ("dan_standalone", R, 0.5, r"\bDAN\b", "cased"),
+        ("privileged_mode", R, 0.4, r"\b(?:developer|god|sudo|admin) mode\b|\bmodo (?:desenvolvedor|deus)\b", "norm"),
+        ("no_restrictions", R, 0.4, r"\b(?:without|with no|no)\b(?:\W+(?:any|your|the))*\W+(?:restrictions?|filters?|limitations?|censorship|guardrails?|safeguards?|rules)\b|\bsem\b(?:\W+(?:nenhuma|nenhum|qualquer))*\W+(?:restricoes|filtros|limites|censura|regras)\b", "norm"),
+        ("prompt_extraction_en_system", D, 0.6, r"\b(?:reveal|show|print|repeat|display|leak|output|expose|disclose)\b" + gap(3) + r"\W+(?:system\s+prompt|system\s+message|initial\s+prompt|hidden\s+prompt)\b", "norm"),
+        ("prompt_extraction_en_own", D, 0.5, r"\b(?:reveal|show|print|repeat|display|leak|output|expose|disclose)\b" + gap(3) + r"\W+your\s+(?:instructions|prompt|rules|guidelines)\b", "norm"),
+        ("prompt_extraction_pt_system", D, 0.6, r"\b(?:revele|mostre|exiba|imprima|repita|vaze|divulgue)\b" + gap(3) + r"\W+(?:prompt\s+do\s+sistema|mensagem\s+do\s+sistema|prompt\s+inicial|prompt\s+oculto)\b", "norm"),
+        ("prompt_extraction_pt_own", D, 0.5, r"\b(?:revele|mostre|exiba|imprima|repita|vaze|divulgue)\b" + gap(3) + r"\W+suas\s+(?:instrucoes|regras|diretrizes)\b", "norm"),
+        # --- Personificação do sistema ---
+        ("system_role_tag", S, 0.7, r"\[\s*(?:system|sistema|admin|administrator|developer|root)\s*\]|<\s*\|?\s*(?:system|im_start)\s*\|?\s*>", "norm"),
+        ("system_line_marker", S, 0.5, r"(?m)^\s*(?:system|sistema)\s*:|^\s*#{2,3}\s*(?:system|instructions?)\b", "norm"),
+        ("new_system_prompt", S, 0.6, r"\b(?:new|updated|revised)\s+system\s+(?:prompt|instructions?|message)\b|\b(?:novo|nova|novas|novos)\s+(?:prompt|instrucoes|regras)\s+do\s+sistema\b", "norm"),
+        ("claims_developer", S, 0.4, r"\bi\s+am\s+(?:your|the)\s+(?:developer|creator|administrator|admin|owner|programmer)\b|\bsou\s+(?:o\s+)?(?:seu\s+|teu\s+)?(?:desenvolvedor|criador|administrador|programador)\b", "norm"),
+        # --- Ofuscação por espaçamento/pontuação (apenas frases longas e específicas) ---
+        ("squash_override_en", D, 1.0, r"(?:ignore|disregard|forget|override)(?:all|any|every|the)?(?:previous|prior|above|earlier|preceding|your|system)(?:instructions?|rules|prompts?|guidelines?)", "squash"),
+        ("squash_override_pt", D, 1.0, r"(?:ignore|desconsidere|esqueca)(?:todas)?(?:as|os)?(?:instrucoes|regras|diretrizes)anteriores", "squash"),
+        ("squash_persona", R, 1.0, r"youarenow(?:dan|unrestricted|unfiltered|jailbroken)|doanythingnow", "squash"),
+    ]
+    return [(name, kind, weight, re.compile(pattern), scope) for name, kind, weight, pattern, scope in raw]
+
 
 class RealJailbreakDetector:
-    """POST32: Jailbreak Detection - CONSOLIDADO"""
+    """POST32: heurística de detecção de jailbreak e prompt injection (EN/PT).
+
+    Primeira camada, não garantia: normaliza o texto (NFKC, caracteres de largura zero,
+    homóglifos comuns, acentos, leetspeak), procura frases-alvo com fronteira de palavra e
+    soma pesos de sinais. Frases fortes sempre disparam; sinais fracos só disparam somados
+    ou quando ``sensitivity`` (0 a 1) é alta. Não é um classificador semântico, não cobre
+    outros idiomas nem paráfrases inéditas e não substitui controle de privilégio (OWASP
+    LLM01 recomenda defesa em camadas).
+    """
+
+    _CONFUSABLES = str.maketrans({
+        "\u0430": "a", "\u0435": "e", "\u043e": "o", "\u0440": "p", "\u0441": "c", "\u0443": "y",
+        "\u0445": "x", "\u0456": "i", "\u0458": "j", "\u0455": "s", "\u03bf": "o", "\u03b1": "a",
+        "\u03bd": "v", "\u03b9": "i", "\u03ba": "k", "\u03c1": "p", "\u03c4": "t",
+    })
+    _LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s"})
+    _BASE_SEVERITY = {
+        AttackType.DIRECT_OVERRIDE: 0.9,
+        AttackType.ROLE_PLAY: 0.8,
+        AttackType.SYSTEM_IMPERSONATION: 0.8,
+    }
+    _REASONS = {
+        AttackType.DIRECT_OVERRIDE: "Direct override attempt detected",
+        AttackType.ROLE_PLAY: "Role play attack detected",
+        AttackType.SYSTEM_IMPERSONATION: "System impersonation attempt detected",
+    }
+    _SIGNALS = _build_jailbreak_signals()
 
     def __init__(self, sensitivity: float = 0.7):
-        self.sensitivity = sensitivity
+        self.sensitivity = min(1.0, max(0.0, float(sensitivity)))
+        self.threshold = round(min(1.0, max(0.3, 1.3 - self.sensitivity)), 2)
         self.detections_count = 0
+        self._count_lock = threading.Lock()
+
+    @classmethod
+    def _normalize(cls, text: Any) -> Tuple[str, str]:
+        """Retorna (texto_nfkc_com_caixa, texto_normalizado_minúsculo_sem_acentos)."""
+        text = unicodedata.normalize("NFKC", "" if text is None else str(text))
+        text = "".join(ch for ch in text if ch in "\n\t " or unicodedata.category(ch) not in ("Cf", "Cc"))
+        folded = unicodedata.normalize("NFKD", text.casefold().translate(cls._CONFUSABLES))
+        folded = "".join(ch for ch in folded if not unicodedata.combining(ch))
+        return text, re.sub(r"[ \t\r\f\v]+", " ", folded).strip()
 
     def detect(self, text: str) -> JailbreakDetection:
         """Detectar tentativas de jailbreak"""
-        text_lower = text.lower()
+        cased, norm = self._normalize(text)
+        deleet = norm.translate(self._LEET)
+        squash = re.sub(r"[^a-z0-9]+", "", deleet)
+        views = {"norm": (norm,) if norm == deleet else (norm, deleet), "cased": (cased,), "squash": (squash,)}
 
-        # Direct override patterns
-        override_patterns = ["ignore", "disregard", "forget", "override"]
-        if any(p in text_lower for p in override_patterns):
-            self.detections_count += 1
+        matched = {}
+        for name, kind, weight, pattern, scope in self._SIGNALS:
+            if any(pattern.search(view) for view in views[scope]):
+                matched[name] = (kind, weight)
+
+        score = round(min(1.0, sum(weight for _, weight in matched.values())), 2)
+        if matched and score >= self.threshold:
+            top_kind, _ = max(matched.values(), key=lambda value: value[1])
+            with self._count_lock:
+                self.detections_count += 1
             return JailbreakDetection(
                 detected=True,
-                attack_type=AttackType.DIRECT_OVERRIDE,
-                severity=0.9,
-                confidence=0.85,
-                reason="Direct override attempt detected"
+                attack_type=top_kind,
+                severity=self._BASE_SEVERITY[top_kind],
+                confidence=round(min(0.95, 0.5 + 0.45 * score), 2),
+                reason=self._REASONS[top_kind],
+                signals=tuple(sorted(matched)),
             )
 
-        # Role play patterns
-        role_patterns = ["you are now", "pretend you are", "dan", "jailbreak"]
-        if any(p in text_lower for p in role_patterns):
-            self.detections_count += 1
-            return JailbreakDetection(
-                detected=True,
-                attack_type=AttackType.ROLE_PLAY,
-                severity=0.8,
-                confidence=0.8,
-                reason="Role play attack detected"
-            )
-
-        # No attack detected
         return JailbreakDetection(
             detected=False,
             attack_type=None,
             severity=0.0,
             confidence=1.0,
-            reason="No attack detected"
+            reason="No attack detected",
+            signals=tuple(sorted(matched)),
         )
 
 
