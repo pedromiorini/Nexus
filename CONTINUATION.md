@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 254
+tests: 257
 bandit_low: 131
 -->
 
@@ -11,21 +11,21 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta rodada:** `main` pós-PR #26, commit `508020d77d5705f99c76eaca4df05e8e265662f7`; branch isolada `feat/post-pr26-tool-input-boundary-2026-10-16`.
-- **Estado da revisão:** candidata validada localmente; será publicada em branch e PR próprias para revisão/CI. Não mesclar sem autorização específica do usuário para esta PR.
-- **Mudança:** `format_json` usa `allow_nan=False` e rejeita NaN/infinitos como falha estruturada. Falhas esperadas ao formar a chave de cache registram `TOOL_CACHE_KEY_UNAVAILABLE`, bypassam lookup/store e mantêm a execução normal; ferramentas não cacheáveis não serializam parâmetros.
-- **Validação local (não CI):** 254/254 testes; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 37/37 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall e auditorias AST passaram.
-- **Benchmarks:** testes e CLIs dos benchmarks de capacidade e POMDP v2 passaram na seed `20261016`; os resultados sintéticos mantêm seus limites interpretativos existentes.
-- **Limites desta mudança:** subclasses de `dict` continuam aceitas, chaves extras continuam ignoradas e valores não recebem validação recursiva de schema. O bypass não limita o custo de entradas grandes serializáveis; o cache limita payload estimado, não a memória global. Timeout continua diagnóstico, não cancelamento.
+- **Base desta rodada:** `main` pós-PR #27, merge commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; branch isolada `feat/post-pr27-cache-key-resource-bounds-2026-10-16`.
+- **Estado da revisão:** candidata validada localmente; próxima etapa é publicar a branch e abrir PR própria contra `main` para revisão/CI. Não mesclar sem autorização específica para esta PR.
+- **Mudança candidata:** a formação de cache key agora faz pré-verificação iterativa antes do encoder JSON: 64 KiB estimados, profundidade 64, 4.096 nós/ocorrências, 1.024 itens por contêiner e detecção de ciclos. Excesso/ciclo/tipo não percorrido com segurança gera `TOOL_CACHE_KEY_UNAVAILABLE` e ignora lookup/store; o executor continua. Para entradas elegíveis, encoder, ordenação e SHA-256 legados permanecem inalterados.
+- **Validação local (não CI):** 257/257 testes; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 42/42 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade e auditorias AST passaram.
+- **Benchmarks:** CLIs de capacidade e POMDP v2 passaram na seed `20261016`; o v2 manteve 128/128 casos dentro de `1e-12` e 4/4 controles inválidos rejeitados.
+- **Limites desta mudança:** os budgets restringem apenas a elegibilidade e o custo da geração da chave, não o trabalho nem a memória própria do executor. Subclasses de `dict` continuam aceitas e executadas, mas bypassam cache; chaves extras continuam ignoradas e valores não recebem validação recursiva de schema. Timeout continua diagnóstico, não cancelamento.
 - **POMDP herdado:** a PR #24 foi mesclada com ambos os checks oficiais aprovados; o filtro de um passo recebe modelo explícito, sem alegar aprendizagem ou planejamento. O protocolo v1 continua inalterado e mantém `unsupported_interface` para observação parcial.
-- **Hardening herdado:** PR #25 foi mesclada no commit `675f5aa95416c3a92998a34dd2f905f529b90980`; PR #26 foi mesclada no commit `508020d77d5705f99c76eaca4df05e8e265662f7` após autorização específica. A PR #23 limitou `math_calculate` e isolou aliases de cache.
+- **Hardening herdado:** PR #25 foi mesclada no commit `675f5aa95416c3a92998a34dd2f905f529b90980`; PR #26 no commit `508020d77d5705f99c76eaca4df05e8e265662f7`; PR #27 no commit `c4375d9f42703b11d2632b3a701303c5a69563a4`. A PR #23 limitou `math_calculate` e isolou aliases de cache.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
 
-## Contratos adicionados nesta branch
+## Contratos relevantes na fronteira de cache/ferramentas
 
-- `test_format_json_contract.py`: preserva formatação de JSON finito e exige falha estruturada para NaN/infinitos e dados não serializáveis.
-- `test_tool_cache_key_contract.py`: garante que a falha de serialização da cache key não interrompe execução válida, que a chamada fica sem cache e que ferramentas não cacheáveis não serializam parâmetros.
+- Herdado da PR #27: `test_format_json_contract.py` preserva formatação de JSON finito e exige falha estruturada para NaN/infinitos e dados não serializáveis.
+- `test_tool_cache_key_contract.py`: preserva a identidade das chaves pequenas; garante bypass pré-serialização para tamanho, profundidade, nós, itens por contêiner e ciclos; comprova que falhas de cache não bloqueiam o executor, que subclasses de `dict` seguem válidas e que ferramenta não cacheável não forma chave.
 
 ## O que está implementado
 

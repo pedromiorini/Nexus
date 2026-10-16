@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 254
+tests: 257
 bandit_low: 131
 -->
 
@@ -138,3 +138,15 @@ O manifesto distingue `discovered_static` (inventário AST) de `executed`, `pass
 - Validação local: 254/254 testes; suíte integrada 30 aprovados e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 37/37 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW e nenhum MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST e benchmarks de capacidade e POMDP v2 passaram.
 - Base normativa: [documentação Python 3.12 do módulo `json`](https://docs.python.org/3.12/library/json.html) e [RFC 8259, §6](https://www.rfc-editor.org/rfc/rfc8259) determinam que NaN/Infinity não são números JSON válidos; `allow_nan=False` produz `ValueError` em modo estrito.
 - Limites: não há validação recursiva de schema nem rejeição de chaves desconhecidas; o bypass não limita o custo de serializar entradas grandes que são serializáveis, nem transforma o orçamento estimado do cache em limite de memória global. Os resultados são locais, não CI oficial.
+
+
+## Pré-verificação limitada da geração de cache key — 2026-10-16
+
+- Base local: `main` pós-PR #27, merge commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; branch isolada `feat/post-pr27-cache-key-resource-bounds-2026-10-16`.
+- Lacuna reproduzida por inspeção: `execute_tool` chamava `json.dumps(params, sort_keys=True)` antes do executor. Os limites existentes de payload cacheado não restringiam o custo da serialização de parâmetros grandes, profundos ou com muitos nós.
+- Correção: uma pré-verificação iterativa limita a estimativa conservadora do JSON+prefixo a 64 KiB, profundidade a 64, travessia a 4.096 ocorrências e cada contêiner a 1.024 itens; ciclos são identificados sem recursão. A estimativa conta escapes de strings e usa limite superior para inteiros antes do encoder.
+- Se qualquer budget for excedido, ou o valor não pertencer aos tipos Python nativos aceitos pelo encoder JSON padrão e percorridos com segurança, `TOOL_CACHE_KEY_UNAVAILABLE` registra um motivo e `cache_bypassed=true`; lookup/store são pulados, mas o executor segue normalmente. Subclasses de `dict` continuam aceitas/executadas e apenas bypassam a otimização. Ferramentas não cacheáveis continuam sem pré-verificação.
+- Para valores elegíveis, `json.dumps(..., sort_keys=True)` e a fórmula SHA-256 foram preservados; o teste compara a chave nova com a fórmula anterior e verifica que um hit ainda ocorre na repetição. `test_tool_cache_key_contract.py` protege também bypass de bytes, profundidade, nós, itens por contêiner, ciclos e valores não serializáveis, sem impedir execução.
+- Validação local: **257/257** testes; suíte integrada 30 aprovados e 1 skip opcional FAISS; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate **42/42** mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW, nenhum MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade e auditorias AST passaram. Benchmarks de capacidade e POMDP v2 passaram com seed `20261016`.
+- Fundamentação: a [documentação oficial Python 3.12 do módulo `json`](https://docs.python.org/3.12/library/json.html) descreve `iterencode` como gerador de fragmentos disponíveis e não documenta um tamanho máximo para cada fragmento nem budgets gerais de tamanho/profundidade; por isso o preflight é iterativo e ocorre antes da serialização. Os resultados permanecem locais até a CI do commit candidato.
+- Limite epistemológico: este contrato restringe somente o trabalho adicional da chave de cache e a elegibilidade ao cache. Não limita custo/memória próprios do executor, não valida schema recursivamente, não rejeita chaves extras e não converte o budget de cache em limite global de memória.

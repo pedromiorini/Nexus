@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 254
+tests: 257
 bandit_low: 131
 -->
 
@@ -106,3 +106,16 @@ Validação local em Python 3.12: 254/254 testes; suíte integrada 30 aprovados,
 Fundamento: a [documentação Python 3.12 de `json`](https://docs.python.org/3.12/library/json.html) descreve o padrão permissivo e o efeito estrito de `allow_nan=False`; a [RFC 8259, seção 6](https://www.rfc-editor.org/rfc/rfc8259) não permite Infinity/NaN na gramática numérica JSON. Não houve normalização silenciosa para strings ou `null`.
 
 Limites: não foi introduzida validação recursiva de schema nem rejeição de chaves desconhecidas. O bypass não limita custo de parâmetros grandes porém serializáveis, e o tamanho estimado do cache não é limite global de memória. O diagnóstico de falha de cache não é falha da ferramenta; exceções reais do executor continuam seguindo seu tratamento original.
+
+
+## Orçamento de recursos da cache key — 2026-10-16
+
+Base local: `main` pós-PR #27, merge commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; branch `feat/post-pr27-cache-key-resource-bounds-2026-10-16`.
+
+A chave era construída por `json.dumps(params, sort_keys=True)` antes do executor, sem limite de bytes ou profundidade; os budgets existentes só cobriam resultados retidos no cache. A alteração adiciona percurso iterativo prévio com limite conservador de 64 KiB incluindo prefixo, profundidade 64, 4.096 nós/ocorrências e 1.024 itens por contêiner, além de detecção de ciclos. O percurso contabiliza expansão de escapes e tamanho de inteiros sem serializar o objeto completo.
+
+Testes com orçamento excedido (bytes, profundidade, cardinalidade total, itens por contêiner e ciclo) verificam que `json.dumps` não é chamado, que `TOOL_CACHE_KEY_UNAVAILABLE` inclui o motivo e que duas chamadas válidas continuam no executor, sem hit nem armazenamento. O contrato também confirma compatibilidade do hash para entradas pequenas, execução de subclass de `dict`, bypass de valor extra não serializável e ausência de serialização em ferramenta não cacheável. Cinco mutantes direcionados removendo cada guarda/detecção são mortos.
+
+Resultados locais medidos: unittest 257 executados/aprovados, 0 falhas/skips/XPASS; suíte integrada 30 aprovados e 1 skip FAISS opcional; cobertura 95% fila, 94% guard VRAM, 76% Vita, 68% núcleo; mutation 42/42 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH. Ruff, actionlint, zizmor, compileall, auditoria de realidade, auditorias AST e CLIs dos benchmarks de capacidade e POMDP v2 na seed `20261016` passaram. A fonte normativa consultada foi https://docs.python.org/3.12/library/json.html.
+
+Limitação: execução fora do cache continua sujeita ao comportamento e custo do executor; a mudança limita somente a pré-verificação/serialização para cache. Os resultados são locais, não substituem os checks oficiais da PR.
