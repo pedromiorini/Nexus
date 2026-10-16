@@ -3,11 +3,11 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 169
+tests: 173
 bandit_low: 131
 -->
 
-Estado oficial de referência: use o artefato `nexus-state-manifest` associado ao `HEAD`. A validação local desta branch passou com 169 testes unitários; a suíte integrada registrou 30 aprovados e 1 ignorado. Esses resultados locais não substituem o manifesto de CI do commit.
+Estado oficial de referência: use o artefato `nexus-state-manifest` associado ao `HEAD`. Nesta branch, 173/173 testes passaram localmente; a cobertura da fila foi 96%, a do bridge Vita 74% e a suíte integrada registrou 30 aprovados e 1 ignorado. O benchmark v1 (seed `20261016`) mediu acerto composicional exato 1,0 em 39 casos, F1=0,667 na extração lexical causal, F1=0,667 nas alegações de efeito downstream, Brier=0,1849 e ECE=0,01684 na trilha que recebe probabilidades como entrada; observação parcial foi marcada `unsupported_interface`, sem acurácia inventada. Esses resultados locais não substituem o manifesto de CI do commit.
 Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e não devem ser usados como estado atual.
 
 | Área | Estado | Evidência verificável | Limitação |
@@ -28,6 +28,7 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Telemetria | parcial/verificado | Vita, audit log SQLite serializado e guard de VRAM | dependente do ambiente; sem locking distribuído ou exactly-once |
 | Segurança | parcial | Bandit 131 LOW, triagem, auditorias AST e testes negativos | não substitui threat model ou revisão manual completa |
 | CI | verificado por commit | run associado ao `HEAD` e manifesto retido como artefato quando disponível | qualquer novo commit exige leitura do manifesto correspondente |
+| Benchmark sintético | verificado localmente no protocolo v1 | 39 sequências (holdout exato 1,0), extração causal lexical (F1 0,667), alegação de intervenção (F1 0,667), trilha de confiança (Brier 0,1849; ECE 0,01684) e JSON determinístico com SHA-256 | sem treino; causalidade textual/heurística; incerteza recebe probabilidades externas; crença POMDP não suportada; não valida teorias cognitivas |
 | Autonomia geral | não demonstrada | nenhuma evidência válida no repositório | não fazer esse claim |
 | AGI/ASI/consciência | não demonstradas | explicitamente negadas pela documentação | nomes e banners não contam como evidência |
 

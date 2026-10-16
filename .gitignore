@@ -24,6 +24,7 @@ STATE_MANIFEST.json
 state-consistency.json
 test-summary.json
 integrated-summary.json
+capability-benchmark.json
 bandit-report.json
 security-triage-generated.md
 implementation-gaps.json

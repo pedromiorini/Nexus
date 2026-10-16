@@ -81,7 +81,10 @@ jobs:
             tools/targeted_mutation.py \
             tools/implementation_gap_audit.py \
             tools/state_manifest.py \
-            tools/state_consistency_audit.py
+            tools/state_consistency_audit.py \
+            benchmarks/__init__.py \
+            benchmarks/nexus_capability_benchmark.py \
+            test_capability_benchmark.py
 
       - name: Run schema contract tests
         env:
@@ -143,6 +146,22 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m unittest -v test_state_consistency_audit.py
+
+      - name: Run reproducible capability benchmark
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest -v test_capability_benchmark.py
+          python -m benchmarks.nexus_capability_benchmark --seed 20261016 --output capability-benchmark.json
+          test -s capability-benchmark.json
+
+      - name: Retain capability benchmark report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nexus-capability-benchmark
+          path: capability-benchmark.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Run targeted mutation gate
         env:
@@ -225,6 +244,7 @@ jobs:
           rm -f nexus_audit.sqlite3
           rm -f test-summary.json
           rm -f integrated-summary.json
+          rm -f capability-benchmark.json
           if find . -type f \( -name '*.sqlite3' -o -name '*.db' \) -print -quit | grep -q .; then
             echo 'Unexpected database artifact detected'
             exit 1
