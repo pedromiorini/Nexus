@@ -89,14 +89,18 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Run all tests with coverage (contract suite, then integrated suite)
+      - name: Run contract and integrated suites with coverage
         env:
           NEXUS_INTEGRATED_SUMMARY: integrated-summary.json
         run: |
           coverage run --branch -m unittest discover -p 'test_*.py'
+          coverage run --append --branch core/constitutional_brain.py
+          test -s integrated-summary.json
           coverage report --fail-under=0
           coverage report --include='core/deferred_task_queue.py' --fail-under=90
+          coverage report --include='core/vram_defense_guard.py' --fail-under=90
           coverage report --include='vita/nexus_constitutional_bridge_v3.py' --fail-under=70
+          coverage report --include='core/constitutional_brain.py' --fail-under=62
           coverage xml -o coverage.xml
 
       - name: Retain coverage report
@@ -186,14 +190,6 @@ jobs:
             implementation-gaps.json
           if-no-files-found: error
           retention-days: 14
-
-      - name: Run integrated Nexus suite
-        env:
-          PYTHONPATH: .
-          NEXUS_INTEGRATED_SUMMARY: integrated-summary.json
-        run: |
-          python core/constitutional_brain.py
-          test -s integrated-summary.json
 
       - name: Run final full test suite summary
         run: python tools/test_summary.py --output test-summary.json
