@@ -1,8 +1,8 @@
 # Benchmark sintético de capacidades observáveis do Nexus
 
-Este benchmark introduz uma avaliação **reproduzível, local e baseada em tarefas sintéticas** para quatro perguntas delimitadas: comportamento composicional, alegações de intervenção causal, tratamento de incerteza e inferência sob observação parcial. A referência de código é o `main` em `5f53a9922b71d6ef3c565a31630f56091a454671` (após a PR #9).
+O protocolo original `nexus.capability-benchmark.v1` oferece uma avaliação **reproduzível, local e baseada em tarefas sintéticas** para quatro perguntas delimitadas: comportamento composicional, alegações de intervenção causal, tratamento de incerteza e inferência sob observação parcial. Sua referência histórica de código é o `main` em `5f53a9922b71d6ef3c565a31630f56091a454671` (após a PR #9).
 
-O benchmark mede as APIs experimentais existentes; não altera o núcleo de produção, não usa rede ou modelos externos e não converte nomes teóricos em alegações de capacidade. Cada trilha declara o que foi efetivamente medido e o que ainda não é mensurável pela interface.
+O v1 mede as APIs experimentais existentes; não altera o núcleo de produção, não usa rede ou modelos externos e não converte nomes teóricos em alegações de capacidade. Cada trilha declara o que foi efetivamente medido e o que ainda não é mensurável pela interface. O benchmark POMDP v2 abaixo é um protocolo adicional e independente.
 
 ## Executar
 
@@ -41,6 +41,23 @@ Use `--require-full-support` para receber código de saída 2 se alguma trilha n
 - **Causalidade:** a primeira tarefa distingue relações textuais positivas de associação e negação. A segunda fornece ao engine um pequeno grafo causal conhecido e verifica se a API discrimina variáveis com descendentes, variáveis isoladas e intervenções sem mudança. O teste detecta sobrealegações; não tenta inferir estrutura de dados observacionais.
 - **Incerteza:** outcomes Bernoulli são amostrados de probabilidades conhecidas, com seed fixada. Brier avalia previsões probabilísticas; ECE resume a diferença entre confiança e frequência de acerto nos bins definidos. O engine recebe um vetor de probabilidades e retorna somente confiança escalar, então o relatório reconstrói a probabilidade da classe positiva a partir da classe prevista e dessa confiança. A regra estritamente própria de Brier é calculada pelo avaliador, não pelo campo heurístico `calibration_score` do módulo.
 - **Observação parcial:** um POMDP sintético binário fornece observações `clear` e `alarm` com posterior exato diferente. A interface atual de codificação preditiva retorna valor/confiança hierárquicos, não uma distribuição de crença sobre estados ocultos. Portanto o benchmark registra a lacuna e não fabrica acurácia de posterior.
+
+## Filtro de crença POMDP — protocolo v2 separado
+
+O protocolo `nexus.pomdp-belief-benchmark.v2` mede uma operação diferente e **não altera o protocolo v1**: uma atualização Bayesiana de um passo, com estados finitos e modelo explicitamente fornecidos. A trilha de observação parcial do v1 continua registrando `unsupported_interface`, pois `hierarchical_prediction_cycle` ainda não retorna uma distribuição de crença.
+
+```bash
+PYTHONPATH=. python -m unittest -v \
+  test_pomdp_belief_filter_contract.py test_pomdp_benchmark_v2.py
+PYTHONPATH=. python -m benchmarks.nexus_pomdp_benchmark_v2 \
+  --seed 20261016 \
+  --output /tmp/nexus-pomdp-belief-v2.json \
+  --dump-cases /tmp/nexus-pomdp-belief-v2-cases.json
+```
+
+O taskset determinístico contém 128 modelos sintéticos com 2–8 estados, priors, matrizes de transição por linha e likelihoods variáveis gerados pela seed. O scorer compara cada posterior com uma implementação de referência independente, mede erros absoluto médio/máximo e a taxa de casos dentro da tolerância; quatro controles inválidos verificam rejeição. O filtro aceita no máximo 128 estados, valida dimensões e probabilidades, usa log-sum-exp para manter evidência numericamente estável e rejeita evidência realmente nula.
+
+O gate exige que todos os casos fiquem dentro de `1e-12` e que todos os controles negativos sejam rejeitados; a CLI retorna código 1 se qualquer limiar falhar. O workflow retém o relatório mesmo em falha, se já tiver sido gerado, por 14 dias. O filtro recebe o modelo completo como entrada e não aprende parâmetros, identifica estados, escolhe políticas ou demonstra desempenho em ambiente real. Comparações com o benchmark v1 não são válidas porque os protocolos medem interfaces e comportamentos diferentes.
 
 ## Fundamentos teóricos e limites de atribuição
 

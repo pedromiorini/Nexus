@@ -142,6 +142,8 @@ import copy
 import math
 import random
 import numpy as np
+from collections.abc import Sequence
+from numbers import Real
 from typing import Dict, List, Set, Optional, Tuple, Any
 from dataclasses import dataclass, field
 from enum import Enum
@@ -6660,6 +6662,8 @@ class RealPredictiveCodingSystem:
     - Hohwy's Prediction Error Minimization (2013)
     """
 
+    MAX_BELIEF_STATES = 128
+
     def __init__(self, world_model=None, perception=None, learning=None, attention=None):
         self.world_model = world_model
         self.perception = perception
@@ -6692,6 +6696,132 @@ class RealPredictiveCodingSystem:
         self.generative_model_updates: List[Dict[str, Any]] = []
 
         print("🧠📊 POST 33 - RealPredictiveCodingSystem initialized (Bayesian prediction machine active)")
+
+    @classmethod
+    def update_belief_state(
+        cls,
+        states: Sequence[str],
+        prior: Sequence[float],
+        transition_model: Sequence[Sequence[float]],
+        observation_likelihoods: Sequence[float],
+    ) -> Dict[str, float]:
+        """Apply one numerically stable Bayesian update to a supplied POMDP.
+
+        ``transition_model[i][j]`` is P(next=states[j] | current=states[i], action),
+        and each observation likelihood is P(observation | next=state, action).
+        This pure filter neither learns model parameters nor retains the inputs.
+        """
+        tolerance = 1e-9
+        negative_infinity = float("-inf")
+
+        def is_sequence(value: Any) -> bool:
+            return isinstance(value, Sequence) and not isinstance(
+                value, (str, bytes, bytearray)
+            )
+
+        def probability_value(value: Any, name: str) -> float:
+            if isinstance(value, bool) or not isinstance(value, Real):
+                raise ValueError(f"{name} must contain real probabilities")
+            try:
+                probability = float(value)
+            except (OverflowError, TypeError, ValueError) as exc:
+                raise ValueError(f"{name} must contain finite probabilities") from exc
+            if not math.isfinite(probability) or probability < 0.0:
+                raise ValueError(f"{name} must contain finite non-negative probabilities")
+            if probability == 0.0 and value != 0:
+                raise ValueError(f"{name} contains a value below float precision")
+            if probability > 1.0:
+                raise ValueError(f"{name} probabilities must be in [0, 1]")
+            return probability
+
+        def logsumexp(values: Sequence[float]) -> float:
+            maximum = max(values, default=negative_infinity)
+            if maximum == negative_infinity:
+                return negative_infinity
+            return maximum + math.log(
+                math.fsum(
+                    math.exp(value - maximum)
+                    for value in values
+                    if value != negative_infinity
+                )
+            )
+
+        if not is_sequence(states) or len(states) == 0:
+            raise ValueError("states must be a non-empty sequence of unique names")
+        state_count = len(states)
+        if state_count > cls.MAX_BELIEF_STATES:
+            raise ValueError(
+                f"state count exceeds the maximum of {cls.MAX_BELIEF_STATES}"
+            )
+        state_names = tuple(states)
+        if any(not isinstance(state, str) or not state.strip() for state in state_names):
+            raise ValueError("states must contain non-empty strings")
+        if len(set(state_names)) != state_count:
+            raise ValueError("states must be unique")
+
+        if not is_sequence(prior) or len(prior) != state_count:
+            raise ValueError("prior length must match the number of states")
+        prior_values = [probability_value(value, "prior") for value in prior]
+        if abs(math.fsum(prior_values) - 1.0) > tolerance:
+            raise ValueError("prior must be normalized to 1")
+
+        if not is_sequence(transition_model) or len(transition_model) != state_count:
+            raise ValueError("transition_model must be a square matrix matching the states")
+        transition_values = []
+        for row in transition_model:
+            if not is_sequence(row) or len(row) != state_count:
+                raise ValueError("transition_model must be a square matrix matching the states")
+            probabilities = [probability_value(value, "transition_model") for value in row]
+            if abs(math.fsum(probabilities) - 1.0) > tolerance:
+                raise ValueError("each transition_model row must be normalized to 1")
+            transition_values.append(probabilities)
+
+        if not is_sequence(observation_likelihoods) or len(observation_likelihoods) != state_count:
+            raise ValueError("observation_likelihoods length must match the number of states")
+        likelihood_values = [
+            probability_value(value, "observation_likelihoods")
+            for value in observation_likelihoods
+        ]
+
+        log_prior = [math.log(value) if value > 0.0 else negative_infinity for value in prior_values]
+        log_transition = [
+            [math.log(value) if value > 0.0 else negative_infinity for value in row]
+            for row in transition_values
+        ]
+        log_likelihoods = [
+            math.log(value) if value > 0.0 else negative_infinity
+            for value in likelihood_values
+        ]
+        predicted_log_probabilities = [
+            logsumexp(
+                [
+                    log_prior[i] + log_transition[i][j]
+                    for i in range(state_count)
+                    if prior_values[i] > 0.0 and transition_values[i][j] > 0.0
+                ]
+            )
+            for j in range(state_count)
+        ]
+        unnormalized_log_weights = [
+            predicted_log_probabilities[j] + log_likelihoods[j]
+            if predicted_log_probabilities[j] != negative_infinity
+            and log_likelihoods[j] != negative_infinity
+            else negative_infinity
+            for j in range(state_count)
+        ]
+        log_evidence = logsumexp(unnormalized_log_weights)
+        if not math.isfinite(log_evidence):
+            raise ValueError(
+                "observation has zero probability under the supplied belief model"
+            )
+
+        posterior = [
+            math.exp(log_weight - log_evidence)
+            if log_weight != negative_infinity
+            else 0.0
+            for log_weight in unnormalized_log_weights
+        ]
+        return dict(zip(state_names, posterior, strict=True))
 
     def generate_prediction(self, level: int, context: Dict[str, Any]) -> Prediction:
         """

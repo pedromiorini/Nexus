@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 222
+tests: 240
 bandit_low: 131
 -->
 
@@ -11,13 +11,13 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta rodada:** `main` pós-PR #22, commit `27299281b636deddb5555173a9f191dd01e65013`; branch local `fix/math-calculate-resource-limits-2026-10-16`.
-- **Estado da revisão:** sem merge; o status oficial depende dos checks do head da PR. A aprovação de merge continua específica a cada PR.
-- **Achado de segurança:** a calculadora aceitava literais string e operadores sem budgets; entrada do tipo `"x" * 1000000` retornava e cacheava um milhão de caracteres; potências grandes eram aceitas; TTL vencido não removia resultados antigos.
-- **Mitigações nesta branch:** a calculadora aceita somente números reais finitos, limita expressão/AST/expoente/magnitude; cache remove expirados, limita quantidade/payload e armazena/devolve cópias profundas para isolamento de aliases. O benchmark e os relatórios v1 não foram alterados.
-- **Validação local (não CI):** 222/222 testes, 30 aprovações + 1 skip FAISS opcional na suíte integrada; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation 28/28 mortos, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall e requisitos constitucionais passaram.
-- **Limites remanescentes:** `timeout_seconds` não cancela executores arbitrários; o byte-budget do cache é estimado por payload e não substitui limite de memória do processo. O manifesto dos checks do head da PR é a fonte do status oficial.
-- **Próxima trilha independente:** POMDP/belief-state v2 está isolada em outra worktree/branch; não faz parte desta revisão de segurança; v1 permanece `unsupported_interface`.
+- **Base desta rodada:** `main` pós-PR #23, commit `e3cc760597aa1782aef9879a8f88ee6f48032348`; branch `feat/pomdp-belief-filter-v2-post-pr23-2026-10-16`.
+- **Estado da revisão:** alterações não mescladas; qualquer merge continua dependendo de aprovação específica para esta PR. O estado oficial depende dos checks do head.
+- **Contrato POMDP:** `RealPredictiveCodingSystem.update_belief_state` calcula uma atualização Bayesiana pura com entradas explícitas; valida dimensões e probabilidades, aceita até 128 estados, usa log-sum-exp e rejeita evidência nula.
+- **Benchmark v2 local:** 128 casos com 2–8 estados; erro médio absoluto `3.001891167837976e-17`, máximo `2.7755575615628914e-16`, 128/128 dentro da tolerância e 4/4 controles inválidos rejeitados. A seed CI `20261016` é testada diretamente; se algum caso exceder `1e-12` ou algum controle passar, a CLI falha e o relatório é preservado. A trilha de observação parcial do v1 continua `unsupported_interface`; o protocolo v1 não foi alterado.
+- **Validação local (não CI):** 240/240 testes; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation 28/28 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall e auditorias AST passaram. A execução oficial ainda será determinada pelos checks da revisão.
+- **Limites:** o filtro recebe prior, transições e likelihoods prontos; não aprende modelo, descobre estados, resolve política ou demonstra inferência em ambiente real. `timeout_seconds` herdado ainda não cancela executores genéricos; o cache usa budget de payload estimado, não de memória global.
+- **Hardening herdado:** a PR #23 foi mesclada em `main`, incluindo limites explícitos para `math_calculate` e cache bounded com isolamento de aliases.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
 
