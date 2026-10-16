@@ -50,11 +50,13 @@ def _test_summary() -> dict[str, Any]:
     path = ROOT / "test-summary.json"
     try:
         summary = json.loads(path.read_text(encoding="utf-8"))
-        required = ("executed", "passed", "failed", "skipped", "result")
+        required = ("executed", "passed", "failed", "skipped", "unexpected_successes", "result")
         if not all(key in summary for key in required):
             return {"status": "invalid_summary"}
-        counts = ("executed", "passed", "failed", "skipped")
+        counts = ("executed", "passed", "failed", "skipped", "unexpected_successes")
         if any(type(summary[key]) is not int or summary[key] < 0 for key in counts):
+            return {"status": "invalid_summary"}
+        if summary["unexpected_successes"] > summary["failed"]:
             return {"status": "invalid_summary"}
         if summary["passed"] + summary["failed"] + summary["skipped"] != summary["executed"]:
             return {"status": "invalid_summary"}

@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 202
+tests: 203
 bandit_low: 131
 -->
 
@@ -70,6 +70,8 @@ Fila, snapshots, recuperação, SQL, CentralRouter, memória episódica, working
 ## Manifesto factual
 
 O estado operacional atual deve ser lido do artefato `nexus-state-manifest` do CI correspondente ao commit. Ele registra commit, branch, contagem de testes, mutation testing, Bandit, métricas AST, dependências opcionais e commits dos documentos. A ausência de um relatório no manifesto significa `not_generated`, não zero.
+
+O resumo `unittest` contabiliza sucessos inesperados (`@expectedFailure` que passa, XPASS) como falhas, seguindo `TestResult.wasSuccessful()`, e expõe sua contagem em `unexpected_successes`; o manifesto e o gate de consistência validam esse campo sem somá-lo duas vezes.
 
 ## Regra de atualização
 

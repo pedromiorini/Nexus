@@ -14,7 +14,7 @@ class StateConsistencyAuditTests(unittest.TestCase):
             "repository": {"commit": commit},
             "verification": {"tests": {
                 "status": "generated", "executed": tests, "passed": tests,
-                "failed": 0, "skipped": 0, "result": "passed",
+                "failed": 0, "skipped": 0, "unexpected_successes": 0, "result": "passed",
             }, "integrated": {
                 "status": "generated", "discovered_static": 3, "passed": 2,
                 "skipped": 1, "failed": 0, "unexpected": 0, "result": "passed",
@@ -87,6 +87,7 @@ class StateConsistencyAuditTests(unittest.TestCase):
         cases = (
             ("result", "failed", "verification.tests.result"),
             ("failed", 1, "verification.tests.failed"),
+            ("unexpected_successes", 1, "unexpected_successes excede"),
         )
         for field, value, expected_error in cases:
             directory, manifest_path = self._write_fixture()

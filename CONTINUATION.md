@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 202
+tests: 203
 bandit_low: 131
 -->
 
@@ -72,7 +72,7 @@ bandit_low: 131
 - `test_mcts_action_contract.py`: contrato da distinção entre ações padrão (`None`) e espaço de ações vazio (`[]`).
 - `tools/state_consistency_audit.py`: compara claims atuais estruturados com o manifesto factual e ignora histórico fora do bloco.
 - `test_state_consistency_audit.py`: contratos de sincronização, divergência, ausência de marcador e manifesto inválido, incluindo a evidência integrada.
-- `tools/test_summary.py`: executa a suíte final e registra `executed`, `passed`, `failed` e `skipped` para o manifesto.
+- `tools/test_summary.py`: executa a suíte final e registra `executed`, `passed`, `failed`, `skipped` e `unexpected_successes`; XPASS conta como falha e é coberto por `test_test_summary.py`.
 
 ## Validação local da branch de acompanhamento — 2026-10-16
 

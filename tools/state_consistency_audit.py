@@ -100,9 +100,11 @@ def _operational_errors(manifest: dict[str, Any]) -> list[str]:
             errors.append("manifesto: resumo de testes não foi gerado")
         if tests.get("result") != "passed":
             errors.append("manifesto: verification.tests.result deve ser 'passed'")
-        counts = ("executed", "passed", "failed", "skipped")
+        counts = ("executed", "passed", "failed", "skipped", "unexpected_successes")
         if any(type(tests.get(key)) is not int or tests[key] < 0 for key in counts):
             errors.append("manifesto: contagens de testes inválidas")
+        elif tests["unexpected_successes"] > tests["failed"]:
+            errors.append("manifesto: unexpected_successes excede verification.tests.failed")
         elif tests["failed"] != 0:
             errors.append("manifesto: verification.tests.failed deve ser zero")
         elif tests["executed"] != tests["passed"] + tests["failed"] + tests["skipped"]:
