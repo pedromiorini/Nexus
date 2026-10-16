@@ -83,6 +83,53 @@ class RecoveryDiagnosticsContractTests(unittest.TestCase):
         self.assertFalse(result["valid"])
         self.assertIn("diagnostics_must_be_object", result["errors"])
 
+    def test_diagnostic_field_types_are_validated_without_raising(self):
+        cases = (
+            ("diagnostics", "severity", [], "invalid_severity"),
+            (None, "generated_at", "yesterday", "invalid_generated_at"),
+            ("diagnostics", "severity_counts", [], "invalid_severity_counts"),
+            ("diagnostics", "events_analyzed", "1", "invalid_events_analyzed"),
+            ("diagnostics", "recovery_rate", float("inf"), "invalid_recovery_rate"),
+        )
+        for parent, field, value, expected_error in cases:
+            payload = self.bridge.export_recovery_diagnostics()
+            target = payload if parent is None else payload[parent]
+            target[field] = value
+            with self.subTest(field=field, value=value):
+                result = self.bridge.validate_recovery_diagnostics(payload)
+                self.assertFalse(result["valid"])
+                self.assertIn(expected_error, result["errors"])
+
+        nonstandard_json = self.bridge.export_recovery_diagnostics()
+        nonstandard_json["generated_at"] = float("nan")
+        result = self.bridge.validate_recovery_diagnostics(json.dumps(nonstandard_json))
+        self.assertFalse(result["valid"])
+        self.assertEqual(result["errors"], ["invalid_json"])
+
+        payload = self.bridge.export_recovery_diagnostics()
+        payload["diagnostics"]["severity"] = []
+        with self.assertRaisesRegex(ValueError, "invalid_severity"):
+            render_dashboard(payload)
+
+    def test_nonfinite_metrics_are_rejected_and_json_export_is_strict(self):
+        for value in (float("inf"), float("-inf"), float("nan")):
+            with self.subTest(total_latency_ms=value), self.assertRaisesRegex(ValueError, "finite"):
+                self.bridge.record_reprocessing_telemetry({
+                    "attempts": 1,
+                    "failed": 0,
+                    "discarded": 0,
+                    "total_latency_ms": value,
+                })
+
+        self.assertEqual(self.bridge.get_policy_audit(), [])
+
+        def reject_nonfinite(value):
+            raise ValueError(f"non-standard JSON constant: {value}")
+
+        encoded = self.bridge.export_recovery_diagnostics(as_json=True)
+        decoded = json.loads(encoded, parse_constant=reject_nonfinite)
+        self.assertTrue(self.bridge.validate_recovery_diagnostics(decoded)["valid"])
+
     @settings(max_examples=60, deadline=None)
     @given(
         st.recursive(

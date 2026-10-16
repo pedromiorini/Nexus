@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import sqlite3
 import threading
@@ -52,7 +53,12 @@ class NexusConstitutionalBridge:
         attempts = int(snapshot.get("attempts", 0))
         failed = int(snapshot.get("failed", 0))
         discarded = int(snapshot.get("discarded", 0))
-        total_latency = float(snapshot.get("total_latency_ms", 0.0))
+        try:
+            total_latency = float(snapshot.get("total_latency_ms", 0.0))
+        except (OverflowError, TypeError, ValueError) as exc:
+            raise ValueError("total_latency_ms must be finite and nonnegative") from exc
+        if not math.isfinite(total_latency) or total_latency < 0:
+            raise ValueError("total_latency_ms must be finite and nonnegative")
         avg_latency = total_latency / attempts if attempts else 0.0
         failure_rate = failed / attempts if attempts else 0.0
         discard_rate = discarded / attempts if attempts else 0.0
@@ -72,9 +78,9 @@ class NexusConstitutionalBridge:
             "status": "alert" if alerts else "nominal",
         }
         with self._audit_db_lock:
+            self._write_audit_event("telemetry", record)
             self.reprocessing_telemetry.append(record)
             del self.reprocessing_telemetry[:-128]
-        self._write_audit_event("telemetry", record)
         return record
 
     def record_policy_transition(self, previous_state: str, new_state: str, reason: str, policy: Dict[str, Any]) -> Dict[str, Any]:
@@ -92,7 +98,7 @@ class NexusConstitutionalBridge:
         with self._audit_db_lock:
             self._audit_db.execute(
                 "INSERT INTO policy_audit (event_type, timestamp, payload) VALUES (?, ?, ?)",
-                (event_type, time.time(), json.dumps(payload, sort_keys=True)),
+                (event_type, time.time(), json.dumps(payload, sort_keys=True, allow_nan=False)),
             )
             self._audit_db.commit()
 
@@ -177,15 +183,28 @@ class NexusConstitutionalBridge:
             "diagnostics": self.get_recovery_analysis(limit=limit, window_seconds=window_seconds),
             "events": self.get_policy_audit(limit=limit),
         }
-        return json.dumps(payload, sort_keys=True, separators=(",", ":")) if as_json else payload
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False) if as_json else payload
+
+    @staticmethod
+    def _is_finite_number(value: Any) -> bool:
+        if type(value) not in (int, float):
+            return False
+        try:
+            return math.isfinite(value)
+        except OverflowError:
+            return False
+
+    @staticmethod
+    def _reject_json_constant(value: str) -> None:
+        raise ValueError(f"non-standard JSON constant: {value}")
 
     def validate_recovery_diagnostics(self, payload: Any) -> Dict[str, Any]:
         """Valida estrutura, tipos essenciais e compatibilidade do schema exportado."""
         errors = []
         if isinstance(payload, str):
             try:
-                payload = json.loads(payload)
-            except json.JSONDecodeError:
+                payload = json.loads(payload, parse_constant=self._reject_json_constant)
+            except (json.JSONDecodeError, ValueError):
                 return {"valid": False, "compatible": False, "errors": ["invalid_json"]}
         if not isinstance(payload, dict):
             return {"valid": False, "compatible": False, "errors": ["payload_must_be_object"]}
@@ -196,6 +215,11 @@ class NexusConstitutionalBridge:
         for field in ("schema", "generated_at", "source", "diagnostics", "events"):
             if field not in payload:
                 errors.append(f"missing_{field}")
+        if "generated_at" in payload and not self._is_finite_number(payload["generated_at"]):
+            errors.append("invalid_generated_at")
+        source = payload.get("source")
+        if "source" in payload and (not isinstance(source, str) or not source.strip()):
+            errors.append("invalid_source")
         diagnostics = payload.get("diagnostics")
         if not isinstance(diagnostics, dict):
             errors.append("diagnostics_must_be_object")
@@ -203,10 +227,57 @@ class NexusConstitutionalBridge:
             for field in ("severity", "severity_counts", "events_analyzed", "recovery_rate"):
                 if field not in diagnostics:
                     errors.append(f"missing_diagnostics_{field}")
-            if diagnostics.get("severity") not in {"info", "warning", "critical"}:
+            severity = diagnostics.get("severity")
+            if not isinstance(severity, str) or severity not in {"info", "warning", "critical"}:
                 errors.append("invalid_severity")
-        if not isinstance(payload.get("events"), list):
+            severity_counts = diagnostics.get("severity_counts")
+            required_severities = {"info", "warning", "critical"}
+            if (
+                not isinstance(severity_counts, dict)
+                or not required_severities.issubset(severity_counts)
+                or any(
+                    not isinstance(name, str) or type(count) is not int or count < 0
+                    for name, count in severity_counts.items()
+                )
+            ):
+                errors.append("invalid_severity_counts")
+            events_analyzed = diagnostics.get("events_analyzed")
+            if "events_analyzed" in diagnostics and (type(events_analyzed) is not int or events_analyzed < 0):
+                errors.append("invalid_events_analyzed")
+            recovery_rate = diagnostics.get("recovery_rate")
+            if "recovery_rate" in diagnostics and (
+                not self._is_finite_number(recovery_rate) or recovery_rate < 0
+            ):
+                errors.append("invalid_recovery_rate")
+            for field in ("pauses", "recoveries", "critical_events"):
+                value = diagnostics.get(field)
+                if field in diagnostics and (type(value) is not int or value < 0):
+                    errors.append(f"invalid_{field}")
+            for field in ("avg_pause_seconds", "total_pause_seconds"):
+                value = diagnostics.get(field)
+                if field in diagnostics and (not self._is_finite_number(value) or value < 0):
+                    errors.append(f"invalid_{field}")
+            if "window_seconds" in diagnostics and diagnostics["window_seconds"] is not None:
+                value = diagnostics["window_seconds"]
+                if not self._is_finite_number(value) or value <= 0:
+                    errors.append("invalid_window_seconds")
+            if "open_pause" in diagnostics and type(diagnostics["open_pause"]) is not bool:
+                errors.append("invalid_open_pause")
+            if "latest_state" in diagnostics and not isinstance(diagnostics["latest_state"], str):
+                errors.append("invalid_latest_state")
+        events = payload.get("events")
+        if not isinstance(events, list):
             errors.append("events_must_be_array")
+        else:
+            for event in events:
+                if (
+                    not isinstance(event, dict)
+                    or not isinstance(event.get("event_type"), str)
+                    or not self._is_finite_number(event.get("timestamp"))
+                    or not isinstance(event.get("payload"), dict)
+                ):
+                    errors.append("invalid_event")
+                    break
         return {"valid": not errors, "compatible": compatible, "schema": schema, "errors": errors}
 
     def get_brain_state(self, fed: Any, uci_global: float) -> dict:

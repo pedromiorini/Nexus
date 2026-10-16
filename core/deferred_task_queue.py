@@ -55,10 +55,16 @@ class DeferredTaskQueue:
             if len(self._heap) >= self.max_size:
                 self._stats["discarded"] += 1
                 raise OverflowError("fila de tarefas adiadas está cheia")
+            try:
+                copied_context = copy.deepcopy(context) if context is not None else {}
+            except Exception as exc:
+                raise ValueError("context must be deep-copyable") from exc
+            if not isinstance(copied_context, dict):
+                raise ValueError("context must be a dictionary")
             task_id = str(uuid.uuid4())
             while task_id in self._tasks:
                 task_id = str(uuid.uuid4())
-            task = DeferredTask(priority, time(), task_id, prompt, context or {}, 0, self.max_attempts, reason)
+            task = DeferredTask(priority, time(), task_id, prompt, copied_context, 0, self.max_attempts, reason)
             heapq.heappush(self._heap, task)
             self._tasks[task.task_id] = task
             self._stats["enqueued"] += 1

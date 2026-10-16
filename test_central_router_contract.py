@@ -46,7 +46,8 @@ class CentralRouterContractTests(unittest.TestCase):
         router.vram_guard = Guard()
         router.routing_rules[RequestType.PLANNING] = [ModuleType.WORLD_MODEL]
         router._aggregate_results = lambda results, request_type, context: {
-            "observed_context": dict(context)
+            "observed_context": dict(context),
+            "nested_output": {"values": [1]},
         }
 
         first_actions = [["left"], ["right"]]
@@ -62,9 +63,54 @@ class CentralRouterContractTests(unittest.TestCase):
         self.assertEqual(first["observed_context"]["possible_actions"], first_actions)
         self.assertEqual(first["observed_context"]["original_prompt"], "plan a route")
 
-        router.route("plan without explicit context")
+        execute_stage = router._execute_stage
+
+        def mutate_nested_context(modules, prompt, context):
+            context["nested"]["value"] = 2
+            return execute_stage(modules, prompt, context)
+
+        router._execute_stage = mutate_nested_context
+        caller_context = {"possible_actions": [["up"]], "nested": {"value": 1}}
+        router.route("plan with nested context", caller_context)
+        self.assertEqual(caller_context["nested"]["value"], 1)
+        router._execute_stage = execute_stage
+
+        uncached = router.route("plan without explicit context")
+        uncached["nested_output"]["values"].append(2)
         cached = router.route("plan without explicit context")
         self.assertTrue(cached["cached"])
+        self.assertEqual(cached["nested_output"]["values"], [1])
+        cached["nested_output"]["values"].append(3)
+        cached_again = router.route("plan without explicit context")
+        self.assertEqual(cached_again["nested_output"]["values"], [1])
+
+    def test_execute_stage_isolates_mutable_context_between_modules(self):
+        router = CentralRouter.__new__(CentralRouter)
+        router.modules = {
+            ModuleType.JAILBREAK: object(),
+            ModuleType.BUDGET: object(),
+        }
+        router.stats = {
+            "module_errors": defaultdict(int),
+            "module_call_count": defaultdict(int),
+        }
+        observed = []
+
+        def mutate_context(_module_name, _module, _prompt, context):
+            observed.append(context["nested"]["value"])
+            context["nested"]["value"] += 1
+            return {"ok": True}
+
+        router._invoke_module = mutate_context
+        original = {"nested": {"value": 1}}
+
+        results = router._execute_stage(
+            [ModuleType.JAILBREAK, ModuleType.BUDGET], "prompt", original
+        )
+
+        self.assertEqual(observed, [1, 1])
+        self.assertEqual(original, {"nested": {"value": 1}})
+        self.assertTrue(all(result.success for result in results))
 
     def test_statistics_expose_request_count_and_rates(self):
         router = CentralRouter.__new__(CentralRouter)

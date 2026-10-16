@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from core.constitutional_brain import RealEpisodicMemory
 
@@ -35,6 +37,35 @@ class EpisodicMemoryStatisticsContractTests(unittest.TestCase):
         memory.close_episode(episode_id)
         self.assertEqual(memory.get_statistics()["episodes_closed"], 1)
         memory.conn.close()
+
+    def test_episode_counts_survive_reopening_sqlite(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = str(Path(directory) / "episodic-memory.sqlite3")
+            memory = RealEpisodicMemory(database)
+            first = memory.start_episode("first")
+            memory.start_episode("second")
+            memory.close_episode(first)
+            self.assertEqual(
+                (memory.get_statistics()["episodes_created"], memory.get_statistics()["episodes_closed"]),
+                (2, 1),
+            )
+            memory.close()
+
+            reopened = RealEpisodicMemory(database)
+            self.assertEqual(
+                (reopened.get_statistics()["episodes_created"], reopened.get_statistics()["episodes_closed"]),
+                (2, 1),
+            )
+            reopened.close()
+
+    def test_unknown_episode_link_is_rejected_without_mutating_statistics(self):
+        memory = RealEpisodicMemory(":memory:")
+
+        with self.assertRaisesRegex(ValueError, "episode_id"):
+            memory.link_memory_to_episode("missing-episode", 99)
+
+        self.assertEqual(memory.get_statistics()["total_links"], 0)
+        memory.close()
 
 
 if __name__ == "__main__":

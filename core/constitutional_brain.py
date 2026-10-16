@@ -2119,6 +2119,13 @@ class RealEpisodicMemory:
         self.episodes_created = 0
         self.episodes_closed = 0
         self._create_tables()
+        with self.db_lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(*), COALESCE(SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END), 0)
+                FROM episodic_memories
+            """)
+            self.episodes_created, self.episodes_closed = map(int, cursor.fetchone())
 
     def close(self) -> None:
         """Fecha a conexão SQLite (idempotente); evita ResourceWarning no Python >= 3.13."""
@@ -2199,6 +2206,9 @@ class RealEpisodicMemory:
         """Vincular memória a episódio"""
         with self.db_lock:
             cursor = self.conn.cursor()
+            cursor.execute("SELECT 1 FROM episodic_memories WHERE episode_id = ?", (episode_id,))
+            if cursor.fetchone() is None:
+                raise ValueError("episode_id does not exist")
             cursor.execute("""
                 INSERT OR REPLACE INTO episodic_memory_links
                 (episode_id, memory_id, relevance_score)
@@ -2266,8 +2276,11 @@ class RealEpisodicMemory:
             total_links = int(cursor.fetchone()[0])
             cursor.execute("SELECT AVG(importance) FROM episodic_memories")
             avg_importance = cursor.fetchone()[0]
-            episodes_created = self.episodes_created
-            episodes_closed = self.episodes_closed
+            cursor.execute("""
+                SELECT COUNT(*), COALESCE(SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END), 0)
+                FROM episodic_memories
+            """)
+            episodes_created, episodes_closed = map(int, cursor.fetchone())
         return {
             "episodes_created": episodes_created,
             "episodes_closed": episodes_closed,
@@ -12884,6 +12897,13 @@ class CentralRouter:
         
         Returns: Resultado agregado otimizado
         """
+        if context is not None:
+            if not isinstance(context, dict):
+                raise ValueError("context must be a dictionary")
+            try:
+                context = copy.deepcopy(context)
+            except Exception as exc:
+                raise ValueError("context must be deep-copyable") from exc
         # DEBUG v3.70: Log entry
         _dbg("🔍 DEBUG v3.70: Router.route() CALLED")
         _dbg(f"🔍 DEBUG v3.70: prompt = '{prompt[:50]}...'")
@@ -12952,12 +12972,16 @@ class CentralRouter:
 
             # Verificar se ainda válido (TTL)
             if time.time() - cached_entry["timestamp"] < self.cache_ttl:
-                self.stats["cache_hits"] += 1
-                cached_result = cached_entry["result"].copy()
-                cached_result["cached"] = True
-                cached_result["cache_age_seconds"] = time.time() - cached_entry["timestamp"]
-                _dbg("🔍 DEBUG v3.70: Returning CACHED result")
-                return cached_result
+                try:
+                    cached_result = copy.deepcopy(cached_entry["result"])
+                except Exception:
+                    self.execution_cache.pop(execution_plan.cache_key, None)
+                else:
+                    self.stats["cache_hits"] += 1
+                    cached_result["cached"] = True
+                    cached_result["cache_age_seconds"] = time.time() - cached_entry["timestamp"]
+                    _dbg("🔍 DEBUG v3.70: Returning CACHED result")
+                    return cached_result
 
         # ─── 5. EXECUÇÃO (Stage por Stage) ────────────────────────────────
         all_results: List[ModuleResult] = []
@@ -13013,10 +13037,15 @@ class CentralRouter:
 
         # ─── 8. CACHEAR ────────────────────────────────────────────────────
         if cacheable:
-            self.execution_cache[execution_plan.cache_key] = {
-                "timestamp": time.time(),
-                "result": final_result.copy()
-            }
+            try:
+                cached_result = copy.deepcopy(final_result)
+            except Exception:
+                cached_result = None
+            if cached_result is not None:
+                self.execution_cache[execution_plan.cache_key] = {
+                    "timestamp": time.time(),
+                    "result": cached_result,
+                }
 
         # ─── 9. ESTATÍSTICAS ───────────────────────────────────────────────
         self._update_statistics(latency_ms, execution_plan, all_results)
@@ -13075,7 +13104,7 @@ class CentralRouter:
         def process(task) -> bool:
             metrics["attempts"] += 1
             timings[task.task_id] = time.time()
-            context = dict(task.context)
+            context = copy.deepcopy(task.context)
             context.update({"_deferred_reprocess": True, "deferred_task_id": task.task_id, "deferred_attempt": task.attempts})
             try:
                 result = self.route(task.prompt, context)
@@ -13148,7 +13177,7 @@ class CentralRouter:
                     continue
 
                 # Invocar módulo com interface unificada
-                data = self._invoke_module(module_name, module_instance, prompt, context)
+                data = self._invoke_module(module_name, module_instance, prompt, copy.deepcopy(context))
 
                 latency_ms = (time.time() - start) * 1000
 
