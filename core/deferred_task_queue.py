@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-import math
-from time import time
-from typing import Any, Dict, List, Optional
 import heapq
 import json
+import math
+import threading
+from time import time
+from typing import Any, Dict, List, Optional
 import uuid
 
 
@@ -28,7 +29,7 @@ class DeferredTask:
 
 
 class DeferredTaskQueue:
-    """Fila em memória; snapshots são contratos de transporte, não persistência física."""
+    """Fila em memória; snapshots transportam tarefas pendentes, não tarefas em voo."""
 
     SNAPSHOT_SCHEMA = "nexus.deferred_task_queue.v1"
 
@@ -38,45 +39,84 @@ class DeferredTaskQueue:
         self.max_attempts = max_attempts
         self.max_size = max_size
         self._heap: List[DeferredTask] = []
+        # _tasks indexa tanto tarefas pendentes quanto tarefas entregues a consumidores.
         self._tasks: Dict[str, DeferredTask] = {}
+        self._in_flight: set[str] = set()
         self._stats = {"enqueued": 0, "retried": 0, "completed": 0, "discarded": 0}
+        self._lock = threading.RLock()
 
     def enqueue(self, prompt: str, context: Optional[Dict[str, Any]] = None, priority: int = 0, reason: str = "") -> DeferredTask:
-        if len(self._heap) >= self.max_size:
-            self._stats["discarded"] += 1
-            raise OverflowError("fila de tarefas adiadas está cheia")
-        task = DeferredTask(priority, time(), str(uuid.uuid4()), prompt, context or {}, 0, self.max_attempts, reason)
-        heapq.heappush(self._heap, task)
-        self._tasks[task.task_id] = task
-        self._stats["enqueued"] += 1
-        return task
+        with self._lock:
+            if len(self._heap) >= self.max_size:
+                self._stats["discarded"] += 1
+                raise OverflowError("fila de tarefas adiadas está cheia")
+            task_id = str(uuid.uuid4())
+            while task_id in self._tasks:
+                task_id = str(uuid.uuid4())
+            task = DeferredTask(priority, time(), task_id, prompt, context or {}, 0, self.max_attempts, reason)
+            heapq.heappush(self._heap, task)
+            self._tasks[task.task_id] = task
+            self._stats["enqueued"] += 1
+            return task
 
     def recheck_and_pop(self, pressure_critical: bool) -> Optional[DeferredTask]:
-        if pressure_critical or not self._heap:
-            return None
-        task = heapq.heappop(self._heap)
-        self._tasks.pop(task.task_id, None)
-        task.attempts += 1
-        self._stats["retried"] += 1
-        return task
+        with self._lock:
+            if pressure_critical or not self._heap:
+                return None
+            task = heapq.heappop(self._heap)
+            self._in_flight.add(task.task_id)
+            task.attempts += 1
+            self._stats["retried"] += 1
+            return task
+
+    def _requeue_status(self, task: DeferredTask, reason: str = "") -> str:
+        """Transiciona apenas uma tarefa em voo; devolve queued/discarded/ignored."""
+        with self._lock:
+            task_id = task.task_id
+            if self._tasks.get(task_id) is not task or task_id not in self._in_flight:
+                return "ignored"
+            task.last_reason = reason or task.last_reason
+            if task.attempts >= task.max_attempts or len(self._heap) >= self.max_size:
+                self._in_flight.remove(task_id)
+                self._tasks.pop(task_id, None)
+                self._stats["discarded"] += 1
+                return "discarded"
+            self._in_flight.remove(task_id)
+            heapq.heappush(self._heap, task)
+            return "queued"
 
     def requeue(self, task: DeferredTask, reason: str = "") -> bool:
-        task.last_reason = reason or task.last_reason
-        if task.attempts >= task.max_attempts:
-            self._stats["discarded"] += 1
-            return False
-        heapq.heappush(self._heap, task)
-        self._tasks[task.task_id] = task
-        return True
+        """Reinsere uma tarefa em voo no máximo uma vez e sem exceder a capacidade."""
+        return self._requeue_status(task, reason) == "queued"
 
     def consume(self, processor, max_batch: int = 1, pressure_critical: bool = False, on_success=None, on_failure=None, on_discard=None) -> Dict[str, Any]:
-        """Processa um lote finito; callbacks são opcionais e nunca controlam o retry."""
+        """Processa um lote finito. Erros de callback são reportados, sem reverter estados."""
         if max_batch < 1:
             raise ValueError("max_batch deve ser positivo")
         if pressure_critical:
-            return {"processed": 0, "completed": 0, "retried": 0, "discarded": 0, "blocked": True}
-        processed = completed = retried = discarded = 0
-        initial_depth = min(len(self._heap), max_batch)
+            return {
+                "processed": 0, "completed": 0, "retried": 0,
+                "discarded": 0, "superseded": 0, "callback_errors": [], "blocked": True,
+            }
+
+        processed = completed = retried = discarded = superseded = 0
+        callback_errors: List[Dict[str, str]] = []
+        with self._lock:
+            initial_depth = min(len(self._heap), max_batch)
+
+        def notify(name: str, callback, task: DeferredTask) -> None:
+            if callback is None:
+                return
+            try:
+                callback(task)
+            except Exception as exc:
+                # Não inclui a mensagem, que pode conter conteúdo sensível da tarefa.
+                callback_errors.append({
+                    "callback": name,
+                    "task_id": task.task_id,
+                    "exception": type(exc).__name__,
+                })
+
         for _ in range(initial_depth):
             task = self.recheck_and_pop(False)
             if task is None:
@@ -87,71 +127,107 @@ class DeferredTaskQueue:
             except Exception as exc:
                 ok = False
                 task.last_reason = f"{type(exc).__name__}: {exc}"
+
             if ok:
-                self.complete(task.task_id)
-                completed += 1
-                if on_success is not None:
-                    on_success(task)
-            elif self.requeue(task):
+                if self.complete(task.task_id):
+                    completed += 1
+                    notify("on_success", on_success, task)
+                else:
+                    superseded += 1
+                continue
+
+            transition = self._requeue_status(task)
+            if transition == "queued":
                 retried += 1
-                if on_failure is not None:
-                    on_failure(task)
-            else:
+                notify("on_failure", on_failure, task)
+            elif transition == "discarded":
                 discarded += 1
-                if on_failure is not None:
-                    on_failure(task)
-                if on_discard is not None:
-                    on_discard(task)
-        return {"processed": processed, "completed": completed, "retried": retried, "discarded": discarded, "blocked": False}
+                notify("on_failure", on_failure, task)
+                notify("on_discard", on_discard, task)
+            else:
+                superseded += 1
 
-    def complete(self, task_id: str) -> None:
-        self._tasks.pop(task_id, None)
-        self._stats["completed"] += 1
+        return {
+            "processed": processed,
+            "completed": completed,
+            "retried": retried,
+            "discarded": discarded,
+            "superseded": superseded,
+            "callback_errors": callback_errors,
+            "blocked": False,
+        }
 
-    def discard(self, task_id: str) -> None:
-        self._tasks.pop(task_id, None)
-        self._stats["discarded"] += 1
+    def _remove_pending_locked(self, task_id: str) -> None:
+        if task_id in self._in_flight:
+            self._in_flight.remove(task_id)
+            return
+        self._heap = [task for task in self._heap if task.task_id != task_id]
+        heapq.heapify(self._heap)
+
+    def complete(self, task_id: str) -> bool:
+        """Conclui uma tarefa ativa; é idempotente e remove pendências do heap."""
+        with self._lock:
+            if task_id not in self._tasks:
+                return False
+            self._tasks.pop(task_id, None)
+            self._remove_pending_locked(task_id)
+            self._stats["completed"] += 1
+            return True
+
+    def discard(self, task_id: str) -> bool:
+        """Descarta uma tarefa ativa; é idempotente e remove pendências do heap."""
+        with self._lock:
+            if task_id not in self._tasks:
+                return False
+            self._tasks.pop(task_id, None)
+            self._remove_pending_locked(task_id)
+            self._stats["discarded"] += 1
+            return True
 
     def statistics(self) -> Dict[str, Any]:
-        return {"depth": len(self._heap), "max_attempts": self.max_attempts, "max_size": self.max_size, **self._stats}
-
+        with self._lock:
+            return {"depth": len(self._heap), "max_attempts": self.max_attempts, "max_size": self.max_size, **self._stats}
 
     def export_snapshot(self, as_json: bool = False) -> Any:
         """Exporta somente tarefas pendentes; nenhum processamento é disparado."""
-        payload = {
-            "schema": self.SNAPSHOT_SCHEMA,
-            "generated_at": time(),
-            "max_attempts": self.max_attempts,
-            "max_size": self.max_size,
-            "statistics": dict(self._stats),
-            "tasks": [self._task_to_dict(task) for task in sorted(self._heap, key=lambda item: item.sort_key)],
-        }
-        return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False) if as_json else payload
+        with self._lock:
+            payload = {
+                "schema": self.SNAPSHOT_SCHEMA,
+                "generated_at": time(),
+                "max_attempts": self.max_attempts,
+                "max_size": self.max_size,
+                "statistics": dict(self._stats),
+                "tasks": [self._task_to_dict(task) for task in sorted(self._heap, key=lambda item: item.sort_key)],
+            }
+            return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False) if as_json else payload
 
     def restore_snapshot(self, snapshot: Any, replace: bool = False) -> Dict[str, Any]:
-        """Restaura tarefas pendentes após validar o snapshot inteiro de forma atômica."""
-        payload = self._decode_snapshot(snapshot)
-        tasks = self._validate_snapshot(payload, replace=replace)
-        if not replace and len(self._heap) + len(tasks) > self.max_size:
-            raise ValueError("snapshot excede a capacidade disponível da fila")
-        if replace and len(tasks) > self.max_size:
-            raise ValueError("snapshot excede max_size da fila")
+        """Valida o snapshot inteiro e restaura-o atomicamente, sem invalidar tarefas em voo."""
+        payload = copy.deepcopy(self._decode_snapshot(snapshot))
+        with self._lock:
+            if replace and self._in_flight:
+                raise ValueError("não é possível substituir a fila enquanto há tarefas em voo")
+            tasks = self._validate_snapshot(payload, replace=replace)
+            if not replace and len(self._heap) + len(tasks) > self.max_size:
+                raise ValueError("snapshot excede a capacidade disponível da fila")
+            if replace and len(tasks) > self.max_size:
+                raise ValueError("snapshot excede max_size da fila")
 
-        restored = []
-        for task in tasks:
-            detached = dict(task)
-            detached["context"] = copy.deepcopy(task["context"])
-            restored.append(DeferredTask(**detached))
-        if replace:
-            self._heap.clear()
-            self._tasks.clear()
-            self._stats = dict(payload["statistics"])
-        for task in restored:
-            if task.task_id in self._tasks:
-                raise ValueError(f"task_id duplicado na fila: {task.task_id}")
-            heapq.heappush(self._heap, task)
-            self._tasks[task.task_id] = task
-        return {"restored": len(restored), "depth": len(self._heap), "replaced": replace}
+            restored = []
+            for task in tasks:
+                detached = dict(task)
+                detached["context"] = copy.deepcopy(task["context"])
+                restored.append(DeferredTask(**detached))
+            if replace:
+                self._heap.clear()
+                self._tasks.clear()
+                self._in_flight.clear()
+                self._stats = dict(payload["statistics"])
+            for task in restored:
+                # Todas as colisões foram verificadas antes de modificar o estado.
+                heapq.heappush(self._heap, task)
+                self._tasks[task.task_id] = task
+            return {"restored": len(restored), "depth": len(self._heap), "replaced": replace}
 
     @staticmethod
     def _task_to_dict(task: DeferredTask) -> Dict[str, Any]:

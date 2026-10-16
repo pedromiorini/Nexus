@@ -73,6 +73,21 @@ class DeferredTaskSnapshotTests(unittest.TestCase):
         self.assertEqual(target.statistics()["depth"], 1)
         self.assertEqual(target.recheck_and_pop(False).prompt, "recover")
 
+    def test_replace_is_rejected_without_mutation_while_task_is_in_flight(self):
+        source = DeferredTaskQueue()
+        source.enqueue("replacement")
+        snapshot = source.export_snapshot()
+        target = DeferredTaskQueue()
+        active = target.enqueue("active")
+        self.assertEqual(target.recheck_and_pop(False).task_id, active.task_id)
+        before = target.statistics().copy()
+
+        with self.assertRaises(ValueError):
+            target.restore_snapshot(snapshot, replace=True)
+
+        self.assertEqual(target.statistics(), before)
+        self.assertTrue(target.complete(active.task_id))
+
     def test_export_and_restore_contexts_are_detached(self):
         source = DeferredTaskQueue()
         task = source.enqueue("isolated", {"nested": {"value": "original"}})

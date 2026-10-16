@@ -16,15 +16,15 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.11'
 
       - name: Install runtime dependencies
-        run: python -m pip install --upgrade pip numpy coverage hypothesis bandit
+        run: python -m pip install --require-hashes -r requirements-ci.lock
 
       - name: Compile changed Python modules
         run: |
@@ -37,6 +37,8 @@ jobs:
             test_reality_audit.py \
             test_deferred_task_properties.py \
             test_deferred_task_snapshot.py \
+            test_immutable_log_contract.py \
+            test_jailbreak_detector_contract.py \
             test_memory_sql_contract.py \
             test_security_triage.py \
             test_error_correction_contract.py \
@@ -87,7 +89,7 @@ jobs:
         run: python tools/reality_audit.py
 
       - name: Retain reality audit report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nexus-reality-audit
           path: |
@@ -100,14 +102,14 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          coverage run --branch -m unittest test_recovery_diagnostics_contract.py test_deferred_task_queue.py test_deferred_task_snapshot.py test_memory_sql_contract.py test_reality_audit.py test_deferred_task_properties.py test_security_triage.py test_error_correction_contract.py test_embedded_assert_audit.py test_central_router_contract.py test_vram_defense_guard.py test_implementation_gap_audit.py test_explicit_gap_contract.py test_working_memory_contract.py test_hardware_telemetry_contract.py test_counterfactual_contract.py test_multimodal_backend_contract.py test_swarm_statistics_contract.py test_episodic_memory_statistics_contract.py test_episodic_memory_concurrency_contract.py test_vita_audit_concurrency_contract.py test_vita_audit_cross_connection_contract.py test_attention_signal_contract.py test_integration_synergy_contract.py test_knowledge_graph_contract.py test_sensorimotor_multimodal_contract.py test_consensus_application_contract.py test_shadow_clone_reintegration_contract.py test_reminiscence_bump_contract.py test_state_manifest.py test_mcts_action_contract.py
+          coverage run --branch -m unittest discover -p 'test_*.py'
           coverage report --fail-under=0
           coverage report --include='core/deferred_task_queue.py' --fail-under=90
           coverage report --include='vita/nexus_constitutional_bridge_v3.py' --fail-under=70
           coverage xml -o coverage.xml
 
       - name: Retain coverage report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nexus-contract-coverage
           path: coverage.xml
@@ -118,6 +120,12 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m unittest -v test_deferred_task_snapshot.py
+
+      - name: Run immutable log and jailbreak detector contracts
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v test_immutable_log_contract.py test_jailbreak_detector_contract.py
+
       - name: Run expanded contract tests
         env:
           PYTHONPATH: .
@@ -167,7 +175,7 @@ jobs:
           print('Bandit severity policy passed: no MEDIUM/HIGH findings')
           PY
       - name: Retain security scan report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nexus-bandit-report
           path: |
@@ -187,23 +195,66 @@ jobs:
           PYTHONPATH: .
         run: python tools/test_summary.py --output test-summary.json
 
-      - name: Generate current state manifest
-        env:
-          PYTHONPATH: .
+      - name: Retain inputs for final state attestation
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nexus-state-manifest-inputs
+          path: |
+            test-summary.json
+            bandit-report.json
+            targeted_mutation_report.json
+            audit_reality.json
+            implementation-gaps.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify clean generated artifacts
+        run: |
+          rm -f nexus_audit.sqlite3
+          rm -f test-summary.json
+          if find . -type f \( -name '*.sqlite3' -o -name '*.db' \) -print -quit | grep -q .; then
+            echo 'Unexpected database artifact detected'
+            exit 1
+          fi
+
+  state-manifest:
+    name: Final state attestation
+    needs: contract-gate
+    if: needs.contract-gate.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      GATES_STATUS: ${{ needs.contract-gate.result }}
+    steps:
+      - name: Checkout verified commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.11'
+
+      - name: Download outputs from completed gates
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nexus-state-manifest-inputs
+          path: .
+
+      - name: Generate final state manifest
         run: >-
           python tools/state_manifest.py
           --output STATE_MANIFEST.json
           --test-result passed
           --test-command "python -m unittest discover -p 'test_*.py'"
-          --ci-status success
+          --gates-status "$GATES_STATUS"
 
       - name: Run state consistency gate
-        env:
-          PYTHONPATH: .
         run: python tools/state_consistency_audit.py --manifest STATE_MANIFEST.json --output state-consistency.json
 
       - name: Retain current state manifest
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nexus-state-manifest
           path: STATE_MANIFEST.json
@@ -211,20 +262,9 @@ jobs:
           retention-days: 14
 
       - name: Retain state consistency report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nexus-state-consistency
           path: state-consistency.json
           if-no-files-found: error
           retention-days: 14
-
-      - name: Verify clean generated artifacts
-        run: |
-          rm -f nexus_audit.sqlite3
-          rm -f STATE_MANIFEST.json
-          rm -f state-consistency.json
-          rm -f test-summary.json
-          if find . -type f \( -name '*.sqlite3' -o -name '*.db' \) -print -quit | grep -q .; then
-            echo 'Unexpected database artifact detected'
-            exit 1
-          fi
