@@ -12945,7 +12945,9 @@ class CentralRouter:
         execution_plan = ethics_check["modified_plan"]
 
         # ─── 4. CHECK CACHE ────────────────────────────────────────────────
-        if execution_plan.cache_key in self.execution_cache:
+        # Contexto adicional pode alterar entradas dos módulos, mas não faz parte da chave do cache.
+        cacheable = not context
+        if cacheable and execution_plan.cache_key in self.execution_cache:
             cached_entry = self.execution_cache[execution_plan.cache_key]
 
             # Verificar se ainda válido (TTL)
@@ -12959,7 +12961,10 @@ class CentralRouter:
 
         # ─── 5. EXECUÇÃO (Stage por Stage) ────────────────────────────────
         all_results: List[ModuleResult] = []
-        aggregated_data = {"original_prompt": prompt}  # Dados passados entre stages
+        aggregated_data = {"original_prompt": prompt}
+        if context:
+            aggregated_data.update(context)
+            aggregated_data["original_prompt"] = prompt
         
         _dbg(f"🔍 DEBUG v3.70: Executing {len(execution_plan.execution_stages)} stages")
 
@@ -13007,10 +13012,11 @@ class CentralRouter:
         _dbg(f"🔍 DEBUG v3.70: request_type = {final_result['request_type']}")
 
         # ─── 8. CACHEAR ────────────────────────────────────────────────────
-        self.execution_cache[execution_plan.cache_key] = {
-            "timestamp": time.time(),
-            "result": final_result.copy()
-        }
+        if cacheable:
+            self.execution_cache[execution_plan.cache_key] = {
+                "timestamp": time.time(),
+                "result": final_result.copy()
+            }
 
         # ─── 9. ESTATÍSTICAS ───────────────────────────────────────────────
         self._update_statistics(latency_ms, execution_plan, all_results)
