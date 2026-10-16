@@ -23,15 +23,17 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(queue.statistics()["depth"], 1)
 
     def test_invalid_queue_limits_are_rejected(self):
-        with self.assertRaises(ValueError):
-            DeferredTaskQueue(max_attempts=0)
-        with self.assertRaises(ValueError):
-            DeferredTaskQueue(max_size=0)
+        for invalid in (0, -1, 1.5, True, "2"):
+            with self.subTest(max_attempts=invalid), self.assertRaises(ValueError):
+                DeferredTaskQueue(max_attempts=invalid)
+            with self.subTest(max_size=invalid), self.assertRaises(ValueError):
+                DeferredTaskQueue(max_size=invalid)
 
     def test_invalid_batch_limit_is_rejected(self):
         queue = DeferredTaskQueue()
-        with self.assertRaises(ValueError):
-            queue.consume(lambda task: True, max_batch=0)
+        for invalid in (0, -1, 1.5, True, "2"):
+            with self.subTest(max_batch=invalid), self.assertRaises(ValueError):
+                queue.consume(lambda task: True, max_batch=invalid)
 
     def test_capacity_limit(self):
         queue = DeferredTaskQueue(max_size=1)
