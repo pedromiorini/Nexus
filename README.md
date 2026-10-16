@@ -12,7 +12,7 @@ O Nexus Constitutional é um **protótipo experimental de arquitetura neuro-simb
 
 | Área | Evidência | Limite da afirmação |
 |---|---|---|
-| Núcleo constitucional | A suíte integrada local executa 29 verificações embutidas; a de FAISS é pulada sem a dependência e o banner final informa quantas passaram e quantas foram puladas | São verificações do próprio projeto, não uma avaliação externa de capacidade geral |
+| Núcleo constitucional | O manifesto do CI de `main` no commit `5b8bed8` registrou 31 verificações integradas: 30 aprovadas e 1 ignorada pela ausência opcional de FAISS; nenhuma falhou | São verificações do próprio projeto, não uma avaliação externa de capacidade geral |
 | Fila de tarefas adiadas | 16 testes unitários e de integração | Cobre contratos da fila e reprocessamento, não carga distribuída de produção |
 | Diagnóstico de recuperação | Exportação versionada `nexus.recovery.diagnostics.v1` e validador formal | O schema garante estrutura, não a correção de decisões cognitivas |
 | Auditoria Vita | Eventos, transições e métricas persistidos em SQLite | A análise é local e limitada ao histórico disponível |
