@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Any, TextIO
 
-_PASS_LINE = re.compile(r"\bTEST\s+(\d+(?:\.\d+)?)\s+PASSED\b")
+_PASS_LINE = re.compile(r"^\s*(?:✅\s*)?TEST\s+(\d+(?:\.\d+)?)\s+PASSED\b")
 _SKIP_LINE = re.compile(
     r"^\s*TEST\s+(\d+(?:\.\d+)?):.*(?:DISABLED|not\s+(?:available|enabled|active))",
     re.IGNORECASE,
@@ -55,9 +55,12 @@ class IntegratedSuiteTally:
             self._buffer = ""
 
         source = Path(source_path).read_text(encoding="utf-8")
-        expected = set(_EXPECTED_IN_SOURCE.findall(source))
+        expected_markers = _EXPECTED_IN_SOURCE.findall(source)
+        expected = set(expected_markers)
         if not expected:
             raise ValueError("no embedded check markers found in source")
+        if len(expected_markers) != len(expected):
+            raise ValueError("duplicate embedded check markers found in source")
 
         passed = self.passed & expected
         skipped = self.skipped & expected

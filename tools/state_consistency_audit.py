@@ -23,6 +23,7 @@ MARKER_RE = re.compile(
     r"<!--\s*NEXUS-CURRENT-STATE\s*\n(?P<body>.*?)\n\s*-->",
     re.DOTALL,
 )
+MARKER_START_RE = re.compile(r"<!--\s*NEXUS-CURRENT-STATE\b")
 LINE_RE = re.compile(r"^\s*(?P<key>[a-z][a-z0-9_]*)\s*:\s*(?P<value>\S+)\s*$")
 REQUIRED = {"commit", "ci_run", "tests", "bandit_low"}
 
@@ -38,14 +39,21 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _parse_marker(text: str, document: str) -> dict[str, str]:
-    match = MARKER_RE.search(text)
-    if not match:
+    matches = list(MARKER_RE.finditer(text))
+    starts = list(MARKER_START_RE.finditer(text))
+    if not matches:
         raise ValueError(f"{document}: bloco NEXUS-CURRENT-STATE ausente")
+    if len(matches) != 1 or len(starts) != 1:
+        raise ValueError(f"{document}: bloco NEXUS-CURRENT-STATE duplicado ou malformado")
+    match = matches[0]
     claims: dict[str, str] = {}
     for line in match.group("body").splitlines():
         parsed = LINE_RE.match(line)
         if parsed:
-            claims[parsed.group("key")] = parsed.group("value")
+            key = parsed.group("key")
+            if key in claims:
+                raise ValueError(f"{document}: chave duplicada no bloco atual: {key}")
+            claims[key] = parsed.group("value")
         elif line.strip():
             raise ValueError(f"{document}: linha inválida no bloco atual: {line!r}")
     missing = REQUIRED - claims.keys()

@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 203
+tests: 204
 bandit_low: 131
 -->
 
@@ -68,10 +68,10 @@ bandit_low: 131
 - `core/integrated_suite_summary.py`: contabiliza e serializa resultados da suíte integrada sem confundi-los com `unittest`.
 - `tools/state_manifest.py`: gerador determinístico do manifesto factual por execução.
 - `test_state_manifest.py`: contrato do schema, da proveniência e do resumo integrado do manifesto.
-- `test_integrated_suite_summary.py`: contrato de aprovação, skip, ausência, conflito e IDs decimais dos checks integrados.
+- `test_integrated_suite_summary.py`: contrato de aprovação, skip, ausência, conflito, IDs decimais, rejeição de IDs duplicados e de logs que apenas mencionam marcadores.
 - `test_mcts_action_contract.py`: contrato da distinção entre ações padrão (`None`) e espaço de ações vazio (`[]`).
 - `tools/state_consistency_audit.py`: compara claims atuais estruturados com o manifesto factual e ignora histórico fora do bloco.
-- `test_state_consistency_audit.py`: contratos de sincronização, divergência, ausência de marcador e manifesto inválido, incluindo a evidência integrada.
+- `test_state_consistency_audit.py`: contratos de sincronização, divergência, ausência, blocos/chaves duplicados e manifesto inválido, incluindo a evidência integrada.
 - `tools/test_summary.py`: executa a suíte final e registra `executed`, `passed`, `failed`, `skipped` e `unexpected_successes`; XPASS conta como falha e é coberto por `test_test_summary.py`.
 
 ## Validação local da branch de acompanhamento — 2026-10-16
