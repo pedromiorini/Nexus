@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 169
+tests: 173
 bandit_low: 131
 -->
 
@@ -41,6 +41,14 @@ Conflitos não devem ser resolvidos silenciosamente.
 - O Bandit encontrou **131 achados LOW**, sem MEDIUM/HIGH; a triagem e o snapshot de realidade foram regenerados após as mudanças.
 - `RealEpisodicMemory.close_episode` incrementa `episodes_closed` somente quando o SQLite confirma a transição de um episódio aberto para fechado; repetição e ID inexistente não incrementam.
 - Esses resultados são locais; o estado oficial do commit é determinado pelo manifesto de CI associado ao `HEAD`.
+
+## Benchmark científico sintético — branch de avaliação de 2026-10-16
+
+- Base exata: `5f53a9922b71d6ef3c565a31630f56091a454671`; protocolo `nexus.capability-benchmark.v1`, seed `20261016`, taskset SHA-256 `f2cbc785470b5e4018c08512c436e65f98fb26ab2d6b62e2f2c23d8bfd08c5c1`.
+- Execução local: 173/173 testes; cobertura da fila 96% e Vita 74%; suíte integrada 30 aprovados e 1 skip opcional.
+- Resultados medidos: replay composicional 39/39 exato (inclui holdout de comprimento 3); extração lexical de relações F1=0,667 e taxa de falso positivo em controles negativos=0,5; alegações de efeito downstream F1=0,667 com 8 falsos positivos; Brier=0,1849 e ECE=0,01684 em probabilidades fornecidas pelo próprio taskset.
+- Observação parcial: 8 tarefas, nenhum output de distribuição de crença e posterior sem nota (`unsupported_interface`); a API atual não oferece um estado de crença comparável.
+- Resultados são locais e específicos ao protocolo. Não há treino composicional, previsão probabilística gerada pelo Nexus, descoberta causal ou validação de teorias; o CI do commit é a referência oficial.
 
 ## Componentes
 

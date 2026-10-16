@@ -23,6 +23,8 @@
 - Derivar novas métricas de eventos ou registros reais, nunca de constantes arbitrárias.
 - Registrar disponibilidade e qualidade de backends opcionais.
 - Separar métrica operacional de alegação cognitiva.
+- Manter `benchmarks/` versionado, determinístico e com outputs retidos no CI; comparar números somente entre versões compatíveis do protocolo.
+- Definir um contrato explícito de estado de crença antes de pontuar inferência POMDP no `RealPredictiveCodingSystem`.
 
 ## Prioridade 4 — dependências opcionais
 

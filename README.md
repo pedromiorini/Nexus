@@ -39,6 +39,10 @@ As estatísticas de `RealEpisodicMemory` (`total_links` e `avg_importance`) são
 
 No `RealMCTSPlanner`, `available_actions=None` usa o espaço padrão, enquanto `available_actions=[]` é respeitado como espaço vazio. Essa distinção evita que uma entrada explícita seja silenciosamente substituída; o contrato está em `test_mcts_action_contract.py`.
 
+## Benchmark científico sintético
+
+`benchmarks/` contém um protocolo local e determinístico para medir composição de ações, extração/alegações causais, saída de incerteza e observação parcial. Ele usa tarefas sintéticas, registra SHA-256 do taskset e é executado no CI; quando uma interface não retorna o tipo de evidência necessário, o resultado é `unsupported_interface`, não uma nota inventada. O protocolo, comandos, métricas, fontes teóricas e limites estão em [`benchmarks/README.md`](benchmarks/README.md). A execução CI é retida como artefato por 14 dias.
+
 ## Como executar
 
 Use Python 3.11 ou versão compatível, defina o caminho de importação e execute:

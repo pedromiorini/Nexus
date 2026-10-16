@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 169
+tests: 173
 bandit_low: 131
 -->
 
@@ -11,12 +11,12 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Branch de trabalho:** `fix/audit-followup-2026-10-16`, baseada em `origin/main` (`e3aa5ec`).
-- **Base remota sincronizada:** `origin/main` já inclui as PRs #4, #5 e #6; a PR #3 permanece separada e sem alterações nesta continuidade.
-- **Marco desta rodada:** a suíte integrada gera resumo estruturado com IDs inteiros e decimais, o manifesto valida o resumo e o auditor falha se a evidência estiver ausente ou inconsistente.
+- **Branch de trabalho:** `feat/reproducible-scientific-benchmark`, criada a partir do `main` exatamente em `5f53a9922b71d6ef3c565a31630f56091a454671` (após a PR #9).
+- **Estado de PRs conhecido:** PRs #4–#9 estão mescladas; PR #3 continua aberta e conflitante, fora deste escopo.
+- **Marco desta rodada:** protocolo `nexus.capability-benchmark.v1` com tarefas sintéticas determinísticas para composição, relações/intervenções causais, incerteza e observação parcial; relatório JSON com SHA-256 é executado e retido no CI.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
-- **Validação local desta branch — 2026-10-16 (não é CI):** 169 testes unitários passaram; a suíte integrada marcou 30 aprovações e 1 skip opcional; Bandit 131 LOW, sem MEDIUM/HIGH; snapshots de realidade e triagem atualizados. O workflow e os módulos alterados passaram pela validação sintática local. Cobertura e mutação desta branch aguardam os gates do CI; o artefato do commit será a fonte oficial.
+- **Validação local desta branch — 2026-10-16 (não é CI):** 173/173 testes passaram; cobertura da fila 96% e Vita 74%; suíte integrada 30 aprovações e 1 skip opcional; mutation direcionada 10/10; Bandit 131 LOW, sem MEDIUM/HIGH. O benchmark com seed `20261016` mediu composição 39/39, extração lexical causal F1=0,667, alegações de intervenção F1=0,667 (8 falsos positivos), Brier=0,1849 e ECE=0,01684 para probabilidades fornecidas pelo taskset; a trilha POMDP permaneceu `unsupported_interface`. O CI do commit será a referência oficial.
 
 ## O que está implementado
 
@@ -167,4 +167,4 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 
 ## Próxima ação
 
-Manter os documentos canônicos sincronizados com o código e executar mutation testing direcionado antes de qualquer alteração no núcleo monolítico. Não tratar os banners da suíte integrada como evidência independente de capacidade cognitiva.
+Revisar o artefato `nexus-capability-benchmark` do CI e, em uma etapa futura, definir contratos mensuráveis de intervenção numérica e estado de crença POMDP antes de melhorar os módulos correspondentes. Não tratar o holdout de sequências predefinidas como aprendizagem composicional nem os banners da suíte integrada como evidência de capacidade cognitiva.

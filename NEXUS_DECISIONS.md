@@ -97,3 +97,12 @@
 - **Evidência:** `tools/test_summary.py`, `test_state_manifest.py` e o passo `Enforce security severity policy` no workflow.
 - **Limitação:** a contagem executada continua dependente do runner unittest; não mede cobertura semântica nem substitui revisão manual.
 - **Reversibilidade:** fácil.
+
+## D-013 — Benchmark sintético externo ao núcleo e limitado por interface
+
+- **Decisão:** manter tarefas, métricas e adapters em `benchmarks/`, sem alterar o núcleo legado; versionar o protocolo e executar a seed fixa no CI.
+- **Contexto:** o próximo passo de maior valor é testar generalização composicional, intervenções causais, incerteza e observação parcial, com atenção às contribuições teóricas que inspiram cada pergunta.
+- **Motivo:** obter resultados reproduzíveis e delimitar cada evidência; quando não existe saída de crença ou distribuição probabilística, registrar a lacuna em vez de fabricar uma nota.
+- **Evidência:** `benchmarks/nexus_capability_benchmark.py`, `test_capability_benchmark.py` e `benchmarks/README.md`.
+- **Limitação:** benchmark sintético específico às APIs atuais; não valida aprendizagem composicional, descoberta/identificação causal, geração de probabilidades ou teorias cognitivas.
+- **Reversibilidade:** fácil.
