@@ -3,19 +3,21 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 177
+tests: 173
 bandit_low: 131
 -->
 
-Estado de referência operacional: use o artefato `nexus-state-manifest` do CI. O commit e o run exatos são resolvidos pelo manifesto associado ao `HEAD`, com 177 testes.
+Estado oficial de referência: use o artefato `nexus-state-manifest` associado ao `HEAD`. Nesta branch, 173/173 testes passaram localmente; a cobertura da fila foi 96%, a do bridge Vita 74% e a suíte integrada registrou 30 aprovados e 1 ignorado. O benchmark v1 (seed `20261016`) mediu acerto composicional exato 1,0 em 39 casos, F1=0,667 na extração lexical causal, F1=0,667 nas alegações de efeito downstream, Brier=0,1849 e ECE=0,01684 na trilha que recebe probabilidades como entrada; observação parcial foi marcada `unsupported_interface`, sem acurácia inventada. Esses resultados locais não substituem o manifesto de CI do commit.
 Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e não devem ser usados como estado atual.
 
 | Área | Estado | Evidência verificável | Limitação |
 |---|---|---|---|
 | Fila | verificado no contrato | testes de prioridade, retry, capacidade, snapshot e atomicidade | sem carga distribuída ou exactly-once |
+| Log imutável | verificado no contrato | triggers append-only, verificação da cadeia, detecção de adulteração/remoção, reabertura e escritores concorrentes | truncamento final ou rehash por quem controla o arquivo exige âncora externa |
+| Detector de jailbreak | testado por regressão EN/PT | corpus benigno/malicioso, NFKC, caracteres invisíveis, homoglifos, leetspeak e entradas longas | heurística, não fronteira de segurança semântica nem substituto de controle de privilégio |
 | Diagnósticos | verificado no contrato | schema versionado, validação, dashboard e fuzzing de payloads JSON | estrutura não prova correção cognitiva nem cobre entradas não-JSON arbitrárias |
 | Memória SQL | parcial/verificado no fallback | testes adversariais e queries parametrizadas | busca semântica opcional não estava disponível |
-| Memória episódica | verificado no contrato | estatísticas derivadas do SQLite, ciclo de vida concorrente serializado e testes independentes | escopo local; sem locking distribuído ou exactly-once |
+| Memória episódica | verificado no contrato | estatísticas derivadas do SQLite, ciclo de vida concorrente serializado, contagem somente em transições `open` → `closed` e testes independentes | escopo local; sem locking distribuído ou exactly-once |
 | CentralRouter | verificado no contrato | contadores, cache hit rate e latência | cenários internos |
 | Swarm | verificado no contrato | consenso/diversidade derivados de deliberações | não demonstra inteligência coletiva geral |
 | Multimodalidade | parcial | protocolos de backend e fallbacks testados | sem backend não há percepção/transcrição real |
@@ -25,13 +27,8 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Planejamento MCTS | parcial/verificado no contrato | `None` usa ações padrão e lista vazia permanece vazia | recompensas e rollouts continuam heurísticos; não é prova de planejamento geral |
 | Telemetria | parcial/verificado | Vita, audit log SQLite serializado e guard de VRAM | dependente do ambiente; sem locking distribuído ou exactly-once |
 | Segurança | parcial | Bandit 131 LOW, triagem, auditorias AST e testes negativos | não substitui threat model ou revisão manual completa |
-| Detector de jailbreak | parcial | heurística EN/PT com normalização Unicode, corpus malicioso/benigno, propriedades e mutantes; falsos positivos por substring removidos | primeira camada por palavras-chave; não é classificador semântico e não cobre paráfrases inéditas ou outros idiomas |
-| Log imutável | verificado no contrato | cadeia por hash, triggers append-only, `verify_chain()`, retomada após reabrir e múltiplos escritores | truncar o fim do log só é detectável com o `head` ancorado fora do banco |
-| Supply chain do CI | parcial | actions fixadas por SHA, dependências com versão fixa, Dependabot, zizmor e actionlint sem achados | proteção de branch, alertas e relato privado dependem de configuração do repositório |
-| Suíte integrada (checks embutidos) | verificação funcional | marcadores contados; resumo gravado e reportado no manifesto separado dos testes unittest; falha se um marcador do fonte não executar | são checks do próprio projeto, não testes independentes |
-| Mutation testing | parcial | 28 mutantes escolhidos (fila, bridge, VRAM, log, detector), todos mortos, em cópia isolada | o score vale só para esses mutantes; não é mutation testing do núcleo |
-| Alegações no código | parcial | padrões proibidos (gate zero) e inventário por nível com limite que só diminui | ainda há linguagem de ênfase ("REAL <Capacidade>"); a reescrita fica junto do plano de renomeação de classes |
-| CI | verificado | run associado ao `HEAD` com sucesso; o manifesto foi retido como artefato | qualquer novo commit exige leitura do manifesto correspondente |
+| CI | verificado por commit | run associado ao `HEAD` e manifesto retido como artefato quando disponível | qualquer novo commit exige leitura do manifesto correspondente |
+| Benchmark sintético | verificado localmente no protocolo v1 | 39 sequências (holdout exato 1,0), extração causal lexical (F1 0,667), alegação de intervenção (F1 0,667), trilha de confiança (Brier 0,1849; ECE 0,01684) e JSON determinístico com SHA-256 | sem treino; causalidade textual/heurística; incerteza recebe probabilidades externas; crença POMDP não suportada; não valida teorias cognitivas |
 | Autonomia geral | não demonstrada | nenhuma evidência válida no repositório | não fazer esse claim |
 | AGI/ASI/consciência | não demonstradas | explicitamente negadas pela documentação | nomes e banners não contam como evidência |
 

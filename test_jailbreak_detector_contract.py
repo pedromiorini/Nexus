@@ -70,6 +70,8 @@ BENIGN = (
     "Write a function that ignores the previous element in the list",
     "Show me your instructions for assembling the shelf",
     "Preciso de orientação sobre mudança de carreira e ajudando minha equipe",
+    "Explique o que significa jailbreak no iPhone",
+    "What does jailbreak mean in the context of iOS security?",
 )
 
 # Vocabulário benigno que contém "dan", "forget", "ignor"... apenas como parte de outras palavras.

@@ -10,11 +10,17 @@ class StateConsistencyAuditTests(unittest.TestCase):
     def _write_fixture(self, *, commit="abc123", tests=107, bandit_low=131, marker_overrides=None):
         directory = Path(tempfile.mkdtemp())
         manifest = {
-            "schema_version": 1,
+            "schema_version": 2,
             "repository": {"commit": commit},
-            "verification": {"tests": {"executed": tests}},
+            "verification": {"tests": {
+                "status": "generated", "executed": tests, "passed": tests,
+                "failed": 0, "skipped": 0, "result": "passed",
+            }, "integrated": {
+                "status": "generated", "discovered_static": 3, "passed": 2,
+                "skipped": 1, "failed": 0, "unexpected": 0, "result": "passed",
+            }},
             "security": {"bandit": {"severity": {"LOW": bandit_low}}},
-            "ci": {"run_id": "12345"},
+            "ci": {"run_id": "12345", "commit": commit, "gates_status": "success"},
         }
         manifest_path = directory / "STATE_MANIFEST.json"
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
@@ -77,22 +83,58 @@ class StateConsistencyAuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit(manifest, directory)
 
-    def test_failed_integrated_suite_is_a_conflict(self):
+    def test_failed_tests_nonzero_failures_and_failed_gates_fail_closed(self):
+        cases = (
+            ("result", "failed", "verification.tests.result"),
+            ("failed", 1, "verification.tests.failed"),
+        )
+        for field, value, expected_error in cases:
+            directory, manifest_path = self._write_fixture()
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["verification"]["tests"][field] = value
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.subTest(field=field):
+                report = audit(manifest_path, directory)
+                self.assertEqual(report["status"], "fail")
+                self.assertTrue(any(expected_error in error for error in report["errors"]))
+
         directory, manifest_path = self._write_fixture()
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        manifest["verification"]["integrated"] = {"status": "generated", "result": "failed", "failed": 2}
+        manifest["ci"]["gates_status"] = "failure"
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         report = audit(manifest_path, directory)
         self.assertEqual(report["status"], "fail")
-        self.assertIn("integrated", {item["field"] for item in report["conflicts"]})
+        self.assertTrue(any("ci.gates_status" in error for error in report["errors"]))
 
-    def test_passed_or_absent_integrated_summary_is_not_a_conflict(self):
+    def test_commit_mismatch_and_missing_test_summary_fail_closed(self):
+        for change, expected_error in (
+            (lambda manifest: manifest["ci"].update(commit="different"), "ci.commit"),
+            (lambda manifest: manifest["verification"]["tests"].update(status="not_generated"), "resumo de testes"),
+        ):
+            directory, manifest_path = self._write_fixture()
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            change(manifest)
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            report = audit(manifest_path, directory)
+            self.assertEqual(report["status"], "fail")
+            self.assertTrue(any(expected_error in error for error in report["errors"]))
+
+    def test_missing_or_failed_integrated_summary_fails_closed(self):
         directory, manifest_path = self._write_fixture()
-        self.assertEqual(audit(manifest_path, directory)["integrated"], {"status": "not_generated"})
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        manifest["verification"]["integrated"] = {"status": "generated", "result": "passed"}
+        del manifest["verification"]["integrated"]
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-        self.assertEqual(audit(manifest_path, directory)["status"], "pass")
+        report = audit(manifest_path, directory)
+        self.assertEqual(report["status"], "fail")
+        self.assertTrue(any("verification.integrated" in error for error in report["errors"]))
+
+        directory, manifest_path = self._write_fixture()
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["verification"]["integrated"].update(result="failed", failed=1)
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        report = audit(manifest_path, directory)
+        self.assertEqual(report["status"], "fail")
+        self.assertTrue(any("verification.integrated.result" in error for error in report["errors"]))
 
 
 if __name__ == "__main__":

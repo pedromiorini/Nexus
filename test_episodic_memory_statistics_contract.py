@@ -25,6 +25,17 @@ class EpisodicMemoryStatisticsContractTests(unittest.TestCase):
         self.assertEqual(memory.get_statistics()["episodes_closed"], 1)
         memory.conn.close()
 
+    def test_close_count_tracks_only_real_open_to_closed_transitions(self):
+        memory = RealEpisodicMemory()
+        memory.close_episode("missing-episode")
+        self.assertEqual(memory.get_statistics()["episodes_closed"], 0)
+
+        episode_id = memory.start_episode("one-time-close")
+        memory.close_episode(episode_id)
+        memory.close_episode(episode_id)
+        self.assertEqual(memory.get_statistics()["episodes_closed"], 1)
+        memory.conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

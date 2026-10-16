@@ -86,12 +86,60 @@ def _manifest_values(manifest: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _operational_errors(manifest: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    if type(manifest.get("schema_version")) is not int or manifest["schema_version"] != 2:
+        errors.append("manifesto: schema_version incompatível; esperado 2")
+
+    verification = manifest.get("verification")
+    tests = verification.get("tests") if isinstance(verification, dict) else None
+    if not isinstance(tests, dict):
+        errors.append("manifesto: verification.tests ausente ou inválido")
+    else:
+        if tests.get("status") != "generated":
+            errors.append("manifesto: resumo de testes não foi gerado")
+        if tests.get("result") != "passed":
+            errors.append("manifesto: verification.tests.result deve ser 'passed'")
+        counts = ("executed", "passed", "failed", "skipped")
+        if any(type(tests.get(key)) is not int or tests[key] < 0 for key in counts):
+            errors.append("manifesto: contagens de testes inválidas")
+        elif tests["failed"] != 0:
+            errors.append("manifesto: verification.tests.failed deve ser zero")
+        elif tests["executed"] != tests["passed"] + tests["failed"] + tests["skipped"]:
+            errors.append("manifesto: contagens dos testes são inconsistentes")
+
+    integrated = verification.get("integrated") if isinstance(verification, dict) else None
+    if not isinstance(integrated, dict):
+        errors.append("manifesto: verification.integrated ausente ou inválido")
+    else:
+        if integrated.get("status") != "generated":
+            errors.append("manifesto: resumo da suíte integrada não foi gerado")
+        if integrated.get("result") != "passed":
+            errors.append("manifesto: verification.integrated.result deve ser 'passed'")
+        counts = ("discovered_static", "passed", "skipped", "failed", "unexpected")
+        if any(type(integrated.get(key)) is not int or integrated[key] < 0 for key in counts):
+            errors.append("manifesto: contagens da suíte integrada inválidas")
+        elif integrated["failed"] != 0 or integrated["unexpected"] != 0:
+            errors.append("manifesto: suíte integrada contém verificações sem sucesso")
+        elif integrated["discovered_static"] != integrated["passed"] + integrated["skipped"]:
+            errors.append("manifesto: contagens da suíte integrada são inconsistentes")
+
+    ci = manifest.get("ci")
+    repository = manifest.get("repository")
+    if not isinstance(ci, dict) or ci.get("gates_status") != "success":
+        errors.append("manifesto: ci.gates_status deve ser 'success'")
+    if isinstance(ci, dict) and isinstance(repository, dict):
+        if ci.get("commit") != repository.get("commit"):
+            errors.append("manifesto: ci.commit não corresponde a repository.commit")
+    return errors
+
+
 def audit(manifest_path: Path, root: Path = ROOT) -> dict[str, Any]:
     manifest = _read_json(manifest_path)
     expected = _manifest_values(manifest)
     documents: dict[str, dict[str, str]] = {}
     conflicts: list[dict[str, str]] = []
-    errors: list[str] = []
+    errors = _operational_errors(manifest)
     for name in DOCUMENTS:
         path = root / name
         try:
@@ -123,6 +171,19 @@ def audit(manifest_path: Path, root: Path = ROOT) -> dict[str, Any]:
         "status": status,
         "integrated": integrated if isinstance(integrated, dict) else {"status": "not_generated"},
         "manifest": expected,
+        "operational_validation": {
+            "tests_result": manifest.get("verification", {}).get("tests", {}).get("result")
+            if isinstance(manifest.get("verification"), dict)
+            and isinstance(manifest["verification"].get("tests"), dict)
+            else None,
+            "gates_status": manifest.get("ci", {}).get("gates_status")
+            if isinstance(manifest.get("ci"), dict)
+            else None,
+            "integrated_result": manifest.get("verification", {}).get("integrated", {}).get("result")
+            if isinstance(manifest.get("verification"), dict)
+            and isinstance(manifest["verification"].get("integrated"), dict)
+            else None,
+        },
         "documents": documents,
         "conflicts": conflicts,
         "errors": errors,

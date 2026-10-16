@@ -1,38 +1,32 @@
-# Prompt de engenharia para desenvolver o Nexus
+# Prompt de engenharia — hardening do snapshot da fila Nexus
 
-Você é um engenheiro de software sênior responsável por evoluir o repositório Nexus com foco em **evidência verificável, confiabilidade operacional e honestidade documental**.
+Você é um engenheiro de software sênior responsável por evoluir o repositório Nexus com foco em comportamento reproduzível, confiabilidade operacional e documentação honesta.
 
 ## Contexto confirmado
 
-- O projeto é um protótipo experimental neuro-simbólico em Python; não trate nomes de classes, banners ou métricas internas como prova de AGI, ASI, consciência ou autonomia geral.
-- O núcleo possui componentes de roteamento, governança, fila de tarefas adiadas, telemetria Vita, auditoria SQLite e contratos de diagnóstico versionados.
-- A auditoria atual recomenda priorizar componentes críticos pequenos antes de refatorar o núcleo monolítico.
-- A fila de tarefas adiadas é atualmente em memória e já possui contratos de prioridade, limite, retry, descarte, callbacks e preservação de contexto.
+- Nexus é um protótipo experimental de arquitetura neuro-simbólica em Python; não trate nomes, banners, métricas ou testes internos como prova de AGI, consciência ou autonomia geral.
+- A fila em `core/deferred_task_queue.py` já implementa o contrato `nexus.deferred_task_queue.v1`, exportação/restauração em objeto e JSON, restauração validada, limite de capacidade e opção `replace=True`.
+- A missão histórica de implementar snapshots já está cumprida. Não duplique a funcionalidade nem altere o schema/API sem necessidade.
+- O contrato e os testes atuais passam, mas dois defeitos foram reproduzidos: mutar o contexto aninhado do snapshot exportado também muta a tarefa da fila; e o validador aceita timestamp `NaN` e contador `True`.
 
 ## Missão desta iteração
 
-Evolua a fila de tarefas adiadas para suportar **exportação e restauração versionadas, determinísticas e seguras**, sem executar tarefas durante a restauração e sem quebrar os contratos existentes.
+Endureça as fronteiras de exportação/restauração do snapshot para que os dados sejam isolados e os valores numéricos sejam válidos, mantendo compatibilidade com Python 3.11 e com o schema/API existentes.
 
-## Requisitos funcionais
+## Requisitos
 
-1. Defina um schema público versionado para snapshots da fila, com `schema`, `generated_at`, limites da fila, estatísticas e tarefas pendentes.
-2. Preserve em cada tarefa `task_id`, `prompt`, `context`, `priority`, `created_at`, `attempts`, `max_attempts` e `last_reason`.
-3. Exporte JSON e objeto Python; restaure a partir de ambos.
-4. Preserve a ordem de prioridade e desempate por criação.
-5. Rejeite snapshots malformados, schema incompatível, IDs duplicados, tentativas fora do intervalo, tipos inválidos, capacidade excedida e contextos não serializáveis, sem alterar a fila em caso de erro.
-6. Não invoque `processor`, callbacks ou qualquer execução de tarefa durante a restauração.
-7. Permita restauração em fila vazia por padrão e uma opção explícita de substituição para recuperação operacional.
-8. Não faça alegações de durabilidade em disco: o snapshot é um contrato de transporte; persistência física continua sendo responsabilidade do consumidor.
+1. Exportar e restaurar contextos sem compartilhar referências mutáveis com a fila nem com o objeto de snapshot recebido/devolvido.
+2. Rejeitar timestamps `generated_at`/`created_at` não finitos (`NaN`, `Infinity`, `-Infinity`) e contextos que não possam ser codificados como JSON estrito.
+3. Validar limites e contadores estatísticos como inteiros reais não negativos — `bool` não é inteiro válido para o contrato — e validar `max_attempts` das tarefas com a mesma regra estrita.
+4. Validar o snapshot inteiro e preparar os objetos restaurados antes de alterar a fila; falhas também devem preservar integralmente estado, fila e estatísticas quando `replace=True`.
+5. Preservar ordenação, tentativas, IDs, limites, estatísticas, callbacks e comportamento de execução já existentes. Restauração não executa tarefas.
+6. Não adicionar dependências de runtime nem alegar persistência física. O snapshot continua sendo um contrato de transporte.
+7. Adicionar testes de regressão para isolamento de referências, números inválidos, validação estrita de inteiros e atomicidade.
+8. Atualizar a documentação pública do contrato e registrar comandos/resultados reproduzíveis.
 
-## Requisitos de engenharia
+## Execução e critérios de aceite
 
-- Preserve compatibilidade com Python 3.11 e com a API existente.
-- Mantenha mudanças pequenas, legíveis e sem dependências novas de runtime.
-- Adicione testes unitários e de contrato para round-trip, ordem, validação, atomicidade do erro, substituição e segurança contra execução.
-- Atualize README e documentação do contrato com comandos reproduzíveis.
-- Execute compilação, suíte completa, auditoria de realidade e inspeção do diff.
-- Não transforme testes internos em evidência de capacidade cognitiva; registre limites e o que ainda não foi medido.
-
-## Critérios de aceite
-
-A entrega só está concluída se o contrato for documentado, os testes novos e antigos passarem, snapshots inválidos forem rejeitados sem mutação de estado, a restauração não executar tarefas e a documentação declarar explicitamente que o recurso não é um mecanismo de persistência física nem prova de autonomia.
+- Reproduza os casos antes do patch e confirme que os novos testes falham sem a correção.
+- Execute testes de snapshot e regressão da fila, suíte completa, compilação Python, auditoria de realidade e inspeção do diff; execute mutation/security gates quando as ferramentas/dependências necessárias estiverem disponíveis.
+- Não versionar relatórios temporários, bancos de teste nem artefatos de execução.
+- Concluir apenas se testes novos e antigos passarem, snapshots inválidos não alterarem a fila, referências não vazarem entre fronteiras e a documentação distinguir transporte de persistência física.

@@ -987,13 +987,12 @@ class LogEntry:
     previous_hash: str
 
 class RealImmutableLog:
-    """POST29: Log constitucional encadeado por hash e append-only.
+    """POST29: log constitucional append-only com encadeamento verificável.
 
-    Cada entrada guarda ``previous_hash`` e ``content_hash`` (SHA-256 sobre
-    tipo|dados|timestamp|hash anterior). Triggers do SQLite bloqueiam UPDATE e DELETE por
-    conexões comuns, e ``verify_chain()`` recalcula a cadeia para detectar adulteração,
-    inclusive por quem remover os triggers. Truncar o final do log não é detectável apenas
-    pela cadeia: ancore o ``head`` retornado por ``verify_chain()`` fora do banco.
+    Os triggers bloqueiam UPDATE/DELETE por conexões comuns; ``verify_chain``
+    detecta adulteração e remoção de entradas. Truncamento do fim ou reescrita
+    de toda a cadeia por quem controla o arquivo exigem ancorar ``head`` fora
+    deste banco; o hash-chain, sozinho, não é uma assinatura de não repúdio.
     """
 
     GENESIS_HASH = "0" * 64
@@ -1001,34 +1000,59 @@ class RealImmutableLog:
     def __init__(self, db_path: str = ":memory:"):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
-        self._finalizer = weakref.finalize(self, self.conn.close)
-        self.db_lock = threading.Lock()  # FIXED v3.65: Thread safety for SQLite
+        self.db_lock = threading.RLock()
+        self._finalizer = weakref.finalize(self, sqlite3.Connection.close, self.conn)
+        self.conn.execute("PRAGMA busy_timeout = 5000")
         self._create_tables()
-        self.current_hash = self._load_head()  # retoma a cadeia existente (não recomeça do gênesis)
+        report = self.verify_chain()
+        if not report["ok"]:
+            self.close()
+            raise ValueError(
+                f"cadeia do log inválida na sequência {report['first_invalid_sequence']}: {report['reason']}"
+            )
+        self.current_hash = report["head"]
 
     def _create_tables(self):
-        cursor = self.conn.cursor()
-        cursor.executescript("""
-            CREATE TABLE IF NOT EXISTS log_entries (
-                sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_type TEXT NOT NULL,
-                event_data TEXT NOT NULL,
-                timestamp REAL NOT NULL,
-                content_hash TEXT NOT NULL,
-                previous_hash TEXT NOT NULL
-            );
-            CREATE TRIGGER IF NOT EXISTS log_entries_no_update
-            BEFORE UPDATE ON log_entries
-            BEGIN
-                SELECT RAISE(ABORT, 'log_entries is append-only');
-            END;
-            CREATE TRIGGER IF NOT EXISTS log_entries_no_delete
-            BEFORE DELETE ON log_entries
-            BEGIN
-                SELECT RAISE(ABORT, 'log_entries is append-only');
-            END;
-        """)
-        self.conn.commit()
+        with self.db_lock:
+            self.conn.executescript("""
+                CREATE TABLE IF NOT EXISTS log_entries (
+                    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    event_data TEXT NOT NULL,
+                    timestamp REAL NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    previous_hash TEXT NOT NULL
+                );
+                CREATE TRIGGER IF NOT EXISTS log_entries_no_update
+                BEFORE UPDATE ON log_entries
+                BEGIN
+                    SELECT RAISE(ABORT, 'log_entries is append-only');
+                END;
+                CREATE TRIGGER IF NOT EXISTS log_entries_no_delete
+                BEFORE DELETE ON log_entries
+                BEGIN
+                    SELECT RAISE(ABORT, 'log_entries is append-only');
+                END;
+            """)
+            self.conn.commit()
+
+    def _load_head(self) -> str:
+        row = self.conn.execute(
+            "SELECT content_hash FROM log_entries ORDER BY sequence DESC LIMIT 1"
+        ).fetchone()
+        return row[0] if row else self.GENESIS_HASH
+
+    def close(self) -> None:
+        """Fecha a conexão SQLite de modo idempotente."""
+        with self.db_lock:
+            if self._finalizer.alive:
+                self._finalizer()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        self.close()
 
     def _load_head(self) -> str:
         row = self.conn.execute(
@@ -1048,20 +1072,20 @@ class RealImmutableLog:
         self.close()
 
     def log_event(self, event_type: str, event_data: Dict) -> str:
-        """Log evento e retornar hash (correção de auditoria)"""
-        # FIXED v3.68: Thread-safe with lock
-        data_str = json.dumps(event_data, sort_keys=True)  # falha cedo, antes de abrir transação
+        """Registra evento em uma transação serializada e retorna seu SHA-256."""
+        data_str = json.dumps(event_data, sort_keys=True, allow_nan=False)
         with self.db_lock:
-            ts = time.time()
             try:
-                # BEGIN IMMEDIATE serializa escritores (inclusive de outros processos/instâncias);
-                # o hash anterior vem do banco, não da memória, para manter uma única cadeia.
+                # BEGIN IMMEDIATE serializa escritores de outras conexões; o
+                # hash anterior sempre vem do banco, não de cache local.
                 self.conn.execute("BEGIN IMMEDIATE")
                 previous_hash = self._load_head()
+                ts = time.time()
                 content = f"{event_type}|{data_str}|{ts}|{previous_hash}"
                 content_hash = hashlib.sha256(content.encode()).hexdigest()
                 self.conn.execute("""
-                    INSERT INTO log_entries (event_type, event_data, timestamp, content_hash, previous_hash)
+                    INSERT INTO log_entries
+                        (event_type, event_data, timestamp, content_hash, previous_hash)
                     VALUES (?, ?, ?, ?, ?)
                 """, (event_type, data_str, ts, content_hash, previous_hash))
                 self.conn.commit()
@@ -1069,7 +1093,37 @@ class RealImmutableLog:
                 self.conn.rollback()
                 raise
             self.current_hash = content_hash
-            return content_hash  # Retorna STRING, não objeto
+            return content_hash
+
+    def verify_chain(self) -> Dict[str, Any]:
+        """Recalcula a cadeia inteira e retorna a primeira inconsistência, se houver."""
+        with self.db_lock:
+            rows = self.conn.execute(
+                "SELECT sequence, event_type, event_data, timestamp, content_hash, previous_hash "
+                "FROM log_entries ORDER BY sequence ASC"
+            ).fetchall()
+        expected_previous = self.GENESIS_HASH
+        for sequence, event_type, event_data, timestamp, content_hash, previous_hash in rows:
+            if previous_hash != expected_previous:
+                return {
+                    "ok": False, "entries": len(rows), "head": expected_previous,
+                    "first_invalid_sequence": sequence,
+                    "reason": "previous_hash não confere com a entrada anterior (remoção ou reordenação)",
+                }
+            recomputed = hashlib.sha256(
+                f"{event_type}|{event_data}|{timestamp}|{previous_hash}".encode()
+            ).hexdigest()
+            if recomputed != content_hash:
+                return {
+                    "ok": False, "entries": len(rows), "head": expected_previous,
+                    "first_invalid_sequence": sequence,
+                    "reason": "content_hash não confere com o conteúdo (adulteração)",
+                }
+            expected_previous = content_hash
+        return {
+            "ok": True, "entries": len(rows), "head": expected_previous,
+            "first_invalid_sequence": None, "reason": "ok",
+        }
 
     def verify_chain(self) -> Dict[str, Any]:
         """Recalcula toda a cadeia e devolve o diagnóstico (não lança em caso de adulteração)."""
@@ -1208,7 +1262,7 @@ def _build_jailbreak_signals() -> list:
         ("roleplay_pt_you_are_now", R, 1.0, r"\bvoce\s+agora\s+(?:e|esta|sera)\b" + gap(2) + r"\W+(?:dan|" + pt_persona + r")\b", "norm"),
         ("roleplay_pt_pretend_persona", R, 1.0, r"\b(?:finja|fingir|aja|atue|comporte-se|simule)\b" + gap(3) + r"\W+" + pt_persona + r"\b", "norm"),
         # --- Sinais fracos / contextuais ---
-        ("jailbreak_keyword", R, 0.6, r"\bjailbreak(?:s|ed|ing)?\b", "norm"),
+        ("jailbreak_keyword", R, 0.4, r"\bjailbreak(?:s|ed|ing)?\b", "norm"),
         ("dan_standalone", R, 0.5, r"\bDAN\b", "cased"),
         ("privileged_mode", R, 0.4, r"\b(?:developer|god|sudo|admin) mode\b|\bmodo (?:desenvolvedor|deus)\b", "norm"),
         ("no_restrictions", R, 0.4, r"\b(?:without|with no|no)\b(?:\W+(?:any|your|the))*\W+(?:restrictions?|filters?|limitations?|censorship|guardrails?|safeguards?|rules)\b|\bsem\b(?:\W+(?:nenhuma|nenhum|qualquer))*\W+(?:restricoes|filtros|limites|censura|regras)\b", "norm"),
@@ -1287,7 +1341,7 @@ class RealJailbreakDetector:
 
         score = round(min(1.0, sum(weight for _, weight in matched.values())), 2)
         if matched and score >= self.threshold:
-            top_name, (top_kind, _) = max(matched.items(), key=lambda item: item[1][1])
+            top_kind, _ = max(matched.values(), key=lambda value: value[1])
             with self._count_lock:
                 self.detections_count += 1
             return JailbreakDetection(
@@ -2178,12 +2232,14 @@ class RealEpisodicMemory:
             cursor.execute("""
                 UPDATE episodic_memories
                 SET end_timestamp = ?, status = 'closed'
-                WHERE episode_id = ?
+                WHERE episode_id = ? AND status = 'open'
             """, (time.time(), episode_id))
+            episode_closed = cursor.rowcount == 1
             self.conn.commit()
 
-            self.episodes_closed += 1
-            if episode_id == self.current_episode_id:
+            if episode_closed:
+                self.episodes_closed += 1
+            if episode_closed and episode_id == self.current_episode_id:
                 self.current_episode_id = None
 
     def link_memory_to_episode(self, episode_id: str, memory_id: int, 
@@ -25012,36 +25068,11 @@ if __name__ == "__main__":
     if not __debug__:
         raise SystemExit("A suíte integrada verifica com assert; execute sem -O/PYTHONOPTIMIZE.")
 
-    class _SuiteTally:
-        """Espelha o stdout e contabiliza os marcadores dos testes embutidos (somente leitura)."""
+    from core.integrated_suite_summary import IntegratedSuiteTally
 
-        def __init__(self, stream):
-            self._stream = stream
-            self._buffer = ""
-            self.passed = set()
-            self.skipped = set()
-
-        def write(self, text):
-            self._stream.write(text)
-            self._buffer += text
-            *complete, self._buffer = self._buffer.split("\n")
-            for line in complete:
-                found = re.search(r"TEST (\d+) PASSED", line)
-                if found:
-                    self.passed.add(int(found.group(1)))
-                skipped = re.match(r"\s*TEST (\d+): .*(?:DISABLED|not available)", line)
-                if skipped:
-                    self.skipped.add(int(skipped.group(1)))
-            return len(text)
-
-        def flush(self):
-            self._stream.flush()
-
-        def __getattr__(self, name):
-            return getattr(self._stream, name)
-
-    _tally = _SuiteTally(sys.stdout)
-    sys.stdout = _tally
+    _original_stdout = sys.stdout
+    _suite_tally = IntegratedSuiteTally(_original_stdout)
+    sys.stdout = _suite_tally
 
     print("\n" + "="*70)
     print("🧪 NEXUS CONSTITUTIONAL - INTEGRATED EMBEDDED SUITE (functional demonstration)")
@@ -26878,30 +26909,28 @@ if __name__ == "__main__":
         print("="*70)
         print("⚠️  Embodied Cognition not active in this configuration\n")
 
-    sys.stdout = _tally._stream
-    _source = globals().get("__file__")
-    _expected = set()
-    if _source:
-        with open(_source, encoding="utf-8") as _source_file:
-            _expected = {int(n) for n in re.findall(r"TEST (\d+) PASSED", _source_file.read())}
-    _missing = sorted(_expected - _tally.passed - _tally.skipped)
+    _suite_tally.flush()
+    sys.stdout = _original_stdout
+    _integrated_summary = _suite_tally.build_summary(__file__)
     _summary_path = os.environ.get("NEXUS_INTEGRATED_SUMMARY")
-    if _summary_path:  # resumo legível por máquina (lido por tools/state_manifest.py)
-        with open(_summary_path, "w", encoding="utf-8") as _summary_file:
-            json.dump({
-                "scope": "embedded checks of core/constitutional_brain.py (integrated suite)",
-                "expected": sorted(_expected),
-                "passed": sorted(_tally.passed),
-                "skipped": sorted(_tally.skipped),
-                "missing": _missing,
-                "result": "failed" if _missing else "passed",
-            }, _summary_file, indent=2)
-            _summary_file.write("\n")
-    print("=" * 70)
-    print(f"EMBEDDED CHECKS: {len(_tally.passed)} passed, {len(_tally.skipped)} skipped (module disabled or optional dependency missing)")
-    if _tally.skipped:
-        print(f"Skipped checks: {sorted(_tally.skipped)}")
-    print("Scope: functional checks of this prototype; not evidence of AGI, consciousness or production readiness.")
-    print("=" * 70 + "\n")
-    if _missing:
-        raise SystemExit(f"Embedded checks neither passed nor skipped: {_missing}")
+    if _summary_path:
+        _suite_tally.write_summary(_integrated_summary, _summary_path)
+    print(
+        f"EMBEDDED CHECKS: {len(_integrated_summary['passed'])} passed, "
+        f"{len(_integrated_summary['skipped'])} skipped, "
+        f"{len(_integrated_summary['missing'])} missing"
+    )
+    if _integrated_summary["result"] != "passed":
+        raise SystemExit(
+            "Embedded checks missing, unexpected or conflicting: "
+            f"missing={_integrated_summary['missing']}, "
+            f"unexpected={_integrated_summary['unexpected']}, "
+            f"conflicting={_integrated_summary['conflicting']}"
+        )
+
+    print("="*70)
+    print("="*70)
+    print("\n🎉💪 NEXUS CONSTITUTIONAL v3.30 - NARRATIVE IDENTITY EDITION 💪🎉")
+    print("36/55 Modules (65.5%) - 🎉🎉 65% MILESTONE! PARCERIA SIMBIÓTICA! 🎉🎉")
+    print("CentralRouter + EthicsGuard + RSI + ToM + ToolUse + Emotion + Consciousness + Empathy + Curiosity + SocialLearning + Creativity + Multimodal + Language + Metacognition + Attention + WorkingMemory + ExecutiveFunctions + ContextualMemory + SemanticNetworks + AnalogicalReasoning + MentalSimulation + EpisodicFutureThinking + PredictiveCoding + EmbodiedCognition Active")
+    print("="*70 + "\n")

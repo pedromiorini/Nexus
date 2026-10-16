@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 177
+tests: 173
 bandit_low: 131
 -->
 
@@ -11,10 +11,12 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Branch:** `main`
-- **Base remota sincronizada:** `origin/main` contém o gerador de manifesto e a reconciliação documental; use o artefato `nexus-state-manifest` do CI para o SHA exato verificado.
-- **Marco desta rodada:** `STATE_MANIFEST.json` passou a ser gerado e retido pelo CI, eliminando a dependência de snapshots manuais para commit, testes, segurança e mutation.
+- **Branch de trabalho:** `feat/reproducible-scientific-benchmark`, criada a partir do `main` exatamente em `5f53a9922b71d6ef3c565a31630f56091a454671` (após a PR #9).
+- **Estado de PRs conhecido:** PRs #4–#9 estão mescladas; PR #3 continua aberta e conflitante, fora deste escopo.
+- **Marco desta rodada:** protocolo `nexus.capability-benchmark.v1` com tarefas sintéticas determinísticas para composição, relações/intervenções causais, incerteza e observação parcial; relatório JSON com SHA-256 é executado e retido no CI.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
+- **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
+- **Validação local desta branch — 2026-10-16 (não é CI):** 173/173 testes passaram; cobertura da fila 96% e Vita 74%; suíte integrada 30 aprovações e 1 skip opcional; mutation direcionada 10/10; Bandit 131 LOW, sem MEDIUM/HIGH. O benchmark com seed `20261016` mediu composição 39/39, extração lexical causal F1=0,667, alegações de intervenção F1=0,667 (8 falsos positivos), Brier=0,1849 e ECE=0,01684 para probabilidades fornecidas pelo taskset; a trilha POMDP permaneceu `unsupported_interface`. O CI do commit será a referência oficial.
 
 ## O que está implementado
 
@@ -27,8 +29,10 @@ bandit_low: 131
 - `tools/diagnostics_dashboard.py`: dashboard CLI determinístico que valida snapshots antes de renderizar métricas observáveis.
 - `tools/security_triage.py` e `SECURITY_TRIAGE.md`: inventário conservador dos achados Bandit, sem supressão automática.
 - `test_memory_sql_contract.py`: teste adversarial para a fronteira SQL do fallback parametrizado da memória.
-- `tools/targeted_mutation.py`: mutation testing direcionado (28 mutantes escolhidos) para fila, Vita, guard de VRAM, log imutável e detector de jailbreak.
-- `core/deferred_task_queue.py`: snapshot versionado `nexus.deferred_task_queue.v1`, exportação JSON/objeto, restauração atômica, validação de tipos/capacidade/IDs e opção `replace=True`.
+- `tools/targeted_mutation.py`: mutation testing direcionado para fila, Vita e schema.
+- `core/deferred_task_queue.py`: transições de estado protegidas por `RLock`; conclusão/descarte removem tarefas pendentes do heap, retry é único e limitado, callbacks defeituosos são reportados sem interromper o lote; snapshots versionados continuam atômicos.
+- `RealImmutableLog`: triggers bloqueiam UPDATE/DELETE, o SHA-chain é verificado na inicialização e detecta adulteração/remoção; writes de conexões concorrentes são serializados. Truncamento final ou rehash por quem controla o arquivo ainda exige âncora externa.
+- `RealJailbreakDetector`: normalização Unicode, sinais por frases e fronteiras de palavra reduzem falsos positivos e detectam ofuscações testadas em inglês/português; continua heurístico, não é uma fronteira de segurança.
 - `test_deferred_task_snapshot.py`: contrato de round-trip, ordem, atomicidade, limites, tipos inválidos e ausência de execução durante restauração.
 - Auditoria de realidade em `tools/reality_audit.py`.
 - Hardening do fallback SQL em `RealHierarchicalMemory`: consultas estáticas parametrizadas por termo, sem montagem dinâmica de placeholders.
@@ -60,18 +64,29 @@ bandit_low: 131
 - `NEXUS_DECISIONS.md`: decisões arquiteturais com contexto e evidência.
 - `NEXUS_ROADMAP.md`: prioridades técnicas orientadas por risco.
 - `NEXUS_BOOTSTRAP_AUDIT.md`: auditoria de bootstrap e reconciliação documental.
+- `core/integrated_suite_summary.py`: contabiliza e serializa resultados da suíte integrada sem confundi-los com `unittest`.
 - `tools/state_manifest.py`: gerador determinístico do manifesto factual por execução.
-- `test_state_manifest.py`: contrato do schema básico e da proveniência do manifesto.
+- `test_state_manifest.py`: contrato do schema, da proveniência e do resumo integrado do manifesto.
+- `test_integrated_suite_summary.py`: contrato de aprovação, skip, ausência, conflito e IDs decimais dos checks integrados.
 - `test_mcts_action_contract.py`: contrato da distinção entre ações padrão (`None`) e espaço de ações vazio (`[]`).
 - `tools/state_consistency_audit.py`: compara claims atuais estruturados com o manifesto factual e ignora histórico fora do bloco.
-- `test_state_consistency_audit.py`: contratos de sincronização, divergência, ausência de marcador e manifesto inválido.
+- `test_state_consistency_audit.py`: contratos de sincronização, divergência, ausência de marcador e manifesto inválido, incluindo a evidência integrada.
 - `tools/test_summary.py`: executa a suíte final e registra `executed`, `passed`, `failed` e `skipped` para o manifesto.
 
-## Gates locais desta rodada
+## Validação local da branch de acompanhamento — 2026-10-16
 
-- **177 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails/segurança/higiene:** passaram na suíte integral local; os contratos MCTS, memória episódica e Vita cobrem espaço de ações vazio, concorrência na mesma conexão e concorrência entre conexões SQLite.
-- **Cobertura branch (testes + suíte integrada):** fila **98%** (piso 90%); guard de VRAM **94%** (piso 90%); bridge Vita **74%** (piso 70%); `core/constitutional_brain.py` **66%** (piso 62%; só com testes unitários eram 23%).
-- **Mutation testing:** **28/28 mutações mortas, 0 sobreviventes, 100%** (fila, bridge, guard de VRAM, log imutável e detector de jailbreak), aplicadas em cópia temporária do repositório. O score vale só para esses 28 mutantes; não é mutation testing do núcleo.
+- **Suíte unitária:** 169 executados, 169 aprovados, 0 falhas e 0 skips.
+- **Suíte integrada:** 31 IDs inventariados, 30 aprovados e 1 skip explícito por dependência FAISS opcional ausente; resumo estruturado validado pelo manifesto.
+- **Bandit:** 131 LOW, sem MEDIUM/HIGH; a triagem versionada corresponde às linhas atuais.
+- **Auditoria de realidade:** snapshot regenerado com 31 marcadores integrados, 0 funções `pass`-only e 59 retornos constantes simples.
+- **Validação de arquivos:** compilação Python, parsing YAML do workflow e `git diff --check` passaram.
+- **Ainda pendente:** cobertura e mutação desta branch serão confirmadas pelos gates de CI; os resultados da branch base não são reutilizados como resultado desta branch.
+
+## Histórico de gates locais da base `7c8a187`
+
+- **121 testes unitários/property/contrato/triagem/SQL/VRAM/guardrails:** passaram na suíte integral local; os contratos MCTS, memória episódica e Vita cobrem espaço de ações vazio, contagem idempotente de fechamentos, concorrência na mesma conexão e concorrência entre conexões SQLite.
+- **Cobertura branch:** `core/deferred_task_queue.py` **98%** (limiar 90%); `vita/nexus_constitutional_bridge_v3.py` **71%** (limiar 70%); total dos dois módulos **85%**.
+- **Mutation testing:** **10/10 mutações mortas, 0 sobreviventes, 100%**.
 - **Bandit:** **131 achados LOW** após o hardening do B607 em `tools/state_manifest.py`; a triagem classifica 16 B311 como `simulation_only_random_review`, 111 B101 como `embedded_demo_assert_review` e 4 subprocessos como `controlled_subprocess_review`, sem `manual_review` residual. Isso não é clearance de segurança.
 - **Auditoria de realidade:** executada sem elevar claims cognitivos.
 - **Dashboard:** snapshot válido renderizado; payload inválido rejeitado pelos testes.
@@ -83,7 +98,7 @@ bandit_low: 131
 - **Segurança:** LOW permanece triado e informativo; qualquer MEDIUM/HIGH no Bandit bloqueia o workflow após a triagem.
 - **Auditor B101:** 111 achados restantes, `outside_main_block: []`, `assert_lines_outside_main: []`, bloco detectado em `24668–26510`; compilação de módulos, ferramentas e testes passou.
 - **Inventário de lacunas:** propagação, adaptação e atualização gerativa registram contratos mínimos observáveis; ferramenta registrada sem executor retorna falha estruturada. O inventário AST agora registra `pass_only_count=0` e `not_implemented_count=0`.
-- **Memória episódica:** a conexão compartilhada usa `RLock` para serializar DDL, escritas, leituras e contadores; o teste concorrente cobre criação, vínculo, fechamento, estatísticas e busca.
+- **Memória episódica:** a conexão compartilhada usa `RLock` para serializar DDL, escritas, leituras e contadores; `episodes_closed` conta apenas transições `open` → `closed` confirmadas pelo SQLite; o teste concorrente cobre criação, vínculo, fechamento, estatísticas e busca.
 - **Bridge Vita:** o audit log compartilhado usa `RLock` para serializar DDL, commits, escritas e leituras; o teste concorrente cobre eventos de política, telemetria e análise de recuperação.
 - **Cross-connection SQLite:** cada conexão Vita configura `busy_timeout=5000`; o contrato compartilhado verifica duas instâncias escrevendo no mesmo arquivo sem perda de eventos.
 - **Fuzzing de diagnósticos:** 60 exemplos Hypothesis cobrem valores JSON aninhados, tipos escalares, listas e mapas; o validador sempre retorna o contrato booleano/erro sem exceção inesperada.
@@ -101,8 +116,8 @@ bandit_low: 131
 - **Shadow clones:** conhecimento é enviado ao bootstrap apenas via `ingest_knowledge`; ausência do protocolo gera evento `integrated=false` e não é apresentada como treinamento.
 - **Reminiscência:** `is_typical` é `true` somente quando o bucket de maior densidade está entre 10 e 30 anos; picos fora da faixa continuam sendo retornados, mas marcados como atípicos.
 - **Correção:** descrições malformadas de mínimo/máximo retornam imediatamente o conteúdo original, preservando o comportamento seguro já testado.
-- **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 61 retornos constantes simples restantes.
-- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; o estado operacional atual deve ser lido do manifesto do CI associado ao `HEAD`, que registra 169 testes e 131 findings LOW.
+- **Auditoria AST:** 0 funções somente com `pass`, 0 `NotImplementedError` explícitos e 59 retornos constantes simples restantes.
+- **Bootstrap audit:** o snapshot de 86 testes e 129 findings LOW é histórico; a branch anterior registrou 159 testes e 131 findings LOW na validação local; o estado oficial de cada `HEAD` deve ser confirmado pelo manifesto do CI associado.
 - **Manifesto factual:** o CI associado ao `HEAD` gera e retém `nexus-state-manifest`; commits e métricas sem esse artefato são classificados como não verificados.
 
 ## Gates do workflow local
@@ -167,4 +182,4 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 
 ## Próxima ação
 
-Decidir e adicionar a licença (`LICENSE`); habilitar no GitHub proteção de branch, Dependabot alerts, secret scanning e relato privado de vulnerabilidades; remover o ramo remoto `master` (obsoleto, ancestral de `main`). Em código: renomear ou isolar classes com termos de consciência/emoção (com aliases de compatibilidade), fatiar `think()` por fase, mover os testes para `tests/` e revisar `EthicsGuard` e `RealCognitiveBudgetEnforcer`. Manter os documentos canônicos sincronizados com o código e não tratar os banners da suíte integrada como evidência independente de capacidade cognitiva.
+Revisar o artefato `nexus-capability-benchmark` do CI e, em uma etapa futura, definir contratos mensuráveis de intervenção numérica e estado de crença POMDP antes de melhorar os módulos correspondentes. Não tratar o holdout de sequências predefinidas como aprendizagem composicional nem os banners da suíte integrada como evidência de capacidade cognitiva.

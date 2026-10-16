@@ -1,0 +1,7 @@
+# Dependências diretas usadas pelos testes e gates de CI.
+# Atualização controlada: uv pip compile --generate-hashes --python-version 3.11 \
+#   --output-file requirements-ci.lock requirements-ci.in
+numpy
+coverage
+hypothesis
+bandit

@@ -3,9 +3,9 @@
   "scope": "conservative reality audit",
   "principle": "names, banners and demo asserts are not proof of general intelligence or production readiness",
   "static_evidence": {
-    "core_lines": 26907,
-    "classes": 268,
-    "functions": 862,
+    "core_lines": 26936,
+    "classes": 267,
+    "functions": 863,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -76,7 +76,7 @@
       "RealUncertaintyQuantificationEngine.get_statistics",
       "RealWorkingMemorySystem.get_capacity_usage"
     ],
-    "embedded_test_markers": 30,
+    "embedded_test_markers": 31,
     "optional_dependency_warnings": [
       "psutil",
       "FAISS/SentenceTransformers"

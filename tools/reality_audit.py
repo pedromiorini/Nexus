@@ -97,7 +97,7 @@ def collect_static_evidence() -> dict:
             else:
                 dynamic_literals.append(qualnames[id(node)])
     source = CORE.read_text(encoding="utf-8", errors="replace")
-    embedded_tests = len(re.findall(r"TEST \d+ PASSED", source))
+    embedded_tests = len(re.findall(r"TEST \d+(?:\.\d+)? PASSED", source))
     return {
         "core_lines": len(source.splitlines()),
         "classes": len(classes),

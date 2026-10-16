@@ -29,7 +29,7 @@ Os processadores multimodais aceitam backends opcionais por protocolo: `VisionPr
 
 As estatísticas de `RealSwarmIntelligence` (`avg_consensus` e `avg_diversity`) são calculadas a partir das decisões produzidas durante as deliberações; não são constantes de demonstração. Uma deliberação sem agentes é rejeitada explicitamente. O contrato está em `test_swarm_statistics_contract.py`.
 
-As estatísticas de `RealEpisodicMemory` (`total_links` e `avg_importance`) são derivadas das tabelas SQLite de episódios e vínculos. No estado vazio, a média retorna `0.0`; o contrato independente está em `test_episodic_memory_statistics_contract.py`.
+As estatísticas de `RealEpisodicMemory` (`total_links` e `avg_importance`) são derivadas das tabelas SQLite de episódios e vínculos. No estado vazio, a média retorna `0.0`. `episodes_closed` conta somente transições reais de `open` para `closed`; IDs inexistentes e fechamentos repetidos não incrementam o contador. O contrato independente está em `test_episodic_memory_statistics_contract.py`.
 
 `StimulusItem` aceita sinais opcionais de `contrast` e `motion`. O componente `BottomUpAttention` usa esses valores quando observados, aceita `contrast` no contexto e mantém fallbacks heurísticos explícitos quando os sinais não estão disponíveis. O contrato está em `test_attention_signal_contract.py`.
 
@@ -38,6 +38,10 @@ As estatísticas de `RealEpisodicMemory` (`total_links` e `avg_importance`) são
 `RealKnowledgeGraph` trata `entity_id` como identidade única: re-adicionar uma entidade atualiza o registro, preserva a contagem e remove o ID do índice de tipo anterior quando necessário. `test_knowledge_graph_contract.py` cobre essa invariável e a média de confiança observada.
 
 No `RealMCTSPlanner`, `available_actions=None` usa o espaço padrão, enquanto `available_actions=[]` é respeitado como espaço vazio. Essa distinção evita que uma entrada explícita seja silenciosamente substituída; o contrato está em `test_mcts_action_contract.py`.
+
+## Benchmark científico sintético
+
+`benchmarks/` contém um protocolo local e determinístico para medir composição de ações, extração/alegações causais, saída de incerteza e observação parcial. Ele usa tarefas sintéticas, registra SHA-256 do taskset e é executado no CI; quando uma interface não retorna o tipo de evidência necessário, o resultado é `unsupported_interface`, não uma nota inventada. O protocolo, comandos, métricas, fontes teóricas e limites estão em [`benchmarks/README.md`](benchmarks/README.md). A execução CI é retida como artefato por 14 dias.
 
 ## Como executar
 
@@ -70,6 +74,8 @@ O diagnóstico inclui severidade, eventos analisados, pausas, recuperações, ta
 ## Snapshot da fila de tarefas adiadas
 
 A `DeferredTaskQueue` expõe `export_snapshot(as_json=True)` e `restore_snapshot(snapshot, replace=False)` para transportar tarefas pendentes entre processos ou pontos de recuperação. O contrato é versionado como `nexus.deferred_task_queue.v1` e preserva prioridade, contexto, tentativas, razão, IDs e ordem de criação. A restauração valida o payload inteiro antes de alterar a fila, rejeita schema incompatível, IDs duplicados, tipos inválidos e excesso de capacidade, e não executa processadores ou callbacks.
+
+Os contextos são copiados nas fronteiras de exportação e restauração para evitar referências mutáveis compartilhadas. Timestamps devem ser finitos; na restauração, contextos precisam ser serializáveis como JSON estrito; limites e contadores devem usar inteiros não negativos (`bool` não é aceito como inteiro do contrato). Snapshots inválidos são rejeitados sem alterar o estado da fila, inclusive com `replace=True`.
 
 Esse recurso **não é persistência física em disco**, não oferece locking distribuído e não garante entrega exatamente uma vez. O consumidor deve armazenar o JSON, controlar concorrência e decidir quando usar `replace=True` para substituir uma fila em memória. Exemplos mínimos:
 

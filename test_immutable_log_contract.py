@@ -113,6 +113,45 @@ class ImmutableLogChainTests(unittest.TestCase):
         self.assertTrue(a.verify_chain()["ok"])
         self.assertEqual(b.verify_chain()["entries"], 6)
 
+    def test_independent_connections_serialize_concurrent_writes(self):
+        logs = [self.open_log() for _ in range(4)]
+        barrier = threading.Barrier(len(logs))
+        errors = []
+
+        def worker(index, log):
+            try:
+                barrier.wait(timeout=5)
+                for n in range(15):
+                    log.log_event("evento", {"worker": index, "n": n})
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [
+            threading.Thread(target=worker, args=(index, log))
+            for index, log in enumerate(logs)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=20)
+        self.assertFalse(any(thread.is_alive() for thread in threads))
+        self.assertEqual(errors, [])
+        report = logs[0].verify_chain()
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["entries"], 60)
+
+    def test_reopening_a_tampered_log_fails_closed(self):
+        log = self.open_log()
+        log.log_event("evento", {"n": 1})
+        log.close()
+        attacker = sqlite3.connect(self.path)
+        attacker.execute("DROP TRIGGER log_entries_no_update")
+        attacker.execute("UPDATE log_entries SET event_data = '{}' WHERE sequence = 1")
+        attacker.commit()
+        attacker.close()
+        with self.assertRaisesRegex(ValueError, "cadeia do log inválida"):
+            RealImmutableLog(self.path)
+
     def test_threaded_writes_keep_the_chain_valid(self):
         log = self.open_log()
 
