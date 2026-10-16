@@ -28,6 +28,9 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install --require-hashes -r requirements-ci.lock
 
+      - name: Validate constitutional runtime requirements
+        run: python -m pip install --dry-run --no-deps -r requirements_constitutional.txt
+
       - name: Compile changed Python modules
         run: |
           python -m py_compile \
