@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 204
+tests: 210
 bandit_low: 131
 -->
 
@@ -11,19 +11,19 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta atualização:** `main` no commit `5b8bed8125002e25eb066620af67d3a65d44e59f`, merge da PR #11; branch documental desta rodada: `docs/refresh-current-project-state-2026-10-16`.
-- **Estado de PRs no início desta rodada:** PR #11 mesclada; PRs #12 (Ruff), #13 (Hypothesis) e #14 (NumPy) abertas, mergeáveis e com os checks de contrato e atestação aprovados; nenhuma issue aberta.
-- **CI oficial de referência:** execução `38907987512` passou para o commit `5b8bed8125002e25eb066620af67d3a65d44e59f`. O manifesto registrou 200/200 testes `unittest`, 30 verificações integradas aprovadas e 1 ignorada (31 inventariadas; 0 falhas), além de 131 achados Bandit LOW e nenhum MEDIUM/HIGH.
-- **Marco desta rodada:** sincronizar o README e este handoff com as métricas verificadas de `main`, sem duplicar a correção de dependências constitucionais já presente no commit atual.
+- **Base desta rodada:** `main` pós-PR #20 no commit `bbe2ae869fde4680c9f3a6a8f3c62505e80a2923`; branch de correção: `fix/context-episode-diagnostics-2026-10-16`.
+- **Estado de PRs no início desta rodada:** PR #20 mesclada; as alterações desta branch seguem isoladas e não foram mescladas.
+- **CI oficial de referência:** os checks obrigatórios da PR #20 passaram no head `faad7dd6a7d4ff1623a4b2db7c8914162cd3bb8a`; o commit de merge em `main` é `bbe2ae869fde4680c9f3a6a8f3c62505e80a2923`. Esta branch ainda depende do CI da sua própria PR.
+- **Marco desta rodada:** isolar mutações de contexto/cache, persistir estatísticas episódicas via SQLite, rejeitar vínculos órfãos e validar diagnósticos/JSON estritamente.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
-- **Validação local de `main` antes desta atualização (não é CI):** 200/200 testes `unittest` passaram; a suíte integrada registrou 30 aprovações, 1 skip opcional de FAISS e nenhuma falha. `psutil`, FAISS e SentenceTransformers estavam indisponíveis; os fallbacks correspondentes foram usados. Para status oficial, prevalece o manifesto de CI acima.
+- **Validação local da branch atual (não é CI):** 210/210 testes `unittest` passaram; a suíte integrada registrou 30 aprovações, 1 skip opcional de FAISS e nenhuma falha. `psutil`, FAISS e SentenceTransformers estavam indisponíveis; os fallbacks correspondentes foram usados.
 
 ## O que está implementado
 
-- Reprocessamento de tarefas adiadas no `CentralRouter`, preservando contexto, callbacks e telemetria.
+- Reprocessamento de tarefas adiadas no `CentralRouter`, preservando contexto, callbacks e telemetria; contextos aninhados são copiados ao enfileirar, reprocessar e entregar a cada módulo.
 - Auditoria persistente SQLite e análise longitudinal no bridge Vita.
-- Exportação/validação do contrato `nexus.recovery.diagnostics.v1`.
+- Exportação/validação do contrato `nexus.recovery.diagnostics.v1`, com tipos/finidade verificados e JSON estrito sem `NaN`/`Infinity`.
 - `test_recovery_diagnostics_contract.py`: fuzzing property-based de 60 payloads JSON arbitrários, com rejeição total e estruturada.
 - `test_vita_audit_concurrency_contract.py`: contrato de escritas concorrentes e leitura consistente do audit log SQLite do bridge Vita.
 - `test_vita_audit_cross_connection_contract.py`: contrato de duas instâncias Vita compartilhando o mesmo arquivo SQLite sem perda de eventos.
@@ -41,7 +41,7 @@ bandit_low: 131
 - Revisão dos 16 achados B311: usos classificados como simulação/heurística, sem reutilização autorizada para segredos ou decisões de segurança.
 - Revisão dos 111 achados B101 restantes: todos estão no bloco `__main__` demonstrativo e permanecem fora dos contratos independentes de produção.
 - `tools/embedded_assert_audit.py`: guardrail AST que impede B101 e qualquer `assert` fora do bloco `__main__` enquanto a migração é incremental.
-- `test_central_router_contract.py`: contrato independente para contagem de requisições, cache hit rate e latência média.
+- `test_central_router_contract.py`: contrato independente para contagem de requisições, cache hit rate, isolamento de contexto aninhado e cópia profunda do cache.
 - `tools/implementation_gap_audit.py`: inventário AST conservador de funções pass-only e `NotImplementedError`, sem tratar lacunas como implementadas.
 - `test_explicit_gap_contract.py`: contratos independentes para propagação de erro e registro de adaptação simulada.
 - `test_working_memory_contract.py`: contrato independente para alocação de atenção local e delegação declarada.
@@ -49,7 +49,7 @@ bandit_low: 131
 - `test_counterfactual_contract.py`: contratos de world model, causalidade e fallback heurístico.
 - `test_multimodal_backend_contract.py`: contratos de backends opcionais de visão/áudio e fallbacks de demonstração.
 - `test_swarm_statistics_contract.py`: contrato de médias observadas do swarm e rejeição de deliberação sem agentes.
-- `test_episodic_memory_statistics_contract.py`: contrato de contagem de vínculos, média de importância e fechamento de episódios.
+- `test_episodic_memory_statistics_contract.py`: contrato de contagem persistente após reabertura do SQLite, rejeição de vínculo a episódio inexistente, média de importância e fechamento de episódios.
 - `test_episodic_memory_concurrency_contract.py`: contrato de ciclo de vida concorrente em uma conexão SQLite compartilhada.
 - `test_attention_signal_contract.py`: contrato de sinais opcionais de contraste/movimento e fallbacks heurísticos da atenção.
 - `test_integration_synergy_contract.py`: contrato da média aritmética de sinergia sobre todas as integrações registradas.

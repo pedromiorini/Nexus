@@ -16,6 +16,19 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(first.prompt, "high")
         self.assertEqual(first.attempts, 1)
 
+    def test_enqueue_detaches_nested_context_from_caller(self):
+        queue = DeferredTaskQueue()
+        context = {"trace": {"values": ["before"]}}
+
+        task = queue.enqueue("deferred", context)
+        context["trace"]["values"].append("after")
+
+        self.assertEqual(task.context, {"trace": {"values": ["before"]}})
+        self.assertEqual(
+            queue.export_snapshot()["tasks"][0]["context"],
+            {"trace": {"values": ["before"]}},
+        )
+
     def test_critical_pressure_does_not_pop(self):
         queue = DeferredTaskQueue()
         queue.enqueue("blocked", priority=5)
@@ -187,8 +200,16 @@ class DeferredTaskQueueTests(unittest.TestCase):
         })()
         router.vita_bridge = NexusConstitutionalBridge(":memory:")
         observed = []
-        router.route = lambda prompt, context: observed.append((prompt, context)) or {"success": True}
-        router.deferred_queue.enqueue("recover", {"trace_id": "t-1"})
+
+        def route(prompt, context):
+            observed.append((prompt, context))
+            context["nested"]["value"] = 2
+            return {"success": True}
+
+        router.route = route
+        task = router.deferred_queue.enqueue(
+            "recover", {"trace_id": "t-1", "nested": {"value": 1}}
+        )
         callbacks = []
         result = router.reprocess_deferred_tasks(
             on_success=lambda task: callbacks.append(task.task_id)
@@ -197,6 +218,7 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(len(observed), 1)
         self.assertEqual(observed[0][0], "recover")
         self.assertEqual(observed[0][1]["trace_id"], "t-1")
+        self.assertEqual(task.context["nested"]["value"], 1)
         self.assertTrue(observed[0][1]["_deferred_reprocess"])
         self.assertEqual(router.stats["deferred_reprocessing"]["attempts"], 1)
         self.assertEqual(router.stats["deferred_reprocessing"]["completed"], 1)

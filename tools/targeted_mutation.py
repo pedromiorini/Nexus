@@ -56,7 +56,7 @@ MUTATIONS = [
     Mutation("vita_failure_threshold_boundary", "vita/nexus_constitutional_bridge_v3.py", "failure_rate >= self.reprocessing_thresholds[\"failure_rate\"]", "failure_rate > self.reprocessing_thresholds[\"failure_rate\"]"),
     Mutation("vita_audit_order", "vita/nexus_constitutional_bridge_v3.py", "reversed(rows)", "rows"),
     Mutation("schema_version_compatibility", "vita/nexus_constitutional_bridge_v3.py", "schema == self.RECOVERY_SCHEMA", "schema != self.RECOVERY_SCHEMA"),
-    Mutation("schema_severity_membership", "vita/nexus_constitutional_bridge_v3.py", "diagnostics.get(\"severity\") not in {\"info\", \"warning\", \"critical\"}", "diagnostics.get(\"severity\") in {\"info\", \"warning\", \"critical\"}"),
+    Mutation("schema_severity_membership", "vita/nexus_constitutional_bridge_v3.py", "severity not in {\"info\", \"warning\", \"critical\"}", "severity in {\"info\", \"warning\", \"critical\"}"),
     Mutation('vram_hard_boundary', 'core/vram_defense_guard.py', 'elif current.utilization >= self.hard_limit:', 'elif current.utilization > self.hard_limit:', tests=VRAM),
     Mutation('vram_soft_boundary', 'core/vram_defense_guard.py', 'elif current.utilization >= self.soft_limit:', 'elif current.utilization > self.soft_limit:', tests=VRAM),
     Mutation('vram_limit_validation', 'core/vram_defense_guard.py', 'if not 0 < soft_limit < hard_limit <= 1:', 'if not 0 < soft_limit < hard_limit < 1:', tests=VRAM),
