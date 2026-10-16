@@ -1,7 +1,9 @@
 """Fila priorizada e limitada para tarefas adiadas pelo sistema de defesa."""
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
+import math
 from time import time
 from typing import Any, Dict, List, Optional
 import heapq
@@ -124,7 +126,7 @@ class DeferredTaskQueue:
             "statistics": dict(self._stats),
             "tasks": [self._task_to_dict(task) for task in sorted(self._heap, key=lambda item: item.sort_key)],
         }
-        return json.dumps(payload, sort_keys=True, separators=(",", ":")) if as_json else payload
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False) if as_json else payload
 
     def restore_snapshot(self, snapshot: Any, replace: bool = False) -> Dict[str, Any]:
         """Restaura tarefas pendentes após validar o snapshot inteiro de forma atômica."""
@@ -135,7 +137,11 @@ class DeferredTaskQueue:
         if replace and len(tasks) > self.max_size:
             raise ValueError("snapshot excede max_size da fila")
 
-        restored = [DeferredTask(**task) for task in tasks]
+        restored = []
+        for task in tasks:
+            detached = dict(task)
+            detached["context"] = copy.deepcopy(task["context"])
+            restored.append(DeferredTask(**detached))
         if replace:
             self._heap.clear()
             self._tasks.clear()
@@ -152,7 +158,7 @@ class DeferredTaskQueue:
         return {
             "task_id": task.task_id,
             "prompt": task.prompt,
-            "context": task.context,
+            "context": copy.deepcopy(task.context),
             "priority": task.priority,
             "created_at": task.created_at,
             "attempts": task.attempts,
@@ -178,12 +184,17 @@ class DeferredTaskQueue:
         missing = [field for field in required if field not in payload]
         if missing:
             raise ValueError(f"campos ausentes no snapshot: {', '.join(missing)}")
-        if not isinstance(payload["generated_at"], (int, float)) or isinstance(payload["generated_at"], bool):
+        if not self._is_finite_number(payload["generated_at"]):
             raise ValueError("generated_at inválido no snapshot")
-        if payload["max_attempts"] != self.max_attempts or payload["max_size"] != self.max_size:
+        if (
+            type(payload["max_attempts"]) is not int
+            or type(payload["max_size"]) is not int
+            or payload["max_attempts"] != self.max_attempts
+            or payload["max_size"] != self.max_size
+        ):
             raise ValueError("limites do snapshot não correspondem à fila")
         if not isinstance(payload["statistics"], dict) or any(
-            not isinstance(payload["statistics"].get(key), int) or payload["statistics"][key] < 0
+            type(payload["statistics"].get(key)) is not int or payload["statistics"][key] < 0
             for key in self._stats
         ):
             raise ValueError("estatísticas inválidas no snapshot")
@@ -206,18 +217,27 @@ class DeferredTaskQueue:
                 raise ValueError("prompt ou context inválido no snapshot")
             if not isinstance(raw["priority"], int) or isinstance(raw["priority"], bool):
                 raise ValueError("priority inválida no snapshot")
-            if not isinstance(raw["created_at"], (int, float)) or isinstance(raw["created_at"], bool):
+            if not self._is_finite_number(raw["created_at"]):
                 raise ValueError("created_at inválido no snapshot")
             if not isinstance(raw["attempts"], int) or isinstance(raw["attempts"], bool) or raw["attempts"] < 0:
                 raise ValueError("attempts inválido no snapshot")
-            if not isinstance(raw["max_attempts"], int) or raw["max_attempts"] < 1 or raw["attempts"] > raw["max_attempts"]:
+            if type(raw["max_attempts"]) is not int or raw["max_attempts"] < 1 or raw["attempts"] > raw["max_attempts"]:
                 raise ValueError("max_attempts inválido no snapshot")
             if not isinstance(raw["last_reason"], str):
                 raise ValueError("last_reason inválido no snapshot")
             try:
-                json.dumps(raw["context"])
-            except (TypeError, ValueError) as exc:
+                json.dumps(raw["context"], allow_nan=False)
+            except (OverflowError, TypeError, ValueError) as exc:
                 raise ValueError("context não é serializável") from exc
             ids.add(raw["task_id"])
             validated.append({field: raw[field] for field in fields})
         return validated
+
+    @staticmethod
+    def _is_finite_number(value: Any) -> bool:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return False
+        try:
+            return math.isfinite(value)
+        except OverflowError:
+            return False

@@ -73,6 +73,69 @@ class DeferredTaskSnapshotTests(unittest.TestCase):
         self.assertEqual(target.statistics()["depth"], 1)
         self.assertEqual(target.recheck_and_pop(False).prompt, "recover")
 
+    def test_export_and_restore_contexts_are_detached(self):
+        source = DeferredTaskQueue()
+        task = source.enqueue("isolated", {"nested": {"value": "original"}})
+        exported = source.export_snapshot()
+        exported["tasks"][0]["context"]["nested"]["value"] = "export mutation"
+        self.assertEqual(task.context["nested"]["value"], "original")
+
+        payload = source.export_snapshot()
+        target = DeferredTaskQueue()
+        target.restore_snapshot(payload)
+        payload["tasks"][0]["context"]["nested"]["value"] = "input mutation"
+        restored = target.recheck_and_pop(False)
+        self.assertEqual(restored.context["nested"]["value"], "original")
+
+    def test_nonfinite_values_are_rejected_atomically_with_replace(self):
+        queue = DeferredTaskQueue(max_attempts=2, max_size=4)
+        kept = queue.enqueue("keep", {"nested": {"value": "unchanged"}})
+        before = queue.statistics().copy()
+        invalid_snapshots = []
+
+        for field, value in (("generated_at", float("nan")), ("generated_at", float("inf"))):
+            payload = queue.export_snapshot()
+            payload[field] = value
+            invalid_snapshots.append(payload)
+        for field, value in (("created_at", float("-inf")), ("context", {"bad": float("nan")})):
+            payload = queue.export_snapshot()
+            payload["tasks"][0][field] = value
+            invalid_snapshots.append(payload)
+
+        for payload in invalid_snapshots:
+            with self.subTest(payload=payload), self.assertRaises(ValueError):
+                queue.restore_snapshot(payload, replace=True)
+            self.assertEqual(queue.statistics(), before)
+            self.assertEqual(queue._tasks[kept.task_id].context["nested"]["value"], "unchanged")
+
+        invalid_context = DeferredTaskQueue()
+        invalid_context.enqueue("nonfinite", {"value": float("inf")})
+        with self.assertRaises(ValueError):
+            invalid_context.export_snapshot(as_json=True)
+
+    def test_boolean_numbers_are_rejected_by_snapshot_contract(self):
+        source = DeferredTaskQueue(max_attempts=1, max_size=1)
+        source.enqueue("pending")
+        target = DeferredTaskQueue(max_attempts=1, max_size=1)
+        target.enqueue("keep")
+        before = target.statistics().copy()
+        cases = [
+            ("max_attempts", True),
+            ("max_size", True),
+            ("statistics", {"enqueued": True}),
+            ("task_max_attempts", True),
+        ]
+        for case, value in cases:
+            payload = source.export_snapshot()
+            if case == "statistics":
+                payload["statistics"].update(value)
+            elif case == "task_max_attempts":
+                payload["tasks"][0]["max_attempts"] = value
+            else:
+                payload[case] = value
+            with self.subTest(case=case), self.assertRaises(ValueError):
+                target.restore_snapshot(payload, replace=True)
+            self.assertEqual(target.statistics(), before)
 
     def test_snapshot_validation_rejects_malformed_envelopes(self):
         queue = DeferredTaskQueue(max_attempts=2, max_size=2)

@@ -15,6 +15,7 @@ bandit_low: 131
 - **Base remota sincronizada:** `origin/main` contém o gerador de manifesto e a reconciliação documental; use o artefato `nexus-state-manifest` do CI para o SHA exato verificado.
 - **Marco desta rodada:** `STATE_MANIFEST.json` passou a ser gerado e retido pelo CI, eliminando a dependência de snapshots manuais para commit, testes, segurança e mutation.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
+- **Checkpoint local — 2026-10-16, base `17a1b19` (worktree não publicado; não é CI):** Python 3.11.16; `PYTHONPATH=. python -m unittest discover -p 'test_*.py' -q` passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH; compilação, auditoria de realidade e `git diff --check` passaram. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
 
 ## O que está implementado
 

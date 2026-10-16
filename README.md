@@ -67,6 +67,8 @@ O diagnóstico inclui severidade, eventos analisados, pausas, recuperações, ta
 
 A `DeferredTaskQueue` expõe `export_snapshot(as_json=True)` e `restore_snapshot(snapshot, replace=False)` para transportar tarefas pendentes entre processos ou pontos de recuperação. O contrato é versionado como `nexus.deferred_task_queue.v1` e preserva prioridade, contexto, tentativas, razão, IDs e ordem de criação. A restauração valida o payload inteiro antes de alterar a fila, rejeita schema incompatível, IDs duplicados, tipos inválidos e excesso de capacidade, e não executa processadores ou callbacks.
 
+Os contextos são copiados nas fronteiras de exportação e restauração para evitar referências mutáveis compartilhadas. Timestamps devem ser finitos; na restauração, contextos precisam ser serializáveis como JSON estrito; limites e contadores devem usar inteiros não negativos (`bool` não é aceito como inteiro do contrato). Snapshots inválidos são rejeitados sem alterar o estado da fila, inclusive com `replace=True`.
+
 Esse recurso **não é persistência física em disco**, não oferece locking distribuído e não garante entrega exatamente uma vez. O consumidor deve armazenar o JSON, controlar concorrência e decidir quando usar `replace=True` para substituir uma fila em memória. Exemplos mínimos:
 
 ```python
