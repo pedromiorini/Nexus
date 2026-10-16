@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 257
+tests: 258
 bandit_low: 131
 -->
 
@@ -127,7 +127,7 @@ O manifesto distingue `discovered_static` (inventário AST) de `executed`, `pass
 - Correção: `ToolValidator.validate_parameters` verifica primeiro se a entrada externa é uma instância de `dict`; caso contrário registra `TOOL_PARAM_TYPE_MISMATCH` com o tipo observado e retorna `False`. A chamada pública responde com falha estruturada sem acessar cache nem executor.
 - Três testes independentes cobrem `None`/lista/string, dicionário sem parâmetros obrigatórios e execução normal com dicionário válido. Um mutante que remove a guarda é morto pelo mutation gate.
 - Validação local em Python 3.12.3: 249/249 testes; suíte integrada 30 aprovados e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 34/34 mortas, sem sobreviventes/não aplicadas; Ruff, actionlint, zizmor, compileall, auditorias AST e consistência documental passaram. Bandit: 131 LOW, nenhum MEDIUM/HIGH.
-- Limite: a alteração valida apenas o tipo externo; não restringe subclasses de `dict`, valores aninhados nem chaves extras. Os resultados são locais; a CI do head candidato permanece a referência oficial.
+- Limite: a alteração valida apenas o tipo externo; não restringe subclasses de `dict`, valores aninhados nem chaves extras. As métricas acima são locais; os dois checks oficiais da PR #26 passaram antes do merge em `main` no commit `508020d77d5705f99c76eaca4df05e8e265662f7`.
 
 ## JSON estrito e resiliência da chave de cache — 2026-10-16
 
@@ -137,16 +137,27 @@ O manifesto distingue `discovered_static` (inventário AST) de `executed`, `pass
 - Contratos: `test_format_json_contract.py` verifica valores finitos, rejeição de `NaN`/infinitos e falha estruturada para dados não serializáveis. `test_tool_cache_key_contract.py` prova que a extensão não serializável não bloqueia um executor válido, não é cacheada e é reexecutada; também protege a ausência de serialização para ferramentas não cacheáveis.
 - Validação local: 254/254 testes; suíte integrada 30 aprovados e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 37/37 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW e nenhum MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST e benchmarks de capacidade e POMDP v2 passaram.
 - Base normativa: [documentação Python 3.12 do módulo `json`](https://docs.python.org/3.12/library/json.html) e [RFC 8259, §6](https://www.rfc-editor.org/rfc/rfc8259) determinam que NaN/Infinity não são números JSON válidos; `allow_nan=False` produz `ValueError` em modo estrito.
-- Limites: não há validação recursiva de schema nem rejeição de chaves desconhecidas; o bypass não limita o custo de serializar entradas grandes que são serializáveis, nem transforma o orçamento estimado do cache em limite de memória global. Os resultados são locais, não CI oficial.
+- Limites: não há validação recursiva de schema nem rejeição de chaves desconhecidas; o bypass não limita o custo de serializar entradas grandes que são serializáveis, nem transforma o orçamento estimado do cache em limite de memória global. As métricas acima são locais; os dois checks oficiais da PR #27 passaram antes do merge em `main` no commit `c4375d9f42703b11d2632b3a701303c5a69563a4`.
 
 
 ## Pré-verificação limitada da geração de cache key — 2026-10-16
 
 - Base local: `main` pós-PR #27, merge commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; branch isolada `feat/post-pr27-cache-key-resource-bounds-2026-10-16`.
+- Estado posterior: a branch foi publicada como PR #28, os dois checks oficiais passaram e a alteração foi mesclada em `main` no merge commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`.
 - Lacuna reproduzida por inspeção: `execute_tool` chamava `json.dumps(params, sort_keys=True)` antes do executor. Os limites existentes de payload cacheado não restringiam o custo da serialização de parâmetros grandes, profundos ou com muitos nós.
 - Correção: uma pré-verificação iterativa limita a estimativa conservadora do JSON+prefixo a 64 KiB, profundidade a 64, travessia a 4.096 ocorrências e cada contêiner a 1.024 itens; ciclos são identificados sem recursão. A estimativa conta escapes de strings e usa limite superior para inteiros antes do encoder.
 - Se qualquer budget for excedido, ou o valor não pertencer aos tipos Python nativos aceitos pelo encoder JSON padrão e percorridos com segurança, `TOOL_CACHE_KEY_UNAVAILABLE` registra um motivo e `cache_bypassed=true`; lookup/store são pulados, mas o executor segue normalmente. Subclasses de `dict` continuam aceitas/executadas e apenas bypassam a otimização. Ferramentas não cacheáveis continuam sem pré-verificação.
 - Para valores elegíveis, `json.dumps(..., sort_keys=True)` e a fórmula SHA-256 foram preservados; o teste compara a chave nova com a fórmula anterior e verifica que um hit ainda ocorre na repetição. `test_tool_cache_key_contract.py` protege também bypass de bytes, profundidade, nós, itens por contêiner, ciclos e valores não serializáveis, sem impedir execução.
 - Validação local: **257/257** testes; suíte integrada 30 aprovados e 1 skip opcional FAISS; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate **42/42** mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW, nenhum MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade e auditorias AST passaram. Benchmarks de capacidade e POMDP v2 passaram com seed `20261016`.
-- Fundamentação: a [documentação oficial Python 3.12 do módulo `json`](https://docs.python.org/3.12/library/json.html) descreve `iterencode` como gerador de fragmentos disponíveis e não documenta um tamanho máximo para cada fragmento nem budgets gerais de tamanho/profundidade; por isso o preflight é iterativo e ocorre antes da serialização. Os resultados permanecem locais até a CI do commit candidato.
+- Fundamentação: a [documentação oficial Python 3.12 do módulo `json`](https://docs.python.org/3.12/library/json.html) descreve `iterencode` como gerador de fragmentos disponíveis e não documenta um tamanho máximo para cada fragmento nem budgets gerais de tamanho/profundidade; por isso o preflight é iterativo e ocorre antes da serialização. Os números desta seção são da validação local; a CI oficial da PR #28 passou antes do merge registrado acima.
 - Limite epistemológico: este contrato restringe somente o trabalho adicional da chave de cache e a elegibilidade ao cache. Não limita custo/memória próprios do executor, não valida schema recursivamente, não rejeita chaves extras e não converte o budget de cache em limite global de memória.
+
+
+## Falha na cópia de resultado cacheável não invalida a execução — 2026-10-16
+
+- Base da rodada: `main` pós-PR #28, merge commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`; branch isolada `feat/post-pr28-cache-store-fallback-2026-10-16`.
+- Reprodução: o estimador iterativo aceitou um resultado de listas aninhadas com profundidade 600 e tamanho estimado de 38.445 bytes (abaixo do teto de 64 KiB), mas `copy.deepcopy` lançou `RecursionError`. Como o armazenamento ficava dentro do tratamento de execução, a ferramenta foi reportada como falha e o resultado concluído foi descartado.
+- Correção: a exceção ao preparar a cópia é limitada a esse ponto; `TOOL_CACHE_STORE_UNAVAILABLE` registra ferramenta, tipo da exceção e `cache_bypassed=true`, e o cache não armazena o resultado. O `ToolExecutionResult` original e os contadores de sucesso são preservados.
+- `test_tool_cache_store_contract.py` injeta deterministicamente `RecursionError` e verifica retorno original, contadores, cache vazio, diagnóstico e ausência de `TOOL_EXECUTION_FAILED`; a reprodução manual com profundidade 600 também passou após o patch. Um mutante remove o fallback.
+- Validação local medida: unittest 258/258; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 43/43, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade, auditorias AST e benchmarks de capacidade/POMDP v2 na seed `20261016` passaram.
+- Limites: o fallback cobre especificamente a cópia profunda usada para armazenar o cache; não limita memória/custo próprios do executor nem transforma o cache em limite de memória do processo. A validação de subclasses de valores tipados aninhados não foi alterada; sua intenção de compatibilidade requer contrato específico.

@@ -172,6 +172,16 @@
 - **Compatibilidade:** para parâmetros elegíveis, manter `json.dumps(params, sort_keys=True)` e a fórmula SHA-256 existentes, preservando a identidade de chaves pequenas. Subclasses de `dict` continuam aceitas pela fronteira externa e pelo executor, mas bypassam cache; chaves extras continuam ignoradas conforme o contrato legado.
 - **Contexto/motivo:** os limites de entrada do validator eram superficiais, e o orçamento de resultado armazenado não protegia o custo proporcional da ordenação/serialização da chave. A documentação Python 3.12 não define limites gerais de tamanho/profundidade do encoder nem limite máximo para fragmentos de `iterencode`; o preflight precisa ocorrer antes dele.
 - **Evidência:** `test_tool_cache_key_contract.py` cobre compatibilidade de hash/hit, bypass sem chamar o encoder para bytes, profundidade, nós, cardinalidade de contêiner e ciclos, preservação de execução, subclass de `dict`, valor não serializável e ferramenta não cacheável. Cinco mutantes das guardas/detecção são mortos; validação local: 257/257 testes e mutation 42/42.
-- **Limitação:** o budget cobre somente trabalho de formação da cache key; não restringe memória/custo do executor, nem limita a memória total do processo. A CI da PR ainda é a referência oficial do commit publicado.
+- **Limitação:** o budget cobre somente trabalho de formação da cache key; não restringe memória/custo do executor, nem limita a memória total do processo. Os dois checks oficiais da PR #28 passaram antes do merge em `main` no commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`; as métricas listadas são da validação local daquela branch.
 - **Fonte:** [documentação oficial Python 3.12 do módulo `json`](https://docs.python.org/3.12/library/json.html).
 - **Reversibilidade:** simples; entradas sobre o budget deixam de obter cache hit/store, mas continuam seguindo a execução normal.
+
+
+## D-021 — Falha ao copiar resultado para cache não altera o sucesso do executor
+
+- **Decisão:** se `copy.deepcopy` falhar ao preparar o armazenamento de um resultado elegível, emitir `TOOL_CACHE_STORE_UNAVAILABLE`, pular o armazenamento e devolver o `ToolExecutionResult` concluído; contabilizar a execução como sucesso.
+- **Contexto:** resultado profundo dentro do limite estimado de bytes podia ultrapassar o limite de recursão do Python. A cópia era feita dentro do bloco amplo de tratamento de `execute_tool`, que convertia a falha da otimização em falha da ferramenta e descartava o resultado já calculado.
+- **Motivo:** cache é uma otimização; falha ao copiar uma representação interna não deve alterar a semântica observável da execução original.
+- **Evidência:** reprodução local com listas aninhadas de profundidade 600 (38.445 bytes estimados), teste `test_tool_cache_store_contract.py` e mutante que remove o fallback; métricas locais 258/258 testes e mutation 43/43.
+- **Limitação:** a captura se restringe à cópia profunda antes do armazenamento; não limita o executor nem o uso global de memória. A intenção de aceitar subclasses em valores tipados aninhados permanece questão separada.
+- **Reversibilidade:** fácil; em caso de falha apenas se perde o armazenamento/cache hit desse resultado.

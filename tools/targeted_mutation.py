@@ -35,6 +35,7 @@ TIMEOUT = ("test_tool_definition_contract.py",)
 TOOL_PARAMS = ("test_tool_parameter_contract.py",)
 JSON_FORMAT = ("test_format_json_contract.py",)
 TOOL_CACHE_KEY = ("test_tool_cache_key_contract.py",)
+TOOL_CACHE_STORE = ("test_tool_cache_store_contract.py",)
 COPY_IGNORE = shutil.ignore_patterns(
     ".git", "__pycache__", ".venv", "venv", ".hypothesis", ".ruff_cache", ".mypy_cache",
     "*.sqlite3", "*.db", ".coverage*", "coverage.xml", "targeted_mutation_report.json",
@@ -147,6 +148,13 @@ MUTATIONS = [
         "if value_id in active_containers:",
         "if False:",
         tests=TOOL_CACHE_KEY,
+    ),
+    Mutation(
+        "tool_cache_store_copy_failure_bypasses_cache",
+        "core/constitutional_brain.py",
+        'except Exception as exc:\n            # Caching is an optimization; copy failures must not invalidate execution.\n            self.log.log_event("TOOL_CACHE_STORE_UNAVAILABLE", {',
+        'except Exception as exc:\n            raise\n            # Caching is an optimization; copy failures must not invalidate execution.\n            self.log.log_event("TOOL_CACHE_STORE_UNAVAILABLE", {',
+        tests=TOOL_CACHE_STORE,
     ),
 ]
 

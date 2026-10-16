@@ -3930,7 +3930,16 @@ class RealToolUse:
         result_size = self._estimate_cache_value_size(result.result)
         if result_size is None or result_size > self.MAX_CACHE_ENTRY_BYTES:
             return
-        cached_copy = copy.deepcopy(result)
+        try:
+            cached_copy = copy.deepcopy(result)
+        except Exception as exc:
+            # Caching is an optimization; copy failures must not invalidate execution.
+            self.log.log_event("TOOL_CACHE_STORE_UNAVAILABLE", {
+                "tool": tool.name,
+                "reason": type(exc).__name__,
+                "cache_bypassed": True,
+            })
+            return
         with self._result_cache_lock:
             self._prune_result_cache(time.time())
             if cache_key in self.result_cache:

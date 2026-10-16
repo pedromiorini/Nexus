@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 257
+tests: 258
 bandit_low: 131
 -->
 
@@ -11,14 +11,14 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta rodada:** `main` pós-PR #27, merge commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; branch isolada `feat/post-pr27-cache-key-resource-bounds-2026-10-16`.
+- **Base desta rodada:** `main` pós-PR #28, merge commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`; branch isolada `feat/post-pr28-cache-store-fallback-2026-10-16`.
 - **Estado da revisão:** candidata validada localmente; próxima etapa é publicar a branch e abrir PR própria contra `main` para revisão/CI. Não mesclar sem autorização específica para esta PR.
-- **Mudança candidata:** a formação de cache key agora faz pré-verificação iterativa antes do encoder JSON: 64 KiB estimados, profundidade 64, 4.096 nós/ocorrências, 1.024 itens por contêiner e detecção de ciclos. Excesso/ciclo/tipo não percorrido com segurança gera `TOOL_CACHE_KEY_UNAVAILABLE` e ignora lookup/store; o executor continua. Para entradas elegíveis, encoder, ordenação e SHA-256 legados permanecem inalterados.
-- **Validação local (não CI):** 257/257 testes; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 42/42 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade e auditorias AST passaram.
+- **Mudança candidata:** se `copy.deepcopy` falhar ao preparar uma cópia de resultado para armazenamento opcional, `RealToolUse` emite `TOOL_CACHE_STORE_UNAVAILABLE`, ignora o armazenamento e preserva o `ToolExecutionResult` bem-sucedido e suas estatísticas. A chave, o executor e seu resultado não são reescritos por essa falha de cache.
+- **Validação local (não CI):** 258/258 testes; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 43/43 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade e auditorias AST passaram.
 - **Benchmarks:** CLIs de capacidade e POMDP v2 passaram na seed `20261016`; o v2 manteve 128/128 casos dentro de `1e-12` e 4/4 controles inválidos rejeitados.
-- **Limites desta mudança:** os budgets restringem apenas a elegibilidade e o custo da geração da chave, não o trabalho nem a memória própria do executor. Subclasses de `dict` continuam aceitas e executadas, mas bypassam cache; chaves extras continuam ignoradas e valores não recebem validação recursiva de schema. Timeout continua diagnóstico, não cancelamento.
+- **Limites desta mudança:** a captura é específica à cópia profunda de cache; não limita a memória/custo do executor, não valida schema recursivamente e não transforma o cache em limite global de memória. A compatibilidade de subclasses em valores tipados aninhados continua uma questão aberta, sem mudança de comportamento nesta branch. Timeout segue diagnóstico, não cancelamento.
 - **POMDP herdado:** a PR #24 foi mesclada com ambos os checks oficiais aprovados; o filtro de um passo recebe modelo explícito, sem alegar aprendizagem ou planejamento. O protocolo v1 continua inalterado e mantém `unsupported_interface` para observação parcial.
-- **Hardening herdado:** PR #25 foi mesclada no commit `675f5aa95416c3a92998a34dd2f905f529b90980`; PR #26 no commit `508020d77d5705f99c76eaca4df05e8e265662f7`; PR #27 no commit `c4375d9f42703b11d2632b3a701303c5a69563a4`. A PR #23 limitou `math_calculate` e isolou aliases de cache.
+- **Hardening herdado:** PR #25 foi mesclada no commit `675f5aa95416c3a92998a34dd2f905f529b90980`; PR #26 no commit `508020d77d5705f99c76eaca4df05e8e265662f7`; PR #27 no commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; PR #28 no commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb` após os dois checks oficiais passarem. A PR #23 limitou `math_calculate` e isolou aliases de cache.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
 
@@ -26,6 +26,7 @@ bandit_low: 131
 
 - Herdado da PR #27: `test_format_json_contract.py` preserva formatação de JSON finito e exige falha estruturada para NaN/infinitos e dados não serializáveis.
 - `test_tool_cache_key_contract.py`: preserva a identidade das chaves pequenas; garante bypass pré-serialização para tamanho, profundidade, nós, itens por contêiner e ciclos; comprova que falhas de cache não bloqueiam o executor, que subclasses de `dict` seguem válidas e que ferramenta não cacheável não forma chave.
+- `test_tool_cache_store_contract.py`: injeta `RecursionError` na cópia para cache e exige bypass observável sem descartar o sucesso; a etapa dedicada está no workflow e um mutante protege o caminho.
 
 ## O que está implementado
 
@@ -192,4 +193,4 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 
 ## Próxima ação
 
-Após concluir os checks oficiais da PR atual, priorizar uma revisão separada do custo e dos limites para parâmetros profundamente aninhados ou grandes na geração de cache key. Não rejeitar chaves desconhecidas nem ampliar o schema sem contrato específico; manter a PR desta branch independente e não mesclar sem autorização específica. Não criar outra rotina semanal.
+Após concluir os checks oficiais desta PR, decidir por contrato se subclasses de valores tipados aninhados devem ser aceitas: hoje o validator compara `type(param_value).__name__` exatamente. Não ampliar o schema sem testes específicos, em particular para evitar a compatibilidade acidental de tipos como `bool` com `int`. Manter esta branch isolada e não mesclar sem autorização específica; não criar outra rotina semanal.
