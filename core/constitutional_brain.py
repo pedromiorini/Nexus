@@ -1981,12 +1981,14 @@ class RealEpisodicMemory:
             cursor.execute("""
                 UPDATE episodic_memories
                 SET end_timestamp = ?, status = 'closed'
-                WHERE episode_id = ?
+                WHERE episode_id = ? AND status = 'open'
             """, (time.time(), episode_id))
+            episode_closed = cursor.rowcount == 1
             self.conn.commit()
 
-            self.episodes_closed += 1
-            if episode_id == self.current_episode_id:
+            if episode_closed:
+                self.episodes_closed += 1
+            if episode_closed and episode_id == self.current_episode_id:
                 self.current_episode_id = None
 
     def link_memory_to_episode(self, episode_id: str, memory_id: int, 

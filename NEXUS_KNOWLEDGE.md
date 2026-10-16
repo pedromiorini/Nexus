@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 117
+tests: 121
 bandit_low: 131
 -->
 
@@ -23,16 +23,23 @@ Para o estado atual, usar esta ordem:
 
 Conflitos não devem ser resolvidos silenciosamente.
 
-## Estado verificado em 2026-10-05
+## Estado histórico verificado em 2026-10-05
 
 - Branch: `main`.
 - Commit local/remoto: `HEAD` — o SHA exato é resolvido pelo manifesto do CI desta execução.
 - CI do mesmo commit: o run associado ao manifesto, com sucesso; o artefato `nexus-state-manifest` foi gerado após os gates.
-- Suíte atual: **117 testes**, todos passando no gate.
+- Suíte daquela referência: **117 testes**, todos passando no gate.
 - Mutation testing direcionado: **10/10 mutações mortas**.
 - Bandit após o hardening do B607: **131 achados LOW**, sem MEDIUM; a triagem classifica 16 B311, 111 B101 e 4 subprocessos controlados, sem `manual_review` residual.
 - Auditoria AST: 0 funções somente com `pass`, 0 `NotImplementedError`, 61 retornos constantes simples.
 - Os números de 105 testes/run `37258732531` e 86 testes/run `37097334156` permanecem apenas como histórico de marcos anteriores.
+
+## Validação local em 2026-10-16
+
+- A suíte integral executada nesta continuidade passou com **121 testes**.
+- O Bandit encontrou **131 achados LOW**, sem MEDIUM/HIGH.
+- `RealEpisodicMemory.close_episode` incrementa `episodes_closed` somente quando o SQLite confirma a transição de um episódio aberto para fechado; repetição e ID inexistente não incrementam.
+- Esses resultados são locais; o estado oficial do commit é determinado pelo manifesto de CI associado ao `HEAD`.
 
 ## Componentes
 
