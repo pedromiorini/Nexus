@@ -33,6 +33,8 @@ LOG = ("test_immutable_log_contract.py",)
 JB = ("test_jailbreak_detector_contract.py",)
 TIMEOUT = ("test_tool_definition_contract.py",)
 TOOL_PARAMS = ("test_tool_parameter_contract.py",)
+JSON_FORMAT = ("test_format_json_contract.py",)
+TOOL_CACHE_KEY = ("test_tool_cache_key_contract.py",)
 COPY_IGNORE = shutil.ignore_patterns(
     ".git", "__pycache__", ".venv", "venv", ".hypothesis", ".ruff_cache", ".mypy_cache",
     "*.sqlite3", "*.db", ".coverage*", "coverage.xml", "targeted_mutation_report.json",
@@ -89,6 +91,27 @@ MUTATIONS = [
         'if not isinstance(params, dict):\n            self.log.log_event("TOOL_PARAM_TYPE_MISMATCH", {',
         'if False:\n            self.log.log_event("TOOL_PARAM_TYPE_MISMATCH", {',
         tests=TOOL_PARAMS,
+    ),
+    Mutation(
+        "format_json_rejects_non_finite_values",
+        "core/constitutional_brain.py",
+        "return json.dumps(data, indent=2, sort_keys=True, allow_nan=False)",
+        "return json.dumps(data, indent=2, sort_keys=True, allow_nan=True)",
+        tests=JSON_FORMAT,
+    ),
+    Mutation(
+        "tool_cache_key_failure_bypasses_cache",
+        "core/constitutional_brain.py",
+        "except (TypeError, ValueError, OverflowError, RecursionError) as exc:\n                cache_key = None",
+        "except (TypeError, ValueError, OverflowError, RecursionError) as exc:\n                cache_key = self._make_cache_key(tool_name, params)",
+        tests=TOOL_CACHE_KEY,
+    ),
+    Mutation(
+        "non_cacheable_tool_skips_key_serialization",
+        "core/constitutional_brain.py",
+        "if tool.cacheable:\n            try:\n                cache_key = self._make_cache_key(tool_name, params)",
+        "if True:\n            try:\n                cache_key = self._make_cache_key(tool_name, params)",
+        tests=TOOL_CACHE_KEY,
     ),
 ]
 

@@ -4069,7 +4069,7 @@ class RealToolUse:
         """Formatar JSON"""
         import json
         data = params.get("data", {})
-        return json.dumps(data, indent=2, sort_keys=True)
+        return json.dumps(data, indent=2, sort_keys=True, allow_nan=False)
 
     def _execute_list_operations(self, params: Dict[str, Any]) -> Any:
         """Operações em listas"""
@@ -4149,8 +4149,18 @@ class RealToolUse:
                 )
         # 3. Verificar cache; entradas expiradas são removidas antes de novo acesso.
         self._prune_result_cache(time.time())
-        cache_key = self._make_cache_key(tool_name, params)
+        cache_key = None
         if tool.cacheable:
+            try:
+                cache_key = self._make_cache_key(tool_name, params)
+            except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+                cache_key = None
+                self.log.log_event("TOOL_CACHE_KEY_UNAVAILABLE", {
+                    "tool": tool_name,
+                    "reason": type(exc).__name__,
+                    "cache_bypassed": True,
+                })
+        if tool.cacheable and cache_key is not None:
             with self._result_cache_lock:
                 cached_result = self.result_cache.get(cache_key)
                 if cached_result is not None:
@@ -4215,7 +4225,8 @@ class RealToolUse:
             )
 
             # Cachear apenas resultados pequenos e respeitando limites globais.
-            self._store_cached_result(cache_key, execution_result, tool)
+            if cache_key is not None:
+                self._store_cached_result(cache_key, execution_result, tool)
 
             # Atualizar estatísticas
             self.successful_executions += 1

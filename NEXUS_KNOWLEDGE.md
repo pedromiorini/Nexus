@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 249
+tests: 254
 bandit_low: 131
 -->
 
@@ -128,3 +128,13 @@ O manifesto distingue `discovered_static` (inventário AST) de `executed`, `pass
 - Três testes independentes cobrem `None`/lista/string, dicionário sem parâmetros obrigatórios e execução normal com dicionário válido. Um mutante que remove a guarda é morto pelo mutation gate.
 - Validação local em Python 3.12.3: 249/249 testes; suíte integrada 30 aprovados e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 34/34 mortas, sem sobreviventes/não aplicadas; Ruff, actionlint, zizmor, compileall, auditorias AST e consistência documental passaram. Bandit: 131 LOW, nenhum MEDIUM/HIGH.
 - Limite: a alteração valida apenas o tipo externo; não restringe subclasses de `dict`, valores aninhados nem chaves extras. Os resultados são locais; a CI do head candidato permanece a referência oficial.
+
+## JSON estrito e resiliência da chave de cache — 2026-10-16
+
+- Base local: `main` pós-PR #26, commit `508020d77d5705f99c76eaca4df05e8e265662f7`; branch isolada `feat/post-pr26-tool-input-boundary-2026-10-16`.
+- Reproduções antes da correção: `format_json` retornava sucesso contendo `NaN`, `Infinity` ou `-Infinity`; a geração de cache key levantava `TypeError` fora do `try` do executor quando `params` incluía um valor Python não serializável, inclusive uma extensão extra ignorada pelo schema. Ferramentas marcadas como não cacheáveis também tentavam gerar chave.
+- Correção: `format_json` passa `allow_nan=False`, convertendo valores não finitos em falha estruturada. Para ferramentas cacheáveis, erros esperados de serialização (`TypeError`, `ValueError`, `OverflowError`, `RecursionError`) emitem `TOOL_CACHE_KEY_UNAVAILABLE` e ignoram lookup/store sem impedir a execução normal; ferramentas não cacheáveis não geram chave. Chaves extras ainda ignoradas permanecem compatíveis.
+- Contratos: `test_format_json_contract.py` verifica valores finitos, rejeição de `NaN`/infinitos e falha estruturada para dados não serializáveis. `test_tool_cache_key_contract.py` prova que a extensão não serializável não bloqueia um executor válido, não é cacheada e é reexecutada; também protege a ausência de serialização para ferramentas não cacheáveis.
+- Validação local: 254/254 testes; suíte integrada 30 aprovados e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 37/37 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW e nenhum MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST e benchmarks de capacidade e POMDP v2 passaram.
+- Base normativa: [documentação Python 3.12 do módulo `json`](https://docs.python.org/3.12/library/json.html) e [RFC 8259, §6](https://www.rfc-editor.org/rfc/rfc8259) determinam que NaN/Infinity não são números JSON válidos; `allow_nan=False` produz `ValueError` em modo estrito.
+- Limites: não há validação recursiva de schema nem rejeição de chaves desconhecidas; o bypass não limita o custo de serializar entradas grandes que são serializáveis, nem transforma o orçamento estimado do cache em limite de memória global. Os resultados são locais, não CI oficial.

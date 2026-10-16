@@ -11,7 +11,7 @@
 - Migrar incrementalmente asserts do bloco demonstrativo para contratos independentes.
 - Manter auditoria AST impedindo novos asserts fora do bloco permitido.
 - Fazer revisão manual de entradas externas, subprocessos e fronteiras SQLite.
-- `RealToolUse.execute_tool` exige um `dict` na fronteira externa antes de percorrer o schema e retorna falha estruturada para tipos inválidos; validação profunda de valores e chaves desconhecidas permanece fora deste patch.
+- `RealToolUse.execute_tool` exige um `dict` na fronteira externa; `format_json` usa serialização estrita (`allow_nan=False`) e converte `NaN`/`±Infinity` em falha estruturada. Falhas esperadas ao gerar uma chave de cache em parâmetros não serializáveis geram `TOOL_CACHE_KEY_UNAVAILABLE`, ignoram leitura/armazenamento no cache e continuam no executor; ferramentas não cacheáveis não serializam os parâmetros. Validação recursiva do schema e rejeição de chaves desconhecidas permanecem fora deste patch.
 - Revisar budgets de ferramentas: `math_calculate` limita tamanho/complexidade e resultados numéricos; cache expurga TTL, limita entradas/payload e isola resultados mutáveis. `ToolDefinition.timeout_seconds` rejeita valores que não sejam inteiros em `[1, 60]` e registra `TOOL_EXECUTION_OVERRUN` quando o executor síncrono termina acima do budget, por retorno ou exceção. O diagnóstico não interrompe o trabalho; cancelamento genérico segue como lacuna arquitetural explícita.
 
 ## Prioridade 2 — reduzir risco do núcleo monolítico
