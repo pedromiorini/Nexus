@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 257
+tests: 258
 bandit_low: 131
 -->
 
@@ -89,11 +89,13 @@ Antes da correção, a chamada `execute_tool("list_operations", None)` reproduzi
 
 A guarda inicial agora exige `isinstance(params, dict)` e registra `TOOL_PARAM_TYPE_MISMATCH` (`parameter=params`, `expected=dict`, `actual=<tipo>`), fazendo a chamada retornar `success=false`, `error="Parameter validation failed"` e sem invocar o executor. Três novos testes verificam tipos externos inválidos, dicionário incompleto e dicionário válido; um mutante que desativa a guarda é detectado.
 
-Validação local Python 3.12.3: 249/249 testes; integração 30 aprovações/1 skip FAISS; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 34/34 mortas, nenhum sobrevivente/não aplicado; Ruff, actionlint, zizmor, compileall, auditorias AST, capability benchmark e POMDP v2 passaram; Bandit 131 LOW, nenhum MEDIUM/HIGH. Os dados permanecem locais até validação oficial do head pela CI.
+Validação local Python 3.12.3: 249/249 testes; integração 30 aprovações/1 skip FAISS; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 34/34 mortas, nenhum sobrevivente/não aplicado; Ruff, actionlint, zizmor, compileall, auditorias AST, capability benchmark e POMDP v2 passaram; Bandit 131 LOW, nenhum MEDIUM/HIGH. Os dois checks oficiais da PR #26 passaram antes do merge em `main` no commit `508020d77d5705f99c76eaca4df05e8e265662f7`.
 
 ## JSON estrito e falha da chave de cache — 2026-10-16
 
 Base local: `main` pós-PR #26, commit `508020d77d5705f99c76eaca4df05e8e265662f7`; branch `feat/post-pr26-tool-input-boundary-2026-10-16`.
+
+Estado posterior: a alteração foi publicada como PR #27; os dois checks oficiais passaram e foi mesclada em `main` no commit `c4375d9f42703b11d2632b3a701303c5a69563a4`.
 
 Antes da alteração, `format_json` retornava sucesso com texto contendo `NaN`, `Infinity` e `-Infinity`, pois a serialização Python usava o valor padrão permissivo de `allow_nan`. Também reproduzi `TypeError: Object of type object is not JSON serializable` escapando de `execute_tool` ao serializar a chave do cache antes do `try` do executor. O exemplo usou parâmetros válidos de `list_operations` e uma extensão extra ignorada pelo schema; uma ferramenta marcada como não cacheável também tentava construir uma chave.
 
@@ -101,7 +103,7 @@ O formatador agora define `allow_nan=False`; os valores não finitos se tornam f
 
 Os contratos `test_format_json_contract.py` e `test_tool_cache_key_contract.py` passaram após reproduzirem as falhas antes do patch. O gate direcionado adicionou um mutante para desfazer `allow_nan=False` e dois mutantes para remover o bypass/serialização condicional.
 
-Validação local em Python 3.12: 254/254 testes; suíte integrada 30 aprovados, 1 skip FAISS opcional e 0 falhas; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation testing 37/37 mortas, 0 sobreviventes ou não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST e CLIs dos benchmarks de capacidade e POMDP v2 passaram. Relatórios de realidade foram regenerados. Esta evidência é local e não substitui os checks oficiais da PR.
+Validação local em Python 3.12: 254/254 testes; suíte integrada 30 aprovados, 1 skip FAISS opcional e 0 falhas; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation testing 37/37 mortas, 0 sobreviventes ou não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST e CLIs dos benchmarks de capacidade e POMDP v2 passaram. Relatórios de realidade foram regenerados. Os dois checks oficiais da PR #27 passaram antes do merge registrado acima.
 
 Fundamento: a [documentação Python 3.12 de `json`](https://docs.python.org/3.12/library/json.html) descreve o padrão permissivo e o efeito estrito de `allow_nan=False`; a [RFC 8259, seção 6](https://www.rfc-editor.org/rfc/rfc8259) não permite Infinity/NaN na gramática numérica JSON. Não houve normalização silenciosa para strings ou `null`.
 
@@ -111,6 +113,7 @@ Limites: não foi introduzida validação recursiva de schema nem rejeição de 
 ## Orçamento de recursos da cache key — 2026-10-16
 
 Base local: `main` pós-PR #27, merge commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; branch `feat/post-pr27-cache-key-resource-bounds-2026-10-16`.
+Estado posterior: a branch foi publicada como PR #28, recebeu aprovação dos dois checks oficiais e foi mesclada em `main` no commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`.
 
 A chave era construída por `json.dumps(params, sort_keys=True)` antes do executor, sem limite de bytes ou profundidade; os budgets existentes só cobriam resultados retidos no cache. A alteração adiciona percurso iterativo prévio com limite conservador de 64 KiB incluindo prefixo, profundidade 64, 4.096 nós/ocorrências e 1.024 itens por contêiner, além de detecção de ciclos. O percurso contabiliza expansão de escapes e tamanho de inteiros sem serializar o objeto completo.
 
@@ -118,4 +121,17 @@ Testes com orçamento excedido (bytes, profundidade, cardinalidade total, itens 
 
 Resultados locais medidos: unittest 257 executados/aprovados, 0 falhas/skips/XPASS; suíte integrada 30 aprovados e 1 skip FAISS opcional; cobertura 95% fila, 94% guard VRAM, 76% Vita, 68% núcleo; mutation 42/42 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH. Ruff, actionlint, zizmor, compileall, auditoria de realidade, auditorias AST e CLIs dos benchmarks de capacidade e POMDP v2 na seed `20261016` passaram. A fonte normativa consultada foi https://docs.python.org/3.12/library/json.html.
 
-Limitação: execução fora do cache continua sujeita ao comportamento e custo do executor; a mudança limita somente a pré-verificação/serialização para cache. Os resultados são locais, não substituem os checks oficiais da PR.
+Limitação: execução fora do cache continua sujeita ao comportamento e custo do executor; a mudança limita somente a pré-verificação/serialização para cache. As métricas acima são locais; os checks oficiais da PR #28 passaram antes do merge.
+
+
+## Falha de cópia durante armazenamento de cache — 2026-10-16
+
+Base: `main` pós-PR #28, merge commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`; branch `feat/post-pr28-cache-store-fallback-2026-10-16`.
+
+Reprodução pré-patch: um executor built-in foi substituído por retorno de listas aninhadas com profundidade 600. `_estimate_cache_value_size` mediu 38.445 bytes, abaixo de `MAX_CACHE_ENTRY_BYTES`; a cópia subsequente com `copy.deepcopy` lançou `RecursionError`. Observado: `execute_tool` devolvia `success=False`, erro `maximum recursion depth exceeded` e nenhum payload, embora o executor já tivesse retornado com sucesso.
+
+Após o patch, o mesmo cenário devolve o objeto e sucesso originais, registra `TOOL_CACHE_STORE_UNAVAILABLE` com `reason=RecursionError` e `cache_bypassed=true`, mantém uma contagem de sucesso, não incrementa falhas e deixa o cache vazio. `test_tool_cache_store_contract.py` protege deterministicamente esse contrato por injeção da exceção. Um mutante que restaura a propagação da exceção é morto.
+
+Resultados locais medidos: unittest 258/258; suíte integrada 30 aprovados, 1 skip opcional FAISS; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation 43/43 mortas, 0 sobreviventes e 0 não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade, auditorias AST e benchmarks de capacidade/POMDP v2 na seed `20261016` passaram.
+
+Limite: a captura é específica à cópia profunda antes do armazenamento; não contém exceções arbitrárias do executor, não muda sua saída e não oferece garantia de limite global de memória. Checks de CI desta branch ainda devem ser consultados na PR.
