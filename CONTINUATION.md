@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 240
+tests: 246
 bandit_low: 131
 -->
 
@@ -11,13 +11,13 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta rodada:** `main` pós-PR #23, commit `e3cc760597aa1782aef9879a8f88ee6f48032348`; branch `feat/pomdp-belief-filter-v2-post-pr23-2026-10-16`.
-- **Estado da revisão:** alterações não mescladas; qualquer merge continua dependendo de aprovação específica para esta PR. O estado oficial depende dos checks do head.
-- **Contrato POMDP:** `RealPredictiveCodingSystem.update_belief_state` calcula uma atualização Bayesiana pura com entradas explícitas; valida dimensões e probabilidades, aceita até 128 estados, usa log-sum-exp e rejeita evidência nula.
-- **Benchmark v2 local:** 128 casos com 2–8 estados; erro médio absoluto `3.001891167837976e-17`, máximo `2.7755575615628914e-16`, 128/128 dentro da tolerância e 4/4 controles inválidos rejeitados. A seed CI `20261016` é testada diretamente; se algum caso exceder `1e-12` ou algum controle passar, a CLI falha e o relatório é preservado. A trilha de observação parcial do v1 continua `unsupported_interface`; o protocolo v1 não foi alterado.
-- **Validação local (não CI):** 240/240 testes; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation 28/28 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall e auditorias AST passaram. A execução oficial ainda será determinada pelos checks da revisão.
-- **Limites:** o filtro recebe prior, transições e likelihoods prontos; não aprende modelo, descobre estados, resolve política ou demonstra inferência em ambiente real. `timeout_seconds` herdado ainda não cancela executores genéricos; o cache usa budget de payload estimado, não de memória global.
-- **Hardening herdado:** a PR #23 foi mesclada em `main`, incluindo limites explícitos para `math_calculate` e cache bounded com isolamento de aliases.
+- **Base desta rodada:** `main` pós-PR #24, commit `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`; branch isolada `feat/post-pr24-contract-hardening-2026-10-16`.
+- **Estado da revisão:** melhoria local ainda não mesclada; qualquer merge exige autorização específica do usuário. A CI oficial deve validar o head candidato.
+- **Mudança:** `ToolDefinition.timeout_seconds` agora exige inteiro não booleano em `[1, 60]` no registro e antes da execução; executores síncronos usam `time.monotonic()` para emitir `TOOL_EXECUTION_OVERRUN` ao terminar além do orçamento, por retorno ou exceção, sem alegar cancelamento.
+- **Validação local (não CI):** 246/246 testes; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 33/33 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall e auditorias AST passaram.
+- **Limite do timeout:** não há deadline rígida nem interrupção segura dos executores genéricos. `Future.cancel()` não cancela trabalho já em execução; `Process.terminate()` pode corromper IPC ou quebrar locks. Um runner isolado ou API cooperativa é uma lacuna arquitetural futura. O cache ainda limita payload estimado, não a memória global.
+- **POMDP herdado:** a PR #24 foi mesclada com ambos os checks oficiais aprovados; o filtro de um passo recebe modelo explícito, sem alegar aprendizagem ou planejamento. O protocolo v1 continua inalterado e mantém `unsupported_interface` para observação parcial.
+- **Hardening herdado:** as PRs #23 e #24 foram mescladas em `main`; a PR #23 limitou `math_calculate` e isolou aliases de cache.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
 

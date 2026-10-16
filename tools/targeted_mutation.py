@@ -30,6 +30,7 @@ DEFAULT_TESTS = (
 VRAM = ("test_vram_defense_guard.py",)
 LOG = ("test_immutable_log_contract.py",)
 JB = ("test_jailbreak_detector_contract.py",)
+TIMEOUT = ("test_tool_definition_contract.py",)
 COPY_IGNORE = shutil.ignore_patterns(
     ".git", "__pycache__", ".venv", "venv", ".hypothesis", ".ruff_cache", ".mypy_cache",
     "*.sqlite3", "*.db", ".coverage*", "coverage.xml", "targeted_mutation_report.json",
@@ -75,6 +76,11 @@ MUTATIONS = [
     Mutation('jailbreak_squash_view', 'core/constitutional_brain.py', 'squash = re.sub(r"[^a-z0-9]+", "", deleet)', 'squash = ""', tests=JB),
     Mutation('jailbreak_strong_weight', 'core/constitutional_brain.py', '("override_en_qualified", D, 1.0,', '("override_en_qualified", D, 0.1,', tests=JB),
     Mutation('jailbreak_detection_counter', 'core/constitutional_brain.py', 'self.detections_count += 1', 'self.detections_count += 2', tests=JB),
+    Mutation('tool_timeout_minimum_boundary', 'core/constitutional_brain.py', 'not 1 <= timeout <= 60', 'not 0 <= timeout <= 60', tests=TIMEOUT),
+    Mutation('tool_timeout_maximum_boundary', 'core/constitutional_brain.py', 'not 1 <= timeout <= 60', 'not 1 <= timeout <= 61', tests=TIMEOUT),
+    Mutation('tool_timeout_reject_boolean', 'core/constitutional_brain.py', 'isinstance(timeout, bool)', 'False', tests=TIMEOUT),
+    Mutation('tool_timeout_reject_non_integer', 'core/constitutional_brain.py', 'not isinstance(timeout, int)', 'False', tests=TIMEOUT),
+    Mutation('tool_overrun_does_not_claim_cancellation', 'core/constitutional_brain.py', '"cancelled": False', '"cancelled": True', tests=TIMEOUT),
 ]
 
 

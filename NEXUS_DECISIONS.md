@@ -124,3 +124,13 @@
 - **Evidência:** `test_pomdp_belief_filter_contract.py`, `test_pomdp_benchmark_v2.py` (inclui seed `20261016` e teste de falha injetada), `benchmarks/nexus_pomdp_benchmark_v2.py` e o artefato v2 do workflow. A CLI falha se qualquer posterior ultrapassar `1e-12` ou algum controle inválido for aceito.
 - **Limitação:** o filtro não aprende o prior, a matriz de transição ou o modelo de observação; não resolve políticas nem demonstra inferência em ambiente real. A lacuna da interface de observação parcial do v1 permanece.
 - **Reversibilidade:** fácil; protocolo e schema v2 são independentes do benchmark v1.
+
+## D-016 — Budget de timeout é validado e observado, não apresentado como cancelamento
+
+- **Decisão:** `ToolDefinition.timeout_seconds` aceita somente inteiros não booleanos em `[1, 60]`, com validação no registro e imediatamente antes da execução. A duração do executor síncrono é medida com `time.monotonic()`; se ele termina acima do budget, por retorno ou exceção, emite `TOOL_EXECUTION_OVERRUN`. O resultado de sucesso é preservado, uma exceção continua sendo falha e o evento marca `execution_completed=true` e `cancelled=false`.
+- **Contexto:** a validação anterior rejeitava apenas valores acima de 60; zero, negativos, booleanos, floats e `NaN` eram aceitos, enquanto string podia lançar `TypeError`. O campo não interrompia a execução.
+- **Motivo:** fechar a validação dos limites e observar violações sem sugerir que um timeout de espera cancela trabalho já iniciado nem descartar um resultado concluído.
+- **Evidência:** seis testes em `test_tool_definition_contract.py` cobrem valores inválidos, limites inclusivos, alteração pós-registro, execução dentro do orçamento e overrun após sucesso ou exceção; `tools/targeted_mutation.py` mata cinco mutantes desse contrato.
+- **Base técnica:** `Future.cancel()` falha em cancelar uma chamada já em execução; `Process.terminate()` pode corromper pipes/queues ou deixar locks indisponíveis ([`concurrent.futures`, Python 3.12](https://docs.python.org/3.12/library/concurrent.futures.html), [`multiprocessing`, Python 3.12](https://docs.python.org/3.12/library/multiprocessing.html)).
+- **Limitação:** o evento é pós-execução, não uma deadline nem isolamento. Interrupção segura exige um contrato cooperativo ou runner/processo isolado sem recursos compartilhados perigosos.
+- **Reversibilidade:** fácil; não altera os protocolos dos benchmarks nem o resultado dos executores built-in.

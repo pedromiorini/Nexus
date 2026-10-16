@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 240
+tests: 246
 bandit_low: 131
 -->
 
@@ -67,7 +67,7 @@ Conflitos não devem ser resolvidos silenciosamente.
 - Achado reproduzido antes da correção: `math_calculate` aceitava literais string e repetição, podia devolver/cachear um milhão de caracteres, aceitava potências grandes e mantinha entradas expiradas.
 - Mitigação implementada: expressões numéricas somente, até 256 caracteres/64 nós AST, limites de expoente/inteiro/magnitude, TTL expurgado e cache limitado a 128 entradas, 1 MiB agregado estimado e 64 KiB por payload. O cache guarda uma cópia profunda e devolve cópias nos hits.
 - Validação local: 222/222 testes, 31 marcadores integrados (30 aprovados, 1 skip FAISS opcional), cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; 28/28 mutações direcionadas mortas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor e compileall passaram.
-- Estes resultados são locais e ainda não são CI do head da PR. `timeout_seconds` segue sem execução/cancelamento genérico; o limite de bytes do cache usa `sys.getsizeof` e não é um limite global de memória do processo.
+- Estes resultados são locais e não eram CI do head da PR naquela rodada. `timeout_seconds` ainda não interrompia executores; o limite de bytes do cache usa `sys.getsizeof` e não é um limite global de memória do processo. A validação do campo e a telemetria advisory de overrun foram adicionadas na seção subsequente.
 
 ## Filtro de crença POMDP e benchmark v2 — 2026-10-16
 
@@ -76,7 +76,16 @@ Conflitos não devem ser resolvidos silenciosamente.
 - Protocolo separado `nexus.pomdp-belief-benchmark.v2`: 128 modelos determinísticos de 2–8 estados e 635 probabilidades comparadas com uma referência independente; erro absoluto médio `3.001891167837976e-17`, máximo `2.7755575615628914e-16`, 128/128 dentro de `1e-12`; 4/4 controles inválidos rejeitados. Taskset SHA-256: `232371d0e8e948f4b0a004261e3d271b1003aed8d0de8c931d3439f9d370d025`.
 - Validação local: 240/240 testes, sem falhas/skips/XPASS; suíte integrada 30 aprovadas e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation 28/28 mortas, 0 sobreviventes/não aplicadas; Ruff, compileall, actionlint, zizmor, Bandit (131 LOW, nenhum MEDIUM/HIGH) e auditorias AST passaram.
 - O gate verifica a seed do workflow (`20261016`) e a CLI retorna código 1 se qualquer caso exceder `1e-12` ou um controle inválido for aceito; o relatório da falha é preservado pelo workflow quando gerado.
-- O protocolo v1 permaneceu inalterado: a trilha de observação parcial continua `unsupported_interface`. O v2 recebe o modelo completo e não mede aprendizagem, descoberta de estados ou planejamento; CI oficial do novo head ainda precisa confirmar os resultados locais.
+- O protocolo v1 permaneceu inalterado: a trilha de observação parcial continua `unsupported_interface`. O v2 recebe o modelo completo e não mede aprendizagem, descoberta de estados ou planejamento. A PR #24 foi mesclada em `main` no commit `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`, com ambos os checks oficiais aprovados.
+
+## Validação do budget de ferramentas — 2026-10-16
+
+- Base local: `main` pós-PR #24, commit `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`; branch isolada `feat/post-pr24-contract-hardening-2026-10-16`.
+- Falha reproduzida: o registro aceitava `timeout_seconds` igual a zero, negativo, booleano, float ou `NaN`; valor string causava `TypeError`. A definição também podia ser mutada após o registro.
+- Correção: validação exige inteiro não booleano no intervalo inclusivo `[1, 60]`, tanto ao registrar quanto antes de cada execução. `time.monotonic()` mede somente o executor; `TOOL_EXECUTION_OVERRUN` é emitido quando ele termina, por retorno ou exceção. Resultados bem-sucedidos são preservados; falhas continuam falhas estruturadas; o evento informa `execution_completed=true` e `cancelled=false`.
+- Validação local em Python 3.12.3: 246/246 testes; suíte integrada 30 aprovados e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 33/33 mortas, 0 sobreviventes/não aplicadas; Ruff, actionlint, zizmor, compileall e auditorias AST passaram. Bandit: 131 LOW, nenhum MEDIUM/HIGH.
+- Limite deliberado: isso é diagnóstico pós-execução, não deadline nem cancelamento. `Future.cancel()` não cancela uma chamada já em execução; `Process.terminate()` pode corromper pipes/queues ou deixar locks indisponíveis ([documentação oficial de `concurrent.futures`](https://docs.python.org/3.12/library/concurrent.futures.html), [documentação oficial de `multiprocessing`](https://docs.python.org/3.12/library/multiprocessing.html)). Um executor isolado ou API cooperativa continua necessário para interrupção segura.
+- Estes resultados são locais; o CI do head candidato permanece a referência oficial.
 
 ## Componentes
 
