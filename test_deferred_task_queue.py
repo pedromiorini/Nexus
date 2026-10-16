@@ -201,12 +201,12 @@ class DeferredTaskQueueTests(unittest.TestCase):
         router.vita_bridge = NexusConstitutionalBridge(":memory:")
         observed = []
 
-        def route(prompt, context):
-            observed.append((prompt, context))
+        def route(prompt, context, *, _deferred_reprocess=False):
+            observed.append((prompt, context, _deferred_reprocess))
             context["nested"]["value"] = 2
             return {"success": True}
 
-        router.route = route
+        router._route = route
         task = router.deferred_queue.enqueue(
             "recover", {"trace_id": "t-1", "nested": {"value": 1}}
         )
@@ -219,7 +219,8 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(observed[0][0], "recover")
         self.assertEqual(observed[0][1]["trace_id"], "t-1")
         self.assertEqual(task.context["nested"]["value"], 1)
-        self.assertTrue(observed[0][1]["_deferred_reprocess"])
+        self.assertTrue(observed[0][2])
+        self.assertNotIn("_deferred_reprocess", observed[0][1])
         self.assertEqual(router.stats["deferred_reprocessing"]["attempts"], 1)
         self.assertEqual(router.stats["deferred_reprocessing"]["completed"], 1)
         self.assertEqual(len(callbacks), 1)
@@ -325,7 +326,10 @@ class DeferredTaskQueueTests(unittest.TestCase):
             "evaluate": lambda self: type("Decision", (), {"action": "normal"})()
         })()
         router.vita_bridge = NexusConstitutionalBridge(":memory:")
-        router.route = lambda prompt, context: {"success": True}
+        def successful_route(prompt, context, *, _deferred_reprocess=False):
+            return {"success": True}
+
+        router._route = successful_route
         router.deferred_queue.enqueue("one")
         router.deferred_queue.enqueue("two")
         result = router.reprocess_deferred_tasks(max_batch=2)

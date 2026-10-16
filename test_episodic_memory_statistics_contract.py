@@ -67,6 +67,48 @@ class EpisodicMemoryStatisticsContractTests(unittest.TestCase):
         self.assertEqual(memory.get_statistics()["total_links"], 0)
         memory.close()
 
+    def test_unknown_memory_link_is_rejected_when_provider_is_configured(self):
+        class MissingMemoryStore:
+            def get_memory_by_id(self, _memory_id):
+                return None
+
+        memory = RealEpisodicMemory(hierarchical_memory=MissingMemoryStore())
+        episode_id = memory.start_episode("episode")
+
+        with self.assertRaisesRegex(ValueError, "memory_id"):
+            memory.link_memory_to_episode(episode_id, 987654)
+
+        self.assertEqual(memory.get_statistics()["total_links"], 0)
+        memory.close()
+
+    def test_memory_link_is_recalled_from_falsey_provider(self):
+        class MemoryEntry:
+            id = 101
+            content = "linked memory"
+            importance = 0.8
+
+        class FalseyMemoryStore:
+            def __bool__(self):
+                return False
+
+            def get_memory_by_id(self, memory_id):
+                return MemoryEntry() if memory_id == 101 else None
+
+        memory = RealEpisodicMemory(hierarchical_memory=FalseyMemoryStore())
+        episode_id = memory.start_episode("episode")
+        memory.link_memory_to_episode(episode_id, 101, relevance_score=0.75)
+
+        self.assertEqual(
+            memory.get_episode_memories(episode_id),
+            [{
+                "id": 101,
+                "content": "linked memory",
+                "importance": 0.8,
+                "relevance_to_episode": 0.75,
+            }],
+        )
+        memory.close()
+
 
 if __name__ == "__main__":
     unittest.main()
