@@ -297,8 +297,13 @@ class DeferredTaskQueue:
                 raise ValueError("created_at inválido no snapshot")
             if not isinstance(raw["attempts"], int) or isinstance(raw["attempts"], bool) or raw["attempts"] < 0:
                 raise ValueError("attempts inválido no snapshot")
-            if type(raw["max_attempts"]) is not int or raw["max_attempts"] < 1 or raw["attempts"] > raw["max_attempts"]:
-                raise ValueError("max_attempts inválido no snapshot")
+            if (
+                type(raw["max_attempts"]) is not int
+                or raw["max_attempts"] < 1
+                or raw["max_attempts"] != self.max_attempts
+                or raw["attempts"] > raw["max_attempts"]
+            ):
+                raise ValueError("max_attempts inválido ou incompatível com a fila no snapshot")
             if not isinstance(raw["last_reason"], str):
                 raise ValueError("last_reason inválido no snapshot")
             try:

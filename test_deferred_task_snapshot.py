@@ -32,6 +32,23 @@ class DeferredTaskSnapshotTests(unittest.TestCase):
         self.assertEqual(queue.statistics(), before)
         self.assertEqual(queue.recheck_and_pop(False).task_id, existing.task_id)
 
+    def test_snapshot_cannot_raise_task_attempt_limit_and_rejects_atomically(self):
+        source = DeferredTaskQueue(max_attempts=1, max_size=2)
+        source.enqueue("imported")
+        payload = source.export_snapshot()
+        payload["tasks"][0]["max_attempts"] = 3
+
+        target = DeferredTaskQueue(max_attempts=1, max_size=2)
+        existing = target.enqueue("keep")
+        before = target.statistics().copy()
+
+        with self.assertRaises(ValueError):
+            target.restore_snapshot(payload, replace=True)
+
+        self.assertEqual(target.statistics(), before)
+        self.assertEqual(target._tasks[existing.task_id].prompt, "keep")
+        self.assertEqual(target.statistics()["depth"], 1)
+
     def test_schema_duplicate_and_capacity_are_rejected(self):
         queue = DeferredTaskQueue(max_attempts=2, max_size=2)
         payload = queue.export_snapshot()
