@@ -2201,14 +2201,25 @@ class RealEpisodicMemory:
             if episode_closed and episode_id == self.current_episode_id:
                 self.current_episode_id = None
 
-    def link_memory_to_episode(self, episode_id: str, memory_id: int, 
+    def link_memory_to_episode(self, episode_id: str, memory_id: int,
                                relevance_score: float = 1.0):
-        """Vincular memória a episódio"""
+        """Link memory to an episode and validate it when a resolver is configured."""
         with self.db_lock:
             cursor = self.conn.cursor()
             cursor.execute("SELECT 1 FROM episodic_memories WHERE episode_id = ?", (episode_id,))
             if cursor.fetchone() is None:
                 raise ValueError("episode_id does not exist")
+
+        memory_store = self.hierarchical_memory
+        if memory_store is not None:
+            get_memory = getattr(memory_store, "get_memory_by_id", None)
+            if not callable(get_memory):
+                raise ValueError("hierarchical_memory cannot resolve memory_id")
+            if get_memory(memory_id) is None:
+                raise ValueError("memory_id does not exist in hierarchical_memory")
+
+        with self.db_lock:
+            cursor = self.conn.cursor()
             cursor.execute("""
                 INSERT OR REPLACE INTO episodic_memory_links
                 (episode_id, memory_id, relevance_score)
@@ -2244,7 +2255,7 @@ class RealEpisodicMemory:
 
     def get_episode_memories(self, episode_id: str) -> List[Dict]:
         """Obter memórias de um episódio"""
-        if not self.hierarchical_memory:
+        if self.hierarchical_memory is None:
             return []
 
         with self.db_lock:
@@ -12882,6 +12893,16 @@ class CentralRouter:
         )
 
     def route(self, prompt: str, context: Optional[Dict] = None) -> Dict:
+        """Route an external request without exposing internal reprocessing controls."""
+        return self._route(prompt, context)
+
+    def _route(
+        self,
+        prompt: str,
+        context: Optional[Dict] = None,
+        *,
+        _deferred_reprocess: bool = False,
+    ) -> Dict:
         """
         MÉTODO PRINCIPAL: Rotear requisição através do sistema.
         
@@ -12904,6 +12925,7 @@ class CentralRouter:
                 context = copy.deepcopy(context)
             except Exception as exc:
                 raise ValueError("context must be deep-copyable") from exc
+            context.pop("_deferred_reprocess", None)
         # DEBUG v3.70: Log entry
         _dbg("🔍 DEBUG v3.70: Router.route() CALLED")
         _dbg(f"🔍 DEBUG v3.70: prompt = '{prompt[:50]}...'")
@@ -12920,7 +12942,7 @@ class CentralRouter:
         if vram_decision.action == "emergency_release":
             deferred_context = context or {}
             task = None
-            if not deferred_context.get("_deferred_reprocess"):
+            if not _deferred_reprocess:
                 priority = int(deferred_context.get("priority", 0))
                 task = self.deferred_queue.enqueue(prompt, context, priority=priority, reason=vram_decision.reason)
             recheck = self.vram_guard.evaluate()
@@ -13105,9 +13127,10 @@ class CentralRouter:
             metrics["attempts"] += 1
             timings[task.task_id] = time.time()
             context = copy.deepcopy(task.context)
-            context.update({"_deferred_reprocess": True, "deferred_task_id": task.task_id, "deferred_attempt": task.attempts})
+            context.pop("_deferred_reprocess", None)
+            context.update({"deferred_task_id": task.task_id, "deferred_attempt": task.attempts})
             try:
-                result = self.route(task.prompt, context)
+                result = self._route(task.prompt, context, _deferred_reprocess=True)
             except Exception as exc:
                 task.last_reason = f"{type(exc).__name__}: {exc}"
                 return False

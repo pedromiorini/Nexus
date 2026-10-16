@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 210
+tests: 213
 bandit_low: 131
 -->
 
@@ -11,17 +11,17 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta rodada:** `main` pós-PR #20 no commit `bbe2ae869fde4680c9f3a6a8f3c62505e80a2923`; branch de correção: `fix/context-episode-diagnostics-2026-10-16`.
-- **Estado de PRs no início desta rodada:** PR #20 mesclada; as alterações desta branch seguem isoladas e não foram mescladas.
-- **CI oficial de referência:** os checks obrigatórios da PR #20 passaram no head `faad7dd6a7d4ff1623a4b2db7c8914162cd3bb8a`; o commit de merge em `main` é `bbe2ae869fde4680c9f3a6a8f3c62505e80a2923`. Esta branch ainda depende do CI da sua própria PR.
-- **Marco desta rodada:** isolar mutações de contexto/cache, persistir estatísticas episódicas via SQLite, rejeitar vínculos órfãos e validar diagnósticos/JSON estritamente.
+- **Base desta rodada:** `main` pós-PR #21 no commit `b14123593861b1406e6f6f7b0204fe50630b0f8c`; branch local: `fix/router-deferral-memory-links-2026-10-16`.
+- **Estado de PRs no início desta rodada:** PR #21 mesclada; as correções desta branch ainda não foram publicadas nem mescladas.
+- **CI oficial de referência:** os checks da PR #21 passaram no head `830dc1a21b7839405da26b412925cb439b465e00`; seu commit de merge em `main` é `b14123593861b1406e6f6f7b0204fe50630b0f8c`. Os resultados descritos nesta rodada são locais; consultar os checks e o manifesto do head associado à PR para estado oficial desta branch.
+- **Marco desta rodada:** impedir que contexto caller-controlled suprima o enqueue de uma tarefa adiada; rejeitar IDs de memória inexistentes quando há backend resolutor; preservar links opacos quando o backend não está configurado.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
-- **Validação local da branch atual (não é CI):** 210/210 testes `unittest` passaram; a suíte integrada registrou 30 aprovações, 1 skip opcional de FAISS e nenhuma falha. `psutil`, FAISS e SentenceTransformers estavam indisponíveis; os fallbacks correspondentes foram usados.
+- **Validação local da branch atual (não é CI):** 213/213 testes `unittest` passaram; a suíte integrada registrou 30 aprovações, 1 skip opcional de FAISS e nenhuma falha (31 IDs); `psutil`, FAISS e SentenceTransformers estavam indisponíveis.
 
 ## O que está implementado
 
-- Reprocessamento de tarefas adiadas no `CentralRouter`, preservando contexto, callbacks e telemetria; contextos aninhados são copiados ao enfileirar, reprocessar e entregar a cada módulo.
+- Reprocessamento de tarefas adiadas no `CentralRouter`, preservando contexto, callbacks e telemetria; o sinal interno de reprocessamento não vem mais do contexto do caller e não pode impedir o enqueue normal.
 - Auditoria persistente SQLite e análise longitudinal no bridge Vita.
 - Exportação/validação do contrato `nexus.recovery.diagnostics.v1`, com tipos/finidade verificados e JSON estrito sem `NaN`/`Infinity`.
 - `test_recovery_diagnostics_contract.py`: fuzzing property-based de 60 payloads JSON arbitrários, com rejeição total e estruturada.
@@ -41,7 +41,7 @@ bandit_low: 131
 - Revisão dos 16 achados B311: usos classificados como simulação/heurística, sem reutilização autorizada para segredos ou decisões de segurança.
 - Revisão dos 111 achados B101 restantes: todos estão no bloco `__main__` demonstrativo e permanecem fora dos contratos independentes de produção.
 - `tools/embedded_assert_audit.py`: guardrail AST que impede B101 e qualquer `assert` fora do bloco `__main__` enquanto a migração é incremental.
-- `test_central_router_contract.py`: contrato independente para contagem de requisições, cache hit rate, isolamento de contexto aninhado e cópia profunda do cache.
+- `test_central_router_contract.py`: contrato independente para contagem/cache, isolamento de contexto/cache e garantia de que um marcador caller-controlled não suprima o enqueue de emergência.
 - `tools/implementation_gap_audit.py`: inventário AST conservador de funções pass-only e `NotImplementedError`, sem tratar lacunas como implementadas.
 - `test_explicit_gap_contract.py`: contratos independentes para propagação de erro e registro de adaptação simulada.
 - `test_working_memory_contract.py`: contrato independente para alocação de atenção local e delegação declarada.
@@ -49,7 +49,7 @@ bandit_low: 131
 - `test_counterfactual_contract.py`: contratos de world model, causalidade e fallback heurístico.
 - `test_multimodal_backend_contract.py`: contratos de backends opcionais de visão/áudio e fallbacks de demonstração.
 - `test_swarm_statistics_contract.py`: contrato de médias observadas do swarm e rejeição de deliberação sem agentes.
-- `test_episodic_memory_statistics_contract.py`: contrato de contagem persistente após reabertura do SQLite, rejeição de vínculo a episódio inexistente, média de importância e fechamento de episódios.
+- `test_episodic_memory_statistics_contract.py`: contrato de contagem persistente, rejeição de episódios e memórias inexistentes quando o backend resolve IDs, recuperação com provedor falsey e fechamento de episódios; sem backend, IDs continuam referências opacas não verificadas.
 - `test_episodic_memory_concurrency_contract.py`: contrato de ciclo de vida concorrente em uma conexão SQLite compartilhada.
 - `test_attention_signal_contract.py`: contrato de sinais opcionais de contraste/movimento e fallbacks heurísticos da atenção.
 - `test_integration_synergy_contract.py`: contrato da média aritmética de sinergia sobre todas as integrações registradas.
@@ -74,14 +74,15 @@ bandit_low: 131
 - `test_state_consistency_audit.py`: contratos de sincronização, divergência, ausência, blocos/chaves duplicados e manifesto inválido, incluindo a evidência integrada.
 - `tools/test_summary.py`: executa a suíte final e registra `executed`, `passed`, `failed`, `skipped` e `unexpected_successes`; XPASS conta como falha e é coberto por `test_test_summary.py`.
 
-## Validação local da branch de acompanhamento — 2026-10-16
+## Validação local pós-PR #21 — 2026-10-16
 
-- **Suíte unitária:** 169 executados, 169 aprovados, 0 falhas e 0 skips.
-- **Suíte integrada:** 31 IDs inventariados, 30 aprovados e 1 skip explícito por dependência FAISS opcional ausente; resumo estruturado validado pelo manifesto.
-- **Bandit:** 131 LOW, sem MEDIUM/HIGH; a triagem versionada corresponde às linhas atuais.
-- **Auditoria de realidade:** snapshot regenerado com 31 marcadores integrados, 0 funções `pass`-only e 59 retornos constantes simples.
-- **Validação de arquivos:** compilação Python, parsing YAML do workflow e `git diff --check` passaram.
-- **Ainda pendente:** cobertura e mutação desta branch serão confirmadas pelos gates de CI; os resultados da branch base não são reutilizados como resultado desta branch.
+- **Suíte unitária:** 213 executados, 213 aprovados, 0 falhas, 0 skips e 0 sucessos inesperados.
+- **Suíte integrada:** 31 IDs inventariados, 30 aprovados e 1 skip explícito por dependência FAISS opcional ausente.
+- **Cobertura:** fila 95%, guard VRAM 94%, bridge Vita 76% e núcleo 67%, todos acima dos pisos do workflow.
+- **Mutation testing:** 28/28 mutações aplicáveis mortas, 0 sobreviventes e 0 não aplicadas.
+- **Segurança e lint:** 131 achados Bandit LOW, sem MEDIUM/HIGH; Ruff, actionlint, zizmor, auditorias AST e compilação passaram.
+- **Auditoria de realidade:** relatórios regenerados; núcleo com 26.946 linhas, 267 classes, 859 funções, 0 `pass`-only e 2 retornos constantes simples.
+- **Status:** validação local; o manifesto local identifica `ci_run=not_ci`, sem atribuir estes resultados aos checks oficiais. Os artefatos de realidade versionados correspondem à auditoria local.
 
 ## Histórico de gates locais da base `7c8a187`
 
@@ -183,4 +184,4 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 
 ## Próxima ação
 
-Revisar o artefato `nexus-capability-benchmark` do CI e, em uma etapa futura, definir contratos mensuráveis de intervenção numérica e estado de crença POMDP antes de melhorar os módulos correspondentes. Não tratar o holdout de sequências predefinidas como aprendizagem composicional nem os banners da suíte integrada como evidência de capacidade cognitiva.
+Após os checks da PR atual, continuar pela prioridade POMDP: definir e testar contrato de belief state com modelo fornecido e transição explícita; manter o benchmark v1 como `unsupported_interface` e só pontuar a nova interface sob protocolo v2, sem claim de aprendizagem ou política. Não criar outra rotina semanal; não mesclar sem autorização específica para essa PR.

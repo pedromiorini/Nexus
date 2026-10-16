@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 210
+tests: 213
 bandit_low: 131
 -->
 
@@ -34,13 +34,24 @@ Conflitos não devem ser resolvidos silenciosamente.
 - Auditoria AST: 0 funções somente com `pass`, 0 `NotImplementedError`, 61 retornos constantes simples.
 - Os números de 105 testes/run `37258732531` e 86 testes/run `37097334156` permanecem apenas como histórico de marcos anteriores.
 
-## Validação local da branch de acompanhamento em 2026-10-16
+## Validação local da branch anterior em 2026-10-16
 
 - A suíte unitária executada nesta branch passou com **169 testes**.
 - A suíte integrada registrou **30 verificações aprovadas e 1 explicitamente ignorada** por dependência FAISS opcional indisponível.
 - O Bandit encontrou **131 achados LOW**, sem MEDIUM/HIGH; a triagem e o snapshot de realidade foram regenerados após as mudanças.
 - `RealEpisodicMemory.close_episode` incrementa `episodes_closed` somente quando o SQLite confirma a transição de um episódio aberto para fechado; repetição e ID inexistente não incrementam.
 - Esses resultados são locais; o estado oficial do commit é determinado pelo manifesto de CI associado ao `HEAD`.
+
+## Auditoria local após a PR #21 — 2026-10-16
+
+- Base: `main` no commit `b14123593861b1406e6f6f7b0204fe50630b0f8c`; suíte `unittest` 213/213, sem falhas, skips ou XPASS.
+- A suíte integrada teve 31 marcadores: 30 aprovados e 1 skip opcional por FAISS; os fallbacks de `psutil`, FAISS e SentenceTransformers permaneceram ativos.
+- Cobertura local: fila 95%, guard VRAM 94%, Vita 76%, núcleo 67%; mutation gate: 28/28 aplicáveis mortos; Bandit: 131 LOW, nenhum MEDIUM/HIGH.
+- O roteador ignora/remova o `_deferred_reprocess` fornecido no contexto externo; somente o método interno de reprocessamento pode suprimir um novo enqueue.
+- Vínculos episódicos verificam `memory_id` quando um backend resolutor está configurado; sem backend, o ID é armazenado como referência opaca e não é alegado como validado.
+- Relatórios de realidade locais: 26.946 linhas no núcleo, 267 classes, 859 funções, 0 funções `pass`-only e 2 retornos constantes simples.
+- POMDP permanece `unsupported_interface` no benchmark v1. A atualização Bayesiana exigiria contrato explícito de modelo fornecido e nova versão de protocolo; a API atual não é aprendizagem do modelo nem planejamento.
+- Estes resultados são locais; o manifesto de CI associado ao `HEAD` permanece a fonte de verdade para o estado oficial.
 
 ## Benchmark científico sintético — branch de avaliação de 2026-10-16
 

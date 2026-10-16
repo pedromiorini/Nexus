@@ -24,7 +24,11 @@
 - Registrar disponibilidade e qualidade de backends opcionais.
 - Separar métrica operacional de alegação cognitiva.
 - Manter `benchmarks/` versionado, determinístico e com outputs retidos no CI; comparar números somente entre versões compatíveis do protocolo.
-- Definir um contrato explícito de estado de crença antes de pontuar inferência POMDP no `RealPredictiveCodingSystem`.
+- Definir um contrato explícito de estado de crença antes de pontuar inferência POMDP no `RealPredictiveCodingSystem`:
+  - atualização `b_{t+1}(s') ∝ O(o|s',a) Σ_s T(s'|s,a)b_t(s)`, seguida de normalização explícita;
+  - espaço de estados finito, prior normalizado, transições por linha estocásticas e likelihoods em `[0,1]` fornecidos como entrada;
+  - rejeitar dimensões incompatíveis, valores negativos/não finitos e evidência de observação zero; não fabricar posterior uniforme;
+  - usar protocolo v2 para qualquer nova pontuação e não alegar que o filtro aprende o modelo ou resolve uma política. Referência: [Ross et al. (2011), JMLR](https://www.jmlr.org/papers/volume12/ross11a/ross11a.pdf).
 
 ## Prioridade 4 — dependências opcionais
 
