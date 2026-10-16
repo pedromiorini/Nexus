@@ -77,6 +77,23 @@ class IntegratedSuiteTallyTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "no embedded check markers"):
                 IntegratedSuiteTally(StringIO()).build_summary(source)
 
+    def test_rejects_log_mentions_and_duplicate_source_markers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "runner.py"
+            source.write_text('print("TEST 1 PASSED")\n', encoding="utf-8")
+            tally = IntegratedSuiteTally(StringIO())
+            tally.write("diagnostic: not executed; expected TEST 1 PASSED\n")
+
+            summary = tally.build_summary(source)
+
+            self.assertEqual(summary["passed"], [])
+            self.assertEqual(summary["missing"], ["1"])
+            self.assertEqual(summary["result"], "failed")
+
+            source.write_text('print("TEST 1 PASSED")\nprint("TEST 1 PASSED")\n', encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "duplicate embedded check markers"):
+                IntegratedSuiteTally(StringIO()).build_summary(source)
+
 
 if __name__ == "__main__":
     unittest.main()

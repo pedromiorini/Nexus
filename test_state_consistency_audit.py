@@ -70,12 +70,34 @@ class StateConsistencyAuditTests(unittest.TestCase):
         fields = {item["field"] for item in report["conflicts"]}
         self.assertEqual(fields, {"bandit_low", "commit"})
 
-    def test_missing_marker_fails_without_inventing_state(self):
+    def test_marker_contract_fails_closed_for_missing_or_duplicate_claims(self):
         directory, manifest = self._write_fixture()
         (directory / "CONTINUATION.md").write_text("historical only\n", encoding="utf-8")
         report = audit(manifest, directory)
         self.assertEqual(report["status"], "fail")
         self.assertTrue(any("bloco" in error for error in report["errors"]))
+
+        cases = (
+            (
+                lambda text: text + "\n<!-- NEXUS-CURRENT-STATE\ncommit: stale-sha\nci_run: stale-run\ntests: 1\nbandit_low: 0\n-->\n",
+                "bloco NEXUS-CURRENT-STATE duplicado ou malformado",
+            ),
+            (
+                lambda text: text.replace("commit: HEAD", "commit: stale-sha\ncommit: HEAD", 1),
+                "chave duplicada no bloco atual: commit",
+            ),
+            (
+                lambda text: text + "\n<!-- NEXUS-CURRENT-STATE\ncommit: stale-sha\n",
+                "bloco NEXUS-CURRENT-STATE duplicado ou malformado",
+            ),
+        )
+        for mutate, expected_error in cases:
+            directory, manifest = self._write_fixture()
+            document = directory / "NEXUS_KNOWLEDGE.md"
+            document.write_text(mutate(document.read_text(encoding="utf-8")), encoding="utf-8")
+            report = audit(manifest, directory)
+            self.assertEqual(report["status"], "fail")
+            self.assertTrue(any(expected_error in error for error in report["errors"]))
 
     def test_invalid_manifest_fails_closed(self):
         directory, manifest = self._write_fixture()

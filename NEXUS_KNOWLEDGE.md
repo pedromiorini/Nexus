@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 203
+tests: 204
 bandit_low: 131
 -->
 
@@ -77,6 +77,6 @@ O resumo `unittest` contabiliza sucessos inesperados (`@expectedFailure` que pas
 
 Números de testes, cobertura, findings e commits devem ser confirmados por execução. Markdown histórico não substitui a fonte primária atual.
 
-O `state_consistency_audit.py` considera apenas o bloco estruturado `NEXUS-CURRENT-STATE` como claim atual; referências históricas fora dele são preservadas e ignoradas pelo gate.
+O `state_consistency_audit.py` exige exatamente um bloco estruturado `NEXUS-CURRENT-STATE` e rejeita chaves duplicadas; referências históricas fora dele são preservadas e ignoradas pelo gate.
 
 O manifesto distingue `discovered_static` (inventário AST) de `executed`, `passed`, `failed` e `skipped` obtidos pelo resumo da suíte final. O gate usa `executed` para comparar o claim atual de testes.
