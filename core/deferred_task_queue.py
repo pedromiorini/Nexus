@@ -34,8 +34,13 @@ class DeferredTaskQueue:
     SNAPSHOT_SCHEMA = "nexus.deferred_task_queue.v1"
 
     def __init__(self, max_attempts: int = 3, max_size: int = 256) -> None:
-        if max_attempts < 1 or max_size < 1:
-            raise ValueError("max_attempts e max_size devem ser positivos")
+        if (
+            type(max_attempts) is not int
+            or max_attempts < 1
+            or type(max_size) is not int
+            or max_size < 1
+        ):
+            raise ValueError("max_attempts e max_size devem ser inteiros positivos")
         self.max_attempts = max_attempts
         self.max_size = max_size
         self._heap: List[DeferredTask] = []
@@ -91,8 +96,8 @@ class DeferredTaskQueue:
 
     def consume(self, processor, max_batch: int = 1, pressure_critical: bool = False, on_success=None, on_failure=None, on_discard=None) -> Dict[str, Any]:
         """Processa um lote finito. Erros de callback são reportados, sem reverter estados."""
-        if max_batch < 1:
-            raise ValueError("max_batch deve ser positivo")
+        if type(max_batch) is not int or max_batch < 1:
+            raise ValueError("max_batch deve ser um inteiro positivo")
         if pressure_critical:
             return {
                 "processed": 0, "completed": 0, "retried": 0,
