@@ -5450,14 +5450,27 @@ class StrategySelector:
 
         return best_strategy[0]
 
-    def update_strategy_performance(self, strategy_name: str, performance: float) -> bool:
-        """Atualizar estratégia apenas com score finito em [0, 1]."""
+    def update_strategy_performance(
+        self,
+        strategy_name: str,
+        performance: float,
+        *,
+        task_type: Optional[str] = None,
+    ) -> bool:
+        """Update a strategy only for a valid score and, if supplied, task type.
+
+        Context-free calls retain legacy behavior. Monitored execution supplies
+        its task type so an incompatible task cannot train this strategy.
+        This method validates attribution, not evaluator provenance.
+        """
         if (
             strategy_name not in self.strategies
             or not _is_valid_metacognitive_score(performance)
         ):
             return False
         strategy = self.strategies[strategy_name]
+        if task_type is not None and task_type not in strategy.applicable_to:
+            return False
         score = float(performance)
         previous_count = strategy.usage_count
         strategy.usage_count = previous_count + 1
@@ -5686,6 +5699,9 @@ class RealMetacognitionSystem:
         evaluator. Its exceptions and invalid scores propagate without falling
         back to a heuristic. Heuristic scores remain visible in records but are
         excluded from verified aggregates.
+        A valid evaluator score updates strategy statistics only when the
+        strategy declares applicability to ``process_type``. Incompatible or
+        unknown strategies remain monitorable without receiving strategy credit.
         ``expected_performance`` and ``difficulty`` must be exact built-in
         ``int`` or ``float`` scores, finite and in [0, 1]. They are validated
         before a monitored process starts.
@@ -5755,7 +5771,7 @@ class RealMetacognitionSystem:
             )
         if score_source == METACOGNITIVE_SCORE_EVALUATOR:
             self.strategy_selector.update_strategy_performance(
-                strategy, actual_performance
+                strategy, actual_performance, task_type=process_type
             )
         # Consciência metacognitiva
         if self.consciousness:
