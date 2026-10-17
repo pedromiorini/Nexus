@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 258
+tests: 261
 bandit_low: 131
 -->
 
@@ -161,3 +161,13 @@ O manifesto distingue `discovered_static` (inventário AST) de `executed`, `pass
 - `test_tool_cache_store_contract.py` injeta deterministicamente `RecursionError` e verifica retorno original, contadores, cache vazio, diagnóstico e ausência de `TOOL_EXECUTION_FAILED`; a reprodução manual com profundidade 600 também passou após o patch. Um mutante remove o fallback.
 - Validação local medida: unittest 258/258; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 43/43, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade, auditorias AST e benchmarks de capacidade/POMDP v2 na seed `20261016` passaram.
 - Limites: o fallback cobre especificamente a cópia profunda usada para armazenar o cache; não limita memória/custo próprios do executor nem transforma o cache em limite de memória do processo. A validação de subclasses de valores tipados aninhados não foi alterada; sua intenção de compatibilidade requer contrato específico.
+
+
+## Subclasses de tipos built-in em parâmetros tipados — 2026-10-16
+
+- Base local: `main` pós-PR #29, merge commit `e06511396d407a3440ee1969e0af8d7e055203dc`; branch isolada `fix/tool-validator-container-subclasses-2026-10-16`.
+- Lacuna reproduzida: `ToolValidator.validate_parameters` comparava `type(value).__name__` e rejeitava `Items(list)` para o parâmetro `items` de `list_operations`, antes de o executor built-in usar `sorted` normalmente.
+- Contrato candidato: nomes built-in conhecidos são resolvidos para as classes reais e aceitam subclasses com `issubclass(type(value), expected_class)`. `bool` é recusado para `int`, apesar da relação de subclasse definida pelo Python. `any`/`object` continuam curingas; nomes desconhecidos preservam a comparação legada por nome. Uma classe chamada `list`, mas sem herdar de `list`, não passa no schema built-in.
+- Evidência local: `test_tool_parameter_contract.py` cobre execução de `list` derivada com bypass de cache, subclasses escalares, rejeição de `bool` como `int` e rejeição de nome de classe falsificado. 261/261 testes passaram; 30 verificações integradas passaram e 1 skip opcional; pisos de cobertura 95/94/76/68%; mutation gate 45/45; Bandit 131 LOW e nenhum MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias e benchmarks passaram.
+- Fundamentação: a [documentação oficial de `isinstance`/`issubclass` do Python 3.12](https://docs.python.org/3.12/library/functions.html#isinstance) define subclasses como instâncias compatíveis; a [documentação de `bool`](https://docs.python.org/3.12/library/stdtypes.html#boolean-type-bool) declara que `bool` é subclasse de `int`, relação que não deve alargar silenciosamente esse schema.
+- Limites: a validação ainda é superficial no valor do parâmetro e não valida recursivamente itens de listas/dicionários. O preflight de cache segue aceitando somente estruturas nativas reconhecidas; valores de subclasses podem executar sem cache, deliberadamente.

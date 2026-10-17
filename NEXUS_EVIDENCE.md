@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 258
+tests: 261
 bandit_low: 131
 -->
 
@@ -134,4 +134,17 @@ Após o patch, o mesmo cenário devolve o objeto e sucesso originais, registra `
 
 Resultados locais medidos: unittest 258/258; suíte integrada 30 aprovados, 1 skip opcional FAISS; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation 43/43 mortas, 0 sobreviventes e 0 não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade, auditorias AST e benchmarks de capacidade/POMDP v2 na seed `20261016` passaram.
 
-Limite: a captura é específica à cópia profunda antes do armazenamento; não contém exceções arbitrárias do executor, não muda sua saída e não oferece garantia de limite global de memória. Checks de CI desta branch ainda devem ser consultados na PR.
+Limite: a captura é específica à cópia profunda antes do armazenamento; não contém exceções arbitrárias do executor, não muda sua saída e não oferece garantia de limite global de memória. Estado posterior: a PR #29 foi mesclada em `main` pelo merge commit `e06511396d407a3440ee1969e0af8d7e055203dc` após os dois checks oficiais passarem.
+
+
+## Compatibilidade de subclasses em parâmetros tipados — 2026-10-16
+
+Base: `main` pós-PR #29, merge commit `e06511396d407a3440ee1969e0af8d7e055203dc`; branch candidata isolada `fix/tool-validator-container-subclasses-2026-10-16`.
+
+Reprodução pré-patch: `ToolValidator.validate_parameters` comparava o nome da classe observado com o schema, rejeitando uma subclasse `Items(list)` para `list_operations.items`; o executor teria aceitado a lista em `sorted`, mas não era alcançado. O mesmo critério também aceitava indevidamente uma classe não relacionada se seu `__name__` imitasse um nome built-in, como `list`.
+
+Contrato candidato: nomes built-in conhecidos são resolvidos para classes reais e a relação de subclasse é testada pelo tipo concreto. Uma subclasse de `list` executa e retorna `[1, 2]`; como o preflight de cache não serializa containers customizados, a otimização é bypassada e o sucesso do executor permanece. `int` aceita subclasses verdadeiras, mas `bool` continua rejeitado; um tipo falso com nome `list` não satisfaz o schema. `any` e `object` mantêm semântica wildcard; schemas desconhecidos preservam o matching legado por nome.
+
+Resultados locais medidos: unittest 261/261, sem falhas ou skips; suíte integrada 30 aprovações e 1 skip opcional FAISS; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 45/45 mortas, 0 sobreviventes e 0 não aplicadas; Bandit 131 LOW e 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST/realidade e benchmarks oficiais passaram. No POMDP v2, 128/128 casos ficaram dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e 4/4 controles inválidos foram rejeitados.
+
+Base técnica: [built-ins `isinstance`/`issubclass`, Python 3.12](https://docs.python.org/3.12/library/functions.html#isinstance) e [tipo booleano, Python 3.12](https://docs.python.org/3.12/library/stdtypes.html#boolean-type-bool). Limite: o contrato valida apenas o tipo do valor declarado, sem schema recursivo para elementos aninhados; a CI oficial da nova PR ainda deve ser consultada.

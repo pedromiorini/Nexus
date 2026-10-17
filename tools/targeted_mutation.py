@@ -94,6 +94,20 @@ MUTATIONS = [
         tests=TOOL_PARAMS,
     ),
     Mutation(
+        "tool_parameter_accepts_builtin_subclasses",
+        "core/constitutional_brain.py",
+        "return issubclass(actual_type, expected_class)",
+        "return actual_type is expected_class",
+        tests=TOOL_PARAMS,
+    ),
+    Mutation(
+        "tool_parameter_int_rejects_bool",
+        "core/constitutional_brain.py",
+        'if expected_type == "int" and actual_type is bool:',
+        "if False:",
+        tests=TOOL_PARAMS,
+    ),
+    Mutation(
         "format_json_rejects_non_finite_values",
         "core/constitutional_brain.py",
         "return json.dumps(data, indent=2, sort_keys=True, allow_nan=False)",
