@@ -35,6 +35,9 @@
 - **POMDP/belief state:** o filtro puro de um passo e o benchmark separado `nexus.pomdp-belief-benchmark.v2` estão implementados. O contrato aplica `b_{t+1}(s') ∝ O(o|s',a) Σ_s T(s'|s,a)b_t(s)`, valida prior/transições/likelihoods, limita o espaço a 128 estados, usa log-sum-exp e rejeita evidência nula. O scorer/CLI falha fechado se algum caso exceder a tolerância ou algum controle inválido for aceito; a seed do workflow é coberta diretamente por teste.
 - A trilha de observação parcial do protocolo v1 permanece `unsupported_interface`; o v2 mede somente um modelo explicitamente fornecido e não reivindica aprendizagem, descoberta de estados ou planejamento de política. Referência: [Ross et al. (2011), JMLR](https://www.jmlr.org/papers/volume12/ross11a/ross11a.pdf).
 
+- **Fatos temporais (D-027, proposta em branch):** integrar `TemporalFactStore` ao `RealKnowledgeGraph` somente depois do contrato público; próximos passos verificáveis: persistência SQLite append-only reutilizando o padrão do `RealImmutableLog`, e registrar alegações documentais como fatos com `source` apontando para o comando que as mediu. Não iniciar arbitragem por confiança sem evidência.
+- NetworkX está incluído no lock do CI com hashes para exercitar o caminho `DiGraph`; o fallback continua testável quando a dependência está ausente.
+
 ## Prioridade 4 — dependências opcionais
 
 - Documentar comportamento com e sem `psutil` e FAISS/SentenceTransformers.

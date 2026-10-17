@@ -639,11 +639,19 @@ class RealKnowledgeGraph:
         self.relation_index[relation_type].append(relation)
 
         if self.nx:
-            self.graph.add_edge(source_id, target_id, 
-                              relation=relation_type,
-                              timestamp=relation.timestamp,
-                              confidence=confidence,
-                              **relation.properties)
+            # DiGraph guarda uma aresta por par de nós: acumular os tipos em "relations"
+            # evita que uma segunda relação sobrescreva a primeira (``relation`` = a última).
+            existing = self.graph.get_edge_data(source_id, target_id)
+            relations = list(existing.get("relations", [existing.get("relation")])) if existing else []
+            relations.append(relation_type)
+            edge_attributes = dict(relation.properties)
+            edge_attributes.update({
+                "relation": relation_type,
+                "relations": relations,
+                "timestamp": relation.timestamp,
+                "confidence": confidence,
+            })
+            self.graph.add_edge(source_id, target_id, **edge_attributes)
         else:
             self.graph["edges"][source_id].append((target_id, relation_type))
 

@@ -17,7 +17,7 @@ O Nexus Constitutional é um **protótipo experimental de arquitetura neuro-simb
 | Diagnóstico de recuperação | Exportação versionada `nexus.recovery.diagnostics.v1` e validador formal | O schema garante estrutura, não a correção de decisões cognitivas |
 | Auditoria Vita | Eventos, transições e métricas persistidos em SQLite | A análise é local e limitada ao histórico disponível |
 | CI | Workflow executa lint (ruff, actionlint, zizmor), compilação, testes de contrato e regressão, suíte integrada, cobertura com pisos, mutation testing (58 mutantes escolhidos; o score vale só para eles) e auditorias de segurança e de realidade, com ações fixadas por SHA; o gate usa Python 3.11 | A execução depende do ambiente e das dependências instaladas no runner |
-| Cobertura | Relatório combinado de linhas e branches (testes + suíte integrada) é retido por 14 dias; pisos de cobertura total por arquivo: fila 90%, guard de VRAM 90%, bridge Vita 70%, núcleo 62% | Cobertura não substitui testes de propriedades, segurança ou mutation testing |
+| Cobertura | Relatório combinado de linhas e branches (testes + suíte integrada) é retido por 14 dias; pisos de cobertura total por arquivo: fila 90%, guard de VRAM 90%, ledger temporal 90%, bridge Vita 70%, núcleo 62% | Cobertura não substitui testes de propriedades, segurança ou mutation testing |
 
 ## Componentes principais
 
