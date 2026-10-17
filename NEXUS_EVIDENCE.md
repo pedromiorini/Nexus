@@ -165,7 +165,7 @@ Limite: não há teto para valores positivos altos nem garantia sobre memória g
 
 ## Snapshot JSON limitado para parâmetros de ferramentas — branch pós-PR #31
 
-Base local: `main` pós-PR #31, merge commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45`; branch isolada `fix/tool-cache-json-snapshot-toctou-2026-10-16`. A PR #32 paralela continua aberta, com 2/2 checks oficiais aprovados, propõe D-024 e altera os mesmos documentos/workflow/mutation gate; não foi mesclada nem incorporada aqui.
+Base local: `main` pós-PR #31, merge commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45`; branch isolada `fix/tool-cache-json-snapshot-toctou-2026-10-16`, publicada como [PR #33](https://github.com/pedromiorini/Nexus/pull/33) contra `main`. O estado de revisão e os checks oficiais são acompanhados no head atual da PR; não houve merge. A PR #32 paralela continua aberta, com 2/2 checks oficiais aprovados, propõe D-024 e altera os mesmos documentos/workflow/mutation gate; não foi mesclada nem incorporada aqui.
 
 A lacuna era temporal: `execute_tool` podia formar uma cache key a partir do valor mutável original e, antes de validar/executar, o chamador alterar esse objeto. A chave então descrevia um valor enquanto o executor observava outro. O contrato `test_tool_cache_snapshot_contract.py` reproduz a divergência e exige identidade do mesmo snapshot nas fases subsequentes; um caso adicional confirma que referências compartilhadas tornam-se cópias independentes por valor.
 
