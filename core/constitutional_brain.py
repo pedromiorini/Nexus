@@ -13735,11 +13735,12 @@ class CentralRouter:
             try:
                 result = self._route(task.prompt, context, _deferred_reprocess=True)
             except Exception as exc:
-                task.last_reason = f"{type(exc).__name__}: {exc}"
+                task.last_reason = f"{type(exc).__name__}: deferred reprocessing failed"
                 return False
             if result.get("success"):
                 return True
-            task.last_reason = result.get("reason", result.get("error", "reprocessamento não concluído"))
+            # A resposta pode carregar detalhes privados; não persistir payloads de erro.
+            task.last_reason = "reprocessamento não concluído"
             return False
 
         def success(task):
