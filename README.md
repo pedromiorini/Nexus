@@ -13,10 +13,10 @@ O Nexus Constitutional é um **protótipo experimental de arquitetura neuro-simb
 | Área | Evidência | Limite da afirmação |
 |---|---|---|
 | Núcleo constitucional | O manifesto do CI de `main` no commit `5b8bed8` registrou 31 verificações integradas: 30 aprovadas e 1 ignorada pela ausência opcional de FAISS; nenhuma falhou | São verificações do próprio projeto, não uma avaliação externa de capacidade geral |
-| Fila de tarefas adiadas | 16 testes unitários e de integração | Cobre contratos da fila e reprocessamento, não carga distribuída de produção |
+| Fila de tarefas adiadas | 21 testes unitários e de integração | Cobre contratos da fila e reprocessamento, não carga distribuída de produção |
 | Diagnóstico de recuperação | Exportação versionada `nexus.recovery.diagnostics.v1` e validador formal | O schema garante estrutura, não a correção de decisões cognitivas |
 | Auditoria Vita | Eventos, transições e métricas persistidos em SQLite | A análise é local e limitada ao histórico disponível |
-| CI | Workflow executa lint (ruff, actionlint, zizmor), compilação, testes de contrato e regressão, suíte integrada, cobertura com pisos, mutation testing (28 mutantes escolhidos; o score vale só para eles) e auditorias de segurança e de realidade, com ações fixadas por SHA; o gate usa Python 3.11 | A execução depende do ambiente e das dependências instaladas no runner |
+| CI | Workflow executa lint (ruff, actionlint, zizmor), compilação, testes de contrato e regressão, suíte integrada, cobertura com pisos, mutation testing (58 mutantes escolhidos; o score vale só para eles) e auditorias de segurança e de realidade, com ações fixadas por SHA; o gate usa Python 3.11 | A execução depende do ambiente e das dependências instaladas no runner |
 | Cobertura | Relatório combinado de linhas e branches (testes + suíte integrada) é retido por 14 dias; pisos de cobertura total por arquivo: fila 90%, guard de VRAM 90%, bridge Vita 70%, núcleo 62% | Cobertura não substitui testes de propriedades, segurança ou mutation testing |
 
 ## Componentes principais

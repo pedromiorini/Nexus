@@ -851,7 +851,7 @@ class RealKnowledgeGraph:
 
     # ── Temporal: Resolução de conflitos ──────────────────────────────────
 
-    def resolve_conflicts(self, entity_id: str) -> Entity:
+    def resolve_conflicts(self, entity_id: str) -> Optional[Entity]:
         """
         Quando existem múltiplas versões da mesma entidade,
         retornar a mais recente (timestamp mais alto).
@@ -1863,7 +1863,7 @@ class RealMultimodalSystem:
     def perceive(self, 
                  vision_data: Any = None,
                  audio_data: Any = None,
-                 text_data: str = None) -> MultimodalPercept:
+                 text_data: str | None = None) -> MultimodalPercept:
         """
         Perceber através de múltiplas modalidades.
         
@@ -1926,7 +1926,7 @@ class RealMultimodalSystem:
         modalities_str = ", ".join(percept.modalities.keys())
         return f"Perceived through {modalities_str} with confidence {percept.cross_modal_confidence:.2f}"
 
-    def get_recent_percepts(self, modality_filter: str = None, limit: int = 10) -> List[MultimodalPercept]:
+    def get_recent_percepts(self, modality_filter: str | None = None, limit: int = 10) -> List[MultimodalPercept]:
         """
         Obter percepts recentes.
         
@@ -2670,7 +2670,7 @@ class RealMCTSPlanner:
         self.total_nodes_created += 1
 
         # ─── Loop Principal MCTS ─────────────────────────────────────────
-        for i in range(max_iterations):
+        for _i in range(max_iterations):
             # 1. Seleção
             selected = self._select(root)
 
@@ -3159,7 +3159,7 @@ class BeliefTracker:
         self.ground_truth: Dict[str, Any] = {}  # Verdade objetiva conhecida pelo sistema
         self.belief_updates: List[BeliefUpdate] = []
 
-    def register_agent(self, agent_id: str, initial_knowledge: Set[str] = None):
+    def register_agent(self, agent_id: str, initial_knowledge: Set[str] | None = None):
         """Registrar um novo agente para tracking"""
         if agent_id not in self.mental_states:
             self.mental_states[agent_id] = MentalState(
@@ -3302,7 +3302,7 @@ class RealTheoryOfMind:
         print("🧠 POST 10 - RealTheoryOfMind initialized (Mental state modeling active)")
 
     def observe_action(self, agent_id: str, action_type: str, 
-                      content: Any, context: Dict = None) -> Dict:
+                      content: Any, context: Dict | None = None) -> Dict:
         """
         Observar ação de um agente e atualizar modelo mental.
         
@@ -4723,7 +4723,7 @@ class PragmaticsAnalyzer:
             "declarative"   # declarar mudança
         ]
 
-    def analyze_pragmatics(self, text: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    def analyze_pragmatics(self, text: str, context: Dict[str, Any] | None = None) -> Dict[str, Any]:
         """
         Análise pragmática.
         
@@ -4990,7 +4990,7 @@ class RealLanguageUnderstandingSystem:
 
         print("🗣️💬 POST 18 - RealLanguageUnderstandingSystem initialized (Deep language understanding active)")
 
-    def understand(self, text: str, context: Dict[str, Any] = None) -> LanguageAnalysis:
+    def understand(self, text: str, context: Dict[str, Any] | None = None) -> LanguageAnalysis:
         """
         Compreensão linguística completa.
         
@@ -5315,7 +5315,7 @@ class StrategySelector:
             )
             self.strategies[name] = strategy
 
-    def select_strategy(self, task_type: str, context: Dict[str, Any] = None) -> str:
+    def select_strategy(self, task_type: str, context: Dict[str, Any] | None = None) -> str:
         """
         Selecionar melhor estratégia para tarefa.
         
@@ -5687,7 +5687,7 @@ class BottomUpAttention:
             "motion": 0.2         # Movimento/mudança
         }
 
-    def compute_salience(self, stimulus: StimulusItem, context: Dict[str, Any] = None) -> float:
+    def compute_salience(self, stimulus: StimulusItem, context: Dict[str, Any] | None = None) -> float:
         """
         Computar saliência de estímulo.
         
@@ -5946,7 +5946,7 @@ class RealAttentionSystem:
     def register_stimulus(self, 
                          stimulus_type: str,
                          content: Any,
-                         context: Dict[str, Any] = None) -> StimulusItem:
+                         context: Dict[str, Any] | None = None) -> StimulusItem:
         """
         Registrar novo estímulo.
         
@@ -5981,7 +5981,7 @@ class RealAttentionSystem:
 
         return stimulus
 
-    def attend(self, goals: List[str] = None) -> List[StimulusItem]:
+    def attend(self, goals: List[str] | None = None) -> List[StimulusItem]:
         """
         Processo de atenção completo.
         
@@ -6629,8 +6629,8 @@ class RealEmbodiedCognitionSystem:
         print("🧠💪 POST 34 - RealEmbodiedCognitionSystem initialized (Mind-body integration active)")
 
     def update_body_state(self, posture: str = "neutral",
-                          proprioception: Dict = None,
-                          interoception: Dict = None) -> BodyState:
+                          proprioception: Dict | None = None,
+                          interoception: Dict | None = None) -> BodyState:
         """
         Atualizar representação do estado corporal.
         
@@ -6698,7 +6698,7 @@ class RealEmbodiedCognitionSystem:
         # "understanding" -> ["grasping_metaphor", "holding_idea"]
         # "support" -> ["holding_up", "bearing_weight"]
 
-    def detect_affordances(self, objects: List[str], context: Dict = None) -> List[Affordance]:
+    def detect_affordances(self, objects: List[str], context: Dict | None = None) -> List[Affordance]:
         """
         Detectar affordances em objetos.
         
@@ -7436,7 +7436,7 @@ class RealEpisodicFutureThinkingSystem:
         print("🧠🔮 POST 31 - RealEpisodicFutureThinkingSystem initialized (Future imagination active)")
 
     def imagine_future_event(self, description: str, time_point: str,
-                             details: Dict[str, Any] = None) -> FutureEvent:
+                             details: Dict[str, Any] | None = None) -> FutureEvent:
         """
         Imaginar evento futuro específico.
         
@@ -8079,7 +8079,7 @@ class RealAnalogicalReasoningSystem:
         print("🧠🔄 POST 27 - RealAnalogicalReasoningSystem initialized (Cross-domain transfer active)")
 
     def add_situation(self, domain: str, entities: List[str], 
-                     relations: List[Tuple[str, str, str]], solution: str = None) -> AnalogySituation:
+                     relations: List[Tuple[str, str, str]], solution: str | None = None) -> AnalogySituation:
         """Adicionar situação conhecida"""
         situation = AnalogySituation(
             situation_id=str(uuid.uuid4()),
@@ -8332,7 +8332,7 @@ n's Semantic Networks (1968)
 
         print("🧠🕸️ POST 26 - RealSemanticNetworksSystem initialized (Conceptual knowledge graph active)")
 
-    def add_concept(self, label: str, properties: Dict[str, Any] = None) -> ConceptNode:
+    def add_concept(self, label: str, properties: Dict[str, Any] | None = None) -> ConceptNode:
         """
         Adicionar conceito à rede.
         
@@ -8455,7 +8455,7 @@ n's Semantic Networks (1968)
 
         return activated
 
-    def get_related_concepts(self, label: str, relation_type: str = None) -> List[ConceptNode]:
+    def get_related_concepts(self, label: str, relation_type: str | None = None) -> List[ConceptNode]:
         """
         Obter conceitos relacionados.
         
@@ -8724,7 +8724,7 @@ class RealContextualMemorySystem:
         self.current_context = context
         self.current_context_vector = self.context_encoder.encode_context(context)
 
-    def store_with_context(self, content: Any, context: Dict[str, Any] = None) -> ContextualMemory:
+    def store_with_context(self, content: Any, context: Dict[str, Any] | None = None) -> ContextualMemory:
         """
         Armazenar memória com contexto.
         
@@ -8766,8 +8766,8 @@ class RealContextualMemorySystem:
         return memory
 
     def retrieve_by_context(self, 
-                           query: str = None,
-                           context: Dict[str, Any] = None,
+                           query: str | None = None,
+                           context: Dict[str, Any] | None = None,
                            threshold: float = 0.5) -> List[ContextMatch]:
         """
         Recuperar memórias por contexto.
@@ -9251,7 +9251,7 @@ class RealExecutiveFunctionsSystem:
 
     def execute_with_control(self, 
                             action: str,
-                            context: Dict[str, Any] = None) -> Tuple[bool, Optional[str]]:
+                            context: Dict[str, Any] | None = None) -> Tuple[bool, Optional[str]]:
         """
         Executar ação com controle executivo.
         
@@ -9842,7 +9842,7 @@ class RealEmotionSystem:
         return predicted_state
 
     def apply_trigger(self, agent_id: str, event_type: str, 
-                     intensity: float, valence: float, context: Dict = None):
+                     intensity: float, valence: float, context: Dict | None = None):
         """
         Aplicar um trigger emocional a um agente.
         
@@ -11075,7 +11075,7 @@ class NoveltyDetector:
         # Threshold de novidade
         self.novelty_threshold = 0.5
 
-    def detect_novelty(self, observation: str, context: Dict = None) -> NoveltySignal:
+    def detect_novelty(self, observation: str, context: Dict | None = None) -> NoveltySignal:
         """
         Detectar novidade em observação.
         
@@ -11335,7 +11335,7 @@ class RealCuriositySystem:
 
         print("🔍 POST 21 - RealCuriositySystem initialized (Intrinsic motivation active)")
 
-    def detect_novelty(self, observation: str, context: Dict = None) -> NoveltySignal:
+    def detect_novelty(self, observation: str, context: Dict | None = None) -> NoveltySignal:
         """
         Detectar novidade em observação.
         
@@ -12047,7 +12047,7 @@ class DivergentThinker:
         """
         alternatives = []
 
-        for i in range(num_alternatives):
+        for _i in range(num_alternatives):
             # Escolher estratégia
             strategy = random.choice(self.divergence_strategies)
 
@@ -12288,7 +12288,7 @@ class RealCreativitySystem:
 
         print("🎨 POST 23 - RealCreativitySystem initialized (Creative thinking active)")
 
-    def generate_creative_idea(self, problem: str, constraints: List[str] = None) -> CreativeIdea:
+    def generate_creative_idea(self, problem: str, constraints: List[str] | None = None) -> CreativeIdea:
         """
         Gerar ideia criativa para problema.
         
@@ -13609,7 +13609,7 @@ class CentralRouter:
         
         _dbg(f"🔍 DEBUG v3.70: Executing {len(execution_plan.execution_stages)} stages")
 
-        for stage_idx, stage_modules in enumerate(execution_plan.execution_stages):
+        for _stage_idx, stage_modules in enumerate(execution_plan.execution_stages):
             stage_results = self._execute_stage(
                 stage_modules, prompt, aggregated_data
             )
@@ -19121,7 +19121,7 @@ class RealExplainabilityEngine:
     def generate_justification(self, action: str,
                               rationale: str,
                               supporting_evidence: List[str],
-                              counterarguments: List[str] = None) -> Justification:
+                              counterarguments: List[str] | None = None) -> Justification:
         """
         Gerar justificativa para ação.
         
@@ -19533,7 +19533,7 @@ class RealCollaborativeIntelligenceEngine:
         # Simular execução por subtarefas
         completed_subtasks = 0
         
-        for subtask in task.subtasks:
+        for _subtask in task.subtasks:
             # Verificar se há agente com capacidade para subtask
             # (heurística simples)
             completed_subtasks += 1
@@ -23105,7 +23105,7 @@ class RealIntegrationOrchestrationEngine:
     - Holistic AI (Hassabis et al., 2017)
     """
     
-    def __init__(self, all_modules: Dict[str, Any] = None):
+    def __init__(self, all_modules: Dict[str, Any] | None = None):
         self.all_modules = all_modules or {}
         
         # Integrations
@@ -24895,7 +24895,7 @@ class CompleteNexusBrain:
                         modules_activated.append("multi_task_coordination")
                         # FIXED v3.61: add_task returns TaskDescriptor with generated ID
                         task_ids = []
-                        for i, action_seq in enumerate(possible_actions):
+                        for i, _action_seq in enumerate(possible_actions):
                             task_desc = self.multi_task_coordination.add_task(
                                 task_name=f"simulate_{i}",  # FIXED v3.92: task_type → task_name
                                 priority=priority_score
@@ -26000,7 +26000,7 @@ if __name__ == "__main__":
     print("="*70)
 
     # Repetir interação similar 3x para criar padrão detectável
-    for i in range(3):
+    for _ in range(3):
         brain.memory.store(
             "Security vulnerabilities cause system breaches",
             "short_term", 0.6
