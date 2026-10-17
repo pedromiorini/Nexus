@@ -126,17 +126,23 @@ class DeferredTaskSnapshotTests(unittest.TestCase):
     def test_statistics_keys_are_exact_and_extra_counters_are_rejected(self):
         source = DeferredTaskQueue(max_attempts=2, max_size=4)
         source.enqueue("imported")
-        snapshot = source.export_snapshot()
-        snapshot["statistics"]["uncontracted"] = 17
-
-        for replace in (False, True):
-            target = DeferredTaskQueue(max_attempts=2, max_size=4)
-            kept = target.enqueue("keep")
-            before = target.statistics().copy()
-            with self.subTest(replace=replace), self.assertRaises(ValueError):
-                target.restore_snapshot(snapshot, replace=replace)
-            self.assertEqual(target.statistics(), before)
-            self.assertEqual(target._tasks[kept.task_id].prompt, "keep")
+        extensions = (
+            ("uncontracted", 17),
+            ("opaque", object()),
+            ("infinite", float("inf")),
+        )
+        for key, value in extensions:
+            snapshot = source.export_snapshot()
+            snapshot["statistics"][key] = value
+            for replace in (False, True):
+                with self.subTest(key=key, replace=replace):
+                    target = DeferredTaskQueue(max_attempts=2, max_size=4)
+                    kept = target.enqueue("keep")
+                    before = target.statistics().copy()
+                    with self.assertRaises(ValueError):
+                        target.restore_snapshot(snapshot, replace=replace)
+                    self.assertEqual(target.statistics(), before)
+                    self.assertEqual(target._tasks[kept.task_id].prompt, "keep")
 
     def test_task_at_max_attempts_cannot_be_restored_as_pending(self):
         source = DeferredTaskQueue(max_attempts=2, max_size=4)
@@ -407,50 +413,317 @@ class DeferredTaskSnapshotTests(unittest.TestCase):
         self.assertEqual(target.statistics(), before)
         self.assertEqual(target._tasks[kept.task_id].prompt, "keep")
 
-    def test_snapshot_preserves_builtin_subclass_compatibility_outside_context(self):
+    def test_json_text_rejects_duplicate_object_keys_at_every_level(self):
+        source = DeferredTaskQueue(max_attempts=2, max_size=4)
+        source.enqueue("incoming", {"nested": {"value": 1}})
+        snapshot = source.export_snapshot()
+        encoded = json.dumps(snapshot)
+        task_json = json.dumps(snapshot["tasks"][0])
+        statistics_json = json.dumps(snapshot["statistics"])
+        context_json = json.dumps(snapshot["tasks"][0]["context"])
+        nested_json = json.dumps(snapshot["tasks"][0]["context"]["nested"])
+        duplicate_inputs = {
+            "root": encoded[:-1] + ', "schema": ' + json.dumps(snapshot["schema"]) + "}",
+            "statistics": encoded.replace(
+                statistics_json,
+                statistics_json[:-1] + ', "enqueued": ' + str(snapshot["statistics"]["enqueued"]) + "}",
+                1,
+            ),
+            "task": encoded.replace(
+                task_json,
+                task_json[:-1] + ', "priority": ' + str(snapshot["tasks"][0]["priority"]) + "}",
+                1,
+            ),
+            "context": encoded.replace(
+                context_json,
+                context_json[:-1] + ', "nested": {}}',
+                1,
+            ),
+            "nested_context": encoded.replace(
+                nested_json,
+                nested_json[:-1] + ', "value": 2}',
+                1,
+            ),
+        }
+
+        for level, duplicate_json in duplicate_inputs.items():
+            with self.subTest(level=level):
+                target = DeferredTaskQueue(max_attempts=2, max_size=4)
+                kept = target.enqueue("keep")
+                before = target.statistics().copy()
+                with self.assertRaises(ValueError):
+                    target.restore_snapshot(duplicate_json, replace=True)
+                self.assertEqual(target.statistics(), before)
+                self.assertEqual(target._tasks[kept.task_id].prompt, "keep")
+
+    def test_snapshot_preserves_container_subclass_compatibility_outside_context(self):
         class DictSubclass(dict):
             pass
 
         class ListSubclass(list):
             pass
 
-        class TextSubclass(str):
-            pass
-
-        class IntegerSubclass(int):
-            pass
-
         source = DeferredTaskQueue(max_attempts=2, max_size=4)
         source.enqueue("original")
         payload = DictSubclass(source.export_snapshot())
-        payload["schema"] = TextSubclass(payload["schema"])
-        payload["generated_at"] = IntegerSubclass(1)
         payload["statistics"] = DictSubclass(payload["statistics"])
-        payload[object()] = "ignored root extension"
 
         task = DictSubclass(payload["tasks"][0])
-        task.update({
-            "task_id": TextSubclass("legacy-id"),
-            "prompt": TextSubclass("legacy prompt"),
-            "priority": IntegerSubclass(3),
-            "created_at": IntegerSubclass(1),
-            "attempts": IntegerSubclass(0),
-            "last_reason": TextSubclass("legacy reason"),
-        })
-        task[object()] = "ignored task extension"
         payload["tasks"] = ListSubclass([task])
 
         target = DeferredTaskQueue(max_attempts=2, max_size=4)
         result = target.restore_snapshot(payload, replace=True)
-        restored = target._tasks["legacy-id"]
+        task_id = task["task_id"]
+        restored = target._tasks[task_id]
 
         self.assertEqual(result["restored"], 1)
-        self.assertIsInstance(restored.task_id, TextSubclass)
-        self.assertIsInstance(restored.prompt, TextSubclass)
-        self.assertIsInstance(restored.priority, IntegerSubclass)
-        self.assertIsInstance(restored.attempts, IntegerSubclass)
+        self.assertEqual(restored.prompt, "original")
+        self.assertIs(type(restored.priority), int)
+        self.assertIs(type(restored.attempts), int)
         self.assertEqual(restored.context, {})
-        self.assertEqual(restored.last_reason, "legacy reason")
+
+    def test_string_keyed_root_and_task_extensions_are_ignored_without_deepcopy(self):
+        class DeepcopyBomb:
+            calls = 0
+
+            def __deepcopy__(self, memo):
+                type(self).calls += 1
+                raise AssertionError("extension value must not be copied")
+
+        source = DeferredTaskQueue(max_attempts=2, max_size=4)
+        source.enqueue("incoming")
+        snapshot = source.export_snapshot()
+        task_id = snapshot["tasks"][0]["task_id"]
+        bomb = DeepcopyBomb()
+        snapshot["legacy_object"] = bomb
+        snapshot["legacy_infinite"] = float("inf")
+        snapshot["tasks"][0]["legacy_object"] = bomb
+        snapshot["tasks"][0]["legacy_infinite"] = float("inf")
+
+        for replace in (False, True):
+            with self.subTest(replace=replace):
+                target = DeferredTaskQueue(max_attempts=2, max_size=4)
+                if not replace:
+                    target.enqueue("keep")
+                DeepcopyBomb.calls = 0
+                result = target.restore_snapshot(snapshot, replace=replace)
+                restored = target._tasks[task_id]
+                self.assertEqual(result["restored"], 1)
+                self.assertEqual(DeepcopyBomb.calls, 0)
+                self.assertFalse(hasattr(restored, "legacy_object"))
+                self.assertFalse(hasattr(restored, "legacy_infinite"))
+
+    def test_non_string_keys_are_rejected_before_equality_hooks(self):
+        class EqualityHookKey:
+            calls = 0
+
+            def __init__(self, collides_with):
+                self.collides_with = collides_with
+
+            def __hash__(self):
+                return hash(self.collides_with)
+
+            def __eq__(self, other):
+                type(self).calls += 1
+                return False
+
+        source = DeferredTaskQueue(max_attempts=2, max_size=4)
+        source.enqueue("incoming")
+        locations = ("root", "statistics", "task")
+        for location in locations:
+            for replace in (False, True):
+                with self.subTest(location=location, replace=replace):
+                    snapshot = source.export_snapshot()
+                    collision_key = {
+                        "root": "schema",
+                        "statistics": "enqueued",
+                        "task": "task_id",
+                    }[location]
+                    hostile_key = EqualityHookKey(collision_key)
+                    if location == "root":
+                        attacked = {hostile_key: "extension"}
+                        attacked.update(snapshot)
+                        snapshot = attacked
+                    elif location == "statistics":
+                        attacked_statistics = {hostile_key: "extension"}
+                        attacked_statistics.update(snapshot["statistics"])
+                        snapshot["statistics"] = attacked_statistics
+                    else:
+                        attacked_task = {hostile_key: "extension"}
+                        attacked_task.update(snapshot["tasks"][0])
+                        snapshot["tasks"][0] = attacked_task
+
+                    target = DeferredTaskQueue(max_attempts=2, max_size=4)
+                    kept = target.enqueue("keep")
+                    before = target.statistics().copy()
+                    before_heap = target._heap
+                    before_tasks = target._tasks
+                    before_counters = target._stats
+                    EqualityHookKey.calls = 0
+                    rejected = False
+                    try:
+                        target.restore_snapshot(snapshot, replace=replace)
+                    except ValueError:
+                        rejected = True
+
+                    self.assertEqual(EqualityHookKey.calls, 0)
+                    self.assertTrue(rejected)
+                    self.assertIs(target._heap, before_heap)
+                    self.assertIs(target._tasks, before_tasks)
+                    self.assertIs(target._stats, before_counters)
+                    self.assertIs(target._tasks[kept.task_id], kept)
+                    self.assertEqual(target.statistics(), before)
+
+    def test_priority_subclass_is_rejected_before_negation_and_restore_is_atomic(self):
+        class HookedPriority(int):
+            hook_calls = 0
+
+            def __neg__(self):
+                type(self).hook_calls += 1
+                return int.__neg__(self)
+
+        source = DeferredTaskQueue(max_attempts=2, max_size=4)
+        source.enqueue("incoming", priority=1)
+        snapshot = source.export_snapshot()
+        snapshot["tasks"][0]["priority"] = HookedPriority(3)
+
+        for replace in (False, True):
+            with self.subTest(replace=replace):
+                target = DeferredTaskQueue(max_attempts=2, max_size=4)
+                kept = target.enqueue("keep")
+                before_stats = target.statistics().copy()
+                before_heap = target._heap
+                before_tasks = target._tasks
+                before_in_flight = target._in_flight
+                before_counters = target._stats
+                HookedPriority.hook_calls = 0
+
+                rejected = False
+                try:
+                    target.restore_snapshot(snapshot, replace=replace)
+                except ValueError:
+                    rejected = True
+
+                self.assertEqual(HookedPriority.hook_calls, 0)
+                self.assertTrue(rejected)
+                self.assertIs(target._heap, before_heap)
+                self.assertIs(target._tasks, before_tasks)
+                self.assertIs(target._in_flight, before_in_flight)
+                self.assertIs(target._stats, before_counters)
+                self.assertIs(target._tasks[kept.task_id], kept)
+                self.assertEqual(target.statistics(), before_stats)
+
+    def test_scalar_subclasses_are_rejected_before_hooks_or_restore_mutation(self):
+        class HookedInt(int):
+            hook_calls = 0
+
+            def __neg__(self):
+                type(self).hook_calls += 1
+                return int.__neg__(self)
+
+            def __lt__(self, other):
+                type(self).hook_calls += 1
+                return int.__lt__(self, other)
+
+            def __eq__(self, other):
+                type(self).hook_calls += 1
+                return int.__eq__(self, other)
+
+            __hash__ = int.__hash__
+
+        class HookedFloat(float):
+            hook_calls = 0
+
+            def __float__(self):
+                type(self).hook_calls += 1
+                return float.__float__(self)
+
+            def __lt__(self, other):
+                type(self).hook_calls += 1
+                return float.__lt__(self, other)
+
+            def __eq__(self, other):
+                type(self).hook_calls += 1
+                return float.__eq__(self, other)
+
+            __hash__ = float.__hash__
+
+        class HookedString(str):
+            hook_calls = 0
+
+            def __len__(self):
+                type(self).hook_calls += 1
+                return str.__len__(self)
+
+            def __ne__(self, other):
+                type(self).hook_calls += 1
+                return str.__ne__(self, other)
+
+            def __eq__(self, other):
+                type(self).hook_calls += 1
+                return str.__eq__(self, other)
+
+            __hash__ = str.__hash__
+
+        source = DeferredTaskQueue(max_attempts=2, max_size=4)
+        source.enqueue("incoming-a")
+        source.enqueue("incoming-b")
+        cases = [
+            ("schema", HookedString(DeferredTaskQueue.SNAPSHOT_SCHEMA), "root"),
+            ("generated_at", HookedFloat(1.0), "root"),
+            ("max_attempts", HookedInt(2), "root"),
+            ("max_size", HookedInt(4), "root"),
+            ("task_id", HookedString("hooked-id"), "task"),
+            ("prompt", HookedString("hooked prompt"), "task"),
+            ("priority", HookedInt(3), "task"),
+            ("created_at", HookedFloat(1.0), "task"),
+            ("attempts", HookedInt(0), "task"),
+            ("max_attempts", HookedInt(2), "task"),
+            ("last_reason", HookedString("hooked reason"), "task"),
+            ("statistics", HookedInt(2), "statistics"),
+        ]
+
+        for field, value, section in cases:
+            for replace in (False, True):
+                with self.subTest(field=field, replace=replace):
+                    snapshot = source.export_snapshot()
+                    if section == "root":
+                        snapshot[field] = value
+                    elif section == "task":
+                        snapshot["tasks"][0][field] = value
+                    else:
+                        snapshot["statistics"]["enqueued"] = value
+
+                    target = DeferredTaskQueue(max_attempts=2, max_size=4)
+                    kept = target.enqueue("keep")
+                    before_stats = target.statistics().copy()
+                    before_heap = target._heap
+                    before_tasks = target._tasks
+                    before_in_flight = target._in_flight
+                    before_counters = target._stats
+                    HookedInt.hook_calls = 0
+                    HookedFloat.hook_calls = 0
+                    HookedString.hook_calls = 0
+
+                    rejected = False
+                    try:
+                        target.restore_snapshot(snapshot, replace=replace)
+                    except ValueError:
+                        rejected = True
+
+                    hook_calls = (
+                        HookedInt.hook_calls
+                        + HookedFloat.hook_calls
+                        + HookedString.hook_calls
+                    )
+                    self.assertEqual(hook_calls, 0)
+                    self.assertTrue(rejected)
+                    self.assertIs(target._heap, before_heap)
+                    self.assertIs(target._tasks, before_tasks)
+                    self.assertIs(target._in_flight, before_in_flight)
+                    self.assertIs(target._stats, before_counters)
+                    self.assertIs(target._tasks[kept.task_id], kept)
+                    self.assertEqual(target.statistics(), before_stats)
 
     def test_boolean_numbers_are_rejected_by_snapshot_contract(self):
         source = DeferredTaskQueue(max_attempts=1, max_size=1)
@@ -459,17 +732,21 @@ class DeferredTaskSnapshotTests(unittest.TestCase):
         target.enqueue("keep")
         before = target.statistics().copy()
         cases = [
+            ("generated_at", True),
             ("max_attempts", True),
             ("max_size", True),
             ("statistics", {"enqueued": True}),
             ("task_max_attempts", True),
+            ("task_priority", True),
+            ("task_created_at", True),
+            ("task_attempts", True),
         ]
         for case, value in cases:
             payload = source.export_snapshot()
             if case == "statistics":
                 payload["statistics"].update(value)
-            elif case == "task_max_attempts":
-                payload["tasks"][0]["max_attempts"] = value
+            elif case.startswith("task_"):
+                payload["tasks"][0][case.removeprefix("task_")] = value
             else:
                 payload[case] = value
             with self.subTest(case=case), self.assertRaises(ValueError):

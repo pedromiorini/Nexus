@@ -266,10 +266,19 @@ class DeferredTaskQueue:
             def reject_constant(value: str) -> None:
                 raise ValueError(f"constante JSON não permitida: {value}")
 
+            def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> Dict[str, Any]:
+                result: Dict[str, Any] = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise ValueError(f"chave JSON duplicada: {key}")
+                    result[key] = value
+                return result
+
             try:
                 snapshot = json.loads(
                     snapshot,
                     parse_constant=reject_constant,
+                    object_pairs_hook=reject_duplicate_keys,
                 )
             except (json.JSONDecodeError, RecursionError, ValueError) as exc:
                 raise ValueError("snapshot não é JSON válido") from exc
@@ -286,9 +295,11 @@ class DeferredTaskQueue:
             payload = dict.copy(payload)
         except RuntimeError as exc:
             raise ValueError("snapshot foi modificado durante a leitura") from exc
+        if any(type(key) is not str for key in payload):
+            raise ValueError("chaves do snapshot devem ser strings")
 
         schema = payload.get("schema")
-        if not isinstance(schema, str) or schema != self.SNAPSHOT_SCHEMA:
+        if type(schema) is not str or schema != self.SNAPSHOT_SCHEMA:
             raise ValueError("schema de snapshot incompatível")
         required = ("generated_at", "max_attempts", "max_size", "statistics", "tasks")
         missing = [field for field in required if field not in payload]
@@ -342,6 +353,8 @@ class DeferredTaskQueue:
                 raw = dict.copy(raw)
             except RuntimeError as exc:
                 raise ValueError("tarefa foi modificada durante a leitura") from exc
+            if any(type(key) is not str for key in raw):
+                raise ValueError("chaves da tarefa devem ser strings")
             if any(field not in raw for field in fields):
                 raise ValueError("tarefa inválida no snapshot")
 
@@ -354,17 +367,17 @@ class DeferredTaskQueue:
             max_attempts = raw["max_attempts"]
             last_reason = raw["last_reason"]
 
-            if not isinstance(task_id, str) or not task_id or task_id in ids:
+            if type(task_id) is not str or not task_id or task_id in ids:
                 raise ValueError("task_id ausente ou duplicado no snapshot")
             if not replace and task_id in self._tasks:
                 raise ValueError(f"task_id já existente na fila: {task_id}")
-            if not isinstance(prompt, str) or type(context_value) is not dict:
+            if type(prompt) is not str or type(context_value) is not dict:
                 raise ValueError("prompt ou context inválido no snapshot")
-            if not isinstance(priority, int) or isinstance(priority, bool):
+            if type(priority) is not int:
                 raise ValueError("priority inválida no snapshot")
             if not self._is_finite_number(created_at):
                 raise ValueError("created_at inválido no snapshot")
-            if not isinstance(attempts, int) or isinstance(attempts, bool) or attempts < 0:
+            if type(attempts) is not int or attempts < 0:
                 raise ValueError("attempts inválido no snapshot")
             if (
                 type(max_attempts) is not int
@@ -373,7 +386,7 @@ class DeferredTaskQueue:
                 or attempts >= max_attempts
             ):
                 raise ValueError("max_attempts inválido ou incompatível com a fila no snapshot")
-            if not isinstance(last_reason, str):
+            if type(last_reason) is not str:
                 raise ValueError("last_reason inválido no snapshot")
             context = self._copy_strict_json_context(context_value)
             ids.add(task_id)
@@ -442,7 +455,7 @@ class DeferredTaskQueue:
 
     @staticmethod
     def _is_finite_number(value: Any) -> bool:
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
+        if type(value) not in (int, float):
             return False
         try:
             return math.isfinite(value)

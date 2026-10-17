@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 313
+tests: 318
 bandit_low: 131
 -->
 
@@ -12,10 +12,10 @@ bandit_low: 131
 ## Estado atual
 
 - **Branch e base:** `fix/queue-snapshot-hardening-2026-10-17`, baseada em `origin/main` `812ebd02b0c82ecc3169d620e36d25592b1d6727`; alterações locais, sem push, merge ou rebase.
-- **D-030:** fronteiras de snapshot endurecidas sem mudar schema `nexus.deferred_task_queue.v1` nem assinaturas públicas; contextos de export/restore exigem JSON nativo estrito, enquanto subclasses built-in fora de `context` mantêm compatibilidade anterior. Dicts/lists são capturados por métodos base; a restauração publica heap, índice e contadores somente após staging completo.
-- **Baseline confirmado:** referências aninhadas já eram isoladas; timestamps NaN/±Infinity e bool nos campos inteiros já eram rejeitados. Lacunas reproduzidas: chave extra em estatísticas, tentativa exaurida ainda pendente, hook `__deepcopy__` em contexto arbitrário e falha parcial durante staging; revisão independente encontrou ainda um TOCTOU de `task_id` em dict de entrada mutável, agora coberto e corrigido.
-- **Testes locais:** `unittest` 313 executados, 311 aprovados e 2 skips pelo NetworkX opcional ausente; contratos focados snapshot/fila 46/46 em Python 3.11.16 e 46/46 em Python 3.12.3; cobertura de branch da fila 90%. Suite integrada: 30 aprovados, 1 skip opcional de FAISS, 0 faltantes.
-- **Gates:** mutation 63/63 mortos, 0 sobreviventes/não aplicadas; Ruff 0.16.10, actionlint 1.7.12 e zizmor 1.31.1 passaram; Bandit 131 LOW e 0 MEDIUM/HIGH, triagem coerente; compileall passou no Python 3.12.3 e nos três arquivos alterados no Python 3.11.16. Auditoria de realidade regenerada (27.549 linhas, 269 classes, 875 funções), sem diff nos relatórios versionados.
+- **D-030:** fronteiras de snapshot endurecidas sem mudar schema `nexus.deferred_task_queue.v1` nem assinaturas públicas; contextos exigem JSON nativo estrito. Extensões string-key em raiz/tarefas são ignoradas sem cópia profunda ou propagação interna; `statistics` exige exatamente quatro chaves. Chaves root/tarefa/estatísticas devem ser `str` exatas antes de qualquer lookup/membership, e JSON textual rejeita duplicatas em todos os níveis. Containers externos `dict`/`list` aceitam subclasses; escalares usam tipos built-in exatos e rejeitam `bool`/subclasses antes de operações ou construção de tarefas. A restauração publica heap, índice e contadores somente após staging completo.
+- **Baseline confirmado:** referências aninhadas já eram isoladas; timestamps NaN/±Infinity e bool nos campos inteiros já eram rejeitados. Lacunas reproduzidas: chave extra em estatísticas, tentativa exaurida ainda pendente, hooks de deepcopy/`__eq__`, duplicatas JSON e falha parcial durante staging; revisões independentes encontraram TOCTOU de `task_id` e subclass `int` de `priority` executando `__neg__`, todos agora cobertos e corrigidos.
+- **Testes locais:** `unittest` 318 executados, 316 aprovados e 2 skips pelo NetworkX opcional ausente; contratos focados snapshot/fila 51/51 em Python 3.11.16 e 51/51 em Python 3.12.3; cobertura de branch da fila 91%. Suite integrada: 30 aprovados, 1 skip opcional de FAISS, 0 faltantes.
+- **Gates:** mutation 80/80 mortos, 0 sobreviventes/não aplicadas; Ruff 0.16.10, actionlint 1.7.12 e zizmor 1.31.1 passaram; Bandit 131 LOW e 0 MEDIUM/HIGH, triagem coerente; compileall passou no Python 3.12.3 e nos três arquivos alterados no Python 3.11.16. Auditoria de realidade regenerada (27.549 linhas, 269 classes, 875 funções), sem diff nos relatórios versionados.
 - **Limites:** nenhum teto novo de bytes/profundidade; o parser/encoder JSON padrão pode rejeitar aninhamentos extremos. `enqueue` ainda usa `deepcopy` para contexto e os métodos da fila ainda expõem objetos mutáveis; isso ficou fora do escopo. Não há callsite de produção de `restore_snapshot` no checkout. CI oficial não foi executada porque não houve publicação.
 - **Próxima ação:** manter a branch isolada até autorização explícita para publicação/merge; não enviar para `main`. Considerar `enqueue` como uma decisão separada se futuramente for desejada validação JSON estrita também na entrada da fila.
 
