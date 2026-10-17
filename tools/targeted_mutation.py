@@ -36,6 +36,7 @@ TOOL_PARAMS = ("test_tool_parameter_contract.py",)
 JSON_FORMAT = ("test_format_json_contract.py",)
 TOOL_CACHE_KEY = ("test_tool_cache_key_contract.py",)
 TOOL_CACHE_STORE = ("test_tool_cache_store_contract.py",)
+MEMORY_SQL = ("test_memory_sql_contract.py",)
 COPY_IGNORE = shutil.ignore_patterns(
     ".git", "__pycache__", ".venv", "venv", ".hypothesis", ".ruff_cache", ".mypy_cache",
     "*.sqlite3", "*.db", ".coverage*", "coverage.xml", "targeted_mutation_report.json",
@@ -169,6 +170,20 @@ MUTATIONS = [
         'except Exception as exc:\n            # Caching is an optimization; copy failures must not invalidate execution.\n            self.log.log_event("TOOL_CACHE_STORE_UNAVAILABLE", {',
         'except Exception as exc:\n            raise\n            # Caching is an optimization; copy failures must not invalidate execution.\n            self.log.log_event("TOOL_CACHE_STORE_UNAVAILABLE", {',
         tests=TOOL_CACHE_STORE,
+    ),
+    Mutation(
+        "memory_retrieve_rejects_negative_limit",
+        "core/constitutional_brain.py",
+        "if limit < 0:",
+        "if False:",
+        tests=MEMORY_SQL,
+    ),
+    Mutation(
+        "memory_retrieve_rejects_boolean_limit",
+        "core/constitutional_brain.py",
+        "isinstance(limit, bool)",
+        "False",
+        tests=MEMORY_SQL,
     ),
 ]
 

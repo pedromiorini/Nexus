@@ -195,3 +195,14 @@
 - **Fundamentação:** a documentação oficial Python 3.12 de [`issubclass`](https://docs.python.org/3.12/library/functions.html#isinstance) define compatibilidade por subclasse; a documentação de [`bool`](https://docs.python.org/3.12/library/stdtypes.html#boolean-type-bool) nota que `bool` deriva de `int`, apesar de não ser semanticamente válido para esse parâmetro.
 - **Limitações:** só o valor declarado é validado; não há schema recursivo dos membros de listas/dicionários. O preflight de cache tem política independente e pode ignorar o cache para subclasses não nativas, sem impedir a execução. Tipos de schema desconhecidos ainda usam o nome exato legado.
 - **Reversibilidade:** fácil; a regra está isolada em `ToolValidator._matches_parameter_type` e pode ser ajustada sem alterar o formato público de `ToolDefinition`.
+
+
+## D-023 — Limite de memória deve ser inteiro não negativo antes de qualquer backend
+
+- **Decisão:** `RealHierarchicalMemory.retrieve` aceita `int` não booleano; valores negativos geram `ValueError`, tipos inválidos geram `TypeError` e `limit=0` retorna `[]` sem consultar FAISS ou SQLite.
+- **Contexto:** SQLite interpreta `LIMIT` negativo como ausência de teto; o caminho FAISS podia rejeitar `k` negativo e cair no fallback SQL, que também retornava sem limite.
+- **Motivo:** o parâmetro chamado `limit` não deve ampliar inadvertidamente o resultado para todo o corpus. A validação antes de selecionar backend mantém a mesma fronteira nos modos semântico e fallback.
+- **Evidência:** reprodução com quatro registros: `limit=0` devolveu 0, `limit=1` devolveu 1 e `limit=-1` devolveu 4. `test_memory_sql_contract.py` cobre consultas vazias/por palavra, o ramo FAISS simulado, tipos não inteiros/booleanos e zero; dois mutantes protegem os guardrails.
+- **Fonte:** [SQLite Language Reference — SELECT, seção LIMIT](https://www.sqlite.org/lang_select.html), que declara que limite negativo não impõe teto.
+- **Limitação:** não foi imposto máximo para valores positivos altos, que podem devolver todos os registros existentes se o chamador pedir isso; também não é uma limitação global de memória.
+- **Reversibilidade:** simples; callers inválidos recebem erro explícito, `limit=0` permanece válido e os demais limites positivos preservam o fluxo existente.
