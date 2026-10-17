@@ -99,6 +99,7 @@ jobs:
           coverage report --fail-under=0
           coverage report --include='core/deferred_task_queue.py' --fail-under=90
           coverage report --include='core/vram_defense_guard.py' --fail-under=90
+          coverage report --include='core/temporal_facts.py' --fail-under=90
           coverage report --include='vita/nexus_constitutional_bridge_v3.py' --fail-under=70
           coverage report --include='core/constitutional_brain.py' --fail-under=62
           coverage xml -o coverage.xml
