@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 271
+tests: 275
 bandit_low: 131
 -->
 
@@ -11,12 +11,12 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta atualização:** `main` pós-PR #33, merge commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b`; branch isolada `fix/tool-cache-hit-copy-fallback-2026-10-16` está localmente sincronizada por merge, sem force-push.
-- **Estado da revisão:** [PR #32](https://github.com/pedromiorini/Nexus/pull/32) continua aberta contra `main`; a branch sincronizada passou os gates locais e será publicada para atualizar a revisão. Não mesclar sem autorização específica.
-- **Mudança da PR #32:** `RealToolUse.execute_tool` trata falhas de `copy.deepcopy` em cache hit como bypass, remove a entrada defeituosa, registra `TOOL_CACHE_HIT_UNAVAILABLE` e executa a ferramenta; LRU e contadores só avançam após cópia bem-sucedida.
-- **Hardening já presente na base:** a PR #33 fechou o TOCTOU com snapshot JSON limitado, compartilhado entre validação, cache key e executor, após merge no commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b`. D-024 (cache hit) e D-025 (snapshot) coexistem nesta branch.
-- **Validação combinada local:** unittest 271/271 (0 falhas/skips/XPASS), integração 30 aprovados + 1 skip FAISS opcional, cobertura 95/94/76/68%, mutation 55/55 mortas; Bandit 131 LOW, nenhum MEDIUM/HIGH. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e benchmarks de capacidade/POMDP v2 passaram; no POMDP v2, 128/128 casos ficaram em `1e-12` e 4/4 controles inválidos foram rejeitados.
-- **Limites:** o snapshot é por valor, sem preservar identidade/aliasing/mutações in-place do original; a travessia não sincroniza escrita concorrente. O fallback de cache não limita custo do executor ou memória global; timeout segue diagnóstico, não cancelamento.
+- **Base desta atualização:** `main` pós-PR #32, merge commit `b07254307a23cdaef68f7c2b0d23010ac0827580`; inclui também a PR #33, mesclada em `62f6af14a2ad1d3659a4a5940e713c588513bf9b`. Branch ativa isolada: `fix/episodic-search-nonnegative-limit-2026-10-16`.
+- **Política de integração:** submeter a correção como PR isolada contra `main`; não mesclar a nova mudança sem autorização específica.
+- **Mudança em validação:** `RealEpisodicMemory.search_episodes` rejeita `bool`/tipos não inteiros e limites negativos antes de lock/SQL; `limit=0` retorna vazio sem consulta e os valores positivos preservam o fluxo anterior.
+- **Hardening herdado:** D-024 (fallback de cache hit) e D-025 (snapshot JSON anti-TOCTOU) estão em `main` após os merges #32 e #33.
+- **Validação local concluída:** unittest 275/275; 11/11 contratos episódicos focados; integração 30 aprovados + 1 skip FAISS opcional; cobertura 95/94/76/68%; mutation 58/58 mortas e 0 não aplicadas/sobreviventes; Bandit 131 LOW, sem MEDIUM/HIGH. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e benchmarks oficiais passaram. POMDP v2: 128/128 dentro de `1e-12`, erro máximo `2.7755575615628914e-16`, 4/4 controles inválidos rejeitados.
+- **Limites:** nenhum teto novo para limites positivos altos; o snapshot de parâmetros permanece por valor, sem preservar identidade/aliasing ou sincronizar escrita concorrente. Fallback de cache não limita custo do executor ou memória global; timeout segue diagnóstico, não cancelamento.
 - **POMDP herdado:** o filtro v2 usa modelo explícito e não reivindica aprendizagem ou planejamento; o protocolo v1 mantém `unsupported_interface` para observação parcial.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
