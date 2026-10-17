@@ -206,3 +206,13 @@
 - **Fonte:** [SQLite Language Reference — SELECT, seção LIMIT](https://www.sqlite.org/lang_select.html), que declara que limite negativo não impõe teto.
 - **Limitação:** não foi imposto máximo para valores positivos altos, que podem devolver todos os registros existentes se o chamador pedir isso; também não é uma limitação global de memória.
 - **Reversibilidade:** simples; callers inválidos recebem erro explícito, `limit=0` permanece válido e os demais limites positivos preservam o fluxo existente.
+
+## D-024 — Falha ao copiar um cache hit deve virar bypass, não falha da ferramenta
+
+- **Decisão:** se `copy.deepcopy(cached_result)` falhar durante um hit, remover a entrada e seu tamanho contabilizado, registrar `TOOL_CACHE_HIT_UNAVAILABLE` com o tipo da exceção e `cache_bypassed=true`, e continuar pelo executor. Só uma cópia concluída atualiza LRU e contadores de cache/sucesso.
+- **Contexto:** antes da correção, a cópia ocorria fora do `try` do executor; uma exceção escapava de `execute_tool` e impedia a nova execução, embora o cache seja opcional.
+- **Motivo:** uma falha interna da otimização não deve transformar uma chamada executável em exceção nem contar hit não entregue; descartar a entrada evita repetição do caminho defeituoso.
+- **Evidência:** `test_tool_cache_hit_contract.py` injeta falha no hit e na tentativa de re-cache; valida execução real, contadores, evento e remoção de bytes/entrada. Dois mutantes protegem fallback e eviction. A documentação oficial de [`copy.deepcopy`, Python 3.12](https://docs.python.org/3.12/library/copy.html) descreve cópia recursiva e limitações envolvendo objetos recursivos; a regressão reproduz a falha de forma determinística por injeção.
+- **Validação local:** 267/267 testes, integração 30 aprovados e 1 skip FAISS opcional, pisos 95/94/76/68%, mutation gate 49/49, Bandit 131 LOW e nenhum MEDIUM/HIGH; lint, auditorias e benchmarks passaram. Esses resultados ainda não são checks oficiais da PR.
+- **Limites:** cobre apenas cópia de resultado ao recuperar hit; armazenamento continua com seu fallback já existente. Não resolve a corrida TOCTOU de parâmetros mutáveis entre cache key e executor, registrada como follow-up independente.
+- **Reversibilidade:** simples; basta restaurar o caminho de erro anterior, removendo também o evento/eviction, para reverter o comportamento.

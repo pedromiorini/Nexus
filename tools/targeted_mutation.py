@@ -36,6 +36,7 @@ TOOL_PARAMS = ("test_tool_parameter_contract.py",)
 JSON_FORMAT = ("test_format_json_contract.py",)
 TOOL_CACHE_KEY = ("test_tool_cache_key_contract.py",)
 TOOL_CACHE_STORE = ("test_tool_cache_store_contract.py",)
+TOOL_CACHE_HIT = ("test_tool_cache_hit_contract.py",)
 MEMORY_SQL = ("test_memory_sql_contract.py",)
 COPY_IGNORE = shutil.ignore_patterns(
     ".git", "__pycache__", ".venv", "venv", ".hypothesis", ".ruff_cache", ".mypy_cache",
@@ -170,6 +171,20 @@ MUTATIONS = [
         'except Exception as exc:\n            # Caching is an optimization; copy failures must not invalidate execution.\n            self.log.log_event("TOOL_CACHE_STORE_UNAVAILABLE", {',
         'except Exception as exc:\n            raise\n            # Caching is an optimization; copy failures must not invalidate execution.\n            self.log.log_event("TOOL_CACHE_STORE_UNAVAILABLE", {',
         tests=TOOL_CACHE_STORE,
+    ),
+    Mutation(
+        "tool_cache_hit_copy_failure_falls_through",
+        "core/constitutional_brain.py",
+        'except Exception as exc:\n                            self._remove_cached_result(cache_key)\n                            self.log.log_event("TOOL_CACHE_HIT_UNAVAILABLE", {',
+        'except Exception as exc:\n                            raise\n                            self._remove_cached_result(cache_key)\n                            self.log.log_event("TOOL_CACHE_HIT_UNAVAILABLE", {',
+        tests=TOOL_CACHE_HIT,
+    ),
+    Mutation(
+        "tool_cache_hit_copy_failure_evicts_entry",
+        "core/constitutional_brain.py",
+        'except Exception as exc:\n                            self._remove_cached_result(cache_key)\n                            self.log.log_event("TOOL_CACHE_HIT_UNAVAILABLE", {',
+        'except Exception as exc:\n                            pass\n                            self.log.log_event("TOOL_CACHE_HIT_UNAVAILABLE", {',
+        tests=TOOL_CACHE_HIT,
     ),
     Mutation(
         "memory_retrieve_rejects_negative_limit",

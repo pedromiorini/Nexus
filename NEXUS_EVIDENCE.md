@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 265
+tests: 267
 bandit_low: 131
 -->
 
@@ -160,4 +160,27 @@ A correção valida antes de escolher o backend: `bool` e valores não `int` ger
 
 Validação local: unittest 265/265; integração 30 aprovados e 1 skip FAISS opcional; cobertura 95% fila, 94% VRAM, 76% Vita, 68% núcleo; mutation gate 47/47 mortos sem sobreviventes/não aplicados; Bandit 131 LOW e 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST/realidade, CLIs de capacidade e POMDP v2 passaram. A fonte normativa é a [documentação oficial SQLite de SELECT/LIMIT](https://www.sqlite.org/lang_select.html).
 
+Estado posterior: a PR #31 foi mesclada em `main` no commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45` após 2/2 checks oficiais aprovados.
+
 Limite: não há teto para valores positivos altos nem garantia sobre memória global. Finding adjacente ainda não implementado: os metadados `requires_permission`/`permission_level` não têm enforcement; todos os built-ins atuais os deixam desativados, e a definição de um modelo de autorização foi adiada por depender de escolha explícita de API.
+
+
+## Falha de cópia ao recuperar um cache hit — 2026-10-16
+
+Base local: `main` pós-PR #31, merge commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45`; branch isolada `fix/tool-cache-hit-copy-fallback-2026-10-16`.
+
+Reprodução pré-patch: uma chamada válida a `list_operations` preenchia o cache; uma falha injetada (`RecursionError`) na cópia do hit seguinte escapava de `execute_tool`, pois ocorria fora do `try` que envolve o executor. A segunda chamada não executava a ferramenta; estado observado: `successful_executions=1`, `failed_executions=0`, `cached_executions=0` e a entrada defeituosa permanecia armazenada.
+
+Correção: capturar a exceção apenas ao copiar o resultado do hit, remover a entrada e seu tamanho contabilizado, emitir `TOOL_CACHE_HIT_UNAVAILABLE` com tipo de exceção e `cache_bypassed=true`, e continuar pelo executor. A promoção LRU e os contadores de hit/sucesso só acontecem após uma cópia completa. Se a execução seguinte também não puder ser armazenada, o fallback pré-existente emite `TOOL_CACHE_STORE_UNAVAILABLE` e mantém o sucesso retornado pelo executor.
+
+`test_tool_cache_hit_contract.py` protege a execução real após falha do hit, contadores sem hit espúrio, e evicção quando a cópia da tentativa de re-cache também falha. Dois mutantes direcionados cobrem propagação da exceção e remoção da entrada; o workflow executa este contrato em etapa dedicada.
+
+Validação local: unittest 267/267, sem falhas/skips/XPASS; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 49/49 mortas, 0 sobreviventes e 0 não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade, auditorias AST e benchmarks de capacidade/POMDP v2 passaram. No POMDP v2, 128/128 casos ficaram dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e 4/4 controles inválidos foram rejeitados. Estes resultados são locais até a execução dos checks oficiais.
+
+Fundamentação: a [documentação oficial `copy` do Python 3.12](https://docs.python.org/3.12/library/copy.html) descreve `deepcopy` como recursiva e observa problemas possíveis com objetos recursivos; a falha específica desta fronteira foi reproduzida por injeção determinística. Limite: esta alteração cobre cópia ao recuperar hit, não falhas do logger nem a corrida de mutabilidade dos parâmetros descrita a seguir.
+
+## Achado adjacente pendente — TOCTOU entre parâmetros, cache key e executor
+
+Reprodução determinística por interleaving: `params={'items':[2,1], 'operation':'sort'}`; após `_make_cache_key` produzir a chave original, a lista foi alterada para `[9,0]` antes do executor. A primeira chamada retornou `[0,9]` e armazenou esse resultado sob a chave de `[2,1]`. Restaurada a entrada original, a segunda chamada retornou `[0,9]` com `cached=true`, embora o resultado esperado fosse `[1,2]`. O interleaving foi injetado no limite de `_make_cache_key`; não é um teste de estresse de threads, mas demonstra que a janela permite corrupção caso um caller concorrente mutile os mesmos objetos.
+
+Status: não corrigido nesta branch, por ser um contrato independente. Próxima investigação: definir snapshot seguro e limitado para valores cacheáveis e usar o mesmo snapshot para validação/chave/execução, ou ignorar a cache quando não houver como garantir identidade estável, sem impedir a execução normal. Evitar cópia profunda sem orçamento antes do preflight.

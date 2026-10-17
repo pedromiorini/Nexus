@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 265
+tests: 267
 bandit_low: 131
 -->
 
@@ -181,3 +181,14 @@ O manifesto distingue `discovered_static` (inventário AST) de `executed`, `pass
 - Não confundir esse contrato com um teto de memória global: valores positivos altos seguem permitidos; um máximo operacional precisa de decisão de API separada.
 - Contratos em `test_memory_sql_contract.py` exercitam fallback vazio/keyword, FAISS simulado, bool/float/string e zero; os dois mutantes impedem remover a guarda de negativo e a exceção para bool.
 - Auditoria adjacente: `ToolDefinition.requires_permission` e `permission_level` não são verificados durante execução. Os built-ins atuais declaram `requires_permission=False`; não tratar esses metadados como autorização efetiva e não introduzir ferramentas protegidas até definir principal/contexto e semântica dos níveis.
+
+
+## Falha ao copiar o resultado de um cache hit — 2026-10-16
+
+- Base: `main` pós-PR #31, merge commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45`; branch isolada `fix/tool-cache-hit-copy-fallback-2026-10-16`.
+- Reprodução pré-patch: após um primeiro `list_operations` bem-sucedido preencher o cache, uma falha injetada de `copy.deepcopy` no segundo hit escapava antes do `try` do executor. A segunda chamada não executava a ferramenta; havia 1 sucesso, 0 falhas contadas, 0 hits e a entrada permanecia no cache.
+- Correção: capturar a exceção somente na cópia do hit, remover entrada e contabilização de bytes, registrar `TOOL_CACHE_HIT_UNAVAILABLE` e seguir para o executor. A cópia bem-sucedida é feita antes da promoção LRU e dos contadores; se a ferramenta executar, seus contadores seguem o caminho normal. A tentativa independente de re-cache continua protegida pelo fallback de armazenamento já existente.
+- `test_tool_cache_hit_contract.py` verifica fallback para execução real, ausência de hit espúrio, preservação dos contadores de sucesso, evicção mesmo quando a cópia de re-cache também falha e eventos de bypass. Dois mutantes protegem o tratamento e a evicção; workflow adiciona a suíte como etapa dedicada.
+- Validação local: 267/267 unittest; integração 30 aprovados, 1 skip FAISS opcional; cobertura 95% fila, 94% VRAM, 76% Vita e 68% núcleo; mutation 49/49 sem sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH. Ruff, actionlint, zizmor, compileall, auditoria de realidade, auditorias AST e benchmarks de capacidade/POMDP v2 passaram.
+- Fundamentação: a [documentação oficial `copy` do Python 3.12](https://docs.python.org/3.12/library/copy.html) define `deepcopy` como recursiva e observa riscos em objetos recursivos; portanto, a cache trata a cópia como operação falível e a mantém fora do contrato de execução.
+- Limite independente: ainda não há snapshot estável para `params`. Uma mutação entre geração da chave e execução pode associar um resultado à entrada errada; a reprodução e proposta de follow-up estão no ledger de evidências e no roadmap. Não foi alterado nesta branch.
