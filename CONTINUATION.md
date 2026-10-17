@@ -3,8 +3,8 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
-bandit_low: 131
+tests: 348
+bandit_low: 135
 -->
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
