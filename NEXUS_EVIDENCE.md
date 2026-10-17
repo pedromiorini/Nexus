@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 271
+tests: 275
 bandit_low: 131
 -->
 
@@ -164,7 +164,7 @@ Limite: não há teto para valores positivos altos nem garantia sobre memória g
 
 ## Falha de cópia ao recuperar um cache hit — 2026-10-16
 
-Base da atualização: `main` pós-PR #33, merge commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b`; a branch isolada `fix/tool-cache-hit-copy-fallback-2026-10-16` foi sincronizada localmente. A PR #32 permanece aberta, sem merge para `main`.
+Base da atualização: `main` pós-PR #32, merge commit `b07254307a23cdaef68f7c2b0d23010ac0827580`, que já contém a PR #33 (merge commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b`). A PR #32 foi mesclada e D-024 passou a integrar `main`.
 
 Reprodução pré-patch: uma chamada válida a `list_operations` preenchia o cache; uma falha injetada (`RecursionError`) na cópia do hit seguinte escapava de `execute_tool`, pois ocorria fora do `try` que envolve o executor. A segunda chamada não executava a ferramenta; estado observado: `successful_executions=1`, `failed_executions=0`, `cached_executions=0` e a entrada defeituosa permanecia armazenada.
 
@@ -172,14 +172,14 @@ Correção: capturar a exceção apenas ao copiar o resultado do hit, remover a 
 
 `test_tool_cache_hit_contract.py` protege a execução real após falha do hit, contadores sem hit espúrio, e evicção quando a cópia da tentativa de re-cache também falha. Dois mutantes direcionados cobrem propagação da exceção e remoção da entrada; o workflow executa este contrato em etapa dedicada.
 
-Validação combinada local da branch sincronizada: suíte focada de cache 9/9; unittest 271/271 (0 falhas, skips ou XPASS); integração 30 aprovados + 1 skip FAISS opcional; pisos de cobertura 95/94/76/68%; mutation gate 55/55 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW e nenhum MEDIUM/HIGH, triagem consistente. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e CLIs dos benchmarks de capacidade/POMDP v2 passaram. POMDP v2: 128/128 casos dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e 4/4 controles inválidos rejeitados.
+Validação histórica pré-merge da branch sincronizada: suíte focada de cache 9/9; unittest 271/271 (0 falhas, skips ou XPASS); integração 30 aprovados + 1 skip FAISS opcional; pisos de cobertura 95/94/76/68%; mutation gate 55/55 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW e nenhum MEDIUM/HIGH, triagem consistente. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e CLIs dos benchmarks de capacidade/POMDP v2 passaram. POMDP v2: 128/128 casos dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e 4/4 controles inválidos rejeitados.
 
-Status de publicação: a [PR #32](https://github.com/pedromiorini/Nexus/pull/32) continua aberta contra `main`; esta atualização reúne D-024 e D-025 na branch sem mesclar a PR para `main`.
+Status de publicação: a [PR #32](https://github.com/pedromiorini/Nexus/pull/32) foi mesclada em `main` no commit `b07254307a23cdaef68f7c2b0d23010ac0827580`; D-024 e D-025 estão juntos na base atual.
 
 Fundamentação: a [documentação oficial `copy` do Python 3.12](https://docs.python.org/3.12/library/copy.html) descreve `deepcopy` como recursiva e observa problemas possíveis com objetos recursivos; a falha específica desta fronteira foi reproduzida por injeção determinística. Limite: esta alteração cobre cópia ao recuperar hit, não falhas do logger. A corrida de mutabilidade de parâmetros foi resolvida pelo snapshot documentado na seção seguinte (PR #33).
 
 ## Snapshot JSON limitado para parâmetros de ferramentas — PR #33 mesclada
-Base da correção: a PR #33 foi desenvolvida sobre `main` pós-PR #31 e mesclada em `main` no commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b` após 2/2 checks oficiais aprovados. A branch sincronizada da PR #32 já reúne D-024 e D-025, permanece aberta e não foi mesclada em `main`.
+Base da correção: a PR #33 foi desenvolvida sobre `main` pós-PR #31 e mesclada em `main` no commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b`; a PR #32 foi mesclada depois, no commit `b07254307a23cdaef68f7c2b0d23010ac0827580`. Ambas as decisões estão atualmente em `main`.
 
 A lacuna era temporal: `execute_tool` podia formar uma cache key a partir do valor mutável original e, antes de validar/executar, o chamador alterar esse objeto. A chave então descrevia um valor enquanto o executor observava outro. O contrato `test_tool_cache_snapshot_contract.py` reproduz a divergência e exige identidade do mesmo snapshot nas fases subsequentes; um caso adicional confirma que referências compartilhadas tornam-se cópias independentes por valor.
 
@@ -190,3 +190,15 @@ Se o preflight do snapshot falhar (ciclo, tipo não JSON, subclass/container nã
 Uma revisão independente não encontrou bloqueadores, mas identificou uma limitação P2: substituição de valor com o mesmo tamanho enquanto a travessia está em curso pode formar um snapshot misto, pois a cópia não sincroniza o produtor. Depois de construído, o mesmo snapshot é usado por chave, validação e executor; aplicações que exijam um instante atomicamente consistente precisam sincronizar as escritas na origem. Identidade, aliasing e mutações in-place do original não fazem parte da semântica preservada.
 
 Validação local do head original da PR #33 (pré-sincronização da PR #32), Python 3.12: suítes focadas de cache 9/9; suíte completa `unittest` 269/269, sem falhas/skips/XPASS; suíte integrada 30 aprovados e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76% e núcleo 68%; mutation gate 53/53 mortas, 0 sobreviventes e 0 não aplicadas. Bandit encontrou 131 LOW e nenhum MEDIUM/HIGH; a triagem verificou-se consistente. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e CLIs dos benchmarks de capacidade/POMDP v2 na seed `20261016` passaram. O v2 manteve 128/128 casos dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e rejeitou 4/4 controles inválidos.
+
+## Limite não negativo na busca de memória episódica — 2026-10-16
+
+Base da alteração: branch `fix/episodic-search-nonnegative-limit-2026-10-16`, criada sobre `main` pós-PR #32 no commit `b07254307a23cdaef68f7c2b0d23010ac0827580` (que contém também a PR #33).
+
+Reprodução pré-patch: com dois episódios fechados, `search_episodes(status="closed", limit=-1)` retornou os dois; `limit=True` também foi aceito como limite 1. A implementação repassava diretamente o valor para a cláusula SQL `LIMIT`.
+
+Correção: `search_episodes` rejeita bool e tipos não inteiros com `TypeError`, negativos com `ValueError` e devolve `[]` para zero antes de adquirir lock ou executar SQL. Limites positivos e os filtros existentes de query/status permanecem inalterados; nenhum máximo positivo novo foi introduzido.
+
+`test_episodic_memory_search_limits_contract.py` cobre limites negativos nos dois ramos de query e prova ausência de SQL, rejeição de bool/float/string/None, zero sem consulta e preservação de limite positivo. Validação final: 11/11 contratos episódicos focados e unittest 275/275; integração 30 aprovados + 1 skip FAISS opcional; cobertura 95/94/76/68%; mutation 58/58 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW e nenhum MEDIUM/HIGH. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e benchmarks oficiais passaram. O POMDP v2 obteve 128/128 casos dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e rejeitou 4/4 controles inválidos. O relatório de realidade foi regenerado para refletir as sete linhas acrescentadas ao núcleo.
+
+Fonte normativa: [SQLite Language Reference — SELECT, seção LIMIT](https://www.sqlite.org/lang_select.html), que especifica que um LIMIT negativo não estabelece teto para as linhas retornadas.

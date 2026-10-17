@@ -40,6 +40,7 @@ TOOL_CACHE_MATH = ("test_math_calculate_resource_limits.py",)
 TOOL_CACHE_STORE = ("test_tool_cache_store_contract.py",)
 TOOL_CACHE_HIT = ("test_tool_cache_hit_contract.py",)
 MEMORY_SQL = ("test_memory_sql_contract.py",)
+EPISODIC_SEARCH_LIMIT = ("test_episodic_memory_search_limits_contract.py",)
 COPY_IGNORE = shutil.ignore_patterns(
     ".git", "__pycache__", ".venv", "venv", ".hypothesis", ".ruff_cache", ".mypy_cache",
     "*.sqlite3", "*.db", ".coverage*", "coverage.xml", "targeted_mutation_report.json",
@@ -233,16 +234,37 @@ MUTATIONS = [
     Mutation(
         "memory_retrieve_rejects_negative_limit",
         "core/constitutional_brain.py",
-        "if limit < 0:",
-        "if False:",
+        'def retrieve(self, query: str, limit: int = 5) -> List[Dict]:\n        """\n        Recuperar memórias via busca semântica (FAISS) ou keyword fallback.\n        Retorna: List[Dict] com similarity, importance, etc.\n        """\n        # FIXED v3.68: Thread-safe with lock\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")\n        if limit < 0:',
+        'def retrieve(self, query: str, limit: int = 5) -> List[Dict]:\n        """\n        Recuperar memórias via busca semântica (FAISS) ou keyword fallback.\n        Retorna: List[Dict] com similarity, importance, etc.\n        """\n        # FIXED v3.68: Thread-safe with lock\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")\n        if False:',
         tests=MEMORY_SQL,
     ),
     Mutation(
         "memory_retrieve_rejects_boolean_limit",
         "core/constitutional_brain.py",
-        "isinstance(limit, bool)",
-        "False",
+        'def retrieve(self, query: str, limit: int = 5) -> List[Dict]:\n        """\n        Recuperar memórias via busca semântica (FAISS) ou keyword fallback.\n        Retorna: List[Dict] com similarity, importance, etc.\n        """\n        # FIXED v3.68: Thread-safe with lock\n        if isinstance(limit, bool)',
+        'def retrieve(self, query: str, limit: int = 5) -> List[Dict]:\n        """\n        Recuperar memórias via busca semântica (FAISS) ou keyword fallback.\n        Retorna: List[Dict] com similarity, importance, etc.\n        """\n        # FIXED v3.68: Thread-safe with lock\n        if False',
         tests=MEMORY_SQL,
+    ),
+    Mutation(
+        "episodic_search_rejects_boolean_and_non_integer_limit",
+        "core/constitutional_brain.py",
+        '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")',
+        '"""Buscar episódios"""\n        if False:\n            raise TypeError("limit must be an integer")',
+        tests=EPISODIC_SEARCH_LIMIT,
+    ),
+    Mutation(
+        "episodic_search_rejects_negative_limit",
+        "core/constitutional_brain.py",
+        '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")\n        if limit < 0:\n            raise ValueError("limit must be non-negative")',
+        '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")\n        if False:\n            raise ValueError("limit must be non-negative")',
+        tests=EPISODIC_SEARCH_LIMIT,
+    ),
+    Mutation(
+        "episodic_search_zero_limit_skips_database",
+        "core/constitutional_brain.py",
+        '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")\n        if limit < 0:\n            raise ValueError("limit must be non-negative")\n        if limit == 0:\n            return []',
+        '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")\n        if limit < 0:\n            raise ValueError("limit must be non-negative")\n        if False:\n            return []',
+        tests=EPISODIC_SEARCH_LIMIT,
     ),
 ]
 

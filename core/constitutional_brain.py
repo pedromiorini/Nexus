@@ -2238,6 +2238,13 @@ class RealEpisodicMemory:
     def search_episodes(self, query: Optional[str] = None, 
                        status: str = "closed", limit: int = 10) -> List[Episode]:
         """Buscar episódios"""
+        if isinstance(limit, bool) or not isinstance(limit, int):
+            raise TypeError("limit must be an integer")
+        if limit < 0:
+            raise ValueError("limit must be non-negative")
+        if limit == 0:
+            return []
+
         with self.db_lock:
             cursor = self.conn.cursor()
 

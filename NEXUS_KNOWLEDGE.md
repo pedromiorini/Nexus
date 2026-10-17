@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 271
+tests: 275
 bandit_low: 131
 -->
 
@@ -184,11 +184,11 @@ O manifesto distingue `discovered_static` (inventário AST) de `executed`, `pass
 
 ## Falha ao copiar o resultado de um cache hit — 2026-10-16
 
-- Base atualizada: `main` pós-PR #33, merge commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b`; branch `fix/tool-cache-hit-copy-fallback-2026-10-16` sincronizada, com PR #32 aberta.
+- Base atualizada: `main` pós-PR #32, merge commit `b07254307a23cdaef68f7c2b0d23010ac0827580`, contendo a PR #33 (merge commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b`). A PR #32 foi mesclada.
 - Reprodução pré-patch: após um primeiro `list_operations` bem-sucedido preencher o cache, uma falha injetada de `copy.deepcopy` no segundo hit escapava antes do `try` do executor. A segunda chamada não executava a ferramenta; havia 1 sucesso, 0 falhas contadas, 0 hits e a entrada permanecia no cache.
 - Correção: capturar a exceção somente na cópia do hit, remover entrada e contabilização de bytes, registrar `TOOL_CACHE_HIT_UNAVAILABLE` e seguir para o executor. A cópia bem-sucedida é feita antes da promoção LRU e dos contadores; se a ferramenta executar, seus contadores seguem o caminho normal. A tentativa independente de re-cache continua protegida pelo fallback de armazenamento já existente.
 - `test_tool_cache_hit_contract.py` verifica fallback para execução real, ausência de hit espúrio, preservação dos contadores de sucesso, evicção mesmo quando a cópia de re-cache também falha e eventos de bypass. Dois mutantes protegem o tratamento e a evicção; workflow adiciona a suíte como etapa dedicada.
-- Validação combinada local da branch sincronizada: unittest 271/271 (0 falhas/skips/XPASS), integração 30 aprovados + 1 skip FAISS opcional, pisos de cobertura 95/94/76/68%, mutation 55/55 sem sobreviventes/não aplicadas, Bandit 131 LOW e nenhum MEDIUM/HIGH; Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e benchmarks de capacidade/POMDP v2 passaram. POMDP v2: 128/128 casos dentro de `1e-12` e 4/4 controles inválidos rejeitados.
+- Validação histórica pré-merge da branch sincronizada: unittest 271/271 (0 falhas/skips/XPASS), integração 30 aprovados + 1 skip FAISS opcional, pisos de cobertura 95/94/76/68%, mutation 55/55 sem sobreviventes/não aplicadas, Bandit 131 LOW e nenhum MEDIUM/HIGH; Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e benchmarks de capacidade/POMDP v2 passaram. POMDP v2: 128/128 casos dentro de `1e-12` e 4/4 controles inválidos rejeitados.
 - Fundamentação: a [documentação oficial `copy` do Python 3.12](https://docs.python.org/3.12/library/copy.html) define `deepcopy` como recursiva e observa riscos em objetos recursivos; portanto, a cache trata a cópia como operação falível e a mantém fora do contrato de execução.
 - Limite independente: esta decisão não resolve por si só o TOCTOU entre chave e `params`; essa janela foi fechada pelo snapshot de D-025/PR #33, agora presente na base sincronizada.
 
@@ -198,4 +198,13 @@ O manifesto distingue `discovered_static` (inventário AST) de `executed`, `pass
 - Inputs que não cabem no snapshot JSON (ciclo, tupla, chave não-string, número não finito, subclass/container não reconhecido ou orçamento excedido) bypassam a cache; validação e execução seguem com o objeto original. Falha posterior na chave não deve trocar o objeto já snapshotado usado por validação/execução.
 - Cópia por valor não preserva identidade, aliasing entre referências, nem mutações in-place do original. O percurso não é uma operação atomicamente sincronizada: substituição do mesmo tamanho durante a cópia pode formar um retrato misto; se a aplicação exigir um instante coerente sob escrita concorrente, o produtor deve sincronizar os parâmetros.
 - Contratos: `test_tool_cache_snapshot_contract.py` protege o mesmo snapshot nas três fases, alterações da origem, aliases e bypass; `test_tool_cache_key_contract.py` cobre guardas de containers/ciclos `dict` e `list`; `test_math_calculate_resource_limits.py` protege a rejeição de expressão grande antes da cache key. Validação do head original da PR #33 (pré-sincronização da PR #32): 269/269 testes, integração 30 aprovações + 1 skip opcional, pisos 95/94/76/68%, mutation 53/53 sem sobreviventes/não aplicadas, Bandit 131 LOW e nenhum MEDIUM/HIGH; lint, workflows, auditorias e benchmarks passaram.
-- A PR #33 foi mesclada em `main` no commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b` após 2/2 checks oficiais. A branch sincronizada da PR #32 reúne D-024 e D-025 e segue aberta; não mesclar a PR #32 sem autorização específica.
+- A PR #33 foi mesclada em `main` no commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b`; a PR #32 foi mesclada depois, em `b07254307a23cdaef68f7c2b0d23010ac0827580`, reunindo D-024 e D-025 na base.
+
+## `RealEpisodicMemory.search_episodes`: validar limite antes de SQLite
+
+- Um `LIMIT` negativo no SQLite não tem teto superior; a API antiga repassava `limit` diretamente ao SQL e podia retornar todos os episódios do status solicitado. `bool` era aceito por ser subclasse de `int`.
+- A validação no começo do método segue D-023: `int` não booleano, `ValueError` para negativo, `TypeError` para tipo inválido e `[]` para zero antes de lock/SQL. Valores positivos e filtros de query/status permanecem intactos; limites positivos altos continuam permitidos.
+- A regressão foi reproduzida com dois episódios fechados (`limit=-1` retornou 2; `limit=True` retornou 1). `test_episodic_memory_search_limits_contract.py` cobre os dois caminhos de query, tipos, zero sem consulta e positivo; três mutantes direcionados estão no gate.
+- A alteração está na branch `fix/episodic-search-nonnegative-limit-2026-10-16`, baseada em `main` pós-PR #32 (`b07254307a23cdaef68f7c2b0d23010ac0827580`). A [documentação oficial SQLite](https://www.sqlite.org/lang_select.html) é a fonte para a semântica negativa de `LIMIT`.
+
+- Validação desta branch: unittest 275/275, 11/11 contratos episódicos focados, cobertura 95/94/76/68%, mutation 58/58 (100%) e Bandit 131 LOW/0 MEDIUM/HIGH. Lint, workflows, auditorias e benchmarks oficiais passaram; no POMDP v2, 128/128 ficaram dentro de `1e-12` e 4/4 controles inválidos foram rejeitados.
