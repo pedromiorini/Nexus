@@ -11,11 +11,11 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta atualização:** `main` pós-PR #32, merge commit `b07254307a23cdaef68f7c2b0d23010ac0827580`; inclui também a PR #33, mesclada em `62f6af14a2ad1d3659a4a5940e713c588513bf9b`. Branch ativa isolada: `fix/episodic-search-nonnegative-limit-2026-10-16`.
-- **Política de integração:** submeter a correção como PR isolada contra `main`; não mesclar a nova mudança sem autorização específica.
-- **Mudança em validação:** `RealEpisodicMemory.search_episodes` rejeita `bool`/tipos não inteiros e limites negativos antes de lock/SQL; `limit=0` retorna vazio sem consulta e os valores positivos preservam o fluxo anterior.
+- **Base atual:** `main` pós-PR #34, merge commit `51373dc77179e4edd094df14290f91aa9c8d8060`; contém a PR #33 (`62f6af14a2ad1d3659a4a5940e713c588513bf9b`), a PR #32 (`b07254307a23cdaef68f7c2b0d23010ac0827580`) e a PR #34.
+- **Política de integração:** mudanças futuras devem permanecer em branches isoladas e ser mescladas somente mediante autorização específica.
+- **D-026 implementada:** `RealEpisodicMemory.search_episodes` rejeita `bool`/tipos não inteiros e limites negativos antes de lock/SQL; `limit=0` retorna vazio sem consulta e valores positivos preservam o fluxo anterior, sem novo teto.
 - **Hardening herdado:** D-024 (fallback de cache hit) e D-025 (snapshot JSON anti-TOCTOU) estão em `main` após os merges #32 e #33.
-- **Validação local concluída:** unittest 275/275; 11/11 contratos episódicos focados; integração 30 aprovados + 1 skip FAISS opcional; cobertura 95/94/76/68%; mutation 58/58 mortas e 0 não aplicadas/sobreviventes; Bandit 131 LOW, sem MEDIUM/HIGH. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e benchmarks oficiais passaram. POMDP v2: 128/128 dentro de `1e-12`, erro máximo `2.7755575615628914e-16`, 4/4 controles inválidos rejeitados.
+- **Validação da PR #34:** unittest 275/275; 11/11 contratos episódicos focados; integração 30 aprovados + 1 skip FAISS opcional; cobertura 95/94/76/68%; mutation 58/58 mortas e 0 não aplicadas/sobreviventes; Bandit 131 LOW, sem MEDIUM/HIGH. Checks oficiais da PR: 2/2 aprovados. POMDP v2: 128/128 dentro de `1e-12`, erro máximo `2.7755575615628914e-16`, 4/4 controles inválidos rejeitados.
 - **Limites:** nenhum teto novo para limites positivos altos; o snapshot de parâmetros permanece por valor, sem preservar identidade/aliasing ou sincronizar escrita concorrente. Fallback de cache não limita custo do executor ou memória global; timeout segue diagnóstico, não cancelamento.
 - **POMDP herdado:** o filtro v2 usa modelo explícito e não reivindica aprendizagem ou planejamento; o protocolo v1 mantém `unsupported_interface` para observação parcial.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
