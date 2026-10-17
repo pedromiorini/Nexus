@@ -698,9 +698,13 @@ class RealKnowledgeGraph:
         """
         Raciocínio multi-salto: encontrar caminho de start → end.
         Usa BFS para encontrar caminho mais curto.
+        IDs inexistentes retornam resultado vazio em ambos os backends.
         """
         self.total_queries += 1
         self.total_multihop_queries += 1
+
+        if start_id not in self.entity_index or end_id not in self.entity_index:
+            return QueryResult([], [], "", 0.0, 0)
 
         if self.nx:
             # NetworkX: usar shortest_path
