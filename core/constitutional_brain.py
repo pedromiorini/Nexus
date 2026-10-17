@@ -4399,14 +4399,24 @@ class RealToolUse:
                 if cached_result is not None:
                     age = time.time() - cached_result.timestamp
                     if 0 <= age < tool.cache_ttl:
-                        self.result_cache.pop(cache_key)
-                        self.result_cache[cache_key] = cached_result
-                        cached_copy = copy.deepcopy(cached_result)
-                        self.cached_executions += 1
-                        self.successful_executions += 1
-                        cached_copy.cached = True
-                        return cached_copy
-                    self._remove_cached_result(cache_key)
+                        try:
+                            cached_copy = copy.deepcopy(cached_result)
+                        except Exception as exc:
+                            self._remove_cached_result(cache_key)
+                            self.log.log_event("TOOL_CACHE_HIT_UNAVAILABLE", {
+                                "tool": tool.name,
+                                "reason": type(exc).__name__,
+                                "cache_bypassed": True,
+                            })
+                        else:
+                            self.result_cache.pop(cache_key)
+                            self.result_cache[cache_key] = cached_result
+                            self.cached_executions += 1
+                            self.successful_executions += 1
+                            cached_copy.cached = True
+                            return cached_copy
+                    else:
+                        self._remove_cached_result(cache_key)
         # 4. Executar ferramenta
         try:
             # Mapeamento de ferramentas built-in

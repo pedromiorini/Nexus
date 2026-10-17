@@ -156,6 +156,11 @@ jobs:
           PYTHONPATH: .
         run: python -m unittest -v test_tool_cache_store_contract.py
 
+      - name: Run tool cache hit fallback contract tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v test_tool_cache_hit_contract.py
+
       - name: Run state consistency contract tests
         env:
           PYTHONPATH: .
