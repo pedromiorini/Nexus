@@ -3865,6 +3865,10 @@ class RealToolUse:
         def __init__(self, reason: str):
             super().__init__(reason)
             self.reason = reason
+    class _CacheKeySnapshotUnavailable(ValueError):
+        def __init__(self, reason: str):
+            super().__init__(reason)
+            self.reason = reason
     MAX_MATH_EXPRESSION_LENGTH = 256
     MAX_MATH_AST_NODES = 64
     MAX_MATH_INTEGER_BITS = 4096
@@ -4021,96 +4025,138 @@ class RealToolUse:
             size = self._add_cache_key_size(size, character_size)
         return size
 
-    def _check_cache_key_budget(self, tool_name: str, params: Dict[str, Any]) -> None:
-        """Bound cache-key traversal before invoking the recursive JSON encoder."""
+    def _snapshot_cache_params(self, tool_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a detached JSON-only snapshot within the cache-key budget."""
         if type(tool_name) is not str:
             raise TypeError("tool name must be a string")
+        if type(params) is not dict:
+            raise TypeError("cache snapshots require a plain dict")
         if len(tool_name) > self.MAX_CACHE_KEY_BYTES:
             raise self._CacheKeyBudgetExceeded("byte_limit")
         prefix_size = len(tool_name.encode("utf-8")) + 1
         total_size = self._add_cache_key_size(0, prefix_size)
-        pending = [(params, 0, False, False)]
+        snapshot_root: list[Any] = [None]
+        pending = [(params, snapshot_root, 0, 0, False)]
         active_containers = set()
         visited_nodes = 0
-
         while pending:
-            value, depth, is_key, exiting = pending.pop()
+            value, parent, slot, depth, exiting = pending.pop()
             if exiting:
                 active_containers.discard(id(value))
                 continue
-
             visited_nodes += 1
             if visited_nodes > self.MAX_CACHE_KEY_NODES:
                 raise self._CacheKeyBudgetExceeded("node_limit")
             if depth > self.MAX_CACHE_KEY_DEPTH:
                 raise self._CacheKeyBudgetExceeded("depth_limit")
-
             value_type = type(value)
-            if is_key and value_type not in (str, int, float, bool, type(None)):
-                raise TypeError(
-                    f"keys must be str, int, float, bool or None, not {value_type.__name__}"
-                )
-
-            if value_type in (dict, list, tuple):
-                if is_key:
-                    raise TypeError(
-                        f"keys must be str, int, float, bool or None, not {value_type.__name__}"
-                    )
+            if value_type is dict:
                 value_id = id(value)
                 if value_id in active_containers:
                     raise self._CacheKeyBudgetExceeded("cycle")
                 item_count = len(value)
                 if item_count > self.MAX_CACHE_KEY_CONTAINER_ITEMS:
                     raise self._CacheKeyBudgetExceeded("container_item_limit")
-                active_containers.add(value_id)
-                pending.append((value, depth, False, True))
-                if value_type is dict:
-                    # json.dumps defaults to comma-space and colon-space separators.
-                    punctuation_size = 2 + 2 * item_count + 2 * max(0, item_count - 1)
-                    total_size = self._add_cache_key_size(total_size, punctuation_size)
+                entries = []
+                try:
                     for key, nested_value in value.items():
-                        pending.append((nested_value, depth + 1, False, False))
-                        pending.append((key, depth + 1, True, False))
-                else:
-                    punctuation_size = 2 + 2 * max(0, item_count - 1)
-                    total_size = self._add_cache_key_size(total_size, punctuation_size)
-                    for nested_value in value:
-                        pending.append((nested_value, depth + 1, False, False))
+                        if len(entries) >= item_count:
+                            raise self._CacheKeySnapshotUnavailable("input_changed")
+                        if type(key) is not str:
+                            raise TypeError("cache snapshot requires string object keys")
+                        visited_nodes += 1
+                        if visited_nodes > self.MAX_CACHE_KEY_NODES:
+                            raise self._CacheKeyBudgetExceeded("node_limit")
+                        if depth + 1 > self.MAX_CACHE_KEY_DEPTH:
+                            raise self._CacheKeyBudgetExceeded("depth_limit")
+                        total_size = self._add_cache_key_size(
+                            total_size, self._cache_key_json_string_size(key)
+                        )
+                        entries.append((key, nested_value))
+                except RuntimeError as exc:
+                    raise self._CacheKeySnapshotUnavailable("input_changed") from exc
+                if len(entries) != item_count or len(value) != item_count:
+                    raise self._CacheKeySnapshotUnavailable("input_changed")
+                punctuation_size = 2 + 2 * item_count + 2 * max(0, item_count - 1)
+                total_size = self._add_cache_key_size(total_size, punctuation_size)
+                copied = {}
+                parent[slot] = copied
+                active_containers.add(value_id)
+                pending.append((value, None, None, depth, True))
+                for key, nested_value in reversed(entries):
+                    pending.append((nested_value, copied, key, depth + 1, False))
+            elif value_type is list:
+                value_id = id(value)
+                if value_id in active_containers:
+                    raise self._CacheKeyBudgetExceeded("cycle")
+                item_count = len(value)
+                if item_count > self.MAX_CACHE_KEY_CONTAINER_ITEMS:
+                    raise self._CacheKeyBudgetExceeded("container_item_limit")
+                try:
+                    values = [value[index] for index in range(item_count)]
+                except IndexError as exc:
+                    raise self._CacheKeySnapshotUnavailable("input_changed") from exc
+                if len(value) != item_count:
+                    raise self._CacheKeySnapshotUnavailable("input_changed")
+                punctuation_size = 2 + 2 * max(0, item_count - 1)
+                total_size = self._add_cache_key_size(total_size, punctuation_size)
+                copied = [None] * item_count
+                parent[slot] = copied
+                active_containers.add(value_id)
+                pending.append((value, None, None, depth, True))
+                for index in range(item_count - 1, -1, -1):
+                    pending.append((values[index], copied, index, depth + 1, False))
             elif value_type is str:
                 total_size = self._add_cache_key_size(
                     total_size, self._cache_key_json_string_size(value)
                 )
+                parent[slot] = value
             elif value_type is bool:
-                value_size = 4 if value else 5
-                total_size = self._add_cache_key_size(
-                    total_size, value_size + (2 if is_key else 0)
-                )
+                total_size = self._add_cache_key_size(total_size, 4 if value else 5)
+                parent[slot] = value
             elif value is None:
-                total_size = self._add_cache_key_size(
-                    total_size, 4 + (2 if is_key else 0)
-                )
+                total_size = self._add_cache_key_size(total_size, 4)
+                parent[slot] = None
             elif value_type is int:
                 bit_count = value.bit_length()
                 digit_count = 1 if bit_count == 0 else (bit_count * 302 + 999) // 1000
-                value_size = digit_count + (1 if value < 0 else 0) + (2 if is_key else 0)
+                value_size = digit_count + (1 if value < 0 else 0)
                 total_size = self._add_cache_key_size(total_size, value_size)
+                parent[slot] = value
             elif value_type is float:
-                # Python float JSON representations, including non-finite tokens, are < 32 chars.
-                total_size = self._add_cache_key_size(
-                    total_size, 32 + (2 if is_key else 0)
-                )
+                if not math.isfinite(value):
+                    raise self._CacheKeySnapshotUnavailable("non_finite_float")
+                total_size = self._add_cache_key_size(total_size, 32)
+                parent[slot] = value
             else:
                 raise TypeError(
-                    f"Object of type {value_type.__name__} is not JSON serializable"
+                    f"Object of type {value_type.__name__} is not a strict JSON value"
                 )
+        snapshot = snapshot_root[0]
+        if type(snapshot) is not dict:
+            raise TypeError("cache snapshot root must be a plain dict")
+        return snapshot
 
-    def _make_cache_key(self, tool_name: str, params: Dict[str, Any]) -> str:
-        """Create the legacy cache key only after bounded preflight."""
+    def _make_cache_key(
+        self,
+        tool_name: str,
+        params: Dict[str, Any],
+        *,
+        _snapshot_is_valid: bool = False,
+    ) -> str:
+        """Create a compatible key after bounded JSON snapshot preparation."""
         import json
-        self._check_cache_key_budget(tool_name, params)
-        params_str = json.dumps(params, sort_keys=True)
-        return hashlib.sha256(f"{tool_name}:{params_str}".encode()).hexdigest()
-
+        if _snapshot_is_valid:
+            snapshot = params
+            if type(tool_name) is not str or type(snapshot) is not dict:
+                raise TypeError("cache key requires a string tool name and plain dict")
+        else:
+            snapshot = self._snapshot_cache_params(tool_name, params)
+        params_str = json.dumps(snapshot, sort_keys=True, allow_nan=False)
+        payload = f"{tool_name}:{params_str}".encode()
+        if len(payload) > self.MAX_CACHE_KEY_BYTES:
+            raise self._CacheKeyBudgetExceeded("byte_limit")
+        return hashlib.sha256(payload).hexdigest()
     def _execute_math_calculate(self, params: Dict[str, Any]) -> Any:
         """Evaluate bounded numeric expressions without constructing large objects."""
         import ast
@@ -4294,8 +4340,24 @@ class RealToolUse:
                 execution_time=time.time() - start_time,
             )
         timeout_seconds = tool.timeout_seconds
-        # 2. Validar parâmetros
-        if not self.validator.validate_parameters(tool, params):
+        # 2. Prepare one bounded value snapshot for all cacheable-tool semantics.
+        execution_params = params
+        cache_key = None
+        snapshot_ready = False
+        if tool.cacheable and isinstance(params, dict):
+            try:
+                execution_params = self._snapshot_cache_params(tool_name, params)
+                snapshot_ready = True
+            except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+                execution_params = params
+                cache_key = None
+                self.log.log_event("TOOL_CACHE_KEY_UNAVAILABLE", {
+                    "tool": tool_name,
+                    "reason": getattr(exc, "reason", type(exc).__name__),
+                    "cache_bypassed": True,
+                })
+        # 3. Validate and apply semantic input guards before cache serialization.
+        if not self.validator.validate_parameters(tool, execution_params):
             self.failed_executions += 1
             return ToolExecutionResult(
                 tool_name=tool_name,
@@ -4303,9 +4365,8 @@ class RealToolUse:
                 result=None,
                 error="Parameter validation failed"
             )
-
         if tool_name == "math_calculate":
-            expression = params.get("expression", "")
+            expression = execution_params.get("expression", "")
             if len(expression) > self.MAX_MATH_EXPRESSION_LENGTH:
                 error = f"expression exceeds {self.MAX_MATH_EXPRESSION_LENGTH} characters"
                 self.failed_executions += 1
@@ -4317,12 +4378,12 @@ class RealToolUse:
                     error=error,
                     execution_time=time.time() - start_time,
                 )
-        # 3. Verificar cache; entradas expiradas são removidas antes de novo acesso.
-        self._prune_result_cache(time.time())
-        cache_key = None
-        if tool.cacheable:
+        # 4. Generate the cache key only after validation and semantic input guards.
+        if snapshot_ready:
             try:
-                cache_key = self._make_cache_key(tool_name, params)
+                cache_key = self._make_cache_key(
+                    tool_name, execution_params, _snapshot_is_valid=True
+                )
             except (TypeError, ValueError, OverflowError, RecursionError) as exc:
                 cache_key = None
                 self.log.log_event("TOOL_CACHE_KEY_UNAVAILABLE", {
@@ -4330,6 +4391,8 @@ class RealToolUse:
                     "reason": getattr(exc, "reason", type(exc).__name__),
                     "cache_bypassed": True,
                 })
+        # 5. Verificar cache; entradas expiradas são removidas antes de novo acesso.
+        self._prune_result_cache(time.time())
         if tool.cacheable and cache_key is not None:
             with self._result_cache_lock:
                 cached_result = self.result_cache.get(cache_key)
@@ -4372,7 +4435,7 @@ class RealToolUse:
 
             executor_started = time.monotonic()
             try:
-                result = executors[tool_name](params)
+                result = executors[tool_name](execution_params)
             finally:
                 executor_duration = time.monotonic() - executor_started
                 if executor_duration > timeout_seconds:

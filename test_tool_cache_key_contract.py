@@ -114,6 +114,10 @@ class ToolCacheKeyBoundaryContractTests(unittest.TestCase):
     def test_over_budget_cache_keys_bypass_json_without_blocking_executor(self):
         cycle = []
         cycle.append(cycle)
+        cycle_dict = {}
+        cycle_dict["self"] = cycle_dict
+        container_limit = RealToolUse.MAX_CACHE_KEY_CONTAINER_ITEMS + 1
+        large_dict = {f"key_{index}": None for index in range(container_limit)}
         cases = (
             (
                 "byte_limit",
@@ -131,7 +135,9 @@ class ToolCacheKeyBoundaryContractTests(unittest.TestCase):
                 "container_item_limit",
                 [None] * (RealToolUse.MAX_CACHE_KEY_CONTAINER_ITEMS + 1),
             ),
+            ("container_item_limit", large_dict),
             ("cycle", cycle),
+            ("cycle", cycle_dict),
         )
 
         for expected_reason, extension in cases:

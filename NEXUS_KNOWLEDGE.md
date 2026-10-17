@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 265
+tests: 269
 bandit_low: 131
 -->
 
@@ -181,3 +181,12 @@ O manifesto distingue `discovered_static` (inventário AST) de `executed`, `pass
 - Não confundir esse contrato com um teto de memória global: valores positivos altos seguem permitidos; um máximo operacional precisa de decisão de API separada.
 - Contratos em `test_memory_sql_contract.py` exercitam fallback vazio/keyword, FAISS simulado, bool/float/string e zero; os dois mutantes impedem remover a guarda de negativo e a exceção para bool.
 - Auditoria adjacente: `ToolDefinition.requires_permission` e `permission_level` não são verificados durante execução. Os built-ins atuais declaram `requires_permission=False`; não tratar esses metadados como autorização efetiva e não introduzir ferramentas protegidas até definir principal/contexto e semântica dos níveis.
+
+
+## Snapshot JSON dos parâmetros de ferramentas — branch candidata pós-PR #31
+
+- Para ferramenta cacheável, o preflight estrito cria um snapshot iterativo limitado; validação e guards semânticos rodam antes da cache key, e snapshot, chave e executor usam o mesmo valor. Isso mantém o teto de `math_calculate` antes da serialização.
+- Inputs que não cabem no snapshot JSON (ciclo, tupla, chave não-string, número não finito, subclass/container não reconhecido ou orçamento excedido) bypassam a cache; validação e execução seguem com o objeto original. Falha posterior na chave não deve trocar o objeto já snapshotado usado por validação/execução.
+- Cópia por valor não preserva identidade, aliasing entre referências, nem mutações in-place do original. O percurso não é uma operação atomicamente sincronizada: substituição do mesmo tamanho durante a cópia pode formar um retrato misto; se a aplicação exigir um instante coerente sob escrita concorrente, o produtor deve sincronizar os parâmetros.
+- Contratos: `test_tool_cache_snapshot_contract.py` protege o mesmo snapshot nas três fases, alterações da origem, aliases e bypass; `test_tool_cache_key_contract.py` cobre guardas de containers/ciclos `dict` e `list`; `test_math_calculate_resource_limits.py` protege a rejeição de expressão grande antes da cache key. Validação final local: 269/269 testes, integração 30 aprovações + 1 skip opcional, pisos 95/94/76/68%, mutation 53/53 sem sobreviventes/não aplicadas, Bandit 131 LOW e nenhum MEDIUM/HIGH; lint, workflows, auditorias e benchmarks passaram.
+- A PR #32 paralela permanecia aberta na base pós-PR #31 e propunha D-024; esta candidata usa D-025, sem incorporar nem mesclar a PR #32. Se a ordem de merge mudar, reconciliar os documentos e a branch.

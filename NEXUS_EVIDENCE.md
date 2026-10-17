@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 265
+tests: 269
 bandit_low: 131
 -->
 
@@ -161,3 +161,18 @@ A correção valida antes de escolher o backend: `bool` e valores não `int` ger
 Validação local: unittest 265/265; integração 30 aprovados e 1 skip FAISS opcional; cobertura 95% fila, 94% VRAM, 76% Vita, 68% núcleo; mutation gate 47/47 mortos sem sobreviventes/não aplicados; Bandit 131 LOW e 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST/realidade, CLIs de capacidade e POMDP v2 passaram. A fonte normativa é a [documentação oficial SQLite de SELECT/LIMIT](https://www.sqlite.org/lang_select.html).
 
 Limite: não há teto para valores positivos altos nem garantia sobre memória global. Finding adjacente ainda não implementado: os metadados `requires_permission`/`permission_level` não têm enforcement; todos os built-ins atuais os deixam desativados, e a definição de um modelo de autorização foi adiada por depender de escolha explícita de API.
+
+
+## Snapshot JSON limitado para parâmetros de ferramentas — branch pós-PR #31
+
+Base local: `main` pós-PR #31, merge commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45`; branch isolada `fix/tool-cache-json-snapshot-toctou-2026-10-16`. A PR #32 paralela continua aberta, com 2/2 checks oficiais aprovados, propõe D-024 e altera os mesmos documentos/workflow/mutation gate; não foi mesclada nem incorporada aqui.
+
+A lacuna era temporal: `execute_tool` podia formar uma cache key a partir do valor mutável original e, antes de validar/executar, o chamador alterar esse objeto. A chave então descrevia um valor enquanto o executor observava outro. O contrato `test_tool_cache_snapshot_contract.py` reproduz a divergência e exige identidade do mesmo snapshot nas fases subsequentes; um caso adicional confirma que referências compartilhadas tornam-se cópias independentes por valor.
+
+A correção constrói um snapshot iterativo e limitado para parâmetros cacheáveis estritamente JSON, com os budgets existentes de 64 KiB, profundidade 64, 4.096 ocorrências e 1.024 itens por contêiner. A ordem final é snapshot → validação/schema e guardas semânticas → cache key → lookup → executor. A primeira suíte completa detectou uma regressão de ordenação: expressões de `math_calculate` acima do limite eram serializadas antes da rejeição. A chave foi então movida para depois da validação e da guarda de tamanho, mantendo o mesmo snapshot nas três fases; `test_math_calculate_resource_limits.py` protege esse requisito.
+
+Se o preflight do snapshot falhar (ciclo, tipo não JSON, subclass/container não reconhecido ou budget excedido), a cache é bypassada e a execução segue com o objeto original. Se apenas a geração da chave falhar depois de um snapshot válido, lookup/store são ignorados sem trocar o snapshot usado pela validação e pelo executor.
+
+Uma revisão independente não encontrou bloqueadores, mas identificou uma limitação P2: substituição de valor com o mesmo tamanho enquanto a travessia está em curso pode formar um snapshot misto, pois a cópia não sincroniza o produtor. Depois de construído, o mesmo snapshot é usado por chave, validação e executor; aplicações que exijam um instante atomicamente consistente precisam sincronizar as escritas na origem. Identidade, aliasing e mutações in-place do original não fazem parte da semântica preservada.
+
+Validação final local em Python 3.12: suítes focadas de cache 9/9; suíte completa `unittest` 269/269, sem falhas/skips/XPASS; suíte integrada 30 aprovados e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76% e núcleo 68%; mutation gate 53/53 mortas, 0 sobreviventes e 0 não aplicadas. Bandit encontrou 131 LOW e nenhum MEDIUM/HIGH; a triagem verificou-se consistente. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e CLIs dos benchmarks de capacidade/POMDP v2 na seed `20261016` passaram. O v2 manteve 128/128 casos dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e rejeitou 4/4 controles inválidos.
