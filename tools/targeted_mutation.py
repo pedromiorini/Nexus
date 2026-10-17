@@ -35,6 +35,8 @@ TIMEOUT = ("test_tool_definition_contract.py",)
 TOOL_PARAMS = ("test_tool_parameter_contract.py",)
 JSON_FORMAT = ("test_format_json_contract.py",)
 TOOL_CACHE_KEY = ("test_tool_cache_key_contract.py",)
+TOOL_CACHE_SNAPSHOT = ("test_tool_cache_snapshot_contract.py",)
+TOOL_CACHE_MATH = ("test_math_calculate_resource_limits.py",)
 TOOL_CACHE_STORE = ("test_tool_cache_store_contract.py",)
 TOOL_CACHE_HIT = ("test_tool_cache_hit_contract.py",)
 MEMORY_SQL = ("test_memory_sql_contract.py",)
@@ -119,16 +121,44 @@ MUTATIONS = [
     Mutation(
         "tool_cache_key_failure_bypasses_cache",
         "core/constitutional_brain.py",
-        "except (TypeError, ValueError, OverflowError, RecursionError) as exc:\n                cache_key = None",
-        "except (TypeError, ValueError, OverflowError, RecursionError) as exc:\n                cache_key = self._make_cache_key(tool_name, params)",
+        "except (TypeError, ValueError, OverflowError, RecursionError) as exc:\n                execution_params = params\n                cache_key = None",
+        "except (TypeError, ValueError, OverflowError, RecursionError) as exc:\n                execution_params = params\n                cache_key = self._make_cache_key(tool_name, params, _snapshot_is_valid=True)",
         tests=TOOL_CACHE_KEY,
     ),
     Mutation(
         "non_cacheable_tool_skips_key_serialization",
         "core/constitutional_brain.py",
-        "if tool.cacheable:\n            try:\n                cache_key = self._make_cache_key(tool_name, params)",
-        "if True:\n            try:\n                cache_key = self._make_cache_key(tool_name, params)",
+        "if tool.cacheable and isinstance(params, dict):\n            try:\n                execution_params = self._snapshot_cache_params(tool_name, params)",
+        "if True and isinstance(params, dict):\n            try:\n                execution_params = self._snapshot_cache_params(tool_name, params)",
         tests=TOOL_CACHE_KEY,
+    ),
+    Mutation(
+        "tool_cache_key_uses_snapshot",
+        "core/constitutional_brain.py",
+        "cache_key = self._make_cache_key(\n                    tool_name, execution_params, _snapshot_is_valid=True\n                )",
+        "cache_key = self._make_cache_key(\n                    tool_name, params, _snapshot_is_valid=True\n                )",
+        tests=TOOL_CACHE_SNAPSHOT,
+    ),
+    Mutation(
+        "tool_cache_validation_uses_snapshot",
+        "core/constitutional_brain.py",
+        "if not self.validator.validate_parameters(tool, execution_params):",
+        "if not self.validator.validate_parameters(tool, params):",
+        tests=TOOL_CACHE_SNAPSHOT,
+    ),
+    Mutation(
+        "tool_cache_executor_uses_snapshot",
+        "core/constitutional_brain.py",
+        "result = executors[tool_name](execution_params)",
+        "result = executors[tool_name](params)",
+        tests=TOOL_CACHE_SNAPSHOT,
+    ),
+    Mutation(
+        "tool_math_expression_limit_precedes_cache_key",
+        "core/constitutional_brain.py",
+        'if tool_name == "math_calculate":\n            expression = execution_params.get("expression", "")\n            if len(expression) > self.MAX_MATH_EXPRESSION_LENGTH:',
+        'if False:\n            expression = execution_params.get("expression", "")\n            if len(expression) > self.MAX_MATH_EXPRESSION_LENGTH:',
+        tests=TOOL_CACHE_MATH,
     ),
     Mutation(
         "tool_cache_key_byte_budget",
@@ -147,22 +177,36 @@ MUTATIONS = [
     Mutation(
         "tool_cache_key_node_budget",
         "core/constitutional_brain.py",
-        "if visited_nodes > self.MAX_CACHE_KEY_NODES:",
-        "if False:",
+        "            visited_nodes += 1\n            if visited_nodes > self.MAX_CACHE_KEY_NODES:",
+        "            visited_nodes += 1\n            if False:",
         tests=TOOL_CACHE_KEY,
     ),
     Mutation(
         "tool_cache_key_container_item_budget",
         "core/constitutional_brain.py",
-        "if item_count > self.MAX_CACHE_KEY_CONTAINER_ITEMS:",
-        "if False:",
+        '            elif value_type is list:\n                value_id = id(value)\n                if value_id in active_containers:\n                    raise self._CacheKeyBudgetExceeded("cycle")\n                item_count = len(value)\n                if item_count > self.MAX_CACHE_KEY_CONTAINER_ITEMS:',
+        '            elif value_type is list:\n                value_id = id(value)\n                if value_id in active_containers:\n                    raise self._CacheKeyBudgetExceeded("cycle")\n                item_count = len(value)\n                if False:',
         tests=TOOL_CACHE_KEY,
     ),
     Mutation(
         "tool_cache_key_cycle_guard",
         "core/constitutional_brain.py",
-        "if value_id in active_containers:",
-        "if False:",
+        '            elif value_type is list:\n                value_id = id(value)\n                if value_id in active_containers:',
+        '            elif value_type is list:\n                value_id = id(value)\n                if False:',
+        tests=TOOL_CACHE_KEY,
+    ),
+    Mutation(
+        "tool_cache_dict_container_item_budget",
+        "core/constitutional_brain.py",
+        '            if value_type is dict:\n                value_id = id(value)\n                if value_id in active_containers:\n                    raise self._CacheKeyBudgetExceeded("cycle")\n                item_count = len(value)\n                if item_count > self.MAX_CACHE_KEY_CONTAINER_ITEMS:',
+        '            if value_type is dict:\n                value_id = id(value)\n                if value_id in active_containers:\n                    raise self._CacheKeyBudgetExceeded("cycle")\n                item_count = len(value)\n                if False:',
+        tests=TOOL_CACHE_KEY,
+    ),
+    Mutation(
+        "tool_cache_dict_cycle_guard",
+        "core/constitutional_brain.py",
+        '            if value_type is dict:\n                value_id = id(value)\n                if value_id in active_containers:',
+        '            if value_type is dict:\n                value_id = id(value)\n                if False:',
         tests=TOOL_CACHE_KEY,
     ),
     Mutation(

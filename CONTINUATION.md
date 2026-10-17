@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 267
+tests: 271
 bandit_low: 131
 -->
 
@@ -11,25 +11,22 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta rodada:** `main` pós-PR #31, merge commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45`; branch isolada `fix/tool-cache-hit-copy-fallback-2026-10-16`.
-- **Estado da revisão:** branch publicada e [PR #32 aberta contra `main`](https://github.com/pedromiorini/Nexus/pull/32); consultar os checks oficiais na PR. Não mesclar sem autorização específica.
-- **Mudança candidata:** `RealToolUse.execute_tool` trata falha de `copy.deepcopy` no cache hit como bypass: remove a entrada defeituosa, registra `TOOL_CACHE_HIT_UNAVAILABLE` e segue para o executor; LRU e contadores de hit só avançam após cópia bem-sucedida.
-- **Validação local:** 267/267 testes, 0 falhas/skips/XPASS; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 49/49 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST/realidade e benchmarks passaram.
-- **Benchmarks:** CLIs de capacidade e POMDP v2 passaram na seed `20261016`; o v2 teve erro absoluto máximo `2.7755575615628914e-16` em 128/128 casos e rejeitou 4/4 controles inválidos.
-- **Contrato/limites:** a mudança cobre apenas a cópia de resultados já armazenados; a validação de parâmetros continua superficial e o timeout é diagnóstico, não cancelamento.
-- **Achado pendente:** a mutação concorrente de `params` entre a cache key e a leitura pelo executor pode associar um resultado à entrada errada; foi reproduzida e requer decisão de snapshot limitado ou bypass em uma branch separada.
-- **POMDP herdado:** a PR #24 foi mesclada com ambos os checks oficiais aprovados; o filtro de um passo recebe modelo explícito, sem alegar aprendizagem ou planejamento. O protocolo v1 continua inalterado e mantém `unsupported_interface` para observação parcial.
-- **Hardening herdado:** PR #25 foi mesclada no commit `675f5aa95416c3a92998a34dd2f905f529b90980`; PR #26 no commit `508020d77d5705f99c76eaca4df05e8e265662f7`; PR #27 no commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; PR #28 no commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`; PR #29 no merge commit `e06511396d407a3440ee1969e0af8d7e055203dc`; PR #30 no merge commit `e83ce9eb422e4cb9d2fb5ec818cb795351e57a13`; PR #31 foi mesclada após 2/2 checks oficiais no commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45`. A PR #23 limitou `math_calculate` e isolou aliases de cache.
+- **Base desta atualização:** `main` pós-PR #33, merge commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b`; branch isolada `fix/tool-cache-hit-copy-fallback-2026-10-16` está localmente sincronizada por merge, sem force-push.
+- **Estado da revisão:** [PR #32](https://github.com/pedromiorini/Nexus/pull/32) continua aberta contra `main`; a branch sincronizada passou os gates locais e será publicada para atualizar a revisão. Não mesclar sem autorização específica.
+- **Mudança da PR #32:** `RealToolUse.execute_tool` trata falhas de `copy.deepcopy` em cache hit como bypass, remove a entrada defeituosa, registra `TOOL_CACHE_HIT_UNAVAILABLE` e executa a ferramenta; LRU e contadores só avançam após cópia bem-sucedida.
+- **Hardening já presente na base:** a PR #33 fechou o TOCTOU com snapshot JSON limitado, compartilhado entre validação, cache key e executor, após merge no commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b`. D-024 (cache hit) e D-025 (snapshot) coexistem nesta branch.
+- **Validação combinada local:** unittest 271/271 (0 falhas/skips/XPASS), integração 30 aprovados + 1 skip FAISS opcional, cobertura 95/94/76/68%, mutation 55/55 mortas; Bandit 131 LOW, nenhum MEDIUM/HIGH. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e benchmarks de capacidade/POMDP v2 passaram; no POMDP v2, 128/128 casos ficaram em `1e-12` e 4/4 controles inválidos foram rejeitados.
+- **Limites:** o snapshot é por valor, sem preservar identidade/aliasing/mutações in-place do original; a travessia não sincroniza escrita concorrente. O fallback de cache não limita custo do executor ou memória global; timeout segue diagnóstico, não cancelamento.
+- **POMDP herdado:** o filtro v2 usa modelo explícito e não reivindica aprendizagem ou planejamento; o protocolo v1 mantém `unsupported_interface` para observação parcial.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
-- **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
 
 ## Contratos relevantes na fronteira de cache/ferramentas
 
 - Herdado da PR #27: `test_format_json_contract.py` preserva formatação de JSON finito e exige falha estruturada para NaN/infinitos e dados não serializáveis.
 - `test_tool_cache_key_contract.py`: preserva a identidade das chaves pequenas; garante bypass pré-serialização para tamanho, profundidade, nós, itens por contêiner e ciclos; comprova que falhas de cache não bloqueiam o executor, que subclasses de `dict` seguem válidas e que ferramenta não cacheável não forma chave.
 - `test_tool_cache_store_contract.py`: injeta `RecursionError` na cópia para cache e exige bypass observável sem descartar o sucesso; a etapa dedicada está no workflow e um mutante protege o caminho.
-- `test_tool_cache_hit_contract.py`: injeta falha na cópia de um hit e na tentativa de re-cache; exige execução real, contadores coerentes e remoção da entrada defeituosa; dois mutantes protegem fallback e eviction.
 - `test_tool_parameter_contract.py`: prova execução com subclasse de `list` e cache bypass, aceitação de subclasse de `int`, rejeição de `bool` como `int` e rejeição de classe que apenas imita o nome `list`; dois mutantes protegem o contrato.
+- `test_tool_cache_snapshot_contract.py`: verifica identidade única de snapshot nas três fases, isolamento de mutações posteriores/in-place, cópia por valor sem preservar aliases, bypass para valores fora do JSON estrito e compatibilidade de subclasses.
 
 ## O que está implementado
 
@@ -196,4 +193,4 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 
 ## Próxima ação
 
-Acompanhar o estado atual da PR #32 e seus checks oficiais; não mesclar sem autorização específica nem criar outra rotina semanal. Em seguida, atacar em branch separada o TOCTOU de `params` mutável entre cache key e executor, definindo snapshot limitado ou bypass de cache que preserve a execução. Permanecem também sem enforcement os metadados `ToolDefinition.requires_permission`/`permission_level` (nenhum built-in atual os ativa) e fora do contrato a validação recursiva de membros de contêiner.
+Concluir os gates locais da branch sincronizada e acompanhar a nova CI da PR #32; revisar qualquer regressão sem mesclar. A PR #32 permanece sem autorização de merge. Depois, continuar a auditoria independente de outras fronteiras; `ToolDefinition.requires_permission`/`permission_level` ainda não têm enforcement e a validação recursiva dos membros de contêiner permanece fora do contrato.

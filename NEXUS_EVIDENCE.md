@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 267
+tests: 271
 bandit_low: 131
 -->
 
@@ -160,14 +160,11 @@ A correção valida antes de escolher o backend: `bool` e valores não `int` ger
 
 Validação local: unittest 265/265; integração 30 aprovados e 1 skip FAISS opcional; cobertura 95% fila, 94% VRAM, 76% Vita, 68% núcleo; mutation gate 47/47 mortos sem sobreviventes/não aplicados; Bandit 131 LOW e 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST/realidade, CLIs de capacidade e POMDP v2 passaram. A fonte normativa é a [documentação oficial SQLite de SELECT/LIMIT](https://www.sqlite.org/lang_select.html).
 
-Estado posterior: a PR #31 foi mesclada em `main` no commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45` após 2/2 checks oficiais aprovados.
-
 Limite: não há teto para valores positivos altos nem garantia sobre memória global. Finding adjacente ainda não implementado: os metadados `requires_permission`/`permission_level` não têm enforcement; todos os built-ins atuais os deixam desativados, e a definição de um modelo de autorização foi adiada por depender de escolha explícita de API.
-
 
 ## Falha de cópia ao recuperar um cache hit — 2026-10-16
 
-Base local: `main` pós-PR #31, merge commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45`; branch isolada `fix/tool-cache-hit-copy-fallback-2026-10-16`.
+Base da atualização: `main` pós-PR #33, merge commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b`; a branch isolada `fix/tool-cache-hit-copy-fallback-2026-10-16` foi sincronizada localmente. A PR #32 permanece aberta, sem merge para `main`.
 
 Reprodução pré-patch: uma chamada válida a `list_operations` preenchia o cache; uma falha injetada (`RecursionError`) na cópia do hit seguinte escapava de `execute_tool`, pois ocorria fora do `try` que envolve o executor. A segunda chamada não executava a ferramenta; estado observado: `successful_executions=1`, `failed_executions=0`, `cached_executions=0` e a entrada defeituosa permanecia armazenada.
 
@@ -175,14 +172,21 @@ Correção: capturar a exceção apenas ao copiar o resultado do hit, remover a 
 
 `test_tool_cache_hit_contract.py` protege a execução real após falha do hit, contadores sem hit espúrio, e evicção quando a cópia da tentativa de re-cache também falha. Dois mutantes direcionados cobrem propagação da exceção e remoção da entrada; o workflow executa este contrato em etapa dedicada.
 
-Validação local: unittest 267/267, sem falhas/skips/XPASS; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 49/49 mortas, 0 sobreviventes e 0 não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade, auditorias AST e benchmarks de capacidade/POMDP v2 passaram. No POMDP v2, 128/128 casos ficaram dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e 4/4 controles inválidos foram rejeitados. Estas métricas descrevem a execução local e não antecipam o resultado dos checks oficiais.
+Validação combinada local da branch sincronizada: suíte focada de cache 9/9; unittest 271/271 (0 falhas, skips ou XPASS); integração 30 aprovados + 1 skip FAISS opcional; pisos de cobertura 95/94/76/68%; mutation gate 55/55 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW e nenhum MEDIUM/HIGH, triagem consistente. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e CLIs dos benchmarks de capacidade/POMDP v2 passaram. POMDP v2: 128/128 casos dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e 4/4 controles inválidos rejeitados.
 
-Status de publicação: a branch foi publicada e a [PR #32](https://github.com/pedromiorini/Nexus/pull/32) está aberta contra `main`; consultar nela os checks oficiais atuais.
+Status de publicação: a [PR #32](https://github.com/pedromiorini/Nexus/pull/32) continua aberta contra `main`; esta atualização reúne D-024 e D-025 na branch sem mesclar a PR para `main`.
 
-Fundamentação: a [documentação oficial `copy` do Python 3.12](https://docs.python.org/3.12/library/copy.html) descreve `deepcopy` como recursiva e observa problemas possíveis com objetos recursivos; a falha específica desta fronteira foi reproduzida por injeção determinística. Limite: esta alteração cobre cópia ao recuperar hit, não falhas do logger nem a corrida de mutabilidade dos parâmetros descrita a seguir.
+Fundamentação: a [documentação oficial `copy` do Python 3.12](https://docs.python.org/3.12/library/copy.html) descreve `deepcopy` como recursiva e observa problemas possíveis com objetos recursivos; a falha específica desta fronteira foi reproduzida por injeção determinística. Limite: esta alteração cobre cópia ao recuperar hit, não falhas do logger. A corrida de mutabilidade de parâmetros foi resolvida pelo snapshot documentado na seção seguinte (PR #33).
 
-## Achado adjacente pendente — TOCTOU entre parâmetros, cache key e executor
+## Snapshot JSON limitado para parâmetros de ferramentas — PR #33 mesclada
+Base da correção: a PR #33 foi desenvolvida sobre `main` pós-PR #31 e mesclada em `main` no commit `62f6af14a2ad1d3659a4a5940e713c588513bf9b` após 2/2 checks oficiais aprovados. A branch sincronizada da PR #32 já reúne D-024 e D-025, permanece aberta e não foi mesclada em `main`.
 
-Reprodução determinística por interleaving: `params={'items':[2,1], 'operation':'sort'}`; após `_make_cache_key` produzir a chave original, a lista foi alterada para `[9,0]` antes do executor. A primeira chamada retornou `[0,9]` e armazenou esse resultado sob a chave de `[2,1]`. Restaurada a entrada original, a segunda chamada retornou `[0,9]` com `cached=true`, embora o resultado esperado fosse `[1,2]`. O interleaving foi injetado no limite de `_make_cache_key`; não é um teste de estresse de threads, mas demonstra que a janela permite corrupção caso um caller concorrente mutile os mesmos objetos.
+A lacuna era temporal: `execute_tool` podia formar uma cache key a partir do valor mutável original e, antes de validar/executar, o chamador alterar esse objeto. A chave então descrevia um valor enquanto o executor observava outro. O contrato `test_tool_cache_snapshot_contract.py` reproduz a divergência e exige identidade do mesmo snapshot nas fases subsequentes; um caso adicional confirma que referências compartilhadas tornam-se cópias independentes por valor.
 
-Status: não corrigido nesta branch, por ser um contrato independente. Próxima investigação: definir snapshot seguro e limitado para valores cacheáveis e usar o mesmo snapshot para validação/chave/execução, ou ignorar a cache quando não houver como garantir identidade estável, sem impedir a execução normal. Evitar cópia profunda sem orçamento antes do preflight.
+A correção constrói um snapshot iterativo e limitado para parâmetros cacheáveis estritamente JSON, com os budgets existentes de 64 KiB, profundidade 64, 4.096 ocorrências e 1.024 itens por contêiner. A ordem final é snapshot → validação/schema e guardas semânticas → cache key → lookup → executor. A primeira suíte completa detectou uma regressão de ordenação: expressões de `math_calculate` acima do limite eram serializadas antes da rejeição. A chave foi então movida para depois da validação e da guarda de tamanho, mantendo o mesmo snapshot nas três fases; `test_math_calculate_resource_limits.py` protege esse requisito.
+
+Se o preflight do snapshot falhar (ciclo, tipo não JSON, subclass/container não reconhecido ou budget excedido), a cache é bypassada e a execução segue com o objeto original. Se apenas a geração da chave falhar depois de um snapshot válido, lookup/store são ignorados sem trocar o snapshot usado pela validação e pelo executor.
+
+Uma revisão independente não encontrou bloqueadores, mas identificou uma limitação P2: substituição de valor com o mesmo tamanho enquanto a travessia está em curso pode formar um snapshot misto, pois a cópia não sincroniza o produtor. Depois de construído, o mesmo snapshot é usado por chave, validação e executor; aplicações que exijam um instante atomicamente consistente precisam sincronizar as escritas na origem. Identidade, aliasing e mutações in-place do original não fazem parte da semântica preservada.
+
+Validação local do head original da PR #33 (pré-sincronização da PR #32), Python 3.12: suítes focadas de cache 9/9; suíte completa `unittest` 269/269, sem falhas/skips/XPASS; suíte integrada 30 aprovados e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76% e núcleo 68%; mutation gate 53/53 mortas, 0 sobreviventes e 0 não aplicadas. Bandit encontrou 131 LOW e nenhum MEDIUM/HIGH; a triagem verificou-se consistente. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e CLIs dos benchmarks de capacidade/POMDP v2 na seed `20261016` passaram. O v2 manteve 128/128 casos dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e rejeitou 4/4 controles inválidos.
