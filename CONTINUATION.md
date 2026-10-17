@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 258
+tests: 261
 bandit_low: 131
 -->
 
@@ -11,14 +11,14 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta rodada:** `main` pós-PR #28, merge commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`; branch isolada `feat/post-pr28-cache-store-fallback-2026-10-16`.
-- **Estado da revisão:** candidata validada localmente; próxima etapa é publicar a branch e abrir PR própria contra `main` para revisão/CI. Não mesclar sem autorização específica para esta PR.
-- **Mudança candidata:** se `copy.deepcopy` falhar ao preparar uma cópia de resultado para armazenamento opcional, `RealToolUse` emite `TOOL_CACHE_STORE_UNAVAILABLE`, ignora o armazenamento e preserva o `ToolExecutionResult` bem-sucedido e suas estatísticas. A chave, o executor e seu resultado não são reescritos por essa falha de cache.
-- **Validação local (não CI):** 258/258 testes; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 43/43 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade e auditorias AST passaram.
-- **Benchmarks:** CLIs de capacidade e POMDP v2 passaram na seed `20261016`; o v2 manteve 128/128 casos dentro de `1e-12` e 4/4 controles inválidos rejeitados.
-- **Limites desta mudança:** a captura é específica à cópia profunda de cache; não limita a memória/custo do executor, não valida schema recursivamente e não transforma o cache em limite global de memória. A compatibilidade de subclasses em valores tipados aninhados continua uma questão aberta, sem mudança de comportamento nesta branch. Timeout segue diagnóstico, não cancelamento.
+- **Base desta rodada:** `main` pós-PR #29, merge commit `e06511396d407a3440ee1969e0af8d7e055203dc`; branch isolada `fix/tool-validator-container-subclasses-2026-10-16`.
+- **Estado da revisão:** candidata validada localmente; publicar a branch e abrir PR própria contra `main` para CI/revisão. Não mesclar sem autorização específica para esta PR.
+- **Mudança candidata:** `ToolValidator` resolve schemas built-in conhecidos para classes reais e aceita subclasses; preserva `any`/`object` como curingas, mantém fallback de nome exato para schemas desconhecidos e rejeita explicitamente `bool` quando o tipo esperado é `int`.
+- **Validação local (não CI):** 261/261 testes sem falhas/skip; suíte integrada 30 aprovações e 1 skip opcional FAISS; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 45/45 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade e auditorias AST passaram.
+- **Benchmarks:** CLIs de capacidade e POMDP v2 passaram na seed `20261016`; o v2 teve erro absoluto máximo `2.7755575615628914e-16` em 128/128 casos e rejeitou 4/4 controles inválidos.
+- **Contrato/limites:** uma subclasse `list` em `list_operations.items` executa com sucesso, mas o preflight de cache permanece independente e faz bypass para containers customizados. A validação é apenas do valor do parâmetro declarado; não valida recursivamente elementos aninhados. Timeout segue diagnóstico, não cancelamento.
 - **POMDP herdado:** a PR #24 foi mesclada com ambos os checks oficiais aprovados; o filtro de um passo recebe modelo explícito, sem alegar aprendizagem ou planejamento. O protocolo v1 continua inalterado e mantém `unsupported_interface` para observação parcial.
-- **Hardening herdado:** PR #25 foi mesclada no commit `675f5aa95416c3a92998a34dd2f905f529b90980`; PR #26 no commit `508020d77d5705f99c76eaca4df05e8e265662f7`; PR #27 no commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; PR #28 no commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb` após os dois checks oficiais passarem. A PR #23 limitou `math_calculate` e isolou aliases de cache.
+- **Hardening herdado:** PR #25 foi mesclada no commit `675f5aa95416c3a92998a34dd2f905f529b90980`; PR #26 no commit `508020d77d5705f99c76eaca4df05e8e265662f7`; PR #27 no commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; PR #28 no commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`; PR #29 no merge commit `e06511396d407a3440ee1969e0af8d7e055203dc`, após os dois checks oficiais passarem. A PR #23 limitou `math_calculate` e isolou aliases de cache.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
 
@@ -27,6 +27,7 @@ bandit_low: 131
 - Herdado da PR #27: `test_format_json_contract.py` preserva formatação de JSON finito e exige falha estruturada para NaN/infinitos e dados não serializáveis.
 - `test_tool_cache_key_contract.py`: preserva a identidade das chaves pequenas; garante bypass pré-serialização para tamanho, profundidade, nós, itens por contêiner e ciclos; comprova que falhas de cache não bloqueiam o executor, que subclasses de `dict` seguem válidas e que ferramenta não cacheável não forma chave.
 - `test_tool_cache_store_contract.py`: injeta `RecursionError` na cópia para cache e exige bypass observável sem descartar o sucesso; a etapa dedicada está no workflow e um mutante protege o caminho.
+- `test_tool_parameter_contract.py`: prova execução com subclasse de `list` e cache bypass, aceitação de subclasse de `int`, rejeição de `bool` como `int` e rejeição de classe que apenas imita o nome `list`; dois mutantes protegem o contrato.
 
 ## O que está implementado
 
@@ -193,4 +194,4 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 
 ## Próxima ação
 
-Após concluir os checks oficiais desta PR, decidir por contrato se subclasses de valores tipados aninhados devem ser aceitas: hoje o validator compara `type(param_value).__name__` exatamente. Não ampliar o schema sem testes específicos, em particular para evitar a compatibilidade acidental de tipos como `bool` com `int`. Manter esta branch isolada e não mesclar sem autorização específica; não criar outra rotina semanal.
+Publicar esta branch isolada e acompanhar os checks oficiais da nova PR. O contrato de subclasses built-in está coberto por `test_tool_parameter_contract.py`; preservar a exceção `bool`/`int`, o fallback de nome exato para schemas desconhecidos e o bypass de cache de subclasses não serializadas. Não mesclar sem autorização específica; não criar outra rotina semanal.

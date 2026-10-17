@@ -185,3 +185,13 @@
 - **Evidência:** reprodução local com listas aninhadas de profundidade 600 (38.445 bytes estimados), teste `test_tool_cache_store_contract.py` e mutante que remove o fallback; métricas locais 258/258 testes e mutation 43/43.
 - **Limitação:** a captura se restringe à cópia profunda antes do armazenamento; não limita o executor nem o uso global de memória. A intenção de aceitar subclasses em valores tipados aninhados permanece questão separada.
 - **Reversibilidade:** fácil; em caso de falha apenas se perde o armazenamento/cache hit desse resultado.
+
+## D-022 — Parâmetros built-in aceitam subclasses reais, com exceção bool/int
+
+- **Decisão:** resolver nomes built-in conhecidos para classes reais e aceitar subclasses verdadeiras no schema do parâmetro. Para `int`, rejeitar `bool` explicitamente. Manter `any` e `object` como curingas e preservar a comparação legada por nome para tipos de schema desconhecidos.
+- **Contexto:** `ToolValidator.validate_parameters` comparava `type(value).__name__` exatamente. Isso rejeitava uma subclasse `list` que o executor `list_operations` consegue usar; ao mesmo tempo, a comparação por nome podia confundir uma classe não relacionada chamada `list` com o built-in.
+- **Motivo:** alinhar a compatibilidade com a semântica real das classes Python, evitando uma aceitação acidental de booleanos como inteiros e evitando que apenas um nome de classe satisfaça um schema built-in.
+- **Evidência:** `test_tool_parameter_contract.py` cobre subclasse de lista de ponta a ponta, subclasse escalar, rejeição de `bool` para `int` e classe de nome falsificado; dois mutantes protegem os limites de subclasse e booleano.
+- **Fundamentação:** a documentação oficial Python 3.12 de [`issubclass`](https://docs.python.org/3.12/library/functions.html#isinstance) define compatibilidade por subclasse; a documentação de [`bool`](https://docs.python.org/3.12/library/stdtypes.html#boolean-type-bool) nota que `bool` deriva de `int`, apesar de não ser semanticamente válido para esse parâmetro.
+- **Limitações:** só o valor declarado é validado; não há schema recursivo dos membros de listas/dicionários. O preflight de cache tem política independente e pode ignorar o cache para subclasses não nativas, sem impedir a execução. Tipos de schema desconhecidos ainda usam o nome exato legado.
+- **Reversibilidade:** fácil; a regra está isolada em `ToolValidator._matches_parameter_type` e pode ser ajustada sem alterar o formato público de `ToolDefinition`.

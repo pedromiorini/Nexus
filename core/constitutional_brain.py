@@ -3553,6 +3553,40 @@ class ToolValidator:
     ❌ Execução de comandos shell arbitrários
     """
 
+    # Resolve built-in schema names to real classes; unknown names retain the
+    # legacy exact-class-name contract below.
+    _PARAMETER_TYPE_CLASSES = {
+        "bool": bool,
+        "bytearray": bytearray,
+        "bytes": bytes,
+        "complex": complex,
+        "dict": dict,
+        "float": float,
+        "frozenset": frozenset,
+        "int": int,
+        "list": list,
+        "NoneType": type(None),
+        "range": range,
+        "set": set,
+        "str": str,
+        "tuple": tuple,
+    }
+
+    @classmethod
+    def _matches_parameter_type(cls, expected_type: Any, value: Any) -> bool:
+        actual_type = type(value)
+        expected_class = (
+            cls._PARAMETER_TYPE_CLASSES.get(expected_type)
+            if isinstance(expected_type, str)
+            else None
+        )
+        if expected_class is None:
+            return expected_type == actual_type.__name__
+        # bool subclasses int in Python, but is not a valid integer parameter.
+        if expected_type == "int" and actual_type is bool:
+            return False
+        return issubclass(actual_type, expected_class)
+
     def __init__(self, constitutional_log):
         self.log = constitutional_log
 
@@ -3661,9 +3695,9 @@ class ToolValidator:
 
             expected_type = tool.parameters[param_name].get("type", "any")
 
-            if expected_type != "any":
+            if expected_type != "any" and expected_type != "object":
                 actual_type = type(param_value).__name__
-                if expected_type != actual_type and expected_type != "object":
+                if not self._matches_parameter_type(expected_type, param_value):
                     self.log.log_event("TOOL_PARAM_TYPE_MISMATCH", {
                         "tool": tool.name,
                         "parameter": param_name,
