@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 265
+tests: 269
 bandit_low: 131
 -->
 
@@ -11,14 +11,14 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta rodada:** `main` pós-PR #30, merge commit `e83ce9eb422e4cb9d2fb5ec818cb795351e57a13`; branch isolada `fix/memory-retrieve-nonnegative-limit-2026-10-16`.
-- **Estado da revisão:** candidata validada localmente; branch isolada. O status de publicação/CI fica no GitHub; não mesclar sem autorização específica.
-- **Mudança candidata:** `RealHierarchicalMemory.retrieve` aceita apenas `int` não booleano e não negativo; `limit=0` retorna lista vazia antes de FAISS/SQLite. Não há teto para limites positivos altos.
-- **Validação local:** 265/265 testes, 0 falhas/skips; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 47/47 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST/realidade e benchmarks passaram.
+- **Base desta rodada:** `main` pós-PR #31, merge commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45`; branch isolada `fix/tool-cache-json-snapshot-toctou-2026-10-16`.
+- **Estado da revisão:** PR [#33](https://github.com/pedromiorini/Nexus/pull/33) aberta contra `main`; acompanhe os checks oficiais no head atual da PR. Não mesclar sem autorização específica.
+- **Mudança candidata:** para parâmetros cacheáveis estritamente JSON, construir um snapshot limitado por valor; validar e aplicar guards semânticos antes de gerar a cache key; usar o mesmo objeto na chave, validação e executor. Se o snapshot falhar, ignorar a otimização e executar com os parâmetros originais.
+- **Validação local desta candidata concluída:** unittest 269/269; integração 30 aprovações e 1 skip FAISS opcional; cobertura fila/VRAM/Vita/núcleo 95/94/76/68%; mutation gate 53/53 mortos, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH, triagem verificada. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e benchmarks passaram.
 - **Benchmarks:** CLIs de capacidade e POMDP v2 passaram na seed `20261016`; o v2 teve erro absoluto máximo `2.7755575615628914e-16` em 128/128 casos e rejeitou 4/4 controles inválidos.
-- **Contrato/limites:** uma subclasse `list` em `list_operations.items` executa com sucesso, mas o preflight de cache permanece independente e faz bypass para containers customizados. A validação é apenas do valor do parâmetro declarado; não valida recursivamente elementos aninhados. Timeout segue diagnóstico, não cancelamento.
+- **Contrato/limites:** valores representáveis usam o mesmo snapshot em chave/validação/execução; identidade, aliasing e mutações in-place do original não são preservados. Tuplas, chaves não-string, floats não finitos e subclasses customizadas fazem bypass e mantêm a execução original. A cópia não sincroniza mutações concorrentes do produtor: uma substituição de mesmo tamanho durante a travessia pode formar um retrato misto; após concluída, as três fases compartilham esse retrato. Validação de schema continua superficial.
 - **POMDP herdado:** a PR #24 foi mesclada com ambos os checks oficiais aprovados; o filtro de um passo recebe modelo explícito, sem alegar aprendizagem ou planejamento. O protocolo v1 continua inalterado e mantém `unsupported_interface` para observação parcial.
-- **Hardening herdado:** PR #25 foi mesclada no commit `675f5aa95416c3a92998a34dd2f905f529b90980`; PR #26 no commit `508020d77d5705f99c76eaca4df05e8e265662f7`; PR #27 no commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; PR #28 no commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`; PR #29 no merge commit `e06511396d407a3440ee1969e0af8d7e055203dc`; PR #30 foi mesclada após 2/2 checks oficiais no merge commit `e83ce9eb422e4cb9d2fb5ec818cb795351e57a13`. A PR #23 limitou `math_calculate` e isolou aliases de cache.
+- **Hardening herdado:** PR #25 foi mesclada no commit `675f5aa95416c3a92998a34dd2f905f529b90980`; PR #26 no commit `508020d77d5705f99c76eaca4df05e8e265662f7`; PR #27 no commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; PR #28 no commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`; PR #29 no merge commit `e06511396d407a3440ee1969e0af8d7e055203dc`; PR #30 no merge commit `e83ce9eb422e4cb9d2fb5ec818cb795351e57a13`; PR #31 no merge commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45`. A PR #32 paralela segue aberta, com 2/2 checks aprovados, e usa D-024; não está incorporada nesta base. A PR #23 limitou `math_calculate` e isolou aliases de cache.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
 
@@ -28,6 +28,7 @@ bandit_low: 131
 - `test_tool_cache_key_contract.py`: preserva a identidade das chaves pequenas; garante bypass pré-serialização para tamanho, profundidade, nós, itens por contêiner e ciclos; comprova que falhas de cache não bloqueiam o executor, que subclasses de `dict` seguem válidas e que ferramenta não cacheável não forma chave.
 - `test_tool_cache_store_contract.py`: injeta `RecursionError` na cópia para cache e exige bypass observável sem descartar o sucesso; a etapa dedicada está no workflow e um mutante protege o caminho.
 - `test_tool_parameter_contract.py`: prova execução com subclasse de `list` e cache bypass, aceitação de subclasse de `int`, rejeição de `bool` como `int` e rejeição de classe que apenas imita o nome `list`; dois mutantes protegem o contrato.
+- `test_tool_cache_snapshot_contract.py`: verifica identidade única de snapshot nas três fases, isolamento de mutações posteriores/in-place, cópia por valor sem preservar aliases, bypass para valores fora do JSON estrito e compatibilidade de subclasses.
 
 ## O que está implementado
 
