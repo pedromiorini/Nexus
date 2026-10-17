@@ -78,8 +78,57 @@ de que Nexus melhorou ou generalizou.
 
 ## Resultado final
 
-Pendente: esta seção deve ser preenchida apenas depois de congelar as fontes e
-as previsões e executar o score uma vez, sem alterações motivadas pelos labels.
+**128 acertos em 128 casos pareados**, em uma única execução final. As fontes
+foram fixadas no commit `6daafc540d8fec4b2b42789430c1009dd4ec8d9e`, com worktree
+limpa e comparação de cada fonte/lock com o blob desse commit antes do freeze.
+O conjunto foi gerado somente depois de selecionar o domínio, concluir os testes
+de desenvolvimento e obter revisão independente read-only do commit. Não foram
+abertas as entradas/previsões para inspeção de respostas entre as três fases.
+Primeiro foram congeladas as entradas, depois executadas e seladas as previsões,
+e somente então foram calculados os gabaritos. Nenhuma fonte foi alterada depois
+de abrir os labels; os casos agora estão expostos e não podem ser reutilizados
+como holdout intocado.
+
+O replay offline registrou evaluator explícito e **zero atualizações de
+estratégia**. `production_enabled=false`, `generalization_claim=false`.
+Este resultado é evidência de correção pareada para essas somas e de encadeamento
+do contrato, não evidência de adaptação, ganho sobre baseline ou generalização.
+
+Artefatos completos em `benchmarks/math_verifier_holdout_20261017/`: manifesto,
+seed, entradas, previsões, seal, relatório de score, resumo das validações,
+atestado operacional de commit limpo e inventário dos pacotes instalados.
+
+| Compromisso SHA-256 | Valor |
+| --- | --- |
+| Entradas | `d276712e20dbf18f1568ed63f557190bb6f466fa8998db499318c9badf2aea5b` |
+| Manifesto | `6d4b79871a288ce8407f328a11d9a16f3a370e401768103ac2b521f815066af8` |
+| Previsões seladas | `d6045fdf0600cb94684718edd389e9f0e52ff2cb6b82725928f196163fb858f9` |
+| Bundle de fontes e lock | `8bc95e3afe3fd1bafe66d76c7e38d68a0f4ebe57bc1f91a18b72fe733e0c2526` |
+
+Validações finais: 54 testes focados passaram; suíte completa executou 348 testes
+com dois skips; integração registrou 30 checks aprovados, um skip e nenhum
+ausente; Ruff, compileall e diff-check passaram. A primeira tentativa da integração
+sem `PYTHONPATH=.` falhou por resolução de import de `vita`; a execução corrigida
+usa o mesmo `PYTHONPATH` do CI e passou. O runtime foi Python 3.12.3; o CI usa 3.11,
+que não foi executado neste ensaio. O lock foi hashado, não reinstalado: o inventário
+de pacotes registra o ambiente real, mas não atesta igualdade com o lock.
+
+### Reproduzir sem confundir auditoria com novo teste
+
+Na raiz deste checkout e no mesmo Python/ambiente, uma nova medição exige um
+diretório ainda inexistente. Não utilizar os casos arquivados para tuning:
+
+```bash
+python -m tools.math_verifier_holdout freeze --output /tmp/novo-ensaio-soma --count 128
+NEXUS_AUDIT_DB=/tmp/nexus-soma.sqlite3 python -m tools.math_verifier_holdout predict --input /tmp/novo-ensaio-soma
+NEXUS_AUDIT_DB=/tmp/nexus-soma.sqlite3 python -m tools.math_verifier_holdout score --input /tmp/novo-ensaio-soma
+```
+
+Para auditar o resultado arquivado sem reexecutar o solver, pode-se rodar `score`
+com `--input benchmarks/math_verifier_holdout_20261017 --report /tmp/auditoria-soma.json`.
+Esse relatório deve ter caminho novo; ele reabre labels já expostos, portanto
+**não constitui outra medição cega**. Os hashes das fontes continuam sendo o gate
+mesmo se commits posteriores acrescentarem apenas documentação e artefatos.
 
 ## Parecer pré-holdout
 
@@ -88,8 +137,14 @@ Os bloqueios centrais de vazamento estão cobertos pelo protocolo: `freeze` e
 `predict` não chamam o oráculo; o score só importa/cria callbacks após validar o
 seal; fonte, versão e ambiente são vinculados; pareamento é um-para-um; e o replay
 usa evaluator explícito com verificação de procedência e zero crédito estratégico.
-Ainda não há holdout final nem resultado. Hashes locais/seals não são assinatura
-contra adulteração deliberada por quem controla os arquivos.
+No momento desse parecer ainda não havia holdout final nem resultado. A revisão
+read-only posterior ao commit manteve `git status` limpo antes e depois, e aprovou
+o contrato offline com ressalvas. Uma pré-revisão anterior participou de alterações
+e por isso **não foi contada como revisão read-only independente do commit**.
+Hashes locais/seals não são assinatura contra adulteração deliberada por quem
+controla os arquivos. Os labels são deriváveis das expressões públicas: o protocolo
+garante separação de fases em fluxo confiável, não cegamento externo/adversarial
+nem prova de que terceiros não poderiam calcular as respostas antes do score.
 
 Antes de um holdout final: (1) revisar e fixar um commit limpo com harness,
 oráculo e lock; (2) confirmar que a execução do ensaio usará apenas o CLI
