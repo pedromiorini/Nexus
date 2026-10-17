@@ -354,6 +354,12 @@ class RealHierarchicalMemory:
         Retorna: List[Dict] com similarity, importance, etc.
         """
         # FIXED v3.68: Thread-safe with lock
+        if isinstance(limit, bool) or not isinstance(limit, int):
+            raise TypeError("limit must be an integer")
+        if limit < 0:
+            raise ValueError("limit must be non-negative")
+        if limit == 0:
+            return []
         with self.db_lock:
             # MODO SEMÂNTICO (FAISS)
             if not self.fallback_mode and self.encoder and self.index.ntotal > 0:

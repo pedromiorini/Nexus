@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 261
+tests: 265
 bandit_low: 131
 -->
 
@@ -11,14 +11,14 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base desta rodada:** `main` pós-PR #29, merge commit `e06511396d407a3440ee1969e0af8d7e055203dc`; branch isolada `fix/tool-validator-container-subclasses-2026-10-16`.
-- **Estado da revisão:** candidata validada localmente; publicar a branch e abrir PR própria contra `main` para CI/revisão. Não mesclar sem autorização específica para esta PR.
-- **Mudança candidata:** `ToolValidator` resolve schemas built-in conhecidos para classes reais e aceita subclasses; preserva `any`/`object` como curingas, mantém fallback de nome exato para schemas desconhecidos e rejeita explicitamente `bool` quando o tipo esperado é `int`.
-- **Validação local (não CI):** 261/261 testes sem falhas/skip; suíte integrada 30 aprovações e 1 skip opcional FAISS; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 45/45 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditoria de realidade e auditorias AST passaram.
+- **Base desta rodada:** `main` pós-PR #30, merge commit `e83ce9eb422e4cb9d2fb5ec818cb795351e57a13`; branch isolada `fix/memory-retrieve-nonnegative-limit-2026-10-16`.
+- **Estado da revisão:** candidata validada localmente; branch isolada. O status de publicação/CI fica no GitHub; não mesclar sem autorização específica.
+- **Mudança candidata:** `RealHierarchicalMemory.retrieve` aceita apenas `int` não booleano e não negativo; `limit=0` retorna lista vazia antes de FAISS/SQLite. Não há teto para limites positivos altos.
+- **Validação local:** 265/265 testes, 0 falhas/skips; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 47/47 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST/realidade e benchmarks passaram.
 - **Benchmarks:** CLIs de capacidade e POMDP v2 passaram na seed `20261016`; o v2 teve erro absoluto máximo `2.7755575615628914e-16` em 128/128 casos e rejeitou 4/4 controles inválidos.
 - **Contrato/limites:** uma subclasse `list` em `list_operations.items` executa com sucesso, mas o preflight de cache permanece independente e faz bypass para containers customizados. A validação é apenas do valor do parâmetro declarado; não valida recursivamente elementos aninhados. Timeout segue diagnóstico, não cancelamento.
 - **POMDP herdado:** a PR #24 foi mesclada com ambos os checks oficiais aprovados; o filtro de um passo recebe modelo explícito, sem alegar aprendizagem ou planejamento. O protocolo v1 continua inalterado e mantém `unsupported_interface` para observação parcial.
-- **Hardening herdado:** PR #25 foi mesclada no commit `675f5aa95416c3a92998a34dd2f905f529b90980`; PR #26 no commit `508020d77d5705f99c76eaca4df05e8e265662f7`; PR #27 no commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; PR #28 no commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`; PR #29 no merge commit `e06511396d407a3440ee1969e0af8d7e055203dc`, após os dois checks oficiais passarem. A PR #23 limitou `math_calculate` e isolou aliases de cache.
+- **Hardening herdado:** PR #25 foi mesclada no commit `675f5aa95416c3a92998a34dd2f905f529b90980`; PR #26 no commit `508020d77d5705f99c76eaca4df05e8e265662f7`; PR #27 no commit `c4375d9f42703b11d2632b3a701303c5a69563a4`; PR #28 no commit `fafcd95e6b40c5d51b34d344f164a9045279d8bb`; PR #29 no merge commit `e06511396d407a3440ee1969e0af8d7e055203dc`; PR #30 foi mesclada após 2/2 checks oficiais no merge commit `e83ce9eb422e4cb9d2fb5ec818cb795351e57a13`. A PR #23 limitou `math_calculate` e isolou aliases de cache.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 - **Checkpoint histórico anterior — 2026-10-16, base `17a1b19` (não é CI):** Python 3.11.16; a suíte passou com 120 testes; cobertura branch da fila 97% e do bridge Vita 74%; mutation direcionada 10/10 mutações mortas; Bandit 131 LOW e nenhum MEDIUM/HIGH. `psutil`, FAISS e SentenceTransformers estavam ausentes, portanto fallbacks opcionais foram usados.
 
@@ -39,7 +39,7 @@ bandit_low: 131
 - `test_vita_audit_cross_connection_contract.py`: contrato de duas instâncias Vita compartilhando o mesmo arquivo SQLite sem perda de eventos.
 - `tools/diagnostics_dashboard.py`: dashboard CLI determinístico que valida snapshots antes de renderizar métricas observáveis.
 - `tools/security_triage.py` e `SECURITY_TRIAGE.md`: inventário conservador dos achados Bandit, sem supressão automática.
-- `test_memory_sql_contract.py`: teste adversarial para a fronteira SQL do fallback parametrizado da memória.
+- `test_memory_sql_contract.py`: protege SQL parametrizado, limite positivo/zero, rejeição de negativos e tipos inválidos e falha antes do backend semântico.
 - `tools/targeted_mutation.py`: mutation testing direcionado para fila, Vita e schema.
 - `core/deferred_task_queue.py`: transições de estado protegidas por `RLock`; conclusão/descarte removem tarefas pendentes do heap, retry é único e limitado, callbacks defeituosos são reportados sem interromper o lote; snapshots versionados continuam atômicos.
 - `RealImmutableLog`: triggers bloqueiam UPDATE/DELETE, o SHA-chain é verificado na inicialização e detecta adulteração/remoção; writes de conexões concorrentes são serializados. Truncamento final ou rehash por quem controla o arquivo ainda exige âncora externa.
@@ -194,4 +194,4 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 
 ## Próxima ação
 
-Publicar esta branch isolada e acompanhar os checks oficiais da nova PR. O contrato de subclasses built-in está coberto por `test_tool_parameter_contract.py`; preservar a exceção `bool`/`int`, o fallback de nome exato para schemas desconhecidos e o bypass de cache de subclasses não serializadas. Não mesclar sem autorização específica; não criar outra rotina semanal.
+Publicar a branch isolada e acompanhar os checks oficiais; não mesclar sem autorização específica e não criar outra rotina semanal. A auditoria também encontrou que `ToolDefinition.requires_permission`/`permission_level` são metadados sem checagem em runtime; nenhum built-in atual os ativa, e uma política de autorização requer escolha explícita de principal/contexto e níveis antes de adicionar ferramentas protegidas. A lacuna sobre subclasses foi corrigida na PR #30; validação recursiva de membros continua fora do contrato.

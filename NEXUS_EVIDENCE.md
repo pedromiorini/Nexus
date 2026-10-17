@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 261
+tests: 265
 bandit_low: 131
 -->
 
@@ -139,12 +139,25 @@ Limite: a captura é específica à cópia profunda antes do armazenamento; não
 
 ## Compatibilidade de subclasses em parâmetros tipados — 2026-10-16
 
-Base: `main` pós-PR #29, merge commit `e06511396d407a3440ee1969e0af8d7e055203dc`; branch candidata isolada `fix/tool-validator-container-subclasses-2026-10-16`.
+Base: `main` pós-PR #29, merge commit `e06511396d407a3440ee1969e0af8d7e055203dc`; branch isolada `fix/tool-validator-container-subclasses-2026-10-16`.
 
 Reprodução pré-patch: `ToolValidator.validate_parameters` comparava o nome da classe observado com o schema, rejeitando uma subclasse `Items(list)` para `list_operations.items`; o executor teria aceitado a lista em `sorted`, mas não era alcançado. O mesmo critério também aceitava indevidamente uma classe não relacionada se seu `__name__` imitasse um nome built-in, como `list`.
 
-Contrato candidato: nomes built-in conhecidos são resolvidos para classes reais e a relação de subclasse é testada pelo tipo concreto. Uma subclasse de `list` executa e retorna `[1, 2]`; como o preflight de cache não serializa containers customizados, a otimização é bypassada e o sucesso do executor permanece. `int` aceita subclasses verdadeiras, mas `bool` continua rejeitado; um tipo falso com nome `list` não satisfaz o schema. `any` e `object` mantêm semântica wildcard; schemas desconhecidos preservam o matching legado por nome.
+Contrato implementado: nomes built-in conhecidos são resolvidos para classes reais e a relação de subclasse é testada pelo tipo concreto. Uma subclasse de `list` executa e retorna `[1, 2]`; como o preflight de cache não serializa containers customizados, a otimização é bypassada e o sucesso do executor permanece. `int` aceita subclasses verdadeiras, mas `bool` continua rejeitado; um tipo falso com nome `list` não satisfaz o schema. `any` e `object` mantêm semântica wildcard; schemas desconhecidos preservam o matching legado por nome.
 
 Resultados locais medidos: unittest 261/261, sem falhas ou skips; suíte integrada 30 aprovações e 1 skip opcional FAISS; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 45/45 mortas, 0 sobreviventes e 0 não aplicadas; Bandit 131 LOW e 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST/realidade e benchmarks oficiais passaram. No POMDP v2, 128/128 casos ficaram dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e 4/4 controles inválidos foram rejeitados.
 
-Base técnica: [built-ins `isinstance`/`issubclass`, Python 3.12](https://docs.python.org/3.12/library/functions.html#isinstance) e [tipo booleano, Python 3.12](https://docs.python.org/3.12/library/stdtypes.html#boolean-type-bool). Limite: o contrato valida apenas o tipo do valor declarado, sem schema recursivo para elementos aninhados; a CI oficial da nova PR ainda deve ser consultada.
+Base técnica: [built-ins `isinstance`/`issubclass`, Python 3.12](https://docs.python.org/3.12/library/functions.html#isinstance) e [tipo booleano, Python 3.12](https://docs.python.org/3.12/library/stdtypes.html#boolean-type-bool). Limite: o contrato valida apenas o tipo do valor declarado, sem schema recursivo para elementos aninhados; a PR #30 foi mesclada em `main` no commit `e83ce9eb422e4cb9d2fb5ec818cb795351e57a13` após 2/2 checks oficiais aprovados.
+
+
+## Limite negativo na recuperação SQLite/FAISS — 2026-10-16
+
+Base local: `main` pós-PR #30, merge commit `e83ce9eb422e4cb9d2fb5ec818cb795351e57a13`; branch isolada `fix/memory-retrieve-nonnegative-limit-2026-10-16`.
+
+Reprodução pré-patch com quatro memórias: busca vazia em `limit=0` retornou 0 linhas, `limit=1` retornou 1 e `limit=-1` retornou as 4. A busca por palavra também não rejeitava negativo; no modo semântico, o `k` negativo podia gerar erro e cair nesse mesmo fallback.
+
+A correção valida antes de escolher o backend: `bool` e valores não `int` geram `TypeError`, negativos geram `ValueError` e zero retorna lista vazia sem chamar encoder/FAISS/SQLite. As consultas SQL permanecem parametrizadas. Regressões cobrem busca vazia, keyword, FAISS simulado, tipos inválidos e zero.
+
+Validação local: unittest 265/265; integração 30 aprovados e 1 skip FAISS opcional; cobertura 95% fila, 94% VRAM, 76% Vita, 68% núcleo; mutation gate 47/47 mortos sem sobreviventes/não aplicados; Bandit 131 LOW e 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST/realidade, CLIs de capacidade e POMDP v2 passaram. A fonte normativa é a [documentação oficial SQLite de SELECT/LIMIT](https://www.sqlite.org/lang_select.html).
+
+Limite: não há teto para valores positivos altos nem garantia sobre memória global. Finding adjacente ainda não implementado: os metadados `requires_permission`/`permission_level` não têm enforcement; todos os built-ins atuais os deixam desativados, e a definição de um modelo de autorização foi adiada por depender de escolha explícita de API.
