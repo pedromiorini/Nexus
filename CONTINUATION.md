@@ -11,7 +11,7 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base atual:** `main` pós-PR #34, merge commit `51373dc77179e4edd094df14290f91aa9c8d8060`; contém a PR #33 (`62f6af14a2ad1d3659a4a5940e713c588513bf9b`), a PR #32 (`b07254307a23cdaef68f7c2b0d23010ac0827580`) e a PR #34.
+- **Base auditada nesta rodada:** `main` estava no merge documental da PR #35, commit `047c4ba6bb4fb22e3dbe3251c8aee9bf986e0583`; a base funcional permanece no merge da PR #34 (`51373dc77179e4edd094df14290f91aa9c8d8060`), que contém as PRs #32, #33 e #34.
 - **Política de integração:** mudanças futuras devem permanecer em branches isoladas e ser mescladas somente mediante autorização específica.
 - **D-026 implementada:** `RealEpisodicMemory.search_episodes` rejeita `bool`/tipos não inteiros e limites negativos antes de lock/SQL; `limit=0` retorna vazio sem consulta e valores positivos preservam o fluxo anterior, sem novo teto.
 - **Hardening herdado:** D-024 (fallback de cache hit) e D-025 (snapshot JSON anti-TOCTOU) estão em `main` após os merges #32 e #33.
@@ -153,13 +153,13 @@ O workflow `.github/workflows/nexus-contract-gate.yml` foi ampliado para:
 - executar o contrato de média de sinergia junto com a suíte expandida.
 - executar o contrato de ações do MCTS junto com a suíte expandida.
 - executar o contrato de consistência do estado e o gate contra o manifesto da mesma execução.
-- instalar dependências com versão fixa (`requirements-dev.txt`) e falhar em ruff (F, E9, B904, B006), actionlint (binário oficial 1.7.12 verificado por SHA-256 no workflow; o Dependabot não o atualiza) ou zizmor.
+- instalar dependências com versão fixa (`requirements-dev.txt`) e falhar em ruff (F, E9, B904, B006, B007 e RUF013), actionlint (binário oficial 1.7.12 verificado por SHA-256 no workflow; o Dependabot não o atualiza) ou zizmor.
 - regenerar os relatórios de realidade e falhar se `AUDIT_REALITY_REPORT.md`/`audit_reality.json` versionados divergirem; conferir `SECURITY_TRIAGE.md` com `--check`.
 - medir uma única cobertura (testes + suíte integrada) com pisos para fila, guard de VRAM, bridge e núcleo.
-- rodar a suíte e a suíte integrada em Python 3.12 e 3.13 com `-X dev -W error` (job `python-compat`).
+- **Compatibilidade Python:** o workflow atual executa somente Python 3.11. `requirements.txt` registra combinações de NumPy testadas em 3.12/3.13, mas o workflow não tem matriz nem job `python-compat`; validar essas versões na CI permanece trabalho futuro.
 - falhar se o diretório de trabalho ganhar bancos SQLite ou se arquivos versionados mudarem durante a execução.
 - gravar o resumo da suíte integrada (`NEXUS_INTEGRATED_SUMMARY`) e reportá-lo no manifesto em `verification.integrated`, separado de `verification.tests` (que conta só o `unittest`).
-- falhar o job `python-compat` se `ResourceWarning` aparecer na saída (ele não altera o código de saída).
+- Ao implementar a compatibilidade 3.12/3.13, avaliar execução com `-X dev -W error` e falha em `ResourceWarning`; essa política ainda não está configurada no workflow atual.
 
 O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; as actions estão fixadas por SHA e o runner em `ubuntu-24.04`.
 

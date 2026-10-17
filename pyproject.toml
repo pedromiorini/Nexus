@@ -6,8 +6,9 @@ extend-exclude = [".venv", "venv"]
 
 [tool.ruff.lint]
 # F = pyflakes (nomes indefinidos, imports e variáveis não usados, f-strings vazias),
-# E9 = erros de sintaxe, B904 = raise sem "from" dentro de except, B006 = default mutável.
-select = ["F", "E9", "B904", "B006"]
+# E9 = erros de sintaxe, B904 = raise sem "from" dentro de except, B006 = default mutável,
+# B007 = variável de laço não usada, RUF013 = Optional implícito em anotações.
+select = ["F", "E9", "B904", "B006", "B007", "RUF013"]
 
 [tool.coverage.run]
 branch = true
