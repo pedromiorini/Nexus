@@ -38,7 +38,7 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 
 - `RealKnowledgeGraph` aceita um `TemporalFactStore` opcional. Quando fornecido, `add_relation` mapeia origem/tipo/destino, confiança, fonte e `valid_from`; predicados funcionais não são inferidos e precisam estar declarados no store.
 - O registro temporal ocorre antes de criar nós ou alterar índices, rejeições não deixam estado parcial no grafo, e `properties` não é serializado implicitamente como metadata. As projeções e `find_relations` legados continuam preservados.
-- Evidência: 309/309 testes unittest; 11/11 contratos focados; cobertura 100% em linhas e branches de `RealKnowledgeGraph.__init__` e `add_relation`; 62/62 mutantes direcionados mortos; Ruff passou. O CI oficial desta branch ainda está pendente.
+- Evidência: 309/309 testes unittest; suíte integrada 30 aprovados + 1 skip opcional; contratos focados 11/11; cobertura 100% em linhas e branches de `RealKnowledgeGraph.__init__` e `add_relation`; 62/62 mutantes direcionados mortos; Ruff passou. Os checks oficiais do run `39015023676` passaram 2/2 no commit de implementação `865063d21de9e986f9a502a790bfac2b68f7f801`; consulte a PR #38 para o estado do HEAD mais recente.
 - A fonte literal de cada fato ainda é fornecida pelo chamador; esta mudança não importa automaticamente medições do resumo de CI para o ledger. Persistência SQLite é a próxima etapa separada.
 
 ## Verificação local da branch de correção — 2026-10-16

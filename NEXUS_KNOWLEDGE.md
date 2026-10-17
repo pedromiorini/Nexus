@@ -28,7 +28,7 @@ Conflitos não devem ser resolvidos silenciosamente.
 - `main` inclui o núcleo `TemporalFactStore` e o contrato de relações múltiplas no grafo via PR #37, merge commit `812ebd02b0c82ecc3169d620e36d25592b1d6727`.
 - O ledger continua somente em memória; snapshots são validados por replay, mas ainda não há persistência SQLite.
 - A branch `feat/temporal-ledger-integration-2026-10-17` propõe injeção opt-in do store em `RealKnowledgeGraph`; o caminho padrão sem store permanece legado, e predicados funcionais são escolhidos pelo chamador.
-- Validação local da branch: 309/309 testes unittest, 11/11 contratos focados, cobertura 100% em linhas e branches dos dois métodos alterados e 62/62 mutantes direcionados mortos. O CI oficial ainda está pendente.
+- Validação local: 309/309 testes unittest, 11/11 contratos focados, cobertura 100% em linhas e branches dos dois métodos alterados e 62/62 mutantes direcionados mortos. Os dois checks oficiais do run `39015023676` passaram no commit de implementação `865063d21de9e986f9a502a790bfac2b68f7f801`; consulte a PR #38 para o estado do HEAD mais recente.
 - Persistência SQLite e ingestão de alegações de evidência por comando medidor são etapas separadas e ainda não implementadas.
 
 ## Estado histórico verificado em 2026-10-05
