@@ -12,7 +12,7 @@ bandit_low: 131
 ## Estado atual
 
 - **Base desta rodada:** `main` pós-PR #31, merge commit `93179ec463deefc0fcaf1e6f0cea0c88230cce45`; branch isolada `fix/tool-cache-hit-copy-fallback-2026-10-16`.
-- **Estado da revisão:** candidata validada localmente; publicação/CI ainda pendentes. Não mesclar sem autorização específica.
+- **Estado da revisão:** branch publicada e [PR #32 aberta contra `main`](https://github.com/pedromiorini/Nexus/pull/32); consultar os checks oficiais na PR. Não mesclar sem autorização específica.
 - **Mudança candidata:** `RealToolUse.execute_tool` trata falha de `copy.deepcopy` no cache hit como bypass: remove a entrada defeituosa, registra `TOOL_CACHE_HIT_UNAVAILABLE` e segue para o executor; LRU e contadores de hit só avançam após cópia bem-sucedida.
 - **Validação local:** 267/267 testes, 0 falhas/skips/XPASS; suíte integrada 30 aprovações e 1 skip FAISS opcional; cobertura fila 95%, VRAM 94%, Vita 76%, núcleo 68%; mutation gate 49/49 mortas, 0 sobreviventes/não aplicadas; Bandit 131 LOW, 0 MEDIUM/HIGH; Ruff, actionlint, zizmor, compileall, auditorias AST/realidade e benchmarks passaram.
 - **Benchmarks:** CLIs de capacidade e POMDP v2 passaram na seed `20261016`; o v2 teve erro absoluto máximo `2.7755575615628914e-16` em 128/128 casos e rejeitou 4/4 controles inválidos.
@@ -196,4 +196,4 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 
 ## Próxima ação
 
-Publicar a branch `fix/tool-cache-hit-copy-fallback-2026-10-16` e acompanhar os checks oficiais; não mesclar sem autorização específica e não criar outra rotina semanal. Após a revisão desta mudança, atacar em branch separada o TOCTOU de `params` mutável entre cache key e executor, definindo snapshot limitado ou bypass de cache que preserve a execução. Permanecem também sem enforcement os metadados `ToolDefinition.requires_permission`/`permission_level` (nenhum built-in atual os ativa) e fora do contrato a validação recursiva de membros de contêiner.
+Acompanhar o estado atual da PR #32 e seus checks oficiais; não mesclar sem autorização específica nem criar outra rotina semanal. Em seguida, atacar em branch separada o TOCTOU de `params` mutável entre cache key e executor, definindo snapshot limitado ou bypass de cache que preserve a execução. Permanecem também sem enforcement os metadados `ToolDefinition.requires_permission`/`permission_level` (nenhum built-in atual os ativa) e fora do contrato a validação recursiva de membros de contêiner.
