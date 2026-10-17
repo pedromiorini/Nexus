@@ -193,4 +193,4 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 
 ## Próxima ação
 
-Concluir os gates locais da branch sincronizada e acompanhar a nova CI da PR #32; revisar qualquer regressão sem mesclar. A PR #32 permanece sem autorização de merge. Depois, continuar a auditoria independente de outras fronteiras; `ToolDefinition.requires_permission`/`permission_level` ainda não têm enforcement e a validação recursiva dos membros de contêiner permanece fora do contrato.
+Concluir os gates da branch de auditoria e acompanhar os checks e a revisão da PR #36; corrigir regressões antes de qualquer merge. A PR #32 já está integrada; a PR #36 permanece aberta e qualquer merge exige autorização específica. Depois, continuar a auditoria independente de outras fronteiras; `ToolDefinition.requires_permission`/`permission_level` ainda não têm enforcement e a validação recursiva dos membros de contêiner permanece fora do contrato.
