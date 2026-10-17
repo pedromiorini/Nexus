@@ -158,8 +158,11 @@ class TemporalFactStore:
             raise ValueError("metadata deve ser dict")
         try:
             metadata_value = _json_value(metadata) if metadata is not None else {}
-        except RecursionError as exc:
-            raise ValueError("metadata excede a profundidade suportada") from exc
+            # A árvore é nativa e sem perdas; o preflight também captura limites
+            # do serializador antes de qualquer evento close/assert ser anexado.
+            json.dumps(metadata_value, allow_nan=False)
+        except (OverflowError, RecursionError, TypeError, ValueError) as exc:
+            raise ValueError("metadata não é serializável como JSON estrito") from exc
         requested_valid_from = None if valid_from is None else _number(valid_from, "valid_from")
         with self._lock:
             now = self._now()
@@ -310,6 +313,10 @@ class TemporalFactStore:
                     raise ValueError(f"recorded_at divergente no evento {n}")
                 if not isinstance(fact["metadata"], dict):
                     raise ValueError(f"metadata inválido no evento {n}")
+                try:
+                    _json_value(fact["metadata"])
+                except (RecursionError, ValueError) as exc:
+                    raise ValueError(f"metadata não é JSON estrito no evento {n}") from exc
                 expected_id = f"tf-{store._seq + 1:06d}"
                 if fact["fact_id"] != expected_id or fact["superseded_by"] is not None:
                     raise ValueError(f"fact_id ou superseded_by inválido no evento {n}")
@@ -318,9 +325,18 @@ class TemporalFactStore:
                 if raw.get("fact_id") not in store._facts:
                     raise ValueError(f"referência inexistente no evento {n}")
                 if kind == "close":
-                    _number(raw.get("valid_to"), "valid_to")
+                    close_at = _number(raw.get("valid_to"), "valid_to")
+                    fact = store._facts[raw["fact_id"]]
+                    if close_at < fact.valid_from:
+                        raise ValueError(f"close anterior ao início do fato no evento {n}")
+                    if fact.valid_to is not None and close_at > fact.valid_to:
+                        raise ValueError(f"close não pode estender janela encerrada no evento {n}")
+                    if fact.closed_at is not None and close_at == fact.valid_to:
+                        raise ValueError(f"close duplicado não pode reescrever o fechamento no evento {n}")
                     target = raw.get("superseded_by")
-                    if target is not None and not isinstance(target, str):
+                    if target is not None and (
+                        not isinstance(target, str) or target == raw["fact_id"]
+                    ):
                         raise ValueError(f"superseded_by inválido no evento {n}")
                 else:
                     _text(raw.get("source"), "source")

@@ -134,6 +134,18 @@ class DeferredTaskQueueTests(unittest.TestCase):
         self.assertEqual(second["discarded"], 1)
         self.assertEqual(queue.statistics()["depth"], 0)
 
+    def test_processor_exception_is_sanitized_before_snapshot_export(self):
+        queue = DeferredTaskQueue(max_attempts=2)
+        task = queue.enqueue("boom")
+        result = queue.consume(
+            lambda _task: (_ for _ in ()).throw(RuntimeError("api_token=do-not-persist"))
+        )
+
+        self.assertEqual(result["retried"], 1)
+        self.assertEqual(task.last_reason, "RuntimeError: processor raised an exception")
+        self.assertNotIn("api_token", task.last_reason)
+        self.assertNotIn("api_token", queue.export_snapshot(as_json=True))
+
     def test_consume_blocked_by_critical_pressure(self):
         queue = DeferredTaskQueue()
         queue.enqueue("blocked")
@@ -240,6 +252,60 @@ class DeferredTaskQueueTests(unittest.TestCase):
         invalid = router.validate_recovery_diagnostics({"schema": "nexus.recovery.diagnostics.v9"})
         self.assertFalse(invalid["valid"])
         self.assertFalse(invalid["compatible"])
+
+    def test_router_reprocess_does_not_persist_exception_details(self):
+        router = CentralRouter.__new__(CentralRouter)
+        router.deferred_queue = DeferredTaskQueue(max_attempts=2)
+        router.stats = {"deferred_reprocessing": {
+            "attempts": 0, "completed": 0, "failed": 0,
+            "discarded": 0, "total_latency_ms": 0.0,
+        }, "reprocessing_policy": {
+            "state": "active", "paused_until": 0.0,
+            "cooldown_seconds": 30.0, "last_reason": "",
+        }}
+        router.vram_guard = type("Guard", (), {
+            "evaluate": lambda self: type("Decision", (), {"action": "normal"})()
+        })()
+        router.vita_bridge = NexusConstitutionalBridge(":memory:")
+
+        def fail_with_sensitive_detail(_prompt, _context, *, _deferred_reprocess=False):
+            raise ValueError("api_token=do-not-persist")
+
+        router._route = fail_with_sensitive_detail
+        task = router.deferred_queue.enqueue("recover")
+        result = router.reprocess_deferred_tasks()
+
+        self.assertEqual(result["retried"], 1)
+        self.assertEqual(task.last_reason, "ValueError: deferred reprocessing failed")
+        self.assertNotIn("api_token", task.last_reason)
+        self.assertNotIn("api_token", router.deferred_queue.export_snapshot(as_json=True))
+
+    def test_router_reprocess_does_not_persist_private_failure_payload(self):
+        for field in ("reason", "error"):
+            with self.subTest(field=field):
+                router = CentralRouter.__new__(CentralRouter)
+                router.deferred_queue = DeferredTaskQueue(max_attempts=2)
+                router.stats = {"deferred_reprocessing": {
+                    "attempts": 0, "completed": 0, "failed": 0,
+                    "discarded": 0, "total_latency_ms": 0.0,
+                }, "reprocessing_policy": {
+                    "state": "active", "paused_until": 0.0,
+                    "cooldown_seconds": 30.0, "last_reason": "",
+                }}
+                router.vram_guard = type("Guard", (), {
+                    "evaluate": lambda self: type("Decision", (), {"action": "normal"})()
+                })()
+                router.vita_bridge = NexusConstitutionalBridge(":memory:")
+                router._route = lambda *_args, **_kwargs: {
+                    "success": False, field: "api_token=do-not-persist",
+                }
+                task = router.deferred_queue.enqueue("recover")
+
+                result = router.reprocess_deferred_tasks()
+
+                self.assertEqual(result["retried"], 1)
+                self.assertEqual(task.last_reason, "reprocessamento não concluído")
+                self.assertNotIn("api_token", router.deferred_queue.export_snapshot(as_json=True))
 
     def test_vita_telemetry_alerts_on_discard_rate(self):
         bridge = NexusConstitutionalBridge(":memory:")
