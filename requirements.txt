@@ -4,6 +4,7 @@ numpy>=1.26,<3
 
 # Opcionais: o núcleo usa fallbacks quando ausentes (ver "optional_dependency_warnings" em
 # AUDIT_REALITY_REPORT.md). Instale à parte apenas se quiser os recursos correspondentes:
+#   networkx (backend de grafos; incluído no perfil de testes, não no runtime mínimo)
 #   psutil
 #   faiss-cpu
 #   sentence-transformers

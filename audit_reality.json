@@ -238,6 +238,14 @@
       "exists": true
     },
     {
+      "path": "test_dependency_profiles_contract.py",
+      "exists": true
+    },
+    {
+      "path": "test_knowledge_graph_contract.py",
+      "exists": true
+    },
+    {
       "path": "test_deferred_task_snapshot.py",
       "exists": true
     },
