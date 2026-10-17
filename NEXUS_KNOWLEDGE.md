@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 309
 bandit_low: 131
 -->
 
@@ -22,6 +22,14 @@ Para o estado atual, usar esta ordem:
 9. nomes, comentários e banners.
 
 Conflitos não devem ser resolvidos silenciosamente.
+
+## Estado após a PR #37
+
+- `main` inclui o núcleo `TemporalFactStore` e o contrato de relações múltiplas no grafo via PR #37, merge commit `812ebd02b0c82ecc3169d620e36d25592b1d6727`.
+- O ledger continua somente em memória; snapshots são validados por replay, mas ainda não há persistência SQLite.
+- A branch `feat/temporal-ledger-integration-2026-10-17` propõe injeção opt-in do store em `RealKnowledgeGraph`; o caminho padrão sem store permanece legado, e predicados funcionais são escolhidos pelo chamador.
+- Validação local da branch: 309/309 testes unittest, 11/11 contratos focados, cobertura 100% em linhas e branches dos dois métodos alterados e 62/62 mutantes direcionados mortos. O CI oficial ainda está pendente.
+- Persistência SQLite e ingestão de alegações de evidência por comando medidor são etapas separadas e ainda não implementadas.
 
 ## Estado histórico verificado em 2026-10-05
 
