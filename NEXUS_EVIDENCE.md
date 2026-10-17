@@ -193,7 +193,7 @@ Validação local do head original da PR #33 (pré-sincronização da PR #32), P
 
 ## Limite não negativo na busca de memória episódica — 2026-10-16
 
-Base da alteração: branch `fix/episodic-search-nonnegative-limit-2026-10-16`, criada sobre `main` pós-PR #32 no commit `b07254307a23cdaef68f7c2b0d23010ac0827580` (que contém também a PR #33).
+Base original da alteração: branch `fix/episodic-search-nonnegative-limit-2026-10-16`, criada sobre `main` pós-PR #32 no commit `b07254307a23cdaef68f7c2b0d23010ac0827580` (que contém também a PR #33). A PR #34 foi mesclada em `main` no commit `51373dc77179e4edd094df14290f91aa9c8d8060`.
 
 Reprodução pré-patch: com dois episódios fechados, `search_episodes(status="closed", limit=-1)` retornou os dois; `limit=True` também foi aceito como limite 1. A implementação repassava diretamente o valor para a cláusula SQL `LIMIT`.
 

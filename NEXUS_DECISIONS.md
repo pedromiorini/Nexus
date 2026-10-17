@@ -231,6 +231,7 @@
 
 ## D-026 — `search_episodes` exige limite inteiro não negativo
 
+- **Status:** implementada e incorporada à `main` pela PR #34, merge commit `51373dc77179e4edd094df14290f91aa9c8d8060`.
 - **Decisão:** `RealEpisodicMemory.search_episodes` valida `limit` na entrada: aceita `int` não booleano, rejeita tipos inválidos com `TypeError`, negativos com `ValueError` e retorna `[]` para zero antes de lock ou SQL. Limites positivos preservam o comportamento existente; nenhum teto positivo novo é imposto.
 - **Contexto:** o método encaminhava o valor diretamente para SQLite. Um `LIMIT` negativo significa ausência de limite e pode retornar todos os episódios do status consultado; `bool` também é subclasse de `int` e era aceito como 0/1.
 - **Motivo:** impedir que um parâmetro chamado `limit` amplie inadvertidamente a consulta e alinhar a fronteira episódica ao contrato de `RealHierarchicalMemory.retrieve` (D-023).
