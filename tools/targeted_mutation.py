@@ -28,6 +28,7 @@ DEFAULT_TESTS = (
     "test_deferred_task_properties.py",
     "test_recovery_diagnostics_contract.py",
 )
+QUEUE_SNAPSHOT = ("test_deferred_task_snapshot.py",)
 VRAM = ("test_vram_defense_guard.py",)
 LOG = ("test_immutable_log_contract.py",)
 JB = ("test_jailbreak_detector_contract.py",)
@@ -58,12 +59,22 @@ class Mutation:
 
 
 MUTATIONS = [
-    Mutation("queue_capacity_guard", "core/deferred_task_queue.py", "max_attempts < 1", "max_attempts < 0"),
+    Mutation(
+        "queue_max_attempts_positive",
+        "core/deferred_task_queue.py",
+        "type(max_attempts) is not int\n            or max_attempts < 1\n            or type(max_size) is not int",
+        "type(max_attempts) is not int\n            or max_attempts < 0\n            or type(max_size) is not int",
+    ),
     Mutation("queue_priority_direction", "core/deferred_task_queue.py", "(-self.priority, self.created_at)", "(self.priority, self.created_at)"),
     Mutation("queue_pressure_guard", "core/deferred_task_queue.py", "if pressure_critical or not self._heap:", "if pressure_critical and not self._heap:"),
     Mutation("queue_retry_limit", "core/deferred_task_queue.py", "task.attempts >= task.max_attempts", "task.attempts > task.max_attempts"),
     Mutation("queue_success_branch", "core/deferred_task_queue.py", "if ok:\n                if self.complete(task.task_id):", "if not ok:\n                if self.complete(task.task_id):"),
     Mutation("queue_batch_validation", "core/deferred_task_queue.py", "max_batch < 1", "max_batch < 0"),
+    Mutation("snapshot_statistics_exact_keys", "core/deferred_task_queue.py", "or set(statistics) != set(expected_statistics)", "or False", tests=QUEUE_SNAPSHOT),
+    Mutation("snapshot_pending_attempts_strict", "core/deferred_task_queue.py", "or attempts >= max_attempts", "or attempts > max_attempts", tests=QUEUE_SNAPSHOT),
+    Mutation("snapshot_context_string_keys", "core/deferred_task_queue.py", 'if type(key) is not str:\n                        raise ValueError("chaves de context devem ser strings")', 'if False:\n                        raise ValueError("chaves de context devem ser strings")', tests=QUEUE_SNAPSHOT),
+    Mutation("snapshot_preserves_legacy_container_subclasses", "core/deferred_task_queue.py", "if not isinstance(snapshot, dict):", "if type(snapshot) is not dict:", tests=QUEUE_SNAPSHOT),
+    Mutation("snapshot_restore_uses_staged_heap", "core/deferred_task_queue.py", "heapq.heappush(staged_heap, task)", "heapq.heappush(self._heap, task)", tests=QUEUE_SNAPSHOT),
     Mutation("vita_failure_threshold_boundary", "vita/nexus_constitutional_bridge_v3.py", "failure_rate >= self.reprocessing_thresholds[\"failure_rate\"]", "failure_rate > self.reprocessing_thresholds[\"failure_rate\"]"),
     Mutation("vita_audit_order", "vita/nexus_constitutional_bridge_v3.py", "reversed(rows)", "rows"),
     Mutation("schema_version_compatibility", "vita/nexus_constitutional_bridge_v3.py", "schema == self.RECOVERY_SCHEMA", "schema != self.RECOVERY_SCHEMA"),

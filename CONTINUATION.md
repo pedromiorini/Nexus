@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 313
 bandit_low: 131
 -->
 
@@ -11,14 +11,13 @@ bandit_low: 131
 
 ## Estado atual
 
-- **Base auditada nesta rodada:** `main` estava no merge documental da PR #35, commit `047c4ba6bb4fb22e3dbe3251c8aee9bf986e0583`; a base funcional permanece no merge da PR #34 (`51373dc77179e4edd094df14290f91aa9c8d8060`), que contém as PRs #32, #33 e #34.
-- **Política de integração:** mudanças futuras devem permanecer em branches isoladas e ser mescladas somente mediante autorização específica.
-- **D-026 implementada:** `RealEpisodicMemory.search_episodes` rejeita `bool`/tipos não inteiros e limites negativos antes de lock/SQL; `limit=0` retorna vazio sem consulta e valores positivos preservam o fluxo anterior, sem novo teto.
-- **Hardening herdado:** D-024 (fallback de cache hit) e D-025 (snapshot JSON anti-TOCTOU) estão em `main` após os merges #32 e #33.
-- **Validação da PR #34:** unittest 275/275; 11/11 contratos episódicos focados; integração 30 aprovados + 1 skip FAISS opcional; cobertura 95/94/76/68%; mutation 58/58 mortas e 0 não aplicadas/sobreviventes; Bandit 131 LOW, sem MEDIUM/HIGH. Checks oficiais da PR: 2/2 aprovados. POMDP v2: 128/128 dentro de `1e-12`, erro máximo `2.7755575615628914e-16`, 4/4 controles inválidos rejeitados.
-- **Limites:** nenhum teto novo para limites positivos altos; o snapshot de parâmetros permanece por valor, sem preservar identidade/aliasing ou sincronizar escrita concorrente. Fallback de cache não limita custo do executor ou memória global; timeout segue diagnóstico, não cancelamento.
-- **POMDP herdado:** o filtro v2 usa modelo explícito e não reivindica aprendizagem ou planejamento; o protocolo v1 mantém `unsupported_interface` para observação parcial.
-- **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
+- **Branch e base:** `fix/queue-snapshot-hardening-2026-10-17`, baseada em `origin/main` `812ebd02b0c82ecc3169d620e36d25592b1d6727`; alterações locais, sem push, merge ou rebase.
+- **D-030:** fronteiras de snapshot endurecidas sem mudar schema `nexus.deferred_task_queue.v1` nem assinaturas públicas; contextos de export/restore exigem JSON nativo estrito, enquanto subclasses built-in fora de `context` mantêm compatibilidade anterior. Dicts/lists são capturados por métodos base; a restauração publica heap, índice e contadores somente após staging completo.
+- **Baseline confirmado:** referências aninhadas já eram isoladas; timestamps NaN/±Infinity e bool nos campos inteiros já eram rejeitados. Lacunas reproduzidas: chave extra em estatísticas, tentativa exaurida ainda pendente, hook `__deepcopy__` em contexto arbitrário e falha parcial durante staging; revisão independente encontrou ainda um TOCTOU de `task_id` em dict de entrada mutável, agora coberto e corrigido.
+- **Testes locais:** `unittest` 313 executados, 311 aprovados e 2 skips pelo NetworkX opcional ausente; contratos focados snapshot/fila 46/46 em Python 3.11.16 e 46/46 em Python 3.12.3; cobertura de branch da fila 90%. Suite integrada: 30 aprovados, 1 skip opcional de FAISS, 0 faltantes.
+- **Gates:** mutation 63/63 mortos, 0 sobreviventes/não aplicadas; Ruff 0.16.10, actionlint 1.7.12 e zizmor 1.31.1 passaram; Bandit 131 LOW e 0 MEDIUM/HIGH, triagem coerente; compileall passou no Python 3.12.3 e nos três arquivos alterados no Python 3.11.16. Auditoria de realidade regenerada (27.549 linhas, 269 classes, 875 funções), sem diff nos relatórios versionados.
+- **Limites:** nenhum teto novo de bytes/profundidade; o parser/encoder JSON padrão pode rejeitar aninhamentos extremos. `enqueue` ainda usa `deepcopy` para contexto e os métodos da fila ainda expõem objetos mutáveis; isso ficou fora do escopo. Não há callsite de produção de `restore_snapshot` no checkout. CI oficial não foi executada porque não houve publicação.
+- **Próxima ação:** manter a branch isolada até autorização explícita para publicação/merge; não enviar para `main`. Considerar `enqueue` como uma decisão separada se futuramente for desejada validação JSON estrita também na entrada da fila.
 
 ## Contratos relevantes na fronteira de cache/ferramentas
 
@@ -39,11 +38,11 @@ bandit_low: 131
 - `tools/diagnostics_dashboard.py`: dashboard CLI determinístico que valida snapshots antes de renderizar métricas observáveis.
 - `tools/security_triage.py` e `SECURITY_TRIAGE.md`: inventário conservador dos achados Bandit, sem supressão automática.
 - `test_memory_sql_contract.py`: protege SQL parametrizado, limite positivo/zero, rejeição de negativos e tipos inválidos e falha antes do backend semântico.
-- `tools/targeted_mutation.py`: mutation testing direcionado para fila, Vita e schema.
-- `core/deferred_task_queue.py`: transições de estado protegidas por `RLock`; conclusão/descarte removem tarefas pendentes do heap, retry é único e limitado, callbacks defeituosos são reportados sem interromper o lote; snapshots versionados continuam atômicos.
+- `tools/targeted_mutation.py`: mutation testing direcionado para fila, snapshots, Vita e schema.
+- `core/deferred_task_queue.py`: transições de estado protegidas por `RLock`; conclusão/descarte removem tarefas pendentes do heap, retry é único e limitado, callbacks defeituosos são reportados sem interromper o lote; snapshots usam JSON estrito, estatísticas exatas e restore transacional.
 - `RealImmutableLog`: triggers bloqueiam UPDATE/DELETE, o SHA-chain é verificado na inicialização e detecta adulteração/remoção; writes de conexões concorrentes são serializados. Truncamento final ou rehash por quem controla o arquivo ainda exige âncora externa.
 - `RealJailbreakDetector`: normalização Unicode, sinais por frases e fronteiras de palavra reduzem falsos positivos e detectam ofuscações testadas em inglês/português; continua heurístico, não é uma fronteira de segurança.
-- `test_deferred_task_snapshot.py`: contrato de round-trip, ordem, atomicidade, limites, tipos inválidos e ausência de execução durante restauração.
+- `test_deferred_task_snapshot.py`: round-trip, ordem, atomicidade nos dois modos, limites, JSON estrito, rejeição de bool/NaN/ciclos/hooks de cópia, estatísticas e mutação concorrente de dicts de entrada; restore não executa tarefas.
 - Auditoria de realidade em `tools/reality_audit.py`.
 - Hardening do fallback SQL em `RealHierarchicalMemory`: consultas estáticas parametrizadas por termo, sem montagem dinâmica de placeholders.
 - Hardening de `_generate_correction`: captura explícita de `ValueError`/`IndexError`, com preservação do conteúdo original em descrições inválidas.

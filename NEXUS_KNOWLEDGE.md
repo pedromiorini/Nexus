@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 313
 bandit_low: 131
 -->
 
@@ -208,3 +208,12 @@ O manifesto distingue `discovered_static` (inventário AST) de `executed`, `pass
 - A alteração foi desenvolvida na branch `fix/episodic-search-nonnegative-limit-2026-10-16`, baseada em `main` pós-PR #32 (`b07254307a23cdaef68f7c2b0d23010ac0827580`), e incorporada à `main` pela PR #34 no merge commit `51373dc77179e4edd094df14290f91aa9c8d8060`. A [documentação oficial SQLite](https://www.sqlite.org/lang_select.html) é a fonte para a semântica negativa de `LIMIT`.
 
 - Validação desta branch: unittest 275/275, 11/11 contratos episódicos focados, cobertura 95/94/76/68%, mutation 58/58 (100%) e Bandit 131 LOW/0 MEDIUM/HIGH. Lint, workflows, auditorias e benchmarks oficiais passaram; no POMDP v2, 128/128 ficaram dentro de `1e-12` e 4/4 controles inválidos foram rejeitados.
+
+
+## Fronteiras do snapshot da fila — branch local de 2026-10-17
+
+O estado atual está na branch `fix/queue-snapshot-hardening-2026-10-17`, baseada em `origin/main` `812ebd02b0c82ecc3169d620e36d25592b1d6727`. O contrato `nexus.deferred_task_queue.v1` e as assinaturas públicas não mudaram. Export/restore agora aceitam contextos como árvores JSON nativas estritas e copiadas sem hooks externos; timestamps e inteiros são verificados, estatísticas exigem exatamente `enqueued`, `retried`, `completed`, `discarded`, e tarefas pendentes exigem `attempts < max_attempts`. Fora de `context`, subclasses built-in previamente aceitas continuam válidas; dict/list são capturados via métodos base para não delegar a cópia a overrides. O restore captura os campos do snapshot e publica heap/índice/estatísticas apenas depois de staging completo. `replace=False` preserva contadores do destino; `replace=True` importa os do snapshot.
+
+No baseline deste checkout, isolamento de referências aninhadas, timestamps finitos e rejeição de bool já passavam; as lacunas reproduzidas foram chaves estatísticas extras, tarefa pendente exaurida, execução de `__deepcopy__` em contexto arbitrário e restauração parcialmente aplicada sob falha de staging. Uma revisão independente identificou ainda mutação de `task_id` em dict direto entre validação e uso; a regressão específica foi reproduzida, corrigida e protegida. A revisão final também detectou e levou à correção de uma rejeição acidental de subclasses fora de `context`. A validação local registrada em `NEXUS_EVIDENCE.md` mede 313 testes (311 aprovados, 2 skips opcionais), 46/46 contratos focados em Python 3.11 e 3.12, 63/63 mutantes mortos e cobertura branch de fila de 90%.
+
+Não inferir isolamento geral da fila: `enqueue()` ainda usa `deepcopy` sobre o contexto recebido e tarefas podem continuar mutáveis fora da fronteira de snapshot. Não foi criado limite de bytes/profundidade; o parser/encoder padrão pode rejeitar aninhamento extremo. A origem do dict/list deve ser sincronizada durante snapshot se exigir consistência contra escrita concorrente. Não há callsite de produção de restore encontrado neste checkout; a branch não foi publicada e ainda não tem CI oficial.
