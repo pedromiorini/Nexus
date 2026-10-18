@@ -742,9 +742,13 @@ class RealKnowledgeGraph:
                 return QueryResult([], [], "", 0.0, 0)
         else:
             # Fallback: BFS manual
-            path = self._bfs_path(start_id, end_id, max_hops)
+            # Encontrar a distância real antes de aplicar o limite, como NetworkX.
+            path = self._bfs_path(start_id, end_id, len(self.entity_index))
             if not path:
                 return QueryResult([], [], "", 0.0, 0)
+            hops = len(path) - 1
+            if hops > max_hops:
+                return QueryResult([], [], "", 0.0, hops)
 
             entities = [self.entity_index[nid] for nid in path if nid in self.entity_index]
             context = self._build_path_context(path)
