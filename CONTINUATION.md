@@ -3,16 +3,27 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 312
-bandit_low: 131
-
-tests: 348
+tests: 416
 bandit_low: 135
 -->
 
+## Estado canônico da composição local — 2026-10-18
+
+Candidato isolado em `audit/consolidated-38-45-20261018`, baseado exatamente em
+`812ebd02b0c82ecc3169d620e36d25592b1d6727` (`origin/main` local inventariado).
+Inclui os heads exatos das PRs #38–#45 por merges locais; não é um merge em
+`main`, publicação ou execução de CI remoto. #12–#14 ficam fora: #41 já alinha
+os perfis e o lock, e nenhum dos três bumps é dependência funcional obrigatória.
+Inventário, contratos, comandos, resultados e plano seguro: [AUDIT_COMPOSITION.md](AUDIT_COMPOSITION.md).
+
+Os registros abaixo de outras branches/rodadas são **históricos**, não resultados
+da composição. Os marcadores atuais refletem somente a suíte combinada; `HEAD`
+é resolvido pelo manifesto pós-commit, com `ci_run=not_ci`. Não somar contagens
+isoladas nem atribuir evidência sintética a capacidade geral.
+
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
-## Integração local das duas correções VRAM — 2026-10-18
+## Histórico: integração local das duas correções VRAM — 2026-10-18
 
 ### Proveniência e contrato
 
@@ -269,6 +280,6 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 - **2026-10-05 — 105 testes:** run `37258732531`, marco anterior preservado para proveniência.
 - **Bootstrap — 86 testes:** run `37097334156`, snapshot histórico; não representa o estado atual.
 
-## Próxima ação
+## Próxima ação histórica (superada pelo plano da composição)
 
 Entregar a integração VRAM local para aprovação posterior. Não há autorização de push, PR ou merge. A decisão privada sobre PRs #38–#44 não pertence a esta rodada. A instrução histórica sobre PR #36 aberta está superada: #36 e #37 já integram a base `812ebd02`. Não incorporar outras branches nem sobrescrever seus documentos; regenerar evidências se a base mudar. `ToolDefinition.requires_permission`/`permission_level` continuam sem enforcement, fora deste escopo.

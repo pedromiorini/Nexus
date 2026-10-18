@@ -85,22 +85,14 @@ class MultihopContractMixin:
         self.graph.add_entity("isolated", "concept")
         self.assert_empty_result(self.graph.multihop_query("a", "isolated"), 0)
 
-    def test_missing_node_contract_is_unchanged(self):
+    def test_missing_node_contract_matches_explicit_empty_result(self):
         self.graph.add_entity("a", "concept")
         for start, end in (("missing", "a"), ("a", "missing"), ("missing", "missing")):
             with self.subTest(start=start, end=end):
-                if self.use_networkx:
-                    with self.assertRaises(self.graph.nx.NodeNotFound):
-                        self.graph.multihop_query(start, end)
-                elif start == end:
-                    result = self.graph.multihop_query(start, end)
-                    self.assertEqual(result.entities, [])
-                    self.assertEqual(result.paths, [["missing"]])
-                    self.assertEqual(result.context, "")
-                    self.assertEqual(result.confidence, 0.7)
-                    self.assertEqual(result.hops, 0)
-                else:
-                    self.assert_empty_result(self.graph.multihop_query(start, end), 0)
+                self.assert_empty_result(self.graph.multihop_query(start, end), 0)
+        self.assertEqual(self.graph.total_queries, 3)
+        self.assertEqual(self.graph.total_multihop_queries, 3)
+        self.assertEqual(set(self.graph.entity_index), {"a"})
 
 
 class FallbackMultihopContractTests(MultihopContractMixin, unittest.TestCase):

@@ -3,12 +3,23 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 312
-bandit_low: 131
-
-tests: 348
+tests: 416
 bandit_low: 135
 -->
+
+## Estado canônico da composição local — 2026-10-18
+
+Candidato isolado em `audit/consolidated-38-45-20261018`, baseado exatamente em
+`812ebd02b0c82ecc3169d620e36d25592b1d6727` (`origin/main` local inventariado).
+Inclui os heads exatos das PRs #38–#45 por merges locais; não é um merge em
+`main`, publicação ou execução de CI remoto. #12–#14 ficam fora: #41 já alinha
+os perfis e o lock, e nenhum dos três bumps é dependência funcional obrigatória.
+Inventário, contratos, comandos, resultados e plano seguro: [AUDIT_COMPOSITION.md](AUDIT_COMPOSITION.md).
+
+Os registros abaixo de outras branches/rodadas são **históricos**, não resultados
+da composição. Os marcadores atuais refletem somente a suíte combinada; `HEAD`
+é resolvido pelo manifesto pós-commit, com `ci_run=not_ci`. Não somar contagens
+isoladas nem atribuir evidência sintética a capacidade geral.
 
 ## Fonte de verdade
 
@@ -26,7 +37,7 @@ Para o estado atual, usar esta ordem:
 
 Conflitos não devem ser resolvidos silenciosamente.
 
-## Estado após a PR #37
+## Histórico: estado após a PR #37
 
 - `main` inclui o núcleo `TemporalFactStore` e o contrato de relações múltiplas no grafo via PR #37, merge commit `812ebd02b0c82ecc3169d620e36d25592b1d6727`.
 - O ledger continua somente em memória; snapshots são validados por replay, mas ainda não há persistência SQLite.

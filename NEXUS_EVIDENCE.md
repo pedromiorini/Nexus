@@ -3,14 +3,25 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 312
-bandit_low: 131
-
-tests: 348
+tests: 416
 bandit_low: 135
 -->
 
-## Integração VRAM — evidência combinada local de 2026-10-18
+## Estado canônico da composição local — 2026-10-18
+
+Candidato isolado em `audit/consolidated-38-45-20261018`, baseado exatamente em
+`812ebd02b0c82ecc3169d620e36d25592b1d6727` (`origin/main` local inventariado).
+Inclui os heads exatos das PRs #38–#45 por merges locais; não é um merge em
+`main`, publicação ou execução de CI remoto. #12–#14 ficam fora: #41 já alinha
+os perfis e o lock, e nenhum dos três bumps é dependência funcional obrigatória.
+Inventário, contratos, comandos, resultados e plano seguro: [AUDIT_COMPOSITION.md](AUDIT_COMPOSITION.md).
+
+Os registros abaixo de outras branches/rodadas são **históricos**, não resultados
+da composição. Os marcadores atuais refletem somente a suíte combinada; `HEAD`
+é resolvido pelo manifesto pós-commit, com `ci_run=not_ci`. Não somar contagens
+isoladas nem atribuir evidência sintética a capacidade geral.
+
+## Histórico: integração VRAM isolada — evidência local de 2026-10-18
 
 Base `812ebd02b0c82ecc3169d620e36d25592b1d6727`; branch `fix/vram-integrated-2026-10-18`; SHA do commit de implementação integrada (código/testes) `9b657011d0b0b0eec61fad53b3d353717c109e4d`. Esse não é o hash do checkpoint documental: o follow-up dos registros é um commit posterior, identificado pelo `HEAD` do branch e pelo manifesto pós-commit em `/workspace/nexus-vram-integrated-evidence/STATE_MANIFEST.json`. Composição dos patches `4073eb298cb5fe0b3ca1db58a1b38d91c330afbb` e `41bb57143152486588c1b15431b879849ab2ecb0` (origem documental final `985917446f25c79d526c9ba2aca7f5d33187dd5d`), sem modificar/publicar as origens. Os resultados abaixo foram medidos juntos, não somados a partir de relatórios isolados.
 
