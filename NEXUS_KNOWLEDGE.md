@@ -5,6 +5,9 @@ commit: HEAD
 ci_run: CURRENT_RUN
 tests: 312
 bandit_low: 131
+
+tests: 348
+bandit_low: 135
 -->
 
 ## Fonte de verdade

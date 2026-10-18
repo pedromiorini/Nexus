@@ -5,7 +5,7 @@
   "static_evidence": {
     "core_lines": 27550,
     "classes": 269,
-    "functions": 875,
+    "functions": 884,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
