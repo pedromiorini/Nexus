@@ -137,7 +137,7 @@ class DeferredTaskQueue:
                 ok = bool(processor(task))
             except Exception as exc:
                 ok = False
-                task.last_reason = f"{type(exc).__name__}: {exc}"
+                task.last_reason = f"{type(exc).__name__}: processor raised an exception"
 
             if ok:
                 if self.complete(task.task_id):
