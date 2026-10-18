@@ -12,7 +12,74 @@ bandit_low: 135
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
-## Estado atual
+## Integração local das duas correções VRAM — 2026-10-18
+
+### Proveniência e contrato
+
+- Base remota confirmada por `git ls-remote --heads origin` e `git fetch origin main`: `812ebd02b0c82ecc3169d620e36d25592b1d6727`. Worktree nova, inicialmente limpa: `/workspace/Nexus-vram-integrated`; branch `fix/vram-integrated-2026-10-18`, derivada diretamente de `origin/main`.
+- Origens limpas verificadas antes da composição: `fix/vram-limit-bool-2026-10-18` em `4073eb298cb5fe0b3ca1db58a1b38d91c330afbb`; `fix/vram-snapshot-counters-2026-10-18` em `985917446f25c79d526c9ba2aca7f5d33187dd5d`, após implementação `41bb57143152486588c1b15431b879849ab2ecb0`. Ambas têm merge-base `812ebd02` e os mesmos seis paths alterados. Foram compostos somente seus patches de código/testes; os documentos desta seção foram reconciliados a partir da base, sem transportar os gates isolados como atuais.
+- SHA do commit de implementação integrado (código/testes): `9b657011d0b0b0eec61fad53b3d353717c109e4d`. Este SHA identifica a implementação revisada, não o checkpoint documental. O follow-up destes registros é um commit posterior; seu hash é o `HEAD` documental (`git rev-parse HEAD`) e fica identificado separadamente no manifesto de estado pós-commit em `/workspace/nexus-vram-integrated-evidence/STATE_MANIFEST.json`.
+- Contrato: limites booleanos geram `TypeError` antes de comparações; defaults, tipos numéricos antes aceitos, `0 < soft < hard <= 1` e ações inclusivas permanecem. Os três counters exigem `type(value) is int` e valor não negativo na construção (`TypeError` para tipo, `ValueError` para negativo), antes de qualquer decisão ou alteração do histórico/telemetria.
+- Red/green combinado: com os sete testes novos e sem os patches de produção, 19 testes executados, 145 falhas de subteste e 7 erros; após ambos os patches, 19/19 aprovados. Logs `red-combined.log` e `green-focused.log` no diretório de evidências.
+
+### Resultados medidos no conteúdo combinado
+
+- Suíte completa sob cobertura e resumo final: **310 executados, 310 aprovados, 0 falhas, 0 skips, 0 XPASS**. Integração separada: **30 aprovações, 1 skip FAISS, 0 missing/unexpected/conflicting**.
+- Cobertura branch (arredondamento da CLI; piso entre parênteses): fila **95% (90)**, VRAM **94% (90)**, fatos temporais **93% (90)**, Vita **76% (70)**, núcleo **68% (62)**.
+- Mutation canônico: **58 declaradas/aplicáveis/mortas**, 0 sobreviventes/não aplicadas. Ensaio suplementar externo `vram_mutation.py`: **10 declaradas/aplicáveis/mortas**, 0 sobreviventes/não aplicadas; sete mutantes de counters e três de limites booleanos, em cópias temporárias. Não foi alterado o catálogo versionado.
+- Bandit: **131 LOW, 0 MEDIUM/HIGH**. Triagem/check, auditor B101 (nenhum assert fora do main), gaps (0 pass-only e 0 NotImplementedError), Ruff, compileall, actionlint **1.7.12**, zizmor **1.31.1** offline e dry-run dos requisitos passaram. Bandit gera exit não zero por LOW; o comando aceita relatório não vazio e a política de severidade é conferida separadamente.
+- Realidade regenerada sem diff em `AUDIT_REALITY_REPORT.md`/`audit_reality.json`; não há nova alegação cognitiva. Benchmarks CLI herdados executados com seed `20261016`: v1 mantém observação parcial `unsupported_interface`; v2 **128/128** dentro de `1e-12`, erro máximo **2.7755575615628914e-16**, controles inválidos **4/4** rejeitados. Taskset v2 SHA-256 `232371d0e8e948f4b0a004261e3d271b1003aed8d0de8c931d3439f9d370d025`. São checks sintéticos internos, não avaliação independente ou capacidade geral. Os JSONs usam `source_revision=unrecorded-local`; a proveniência real é esta base, o patch congelado e a atestação pós-commit externa, não o `base_commit` histórico do v1.
+
+### Comandos reproduzíveis desta rodada
+
+Diretório: `/workspace/Nexus-vram-integrated`. Script e logs completos: `/workspace/nexus-vram-integrated-evidence/run-gates.sh`. Ambiente reutilizado, sem modificar as origens: `/tmp/nexus-snapshot-venv`, Python **3.12.3**, dependências instaladas previamente com `requirements-ci.lock`, NetworkX **3.6.1** e Ruff **0.16.10**; versões efetivas registradas em `environment.log`.
+
+```bash
+export PATH=/tmp/nexus-snapshot-venv/bin:/tmp/nexus-ci-tools:$PATH PYTHONPATH=.
+export NEXUS_AUDIT_DB=/workspace/nexus-vram-integrated-evidence/audit.sqlite3
+export NEXUS_INTEGRATED_SUMMARY=integrated-summary.json
+python -m unittest -v test_vram_defense_guard
+bash /workspace/nexus-vram-integrated-evidence/run-gates.sh
+# O script executou, com logs separados:
+python -m pip freeze
+python -m pip install --dry-run --no-deps -r requirements_constitutional.txt
+actionlint .github/workflows/nexus-contract-gate.yml
+zizmor --offline --no-progress .github/workflows
+python -m ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py
+python -m compileall -q core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py
+python tools/reality_audit.py
+git diff --exit-code -- AUDIT_REALITY_REPORT.md audit_reality.json
+python -m coverage run --branch -m unittest discover -p 'test_*.py'
+python -m coverage run --append --branch core/constitutional_brain.py
+for spec in core/deferred_task_queue.py:90 core/vram_defense_guard.py:90 core/temporal_facts.py:90 vita/nexus_constitutional_bridge_v3.py:70 core/constitutional_brain.py:62; do
+  python -m coverage report --include="${spec%:*}" --fail-under="${spec##*:}"
+done
+python -m coverage xml -o /workspace/nexus-vram-integrated-evidence/coverage.xml
+python tools/targeted_mutation.py
+python /workspace/nexus-vram-integrated-evidence/vram_mutation.py
+python -m bandit -r core vita tools -f json -o bandit-report.json || test -s bandit-report.json
+python tools/security_triage.py bandit-report.json security-triage-generated.md
+python tools/security_triage.py bandit-report.json SECURITY_TRIAGE.md --check
+python tools/embedded_assert_audit.py bandit-report.json core/constitutional_brain.py
+python tools/implementation_gap_audit.py core/constitutional_brain.py --output implementation-gaps.json
+# A política de severidade no script bloqueia qualquer MEDIUM/HIGH.
+python -m benchmarks.nexus_capability_benchmark --seed 20261016 --output capability-benchmark.json
+python -m benchmarks.nexus_pomdp_benchmark_v2 --seed 20261016 --output /workspace/nexus-vram-integrated-evidence/pomdp-belief-benchmark-v2.json
+python tools/test_summary.py --output test-summary.json
+python tools/state_manifest.py --output STATE_MANIFEST.json --test-result passed --test-command "python -m unittest discover -p 'test_*.py'" --gates-status success
+python tools/state_consistency_audit.py --manifest STATE_MANIFEST.json --output state-consistency.json
+```
+
+Os quatro claims canônicos foram sincronizados para **310 testes / 131 LOW**. A consistência é medida antes e depois do commit, com `ci_run=not_ci`; os artefatos pós-commit identificam o SHA final. Os gates adicionais que o workflow repete por módulos já estão incluídos no discover; não foram repetidos todos como invocações independentes. Nenhuma execução de CI remoto foi atribuída a esta branch.
+
+### Diferenças em relação às execuções isoladas e limites
+
+- Limites isolados reportavam 14 testes VRAM e 305 executados/303 aprovados/2 skips NetworkX. Counters isolados reportavam 17 VRAM e 308/308, após corrigir o ambiente. Combinado: **19 VRAM e 310/310**; a ausência dos dois skips vem de NetworkX presente, não de correção adicional.
+- Coberturas arredondadas, integração 30+1, mutation canônico 58/58 e Bandit 131 LOW permaneceram iguais aos registros isolados. O ensaio suplementar passa de sete counters para dez mutantes incluindo limites; a comparação é histórica, não nova reexecução das branches de origem.
+- Validação somente na construção: não congela snapshots, não valida atribuição posterior, relações físicas entre counters, objetos forjados ou código Python hostil. `available`, timestamp, coleta CUDA e mitigação não mudaram; as conversões CUDA `int(...)` preexistentes permanecem. Sem ensaio GPU real; psutil/FAISS/SentenceTransformers ausentes. Python local 3.12.3 difere do 3.11 de CI. Testes/scan/revisão não provam segurança geral ou prontidão de produção.
+- As duas origens e `/workspace/Nexus` sujo devem permanecer idênticos; SQLite, relatórios e logs são externos ou ignorados, nunca parte do commit. Somente revisão final única de Segurança sobre o diff integrado; reabrir apenas por achado concreto. Nenhum push, PR ou merge nesta rodada, nem processamento da autorização privada #38–#44.
+
+## Estado histórico anterior à integração VRAM
 
 - **Branch e base:** `fix/queue-snapshot-hardening-2026-10-17`, baseada em `origin/main` `812ebd02b0c82ecc3169d620e36d25592b1d6727`; alterações locais, sem push, merge ou rebase.
 - **D-030:** fronteiras de snapshot endurecidas sem mudar schema `nexus.deferred_task_queue.v1` nem assinaturas públicas; contextos exigem JSON nativo estrito. Extensões string-key em raiz/tarefas são ignoradas sem cópia profunda ou propagação interna; `statistics` exige exatamente quatro chaves. Chaves root/tarefa/estatísticas devem ser `str` exatas antes de qualquer lookup/membership, e JSON textual rejeita duplicatas em todos os níveis. Containers externos `dict`/`list` aceitam subclasses; escalares usam tipos built-in exatos e rejeitam `bool`/subclasses antes de operações ou construção de tarefas. A restauração publica heap, índice e contadores somente após staging completo.
@@ -204,4 +271,4 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 
 ## Próxima ação
 
-Concluir os gates da branch de auditoria e acompanhar os checks e a revisão da PR #36; corrigir regressões antes de qualquer merge. A PR #32 já está integrada; a PR #36 permanece aberta e qualquer merge exige autorização específica. Depois, continuar a auditoria independente de outras fronteiras; `ToolDefinition.requires_permission`/`permission_level` ainda não têm enforcement e a validação recursiva dos membros de contêiner permanece fora do contrato.
+Entregar a integração VRAM local para aprovação posterior. Não há autorização de push, PR ou merge. A decisão privada sobre PRs #38–#44 não pertence a esta rodada. A instrução histórica sobre PR #36 aberta está superada: #36 e #37 já integram a base `812ebd02`. Não incorporar outras branches nem sobrescrever seus documentos; regenerar evidências se a base mudar. `ToolDefinition.requires_permission`/`permission_level` continuam sem enforcement, fora deste escopo.

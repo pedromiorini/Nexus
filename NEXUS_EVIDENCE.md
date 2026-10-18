@@ -10,6 +10,18 @@ tests: 348
 bandit_low: 135
 -->
 
+## Integração VRAM — evidência combinada local de 2026-10-18
+
+Base `812ebd02b0c82ecc3169d620e36d25592b1d6727`; branch `fix/vram-integrated-2026-10-18`; SHA do commit de implementação integrada (código/testes) `9b657011d0b0b0eec61fad53b3d353717c109e4d`. Esse não é o hash do checkpoint documental: o follow-up dos registros é um commit posterior, identificado pelo `HEAD` do branch e pelo manifesto pós-commit em `/workspace/nexus-vram-integrated-evidence/STATE_MANIFEST.json`. Composição dos patches `4073eb298cb5fe0b3ca1db58a1b38d91c330afbb` e `41bb57143152486588c1b15431b879849ab2ecb0` (origem documental final `985917446f25c79d526c9ba2aca7f5d33187dd5d`), sem modificar/publicar as origens. Os resultados abaixo foram medidos juntos, não somados a partir de relatórios isolados.
+
+**Contrato:** rejeitar booleanos em ambos os limites com `TypeError`; nos três counters, exigir inteiro built-in não negativo, rejeitando tipos com `TypeError` e negativos com `ValueError` antes de decisão/telemetria. Preservam-se limiares inclusivos, valores válidos, zeros, indisponibilidade e timestamp. Na base, os testes combinados produziram 145 falhas de subteste e 7 erros em 19 testes; com os dois patches, 19/19 passaram.
+
+**Execução combinada:** 310/310 unittest, zero falhas/skips/XPASS; integração 30 aprovados + 1 skip FAISS; cobertura branch fila/VRAM/temporal/Vita/núcleo 95/94/93/76/68%, acima de 90/90/90/70/62. Mutation canônico 58/58 e suplementar externo 10/10 mortos, zero sobreviventes/não aplicados. Bandit 131 LOW, zero MEDIUM/HIGH; triagem, B101, gaps, realidade sem diff, lint, compilação, actionlint/zizmor e dry-run de requisitos passaram. Benchmarks herdados: v1 preserva `unsupported_interface`; v2 128/128 dentro de `1e-12`, erro máximo `2.7755575615628914e-16`, 4/4 controles rejeitados. Comandos, seed, taskset hash, ambiente e limites em `CONTINUATION.md`; logs em `/workspace/nexus-vram-integrated-evidence/`. Manifesto/consistência são regenerados após commit, sem atribuir CI remoto (`not_ci`).
+
+**Comparação histórica:** limites isolados 305 executados (303 aprovados + 2 skips NetworkX) / 14 VRAM; counters isolados 308/308 / 17 VRAM; combinado 310/310 / 19 VRAM com NetworkX presente. Métricas arredondadas de cobertura, integração, mutation canônico e Bandit permanecem iguais; suplemento cresce de 7 para 10 mutantes. Não houve reexecução ou mudança das origens.
+
+**Limites:** somente validação na construção; sem imutabilidade, validação pós-atribuição, coerência física dos counters ou proteção contra Python hostil. Sem GPU real, sem mudança CUDA/mitigação e sem nova política geral dos outros tipos numéricos dos limites. Python 3.12.3 local, não 3.11 de CI. Checks sintéticos internos, Bandit e revisão focal não estabelecem capacidade geral nem segurança de produção. Histórico abaixo permanece histórico.
+
 Snapshot histórico: manifesto `nexus-state-manifest` do commit `5b8bed8125002e25eb066620af67d3a65d44e59f` (CI run `38907987512`), com 200/200 testes `unittest`, 31 verificações integradas inventariadas (30 aprovadas, 1 ignorada por FAISS opcional ausente e 0 falhas) e 131 achados Bandit LOW (0 MEDIUM/HIGH). Esse snapshot e os resultados locais do benchmark v1 não representam o estado atual.
 A PR #24 partiu do `main` pós-PR #23 (`e3cc760597aa1782aef9879a8f88ee6f48032348`) e foi mesclada em `main` como `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`; os dois checks oficiais passaram. Seus resultados locais de 240/240 testes permanecem históricos; a branch seguinte registra a nova validação em seção própria.
 Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e não devem ser usados como estado atual.

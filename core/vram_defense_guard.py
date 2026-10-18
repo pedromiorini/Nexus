@@ -20,6 +20,15 @@ class VramSnapshot:
     total_bytes: int = 0
     timestamp: float = field(default_factory=time)
 
+    def __post_init__(self) -> None:
+        """Rejeita counters inválidos antes de cálculo ou decisão do guard."""
+        for name in ("allocated_bytes", "reserved_bytes", "total_bytes"):
+            value = getattr(self, name)
+            if type(value) is not int:
+                raise TypeError(f"{name} deve ser um inteiro built-in não negativo")
+            if value < 0:
+                raise ValueError(f"{name} deve ser não negativo")
+
     @property
     def utilization(self) -> float:
         if not self.total_bytes:
@@ -52,6 +61,8 @@ class VramDefenseGuard:
     """Observa pressão de memória e aplica respostas graduais e auditáveis."""
 
     def __init__(self, soft_limit: float = 0.80, hard_limit: float = 0.92) -> None:
+        if isinstance(soft_limit, bool) or isinstance(hard_limit, bool):
+            raise TypeError("limites não podem ser booleanos")
         if not 0 < soft_limit < hard_limit <= 1:
             raise ValueError("limites devem satisfazer 0 < soft < hard <= 1")
         self.soft_limit = soft_limit
