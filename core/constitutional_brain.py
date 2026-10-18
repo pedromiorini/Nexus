@@ -553,7 +553,7 @@ class RealKnowledgeGraph:
 
     def __init__(self, hierarchical_memory: Optional[Any] = None, *,
                  temporal_store: Optional[TemporalFactStore] = None):
-        """NetworkX não precisa de instalação — já está na stdlib Python 3"""
+        """Usa NetworkX se instalado; caso contrário, mantém o fallback interno."""
         try:
             import networkx as nx
             self.nx = nx

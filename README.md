@@ -49,11 +49,35 @@ Use Python 3.11 (a versão verificada no CI). Python 3.12 e 3.13 podem funcionar
 
 ```bash
 python3 -m pip install -r requirements.txt      # execução (numpy)
-python3 -m pip install -r requirements-dev.txt  # testes e CI local (hypothesis, coverage, bandit, ruff...)
+python3 -m pip install -r requirements-dev.txt  # desenvolvimento/testes, incluindo NetworkX
 export PYTHONPATH=.
 python3 -m unittest discover -v -p 'test_*.py'  # todos os testes
 python3 core/constitutional_brain.py            # suíte integrada embutida (recusa python -O)
 python3 tools/reality_audit.py                  # regenera os relatórios de realidade
+```
+
+### Perfis de dependências
+
+`requirements.txt` contém somente o runtime obrigatório (`numpy>=1.26,<3`).
+`requirements_constitutional.txt` é um alias desse perfil, não uma lista independente.
+NetworkX, psutil, faiss-cpu e sentence-transformers continuam opcionais em execução;
+não são vendorados. Para ativar somente o backend de grafos, use `python3 -m pip install networkx`.
+
+`requirements-ci.in` herda o runtime e fixa as dependências diretas de testes e gates.
+`requirements-dev.txt` herda esse mesmo perfil, incluindo NetworkX para executar seus
+contratos localmente, e acrescenta zizmor (mesma versão do binário usado no CI).
+actionlint continua sendo um binário externo ao pip, com versão e SHA-256 no workflow.
+Sem NetworkX, os dois contratos específicos desse backend são pulados; os contratos
+independentes do backend continuam disponíveis no runtime mínimo.
+
+O CI instala `requirements-ci.lock` com `--require-hashes`; o lock inclui as dependências
+transitivas e deve ser regenerado quando o perfil compartilhado ou o runtime mudar:
+
+```bash
+uv pip compile --generate-hashes --python-version 3.11 \
+  --output-file requirements-ci.lock requirements-ci.in
+python3 -m pip install --require-hashes -r requirements-ci.lock  # reproduzir o ambiente Python do CI
+python3 -m unittest -v test_dependency_profiles_contract.py test_knowledge_graph_contract.py
 ```
 
 Os traces de depuração do núcleo ficam silenciosos por padrão; defina `NEXUS_DEBUG=1` para vê-los. `NEXUS_AUDIT_DB` define o caminho do banco de auditoria Vita (padrão: `nexus_audit.sqlite3` no diretório atual).
