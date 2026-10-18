@@ -158,6 +158,7 @@ import weakref
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
 from core.vram_defense_guard import VramDefenseGuard
 from core.deferred_task_queue import DeferredTaskQueue
+from core.temporal_facts import TemporalFactStore
 
 
 _NEXUS_DEBUG = os.environ.get("NEXUS_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
@@ -550,7 +551,8 @@ class RealKnowledgeGraph:
     - Latência: < 45ms
     """
 
-    def __init__(self, hierarchical_memory: Optional[Any] = None):
+    def __init__(self, hierarchical_memory: Optional[Any] = None, *,
+                 temporal_store: Optional[TemporalFactStore] = None):
         """NetworkX não precisa de instalação — já está na stdlib Python 3"""
         try:
             import networkx as nx
@@ -560,6 +562,7 @@ class RealKnowledgeGraph:
             self.nx = None
 
         self.memory = hierarchical_memory
+        self.temporal_store = temporal_store
 
         # Grafo principal
         if self.nx:
@@ -616,8 +619,23 @@ class RealKnowledgeGraph:
         return entity
 
     def add_relation(self, source_id: str, relation_type: str, target_id: str,
-                     properties: Optional[Dict] = None, confidence: float = 0.9) -> Relation:
+                     properties: Optional[Dict] = None, confidence: float = 0.9,
+                     *, source: str = "observation",
+                     valid_from: Optional[float] = None) -> Relation:
         """Adicionar relação direcionada entre entidades."""
+        # A integração é opt-in. Registre antes de criar entidades ou alterar índices,
+        # para que entradas temporais inválidas não deixem uma projeção parcial.
+        if self.temporal_store is not None:
+            if self.nx:
+                properties = dict(properties or {})
+            self.temporal_store.assert_fact(
+                source_id,
+                relation_type,
+                target_id,
+                valid_from=valid_from,
+                confidence=confidence,
+                source=source,
+            )
         # Verificar que entidades existem
         if source_id not in self.entity_index or target_id not in self.entity_index:
             # Criar entidades automaticamente se não existirem

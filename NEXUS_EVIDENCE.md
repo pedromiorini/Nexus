@@ -25,6 +25,7 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Atenção bottom-up | parcial/verificado no contrato | contraste e movimento opcionais, saliência limitada e fallbacks testados | sem sinais observados, usa heurística; não é percepção biológica |
 | Integração/orquestração | parcial/verificado no contrato | média de sinergia calculada sobre integrações registradas | score individual ainda é heurístico por nomes; não demonstra inteligência emergente |
 | Grafo de conhecimento | parcial/verificado no contrato | entidades únicas por ID, média de confiança e índice de tipo consistente | sem consistência distribuída ou validação externa do conhecimento |
+| Ledger temporal | verificado nos contratos; integração proposta nesta branch | janelas semiabertas, `known_at`, correções retroativas, replay/hash-chain e mapeamento opt-in de relações com proveniência | ainda sem persistência SQLite ou ingestão automatizada das alegações documentais; sem transação distribuída com o grafo |
 | Planejamento MCTS | parcial/verificado no contrato | `None` usa ações padrão e lista vazia permanece vazia | recompensas e rollouts continuam heurísticos; não é prova de planejamento geral |
 | Telemetria | parcial/verificado | Vita, audit log SQLite serializado e guard de VRAM | dependente do ambiente; sem locking distribuído ou exactly-once |
 | Segurança | parcial | Bandit 131 LOW, triagem, auditorias AST e testes negativos | não substitui threat model ou revisão manual completa |
@@ -32,6 +33,13 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Benchmark sintético | verificado localmente nos protocolos v1 e v2 | v1 preserva as métricas composicional/causal/incerteza; v2 mede 128 modelos explícitos, erro absoluto máximo `2,7756e-16`, 128/128 casos dentro de `1e-12` e 4/4 controles inválidos rejeitados | trilha POMDP do v1 continua não suportada; v2 não aprende modelos nem escolhe políticas; não valida teorias cognitivas |
 | Autonomia geral | não demonstrada | nenhuma evidência válida no repositório | não fazer esse claim |
 | AGI/ASI/consciência | não demonstradas | explicitamente negadas pela documentação | nomes e banners não contam como evidência |
+
+## Integração temporal opt-in do grafo — validação local em 2026-10-17
+
+- `RealKnowledgeGraph` aceita um `TemporalFactStore` opcional. Quando fornecido, `add_relation` mapeia origem/tipo/destino, confiança, fonte e `valid_from`; predicados funcionais não são inferidos e precisam estar declarados no store.
+- O registro temporal ocorre antes de criar nós ou alterar índices, rejeições não deixam estado parcial no grafo, e `properties` não é serializado implicitamente como metadata. As projeções e `find_relations` legados continuam preservados.
+- Evidência: 309/309 testes unittest; suíte integrada 30 aprovados + 1 skip opcional; contratos focados 11/11; cobertura 100% em linhas e branches de `RealKnowledgeGraph.__init__` e `add_relation`; 62/62 mutantes direcionados mortos; Ruff passou. Os checks oficiais do run `39015023676` passaram 2/2 no commit de implementação `865063d21de9e986f9a502a790bfac2b68f7f801`; consulte a PR #38 para o estado do HEAD mais recente.
+- A fonte literal de cada fato ainda é fornecida pelo chamador; esta mudança não importa automaticamente medições do resumo de CI para o ledger. Persistência SQLite é a próxima etapa separada.
 
 ## Verificação local da branch de correção — 2026-10-16
 

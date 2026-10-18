@@ -19,6 +19,15 @@ bandit_low: 131
 - **Limites:** nenhum teto novo de bytes/profundidade; o parser/encoder JSON padrão pode rejeitar aninhamentos extremos. `enqueue` ainda usa `deepcopy` para contexto e os métodos da fila ainda expõem objetos mutáveis; isso ficou fora do escopo. Não há callsite de produção de `restore_snapshot` no checkout. CI oficial não foi executada porque não houve publicação.
 - **Próxima ação:** manter a branch isolada até autorização explícita para publicação/merge; não enviar para `main`. Considerar `enqueue` como uma decisão separada se futuramente for desejada validação JSON estrita também na entrada da fila.
 
+- **Base desta rodada:** `main` está no merge da PR #37, commit `812ebd02b0c82ecc3169d620e36d25592b1d6727`; essa PR incorporou o núcleo do ledger temporal (D-027) e o acúmulo de tipos de relação no grafo (D-028). A branch `feat/temporal-ledger-integration-2026-10-17` parte desse commit.
+- **Política de integração:** mudanças permanecem em branches/PRs pequenas e só são mescladas com autorização explícita para a PR específica.
+- **D-027/D-028 em `main`:** o `TemporalFactStore` oferece fatos bi-temporais, replay e snapshots encadeados em memória; `RealKnowledgeGraph` preserva tipos de relação múltiplos em uma mesma aresta NetworkX.
+- **D-029 nesta branch:** integração opt-in por `RealKnowledgeGraph(..., temporal_store=...)`; o chamador declara explicitamente predicados funcionais e pode fornecer `source` e `valid_from`. Propriedades da relação não são encaminhadas implicitamente como metadata temporal.
+- **Validação desta branch:** suíte unittest local 309/309; integração 30 aprovados + 1 skip opcional; contratos focados 11/11; cobertura dos métodos alterados 100% em linhas e branches; mutation testing 62/62 mortos; Ruff passou. Os dois checks oficiais do run `39015023676` passaram no commit de implementação `865063d21de9e986f9a502a790bfac2b68f7f801`; consulte a PR #38 para o estado do HEAD mais recente.
+- **Limites atuais:** não há persistência SQLite para o ledger nem ingestão automatizada das alegações de `NEXUS_EVIDENCE.md`; o grafo e o ledger são projeções distintas, sem transação distribuída se uma falha inesperada ocorrer após a escrita temporal. Predicados funcionais continuam configuração explícita do chamador.
+- **POMDP herdado:** o filtro v2 usa modelo explícito e não reivindica aprendizagem ou planejamento; o protocolo v1 mantém `unsupported_interface` para observação parcial.
+- **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
+
 ## Contratos relevantes na fronteira de cache/ferramentas
 
 - Herdado da PR #27: `test_format_json_contract.py` preserva formatação de JSON finito e exige falha estruturada para NaN/infinitos e dados não serializáveis.
