@@ -80,6 +80,12 @@ python tools/state_consistency_audit.py --manifest STATE_MANIFEST.json --output 
 
 Os dois benchmarks são executados com seed `20261016`; os JSON registram taskset hash e, na reexecução pós-commit, `CI_COMMIT_SHA` identifica o candidato sem alegar execução remota. O suplemento VRAM externo declara dez mutantes e usa cópias temporárias, sem alterar o catálogo canônico.
 
+### Follow-up documental sobre `3ddc68d` — 2026-10-18
+
+O README passa a atribuir os resultados acima ao candidato medido `3ddc68d06853ba211bb6c04a02743565c28bd19c`, sem apresentar o manifesto antigo `5b8bed8`, 21 testes de fila ou 58 mutantes como estado atual. As métricas legadas da docstring de `RealKnowledgeGraph` são preservadas como alegações não verificadas, não resultados da composição. A AST do núcleo, excluída somente essa docstring, permanece idêntica; testes e código executável não foram alterados.
+
+O executor `/workspace/nexus-consolidation-evidence/doc-followup/verify.sh` confirmou novamente 416/416 testes, integração 30+1 skip FAISS, Ruff, compileall, realidade, triagem e diff sem erros de whitespace. A regeneração da realidade apenas acrescentou as três referências de testes introduzidas no README. Cobertura, Bandit, benchmarks e mutações acima permanecem medições de `3ddc68d`, não novas execuções deste follow-up. O manifesto do follow-up não deve atribuir esses gates históricos a uma nova execução. O novo diff congelado e sua revisão independente ficam no diretório externo `doc-followup/`, separado da revisão original.
+
 ## Limites residuais
 
 O ledger continua em memória, sem SQLite; grafo e ledger são projeções distintas, sem transação compartilhada após um append bem-sucedido. Predicados funcionais permanecem explícitos. Restore não cria persistência física nem exactly-once; a origem precisa sincronizar mutações para obter visão coerente. `enqueue` continua usando `deepcopy` e objetos de tarefa continuam mutáveis. VRAM é validado na construção, sem GPU real, sem coerência física dos contadores ou imutabilidade posterior. Os callbacks avaliadores são código confiável em processo, não sandbox. Os artefatos de holdout herdados de #42 são históricos, não um novo holdout independente desta composição.

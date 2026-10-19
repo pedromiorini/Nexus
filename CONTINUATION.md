@@ -21,6 +21,14 @@ da composição. Os marcadores atuais refletem somente a suíte combinada; `HEAD
 é resolvido pelo manifesto pós-commit, com `ci_run=not_ci`. Não somar contagens
 isoladas nem atribuir evidência sintética a capacidade geral.
 
+### Follow-up documental da revisão independente — 2026-10-18
+
+Sobre o candidato congelado `3ddc68d06853ba211bb6c04a02743565c28bd19c`, corrigidas duas questões documentais concretas: a tabela do README agora aponta para a composição local e seus resultados, não para o manifesto histórico `5b8bed8`; a docstring de `RealKnowledgeGraph` preserva os números legados `>93%`, `>95%` em 32k e `<45ms`, mas os classifica explicitamente como não verificados, sem task set, comando, ambiente ou proveniência. Não houve mudança de lógica, assinaturas, testes ou catálogo de mutações. A AST é idêntica à de `3ddc68d` ao excluir somente essa docstring.
+
+Verificação do follow-up: `bash /workspace/nexus-consolidation-evidence/doc-followup/verify.sh`, no mesmo ambiente Python 3.11.16 com lock. Suíte completa **416/416**, sem falhas/skips/XPASS; integração **30 aprovadas + 1 skip FAISS**, sem IDs faltantes/inesperados/conflitantes; Ruff, compileall, realidade regenerada, triagem e `git diff --check` aprovados. Os relatórios de realidade versionados apenas acrescentam as três referências de testes do README. Comandos, logs e resumos separados em `/workspace/nexus-consolidation-evidence/doc-followup/`, sem sobrescrever a evidência anterior.
+
+Cobertura, Bandit, 84 mutantes canônicos e suplemento VRAM de 10 mutantes **não foram medidos novamente** neste follow-up documental; os resultados continuam atribuídos a `3ddc68d` em `AUDIT_COMPOSITION.md`. A revisão independente deve ser reaberta somente sobre este novo diff congelado; seu parecer e o SHA final ficam no diretório externo do follow-up. Permanecem proibidos publicação, alteração de `main`, ações sobre PRs e merge remoto; preservar `/workspace/Nexus` sujo e todas as refs de origem.
+
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
 ## Histórico: integração local das duas correções VRAM — 2026-10-18

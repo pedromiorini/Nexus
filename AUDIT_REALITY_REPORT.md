@@ -26,6 +26,9 @@ O núcleo analisado possui **27799 linhas**, **269 classes** e **884 funções**
 
 ## Referências quebradas ou verificadas
 
+- `test_deferred_task_queue.py`: existe.
+- `test_deferred_task_snapshot.py`: existe.
+- `test_consolidated_pr_contract.py`: existe.
 - `core/constitutional_brain.py`: existe.
 - `core/deferred_task_queue.py`: existe.
 - `core/vram_defense_guard.py`: existe.

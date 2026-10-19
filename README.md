@@ -8,16 +8,18 @@ O Nexus Constitutional é um **protótipo experimental de arquitetura neuro-simb
 
 > Nomes de módulos, banners de execução e testes de demonstração não constituem prova de inteligência geral, consciência ou prontidão para produção.
 
-## Evidências atualmente verificadas
+## Evidências locais da composição — 2026-10-18
+
+Resultados medidos no candidato `3ddc68d06853ba211bb6c04a02743565c28bd19c`, branch `audit/consolidated-38-45-20261018`, em Python 3.11.16 com o lock instalado com hashes. Inventário, comandos, ambiente e limites estão em [AUDIT_COMPOSITION.md](AUDIT_COMPOSITION.md#evidência-combinada); logs e manifesto desse commit estão em `/workspace/nexus-consolidation-evidence/`. Esta é uma validação local (`ci_run=not_ci`), não uma execução de CI remoto nem o estado publicado de `main`.
 
 | Área | Evidência | Limite da afirmação |
 |---|---|---|
-| Núcleo constitucional | O manifesto do CI de `main` no commit `5b8bed8` registrou 31 verificações integradas: 30 aprovadas e 1 ignorada pela ausência opcional de FAISS; nenhuma falhou | São verificações do próprio projeto, não uma avaliação externa de capacidade geral |
-| Fila de tarefas adiadas | 21 testes unitários e de integração | Cobre contratos da fila e reprocessamento, não carga distribuída de produção |
+| Suíte combinada e núcleo | 416 testes executados e aprovados, sem falhas ou skips; separadamente, 31 verificações integradas: 30 aprovadas e 1 ignorada pela ausência opcional de FAISS | São verificações do próprio projeto, não uma avaliação externa de capacidade geral |
+| Fila de tarefas adiadas | Contratos de fila, reprocessamento, snapshot e atomicidade incluídos na suíte combinada; arquivos `test_deferred_task_queue.py`, `test_deferred_task_snapshot.py` e `test_consolidated_pr_contract.py` | Não estabelece carga distribuída de produção nem entrega exatamente uma vez |
 | Diagnóstico de recuperação | Exportação versionada `nexus.recovery.diagnostics.v1` e validador formal | O schema garante estrutura, não a correção de decisões cognitivas |
 | Auditoria Vita | Eventos, transições e métricas persistidos em SQLite | A análise é local e limitada ao histórico disponível |
-| CI | Workflow executa lint (ruff, actionlint, zizmor), compilação, testes de contrato e regressão, suíte integrada, cobertura com pisos, mutation testing (58 mutantes escolhidos; o score vale só para eles) e auditorias de segurança e de realidade, com ações fixadas por SHA; o gate usa Python 3.11 | A execução depende do ambiente e das dependências instaladas no runner |
-| Cobertura | Relatório combinado de linhas e branches (testes + suíte integrada) é retido por 14 dias; pisos de cobertura total por arquivo: fila 90%, guard de VRAM 90%, ledger temporal 90%, bridge Vita 70%, núcleo 62% | Cobertura não substitui testes de propriedades, segurança ou mutation testing |
+| Gates locais e workflow | Lint, compilação, contratos, integração, cobertura e auditorias aprovados localmente; mutação canônica: 84/84 mortas, sem sobreviventes ou inconclusivas; suplemento VRAM externo: 10/10 mortas, separado do catálogo canônico | O score vale somente para os mutantes escolhidos; o suplemento não é uma etapa do workflow e nenhum CI remoto foi executado para este candidato |
+| Cobertura | Cobertura combinada de linhas e branches medida localmente: fila 91%, guard de VRAM 94%, ledger temporal 94%, bridge Vita 76%, núcleo 69%; pisos respectivos 90/90/90/70/62% | Cobertura não substitui testes de propriedades, segurança ou mutation testing; a retenção de 14 dias é política do workflow remoto, não destes logs locais |
 
 ## Componentes principais
 

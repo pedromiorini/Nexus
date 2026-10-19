@@ -545,10 +545,10 @@ class RealKnowledgeGraph:
     • × POST11 (Causal): Grafo explicita relações causais
     • × POST9 (Learning): Padrões aprendidos viram nós/arestas
     
-    Métricas de validação:
-    - Multihop reasoning: > 93%
-    - Needle-in-haystack (32k): > 95%
-    - Latência: < 45ms
+    Alegações legadas não verificadas; não são resultados deste candidato:
+    - Multihop reasoning: > 93% (sem task set, comando, ambiente ou proveniência)
+    - Needle-in-haystack (32k): > 95% (sem task set, comando, ambiente ou proveniência)
+    - Latência: < 45ms (sem task set, comando, ambiente ou proveniência)
     """
 
     def __init__(self, hierarchical_memory: Optional[Any] = None, *,
