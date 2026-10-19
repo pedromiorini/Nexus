@@ -3,9 +3,19 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 463
+tests: 470
 bandit_low: 135
 -->
+
+## A06 — Prioridade exata no enqueue — 2026-10-19
+
+Base exata `b2f5bd16cb8b529b8b1df2a61576037837912e39` (#48), branch local nova `fix/queue-priority-exact-int-20261019`; SHA final resolvido por `HEAD` e `/workspace/nexus-queue-priority-20261019-evidence/STATE_MANIFEST.json`. O follow-up A06 de D-030 exige prioridade `int` built-in exata antes de qualquer efeito de enqueue, preservando contexto Python arbitrário em memória e prioridades inteiras válidas. Não altera schema nem valida mutação externa posterior.
+
+`run-red-green.sh` no diretório externo de evidências reproduz `True`/`1.5` aceitos pela base mas rejeitados por export; sete regressões independentes contra archive da base: **35 falhas de subteste/26 erros**. Correção: **7/7 novos, 71/71 focados**; invariantes de identidade/conteúdo/estatísticas inclusive fila cheia/em voo, hooks não executados e compatibilidade positiva de inteiros/contexto não JSON.
+
+Execução `20261019T142022Z-603785` de `run-gates.sh`: **470/470** totais sem falhas/skips/XPASS, integração separada **30 + 1 skip FAISS**, coberturas branch fila/VRAM/temporal/Vita/núcleo **91/94/95/76/69%**, mutação **98/98 mortas** sem sobreviventes/timeouts/não aplicadas, Bandit **135 LOW/0 MEDIUM/HIGH**. Lint, compile, requisitos/lock sem mudanças, actionlint/zizmor, triagem/check, B101, gaps, realidade sem diff e diff-check passaram. Python 3.11.16 local, não CI remoto. Os benchmarks CLI herdados são checks sintéticos internos, não nova validação de capacidade.
+
+Comandos, limites, decisão de não solicitar revisão de código adicional e atestação final em [CONTINUATION.md](CONTINUATION.md#a06--prioridade-exata-no-enqueue--2026-10-19). Conferência paralela foi apenas inventário de gates, não revisão de código. Nenhum push, PR, merge ou alteração de main/worktrees preexistentes. As entradas seguintes são históricas.
 
 ## A04/A05 — Orçamento e conclusão operacional — 2026-10-19
 

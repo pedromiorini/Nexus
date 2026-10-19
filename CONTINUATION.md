@@ -3,9 +3,25 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 463
+tests: 470
 bandit_low: 135
 -->
+
+## A06 — Prioridade exata no enqueue — 2026-10-19
+
+Branch local nova `fix/queue-priority-exact-int-20261019`, worktree `/workspace/Nexus-queue-priority-20261019`, criada exatamente de `b2f5bd16cb8b529b8b1df2a61576037837912e39` (head informado da #48; parent `2ba63f3041a7f8e001b69c8363856a5178d8a308`, #47). SHA final: `HEAD`, resolvido pelo manifesto externo pós-commit `/workspace/nexus-queue-priority-20261019-evidence/STATE_MANIFEST.json`. Não confundir com a base nem atribuir CI remoto: estes são resultados locais. `origin/main` local inventariado em `812ebd02b0c82ecc3169d620e36d25592b1d6727`; `main` local já estava em `7c8a187c1465c6db39777f5e9dc16efb112e1121`. Sem consulta/publicação remota, push, PR ou merge; branches preexistentes, #48 e `/workspace/Nexus` sujo preservados.
+
+**Contrato:** `enqueue` exige `type(priority) is int` antes de capacidade, cópia de contexto, UUID, relógio, construtor e heap. `bool`, `float` e subclasses geram `ValueError` sem hooks nem mudanças de heap/índice/IDs em voo/estatísticas, inclusive fila cheia. Prioridades inteiras válidas mantêm ordenação, FIFO por timestamp em empate, round-trip de snapshot, default zero e overflow legado (incrementa `discarded`). Contexto arbitrário permanece aceito em memória quando o dicionário é deep-copyable; não passa a exigir JSON. Decisão limitada registrada no follow-up A06 de D-030.
+
+**Red/green real:** `bash /workspace/nexus-queue-priority-20261019-evidence/run-red-green.sh` extrai archive da base exata, copia apenas a regressão nova e demonstra `True`/`1.5` aceitos pelo enqueue e rejeitados pelo export. Os sete testes novos na base produziram **35 falhas de subteste e 26 erros**; corrigidos, **7/7**. Matriz inclui vazio/pendente/cheio/em voo; verifica identidade das estruturas e tarefas, conteúdo e contadores invariantes. Hooks adversariais e operações de preparação são monitorados; inteiros ±10¹⁰⁰, zero, contexto Python não JSON, ordenação e capacidade válidas são controles positivos. Focados completos: **71/71**.
+
+**Gates medidos:** `bash /workspace/nexus-queue-priority-20261019-evidence/run-gates.sh`, execução `20261019T142022Z-603785`, Python 3.11.16, numpy 2.4.6/NetworkX 3.6.1, lock com hashes conferido em dry-run (13 pacotes; nenhuma mudança). Suíte completa, cobertura e sumário **470/470**, zero falhas/skips/XPASS; integração separada **30 aprovados + 1 skip FAISS**, sem missing/unexpected/conflicting. Coberturas branch fila/VRAM/temporal/Vita/núcleo **91/94/95/76/69%**, acima dos pisos **90/90/90/70/62%**. Mutação canônica **98/98 mortas** (94 herdadas + 4 novas), zero sobreviventes/timeouts/não aplicadas; o mutante preexistente de prioridade do snapshot ganhou âncora específica para não atingir a nova guarda de enqueue. Bandit **135 LOW, 0 MEDIUM/HIGH**; Ruff, actionlint, zizmor offline, compileall, requisitos, triagem/check, B101, gaps, realidade regenerada sem diff e diff-check passaram. CLIs de benchmarks herdados reexecutadas somente como checks sintéticos internos, sem nova avaliação de capacidade. Invocações repetidas por módulo da CI estão no discover, não todas reexecutadas separadamente. Logs, comandos, checks e relatórios estão no diretório externo de evidências; `run-final-checks.sh` registra a conferência final e a atestação pós-commit.
+
+**Documentação e revisão proporcionais:** D-030, ledger e esta continuidade atualizados; em NEXUS_KNOWLEDGE/SECURITY_TRIAGE mudou apenas o marcador de testes 463→470 exigido pelo gate de consistência. Uma conferência paralela somente leitura inventariou gates e atestação, sem revisar código ou executar suítes. Não foi solicitada revisão independente de código: guarda local de tipo exato, sem coerção, sem nova lógica concorrente/dependência e sem alteração do contexto; risco delimitado pelos testes negativos, controles positivos e mutantes. Não atribuir revisão herdada ao novo diff.
+
+**Limites:** não valida mutações externas de objetos `DeferredTask` depois do enqueue nem construção direta da dataclass; não torna contexto arbitrário exportável nem elimina seus hooks de deepcopy. Sem sandbox para código Python hostil, teto de bytes/nós ou garantia de recursos; não altera retry, snapshot, concorrência geral ou exactly-once. Gates completos com lock somente em Python 3.11; outras versões e GPU não reavaliadas. Estado remoto das PRs não consultado; nenhum serviço externo foi alterado. Resultados são contratos de software, não evidência de capacidade cognitiva ou segurança de produção.
+
+Os registros seguintes são históricos, não resultados desta branch.
 
 ## A04/A05 — Orçamento e conclusão operacional — 2026-10-19
 

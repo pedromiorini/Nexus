@@ -280,6 +280,12 @@
 - **Evidência:** `test_deferred_task_snapshot.py` cobre JSON estrito, finitude, bool, subclasses escalares com hooks, chaves colidentes, extensões root/task ignoradas, estatísticas exatas, JSON duplicado, tentativas, atomicidade, mutação concorrente de dicts e compatibilidade de containers externos. Validação local: unittest 318 (316 aprovados, 2 skips opcionais), 51/51 testes focados em Python 3.11 e 3.12, cobertura da fila 91%, suíte integrada 30/1 skip e mutation gate 80/80 mortos, sem sobreviventes/não aplicadas. Detalhes, reproduções e comandos estão em `NEXUS_EVIDENCE.md`.
 - **Reversibilidade:** fácil; retirar a validação/captura segura e o commit por referências restaura a semântica anterior, inclusive a aceitação mais permissiva de mappings Python diretos.
 
+### Follow-up A06 — Prioridade exata no enqueue (2026-10-19)
+
+- **Decisão autorizada:** `enqueue` exige `type(priority) is int`, com `ValueError` antes de consultar capacidade, copiar contexto, gerar ID/timestamp ou construir/inserir tarefa. Rejeita `bool`, `float` e subclasses, sem conversão, representação ou hooks da prioridade. Rejeições não alteram heap, índice, IDs em voo ou estatísticas, inclusive `discarded` quando a fila está cheia. Inteiros built-in positivos, zero e negativos continuam válidos, sem novo limite de magnitude; overflow de fila com prioridade válida mantém a contabilização legada.
+- **Compatibilidade deliberada:** estende apenas a fronteira escalar de prioridade descrita acima; não aplica o contrato JSON de snapshot ao contexto de `enqueue`. Contextos arbitrários continuam permitidos em memória quando o dicionário aceita `deepcopy`, e podem não ser exportáveis. Schema, assinaturas, retry, ordenação e mutabilidade das tarefas não mudam; mutação externa posterior continua fora da garantia.
+- **Evidência e reversibilidade:** regressões em `test_queue_priority_contract.py`, quatro mutantes específicos e resultados atuais em `NEXUS_EVIDENCE.md`/`CONTINUATION.md`. Retirar a guarda restaura a aceitação anterior, inclusive prioridades que o export rejeita; não é necessário migrar snapshots válidos.
+
 
 ## D-031 — Proveniência de scores metacognitivos
 - **Status:** proposta neste branch.
