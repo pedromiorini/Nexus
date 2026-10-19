@@ -3,9 +3,19 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 470
+tests: 474
 bandit_low: 135
 -->
+
+## A07 — Preflight da projeção NetworkX — 2026-10-19
+
+Base exata A06 `9fea97cd188b8f7212eb88455747ca8a1b3bb220`, nova branch `fix/kg-projection-preflight-a07-20261019`; SHA final resolvido por `HEAD` e `/workspace/nexus-kg-preflight-a07-20261019-evidence/STATE_MANIFEST.json`. O follow-up A07 de D-029 prepara atributos da projeção e rejeita kwargs inválidos antes de ledger/entidades/índices/arestas; mantém ledger antes do grafo e **não** garante atomicidade de falhas arbitrárias posteriores nem transação distribuída. Valores opacos, chaves string válidas, atributos estruturais, histórico e fallback sem NetworkX preservados.
+
+`run-red-green.sh` externo: **4 testes, 40 falhas de subteste na base; 4/4 corrigidos; 64/64 focados**. Sonda sem mocks comprova duas entidades, uma relação indexada, zero arestas e contador zero após `TypeError` na base; com store, o ledger também muda. Regressão compara estado/identidades e zero chamadas de mutação, com controles válidos e fallback.
+
+Execução completa final `20261019T143143Z-609223`: **474/474**, zero falhas/skips/XPASS; integração **30 + 1 skip FAISS**; coberturas branch fila/VRAM/temporal/Vita/núcleo **91/94/95/76/70%**; mutação **102/102 mortas**, zero sobreviventes/timeouts/não aplicadas; Bandit **135 LOW, 0 MEDIUM/HIGH**. Lint, compile, requisitos/lock sem mudança, actionlint/zizmor, triagem/B101/gaps e diff-check passaram. Dois relatórios de realidade regenerados mudam somente a contagem de linhas 27867→27872 e são reproduzidos byte a byte. A primeira rodada parou nessa atualização esperada, antes da repetição completa aprovada. Benchmarks herdados são checks sintéticos, sem nova avaliação de capacidade.
+
+[CONTINUATION.md](CONTINUATION.md#a07--preflight-de-atributos-da-projeção-networkx--2026-10-19) registra comandos, limitações, preservação, gates e procedimento da única revisão independente final do diff congelado. Seu resultado externo fica em `independent-review.md`; manifesto/consistência pós-commit identificam o SHA local sem atribuir CI remoto. Sem push, PR, merge, mudança de main/#48 ou comando no checkout sujo. As entradas seguintes são históricas.
 
 ## A06 — Prioridade exata no enqueue — 2026-10-19
 

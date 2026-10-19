@@ -623,11 +623,26 @@ class RealKnowledgeGraph:
                      *, source: str = "observation",
                      valid_from: Optional[float] = None) -> Relation:
         """Adicionar relação direcionada entre entidades."""
-        # A integração é opt-in. Registre antes de criar entidades ou alterar índices,
-        # para que entradas temporais inválidas não deixem uma projeção parcial.
-        if self.temporal_store is not None:
-            if self.nx:
+        # Prepare a projeção antes do ledger e das mutações do grafo. Isto cobre
+        # erros previsíveis de atributos/kwargs, não falhas arbitrárias posteriores.
+        if self.nx:
+            if self.temporal_store is not None:
                 properties = dict(properties or {})
+            existing = self.graph.get_edge_data(source_id, target_id)
+            relations = list(existing.get("relations", [existing.get("relation")])) if existing else []
+            relations.append(relation_type)
+            edge_attributes = dict(properties or {})
+            edge_attributes.update({
+                "relation": relation_type,
+                "relations": relations,
+                "confidence": confidence,
+            })
+            if any(not isinstance(key, str) for key in edge_attributes):
+                raise TypeError("keywords must be strings")
+            if "u_of_edge" in edge_attributes or "v_of_edge" in edge_attributes:
+                raise TypeError("edge attributes conflict with add_edge arguments")
+        # A integração é opt-in; mantenha o append temporal antes da projeção.
+        if self.temporal_store is not None:
             self.temporal_store.assert_fact(
                 source_id,
                 relation_type,
@@ -657,18 +672,8 @@ class RealKnowledgeGraph:
         self.relation_index[relation_type].append(relation)
 
         if self.nx:
-            # DiGraph guarda uma aresta por par de nós: acumular os tipos em "relations"
-            # evita que uma segunda relação sobrescreva a primeira (``relation`` = a última).
-            existing = self.graph.get_edge_data(source_id, target_id)
-            relations = list(existing.get("relations", [existing.get("relation")])) if existing else []
-            relations.append(relation_type)
-            edge_attributes = dict(relation.properties)
-            edge_attributes.update({
-                "relation": relation_type,
-                "relations": relations,
-                "timestamp": relation.timestamp,
-                "confidence": confidence,
-            })
+            # DiGraph acumula os tipos por par; os atributos estruturais prevalecem.
+            edge_attributes["timestamp"] = relation.timestamp
             self.graph.add_edge(source_id, target_id, **edge_attributes)
         else:
             self.graph["edges"][source_id].append((target_id, relation_type))

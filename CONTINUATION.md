@@ -3,9 +3,27 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 470
+tests: 474
 bandit_low: 135
 -->
+
+## A07 — Preflight de atributos da projeção NetworkX — 2026-10-19
+
+Branch local nova `fix/kg-projection-preflight-a07-20261019`, worktree `/workspace/Nexus-kg-preflight-a07-20261019`, filha direta do A06 local exato `9fea97cd188b8f7212eb88455747ca8a1b3bb220`. SHA final: `HEAD`, resolvido após o commit pelo manifesto externo `/workspace/nexus-kg-preflight-a07-20261019-evidence/STATE_MANIFEST.json`. `origin/main` local inventariado em `812ebd02b0c82ecc3169d620e36d25592b1d6727`. Não houve consulta/publicação remota, push, PR, merge ou comando no checkout `/workspace/Nexus`; #48 e todas as branches/worktrees preexistentes devem permanecer preservadas. Os inventários externos de refs/worktrees permitem conferir seus heads após o commit.
+
+**Contrato D-029/A07:** `add_relation` prepara atributos e cópia da lista `relations` do NetworkX antes de ledger, criação de entidades, índices ou arestas. Chaves não `str` e colisões com os argumentos `u_of_edge`/`v_of_edge` geram `TypeError` sem mutação de estado. Preserva chaves subclasses de `str`, valores opacos, atributos estruturais prevalecentes, múltiplas relações por par e timestamp capturado no ponto legado. Com store, mantém cópia rasa de propriedades e metadata temporal vazia; sem store, mantém a referência legada de `Relation.properties`. O fallback sem NetworkX conserva propriedades com chaves não string e não recebe validação de kwargs.
+
+**Red/green real:** `bash /workspace/nexus-kg-preflight-a07-20261019-evidence/run-red-green.sh` usa archive da base exata com somente a regressão nova. Quatro testes na base produzem **40 falhas de subteste**; corrigidos, **4/4**. A sonda sem mocks reproduz `properties={7: "bad-key"}`: base cria duas entidades e uma relação indexada, mas nenhuma aresta e `total_relations=0`; com store, também altera o snapshot do ledger. Matriz negativa cobre vazio/populado, endpoints novos/existentes, com/sem store, chaves não string e colisões de argumentos; compara conteúdo e identidade de índices, entidades e relações e verifica zero chamadas a append/criação/aresta. Controles positivos cobrem propriedades reservadas, opacas, subclasses de string, defaults, histórico e fallback. Focados completos: **64/64**.
+
+**Gates medidos:** `bash /workspace/nexus-kg-preflight-a07-20261019-evidence/run-gates.sh`, execução final `20261019T143143Z-609223`, Python 3.11.16, numpy 2.4.6/NetworkX 3.6.1. Lock com hashes conferido em dry-run (13 pacotes, sem alterações). Suíte completa, cobertura e sumário: **474/474**, zero falhas/skips/XPASS. Integração separada: **30 aprovados + 1 skip FAISS**, sem missing/unexpected/conflicting. Coberturas branch fila/VRAM/temporal/Vita/núcleo: **91/94/95/76/70%**, acima dos pisos **90/90/90/70/62%**. Mutação canônica **102/102 mortas**, zero sobreviventes/timeouts/não aplicadas (98 herdadas + 4 novas); a âncora do mutante opt-in temporal foi restringida ao append para não colidir com a preparação nova. Bandit **135 LOW, 0 MEDIUM/HIGH**. Ruff, actionlint, zizmor offline, compileall, requisitos, triagem/check, B101, gaps e diff-check passaram. Benchmarks CLI herdados reexecutados apenas como checks sintéticos internos. Os módulos individuais repetidos pela CI estão no discover, não todos reexecutados separadamente.
+
+A primeira rodada `20261019T142854Z-607463` parou no gate de realidade: a contagem gerada do núcleo passou de 27867 para 27872 linhas. Incluídos os dois relatórios regenerados; a rodada final conferiu reprodução byte a byte desses arquivos. Não houve supressão de finding nem modificação do gate versionado. Em NEXUS_KNOWLEDGE/SECURITY_TRIAGE mudou apenas o marcador 470→474 exigido pela consistência. Logs, comandos e JSONs ficam no diretório externo de evidências.
+
+**Diff congelado e revisão:** o patch completo é congelado em `frozen.diff` com SHA-256 externo antes de uma única revisão independente final, somente leitura; o resultado é registrado em `independent-review.md` no mesmo diretório externo. O commit local fica condicionado à ausência de bloqueadores e à igualdade do patch staged com o congelado. Não reabrir salvo achado concreto ou alteração do diff. `run-final-checks.sh <prefixo-da-execução> pre|post` reexecuta focados/sumário, lint, compile, realidade/triagem e, pós-commit, gera manifesto/consistência, compara o diff commitado com o congelado e confere refs/worktrees. A atestação identifica resultados locais, não CI remoto.
+
+**Limites:** a ordem continua preflight → ledger → grafo; não se promete atomicidade para falhas arbitrárias posteriores, rollback compartilhado ou transação distribuída. Backend, alocação, hooks Python, mutação externa/concorrente e `add_entity` chamado diretamente não ficam protegidos por esta mudança. Nenhuma persistência, sincronização geral ou validação JSON de propriedades foi adicionada. Gates completos somente no perfil Python 3.11; outras versões/GPU não reavaliadas. São contratos de software, não prova de capacidade cognitiva ou segurança de produção.
+
+Os registros seguintes são históricos, não resultados desta branch.
 
 ## A06 — Prioridade exata no enqueue — 2026-10-19
 
