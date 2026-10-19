@@ -37,7 +37,7 @@ Ferramentas de auditoria e CI
 
 ## Risco estrutural principal
 
-`core/constitutional_brain.py` concentra aproximadamente 26,6 mil linhas, 267 classes e 843 funções segundo a auditoria atual. Modularização deve ser incremental, orientada por contratos e precedida por evidência local.
+No commit `8c4f6a8057ee4d6a5497fa2df54c26725d9ef66d`, `core/constitutional_brain.py` tinha 27.872 linhas, 269 classes e 887 funções, conforme o manifesto de estado gerado em 2026-10-19. Essas contagens são inventário da superfície, não medida de complexidade ou qualidade. Modularização deve ser incremental, orientada por contratos e precedida por evidência local.
 
 
 ## Contrato operacional do roteador (D-034)
