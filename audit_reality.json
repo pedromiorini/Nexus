@@ -3,9 +3,9 @@
   "scope": "conservative reality audit",
   "principle": "names, banners and demo asserts are not proof of general intelligence or production readiness",
   "static_evidence": {
-    "core_lines": 27799,
+    "core_lines": 27867,
     "classes": 269,
-    "functions": 884,
+    "functions": 887,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -26,7 +26,6 @@
       "RealAttentionRoutingSystem.get_statistics",
       "RealAttentionSystem.get_statistics",
       "RealCausalReasoning.get_statistics",
-      "RealCognitiveBudgetEnforcer.get_status",
       "RealCollaborativeIntelligenceEngine.get_statistics",
       "RealConsciousnessSystem.get_self_knowledge",
       "RealConsciousnessSystem.get_statistics",

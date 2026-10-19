@@ -1156,9 +1156,9 @@ class ResourceType(Enum):
     LOG_ENTRIES = "log_entries"
 
 class RealCognitiveBudgetEnforcer:
-    """POST28: Cognitive Budget Enforcer - CONSOLIDADO"""
-
+    """Orçamento local; try_consume reserva atomicamente antes do trabalho."""
     def __init__(self):
+        self._lock = threading.RLock()
         self.limits = {
             ResourceType.REASONING_CYCLES: 100,
             ResourceType.MEMORY_RETRIEVALS: 500,
@@ -1168,31 +1168,43 @@ class RealCognitiveBudgetEnforcer:
         }
         self.usage = {k: 0 for k in self.limits.keys()}
         self.session_id = None
-
+    @staticmethod
+    def _validate_amount(amount):
+        if type(amount) not in (int, float):
+            raise TypeError("budget amount must be an int or float, not bool")
+        if (type(amount) is float and not math.isfinite(amount)) or amount < 0:
+            raise ValueError("budget amount must be finite and non-negative")
     def start_session(self):
-        """Iniciar sessão de budget"""
-        self.session_id = f"SESSION-{int(time.time() * 1000)}"
-        self.usage = {k: 0 for k in self.limits.keys()}
-
+        """Reset explícito sincronizado; não cancela trabalho já iniciado."""
+        with self._lock:
+            self.session_id = f"SESSION-{int(time.time() * 1000)}"
+            self.usage = {k: 0 for k in self.limits.keys()}
     def request_budget(self, resource_type: ResourceType, amount: int) -> bool:
-        """Requisitar budget"""
-        if self.usage[resource_type] + amount <= self.limits[resource_type]:
+        """Consulta sem reserva; decisões de execução usam try_consume."""
+        self._validate_amount(amount)
+        with self._lock:
+            return self.usage[resource_type] + amount <= self.limits[resource_type]
+    def try_consume(self, resource_type: ResourceType, amount: int) -> bool:
+        """Verifica e debita na mesma seção crítica; negação não altera uso."""
+        self._validate_amount(amount)
+        with self._lock:
+            if self.usage[resource_type] + amount > self.limits[resource_type]:
+                return False
+            self.usage[resource_type] += amount
             return True
-        return False
-
     def consume(self, resource_type: ResourceType, amount: float):
-        """Consumir budget"""
-        self.usage[resource_type] += amount
-
+        """Contabilização explícita legada, não autorização de execução."""
+        self._validate_amount(amount)
+        with self._lock:
+            self.usage[resource_type] += amount
     def get_status(self) -> Dict:
-        """Obter status"""
-        return {
-            "session": self.session_id,
-            "usage": {k.value: v for k, v in self.usage.items()},
-            "limits": {k.value: v for k, v in self.limits.items()}
-        }
-
-
+        """Snapshot coerente com operações pela API, não mutações externas."""
+        with self._lock:
+            return {
+                "session": self.session_id,
+                "usage": {k.value: v for k, v in self.usage.items()},
+                "limits": {k.value: v for k, v in self.limits.items()}
+            }
 # ═══════════════════════════════════════════════════════════════════════════
 # MÓDULO 5: JAILBREAK DETECTION (POST32)
 # ═══════════════════════════════════════════════════════════════════════════
@@ -13407,6 +13419,7 @@ class EthicsGuard:
             "cleared": True,
             "reason": "All constitutional principles validated",
             "modified_plan": execution_plan,
+            "required_modules": [ModuleType.SWARM] if has_ethical_concerns else [],
             "warnings": warnings
         }
 
@@ -13624,6 +13637,27 @@ class CentralRouter:
             ]
         }
 
+    _COMPLETION_MODULES = {
+        RequestType.QUERY: (ModuleType.REASONING,),
+        RequestType.PLANNING: (ModuleType.MCTS_PLANNER,),
+        RequestType.LEARNING: (ModuleType.INCREMENTAL_LEARNER,),
+        RequestType.MEMORY_RECALL: (ModuleType.MEMORY,),
+        RequestType.ETHICAL_DECISION: (ModuleType.REASONING, ModuleType.SWARM),
+        RequestType.ANALYSIS: (ModuleType.CAUSAL, ModuleType.REASONING),
+        RequestType.CREATIVE: (ModuleType.WORLD_MODEL,),
+    }
+    def _operational_failure(self, error, failed_modules, results, plan, start_time):
+        latency_ms = (time.time() - start_time) * 1000
+        self._update_statistics(latency_ms, plan, results)
+        return {
+            "success": False,
+            "error": error,
+            "failed_modules": [module.value for module in failed_modules],
+            "modules_executed": [result.module.value for result in results if result.success],
+            "request_type": plan.request_type.value,
+            "latency_ms": latency_ms,
+            "cached": False,
+        }
     def analyze_request(self, prompt: str, context: Optional[Dict] = None) -> RequestType:
         """
         Classificar tipo de requisição usando análise heurística.
@@ -13864,11 +13898,20 @@ class CentralRouter:
             aggregated_data.update(context)
             aggregated_data["original_prompt"] = prompt
         
+        # Preflight obrigatório antes de qualquer trabalho, mesmo se um plano
+        # modificado omitir BUDGET. Cache hit acima não consulta nem debita.
+        budget_results = self._execute_stage([ModuleType.BUDGET], prompt, aggregated_data)
+        all_results.extend(budget_results)
+        if not (len(budget_results) == 1 and budget_results[0].success
+                and isinstance(budget_results[0].data, dict)
+                and budget_results[0].data.get("allowed") is True):
+            return self._operational_failure(
+                "BUDGET_DENIED", [ModuleType.BUDGET], all_results, execution_plan, start_time)
         _dbg(f"🔍 DEBUG v3.70: Executing {len(execution_plan.execution_stages)} stages")
-
         for _stage_idx, stage_modules in enumerate(execution_plan.execution_stages):
             stage_results = self._execute_stage(
-                stage_modules, prompt, aggregated_data
+                [module for module in stage_modules if module != ModuleType.BUDGET],
+                prompt, aggregated_data
             )
             all_results.extend(stage_results)
 
@@ -13877,6 +13920,13 @@ class CentralRouter:
                 if result.success:
                     aggregated_data[result.module.value] = result.data
 
+        successful = {result.module for result in all_results if result.success}
+        required_modules = dict.fromkeys(
+            (*self._COMPLETION_MODULES[request_type], *ethics_check.get("required_modules", [])))
+        missing = [module for module in required_modules if module not in successful]
+        if missing:
+            return self._operational_failure(
+                "REQUIRED_MODULE_FAILED", missing, all_results, execution_plan, start_time)
         # ─── 6. VALIDAÇÃO ÉTICA PÓS ───────────────────────────────────────
         ethics_post = self.ethics.post_execution_validation(prompt, all_results)
 
@@ -14054,7 +14104,17 @@ class CentralRouter:
 
                 # Invocar módulo com interface unificada
                 data = self._invoke_module(module_name, module_instance, prompt, copy.deepcopy(context))
-
+                # Ausência e falha explícita não são conclusão operacional.
+                # Listas vazias/zero continuam válidos; não usar truthiness.
+                if data is None or (isinstance(data, dict) and "success" in data
+                                    and data["success"] is not True):
+                    raise ValueError("module did not complete successfully")
+                if isinstance(data, dict) and "error" in data and data["error"] is not None:
+                    raise ValueError("module returned an error payload")
+                if module_name == ModuleType.REASONING and not (
+                        isinstance(data, dict) and isinstance(data.get("answer"), str)
+                        and data["answer"].strip()):
+                    raise ValueError("reasoning did not return an answer")
                 latency_ms = (time.time() - start) * 1000
 
                 results.append(ModuleResult(
@@ -14094,7 +14154,15 @@ class CentralRouter:
             return module.retrieve(prompt, limit=5)
 
         elif module_name == ModuleType.REASONING:
-            return module.reason(prompt)
+            # Resolver a interface e copiar o contexto ocorre antes da cobrança.
+            reason = module.reason
+            if not callable(reason):
+                raise TypeError("reason must be callable")
+            budget = self.modules.get(ModuleType.BUDGET)
+            if budget is None or budget.try_consume(ResourceType.REASONING_CYCLES, 1) is not True:
+                raise RuntimeError("reasoning budget denied or unavailable")
+            # Uma exceção daqui em diante conta como tentativa; não há reembolso.
+            return reason(prompt)
 
         elif module_name == ModuleType.SWARM:
             proposal = {"question": prompt}

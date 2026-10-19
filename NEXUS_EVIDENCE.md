@@ -3,9 +3,20 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 439
+tests: 463
 bandit_low: 135
 -->
+
+## A04/A05 — Orçamento e conclusão operacional — 2026-10-19
+
+Base exata `2ba63f3041a7f8e001b69c8363856a5178d8a308`, branch local nova `fix/reasoning-budget-completion-20261019`; SHA final resolvido por `HEAD` e `/workspace/nexus-reasoning-budget-20261019-evidence/STATE_MANIFEST.json`. [D-034](NEXUS_DECISIONS.md#d-034--orçamento-e-conclusão-operacional-do-centralrouter) define reserva atômica na entrada do reasoner (falha cobra/cache hit não), negação anterior ao trabalho, mínimos funcionais por tipo e ausência de conclusão/cache em falha requerida. Regressões incluem erro estruturado de módulo não-reasoner e Swarm imposto pelo guard.
+
+24 testes novos contra a base: 51 falhas de subteste/4 erros; candidato: **52/52 focados**, **463/463** totais, zero falhas/skips/XPASS. Execução final `20261019T063250Z-587065` do script externo `run-gates.sh`: integração **30 + 1 skip FAISS**, cobertura fila/VRAM/temporal/Vita/núcleo **91/94/95/76/70%**, mutação **94/94** (zero sobreviventes/timeouts/não aplicados), Bandit **135 LOW/0 MEDIUM/HIGH**; lint, compile, triagem, auditorias, requisitos/lock, actionlint/zizmor e consistência do diff passaram. Resultados locais Python 3.11.16, não CI remoto nem evidência de capacidade cognitiva. Benchmark CLIs são somente checks sintéticos internos.
+
+A revisão independente apontou payload de erro não-reasoner; correção teve red/green, mutante e confirmação independente do fechamento específico. O probe original confirma agora negação sem reasoner, sucesso com uso 1, falha adiada mantida para retry e ausência de cache de falha. Comandos, logs e limites detalhados em [CONTINUATION.md](CONTINUATION.md). A garantia não cobre `think()`, mutação externa do enforcer, concorrência geral ou exactly-once; CREATIVE/LEARNING continuam produtos legados limitados, sem geração/treinamento comprovados. Nada publicado; branches/PRs existentes e worktree sujo preservados.
+
+As entradas seguintes são históricas.
+
 
 ## Follow-up F-04 sem teto fixo — 2026-10-19
 

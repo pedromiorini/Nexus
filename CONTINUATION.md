@@ -3,9 +3,26 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 439
+tests: 463
 bandit_low: 135
 -->
+
+## A04/A05 — Orçamento e conclusão operacional — 2026-10-19
+
+Branch nova `fix/reasoning-budget-completion-20261019`, worktree `/workspace/Nexus-reasoning-budget-20261019`, derivada exatamente de `2ba63f3041a7f8e001b69c8363856a5178d8a308` (#47). Commit final: `HEAD`, resolvido pelo manifesto externo pós-commit em `/workspace/nexus-reasoning-budget-20261019-evidence/STATE_MANIFEST.json`. #46 em `f025204339b3dc5ae1f345e98be7f6f7fbcb2498`, #47 publicada e `/workspace/Nexus` sujo preservados; nenhuma branch preexistente, `main`, PR ou remoto alterado. Sem push, PR ou merge.
+
+**Contrato D-034:** preflight sem cobrança em cache miss, negando trabalho em ausência/erro/negação ou permissão não booleana; consulta não autoriza a execução posterior. Na fronteira da chamada a `reason`, `try_consume` verifica/debita uma unidade na mesma seção crítica. Falha conta como tentativa, cache hit não cobra; interface/cópia que falha antes do reasoner não cobra. Sucesso exige os módulos funcionais mínimos por tipo e o Swarm imposto pelo guard ético. Falha requerida não agrega/cacheia sucesso nem confirma tarefa adiada: a política existente faz retry e eventual descarte. Retorno ausente, `success` ambíguo/falso, payload com `error` não nulo e resposta textual ausente no reasoner são falhas.
+
+**Red/green factual:** 24 regressões independentes contra archive da base exata: 51 falhas de subteste e 4 erros, sem modificar a base. Corrigido: **52/52 focados** (novo contrato + router + fila). O probe da auditoria, adaptado somente de `first["answer"]` para `first.get("answer")` ao ler a nova falha sem resposta, confirma orçamento negado com zero chamadas, uma unidade usada no sucesso, falha adiada com `completed=0/retried=1/depth=1` e duas tentativas falhas sem cache. Reproduzir: `bash /workspace/nexus-reasoning-budget-20261019-evidence/run-red-green.sh`.
+
+**Gates do conteúdo final:** `bash /workspace/nexus-reasoning-budget-20261019-evidence/run-gates.sh`, execução `20261019T063250Z-587065`, Python 3.11.16, numpy 2.4.6/NetworkX 3.6.1, lock com hashes conferido em dry-run sem mudança de dependências. Suíte completa, cobertura e sumário **463/463**, zero falhas/skips/XPASS; integração separada **30 aprovados + 1 skip FAISS**, sem missing/unexpected/conflicting. Coberturas branch fila/VRAM/temporal/Vita/núcleo **91/94/95/76/70%**, acima dos pisos **90/90/90/70/62%**. Mutação canônica **94/94 mortas**, zero sobreviventes/inconclusivos/não aplicados (84 herdadas + 10 novas). Bandit **135 LOW, 0 MEDIUM/HIGH**; triagem/check, B101, gaps, realidade regenerada, Ruff, compileall, requisitos, actionlint e zizmor aprovados. CLIs de benchmarks reexecutadas somente como checks sintéticos internos, sem alegação nova de capacidade. Logs, comandos, checks, cobertura e JSONs no diretório externo de evidências. Não atribuir CI remoto a estes resultados locais.
+
+**Revisão e correções concretas:** uma revisão independente focada encontrou payload `{"error":"unavailable"}` de módulo obrigatório não-reasoner ainda tratado como sucesso. Regressão adicional reproduziu 15 falhas de subcasos; guarda geral de `error` não nulo corrigiu a fronteira, e confirmação independente limitada ao achado o considerou fechado (24 contratos novos e 2 testes MCTS passaram; mutante específico morto). A primeira rodada de mutação também identificou um teste ausente para recall `None`: 92/93; a regressão de recall já adicionada e a rodada final com o novo mutante de payload de erro resultam em 94/94. Não reabrir áreas não alteradas por inferência destes resultados.
+
+**Limites:** somente CentralRouter e API local de budget; a rota separada `think()` não foi alterada. Lock cobre operações pela API, não mutação externa de `limits`/`usage`, processos distribuídos ou concorrência geral do router/cache/estatísticas. Adaptadores são código confiável, não sandbox. `consume` continua contabilização legada que pode ultrapassar limite; autorização usa `try_consume`. Retries não são exactly-once. O mapa não certifica qualidade/correção do produto: CREATIVE preserva apenas comparação de futuros legada, LEARNING apenas registro da intenção `learning_queued`, sem geração criativa nem treinamento executado. Não reavaliados GPU, controles gerais jailbreak/log ou restante dos achados da auditoria.
+
+Os registros seguintes são históricos, não resultados desta branch.
+
 
 ## Follow-up F-04 sem teto fixo — 2026-10-19
 
