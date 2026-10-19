@@ -268,7 +268,8 @@ class TemporalFactStore:
 
     @property
     def head_hash(self) -> str:
-        return self._head
+        with self._lock:
+            return self._head
 
     def check_invariants(self) -> List[str]:
         """Violações de consistência: janelas invertidas ou sobrepostas em predicados funcionais."""

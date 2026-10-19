@@ -3,9 +3,25 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 474
+tests: 477
 bandit_low: 135
 -->
+
+## Isolamento de head_hash — 2026-10-19
+
+Candidato local `fix/temporal-head-lock-20261019`, worktree `/workspace/Nexus-temporal-head-lock-20261019`, filho direto do SHA exato da #49 `8f8834efba9011cd0d8a4bdfb449d3e862ee6814`. SHA final resolvido por `HEAD` e pelo manifesto externo `/workspace/nexus-temporal-head-lock-20261019-evidence/STATE_MANIFEST.json`. `origin/main` local permanece `812ebd02b0c82ecc3169d620e36d25592b1d6727`. Sem consulta/publicação remota, push, nova PR, alteração de #49/#48/#47, merge, auto-merge ou mudança de main. Checkout sujo `/workspace/Nexus` e demais worktrees preservados; inventários externos de refs/heads e comparação do diff/status protegido registram a conferência. Somente leituras de inspeção foram feitas no checkout protegido.
+
+**Contrato D-027:** `head_hash` usa o mesmo `self._lock` das escritas. Leitor concorrente aguarda commit/rollback e retorna somente o head resultante, nunca um head intermediário ou posteriormente revertido. Mudança de produção restrita ao getter; assinatura, valor normal, ledger, transação e schema permanecem. Testes com Events e sonda do RLock real pausam `_apply` após publicação de `_head`, sem sleeps nem inferência de bloqueio por demora. Cobrem assert inicial, substituição composta (head intermediário distinto do final), corroboração e retração, com sucesso e RuntimeError; verificam snapshot pós-rollback, replay/invariantes e leitura normal/reentrante.
+
+**Red/green:** `bash /workspace/nexus-temporal-head-lock-20261019-evidence/run-red-green.sh` cria archive temporário da base exata, adicionando somente o teste novo: 3 testes, **8 falhas de subteste** na base; candidato **45/45 focados**. `repeated.log`: 100 repetições, 300 testes e 800 cenários concorrentes aprovados. Python 3.12.3: `python3 -m unittest -v test_temporal_head_hash_concurrency_contract test_temporal_facts_contract test_audit_atomic_restore_regression`, **39/39**. Logs externos `red.log`, `red-archive.log`, `green-focused.log`, `green-reproduced.log`, `python-default-focused.log`.
+
+**Gates completos locais:** `bash /workspace/nexus-temporal-head-lock-20261019-evidence/run-gates.sh`, execução `20261019T164801Z-624895`, Python 3.11.16, numpy 2.4.6/NetworkX 3.6.1. Perfil/lock com hashes conferidos em dry-run, sem mudança de dependências. Suíte integral, cobertura e sumário: **477/477**, zero falhas/skips/XPASS; integração separada **30 aprovados + 1 skip FAISS**, sem missing/unexpected/conflicting. Cobertura branch fila/VRAM/temporal/Vita/núcleo **91/94/95/76/70%**, pisos **90/90/90/70/62%**. Mutação canônica inalterada **102/102 mortas**, zero sobreviventes/timeouts/não aplicadas; a remoção do lock é exercitada pelo red/green, não somada ao catálogo. Bandit **135 LOW, 0 MEDIUM/HIGH**. Ruff, compileall, actionlint, zizmor offline, triagem/check, B101, gaps, realidade byte a byte sem diff e diff-check passaram. Benchmarks CLI herdados reexecutados somente como checks sintéticos internos, não nova avaliação de capacidade. As invocações individuais repetidas da CI estão no discover, não todas repetidas separadamente. Logs, comandos exatos, checks e relatórios usam esse prefixo no diretório externo.
+
+**Congelamento/revisão/commit:** `frozen.diff` e seu SHA-256 externo identificam o patch completo. Uma única revisão independente, somente leitura, fica em `independent-review.md`; commit local condicionado à ausência de bloqueadores e à identidade do staged com o congelado. Reabrir somente por achado concreto ou alteração do diff. `bash /workspace/nexus-temporal-head-lock-20261019-evidence/run-final-checks.sh 20261019T164801Z-624895 pre|post` reexecuta focados/sumário/lint/compile/realidade/triagem e, após o commit, confere patch commitado, refs/worktrees, manifesto e consistência. Stage somente dos sete caminhos explícitos; sem artefatos gerados no commit. NEXUS_KNOWLEDGE/SECURITY_TRIAGE mudam apenas o marcador 474→477 exigido pela consistência.
+
+**Limites:** sincronização de uma leitura, não snapshot atômico de várias chamadas nem justiça/latência limitada do lock. Callbacks reentrantes da própria thread escritora, acesso a atributos privados, mutações externas, outras concorrências e atomicidade grafo↔ledger não ganham garantia. Ledger continua em memória, sem autenticação criptográfica ou persistência; não há nova alegação de segurança de produção ou capacidade cognitiva. Gates completos somente no perfil Python 3.11; 3.12 recebeu apenas os 39 testes temporais acima. GPU/backends opcionais não reavaliados; evidência local, não CI remoto.
+
+Os registros seguintes são históricos, não resultados desta branch.
 
 ## A07 — Preflight de atributos da projeção NetworkX — 2026-10-19
 
