@@ -3,9 +3,23 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 433
+tests: 439
 bandit_low: 135
 -->
+
+## Follow-up F-04 sem teto fixo — 2026-10-19
+
+Branch local nova `fix/audit-json-preflight-20261019`, worktree `/workspace/Nexus-audit-json-preflight-20261019`, derivada exatamente de `6d145ccb7a7b2cb50ea0c1bbd1a5b38034d854e1`. O commit final é `HEAD`, resolvido pelo manifesto externo pós-commit em `/workspace/nexus-json-preflight-20261019-evidence/STATE_MANIFEST.json`. O SHA/branch revisados anteriores, todas as refs/PRs e `/workspace/Nexus` sujo devem permanecer preservados; sem push, PR, merge, fechamento ou mudança de `main`.
+
+**Contrato aprovado:** preservar D-030, sem novo teto de profundidade e sem teto 64. Restore serializa apenas os dados capturados/validados no envelope do export antes de construir tarefas ou publicar estado. Não percorre extensões ignoradas. Falha de recursão do encoder gera `ValueError("snapshot excede a capacidade de serialização JSON")`; export testa essa capacidade nos dois modos e usa o mesmo tratamento. Parser textual mantém seu `ValueError` documentado. Schema, formato JSON e contextos exportáveis permanecem compatíveis; contextos Python antes restauráveis, mas não serializáveis, agora falham antes de alterar heap, índice, IDs em voo ou contadores.
+
+**Red/green factual:** o original restaura 5.000 níveis e o export JSON lança `RecursionError` em Python 3.11.16. O encoder 3.12.3 aceita 5.000: o follow-up preserva essa aceitação. Ambos rejeitam o caso de 10.000 níveis controladamente. Seis testes novos cobrem dict/list/misto, replace/merge (incluindo tarefa em voo no merge), tarefa válida antes da inválida, identidade/estado do alvo, erro de export nos dois modos, falha injetada antes do construtor, parser profundo e round-trip a 65/100/300 níveis. Contra a base intocada: 6 testes, 18 falhas de subteste/5 erros em 3.11; 12 falhas/5 erros em 3.12. Corrigido: **77/77** focados nas duas versões. Esses números de profundidade são sondas, não limites do código.
+
+**Gates medidos:** `bash /workspace/nexus-json-preflight-20261019-evidence/run-gates.sh`, execução `20261019T041711Z-550824`, Python 3.11.16, lock com hashes verificado em dry-run (13 pacotes, nenhuma mudança), NetworkX 3.6.1/numpy 2.4.6. Suíte completa, cobertura e sumário: **439/439**, zero falhas/skips/XPASS. Integração separada **30 aprovados + 1 skip FAISS**, nenhum missing/unexpected/conflicting. Coberturas branch fila/VRAM/temporal/Vita/núcleo **91/94/95/76/69%**, acima dos pisos **90/90/90/70/62%**. Mutação canônica **84/84** e suplemento F-04 externo **5/5** mortos, zero sobreviventes/inconclusivos/não aplicados; o suplemento inclui tentativa de introduzir teto 64. Bandit **135 LOW, 0 MEDIUM/HIGH**; triagem/check, B101, gaps, realidade sem diff, Ruff, compileall, requisitos, actionlint 1.7.12, zizmor 1.31.1 e diff-check aprovados. Os módulos repetidos pela CI estão incluídos no discover, não todos reexecutados como comandos individuais. Benchmarks CLI herdados foram reexecutados como checks sintéticos internos, sem nova alegação de capacidade. Logs, comandos, XML de cobertura e JSONs estão no diretório externo; `run-red-green.sh` reproduz a comparação com a base.
+
+**Limites e revisão:** o preflight custa traversal e materialização temporária da string JSON, sem teto de bytes/nós; não é proteção geral contra consumo de recursos, Python hostil ou esgotamento de memória. Capacidade depende de versão/encoder/pilha de chamada; não garante profundidade portátil, parse em outro ambiente, nem export após mutação externa de tarefas. `enqueue` e as garantias temporais anteriores não foram ampliados; nenhum `_json_value` foi alterado. Não reavaliados GPU, transação grafo↔ledger, concorrência geral, PRs ou remotos. A revisão anterior de `6d145cc`, informada como concluída sem bloqueadores, não vale automaticamente para este diff. **Parar com o novo diff/SHA congelados para uma única revisão independente de Segurança**, focada no preflight, atomicidade e compatibilidade; nenhuma revisão independente nova foi realizada nesta etapa. Não reabrir/alterar o diff salvo achado concreto.
+
+As seções seguintes registram checkpoints históricos; decisões pendentes e revisão pendente abaixo descrevem a situação à época, não o follow-up atual.
 
 ## Auditoria temporal local — 2026-10-19
 

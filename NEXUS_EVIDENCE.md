@@ -3,9 +3,17 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 433
+tests: 439
 bandit_low: 135
 -->
+
+## Follow-up F-04 sem teto fixo — 2026-10-19
+
+Base exata `6d145ccb7a7b2cb50ea0c1bbd1a5b38034d854e1`, branch local nova `fix/audit-json-preflight-20261019`; checkpoint final identificado por `HEAD` e manifesto pós-commit em `/workspace/nexus-json-preflight-20261019-evidence/STATE_MANIFEST.json`. Restore faz preflight JSON sobre dados validados/copiados, sem extras ignorados, antes de construir/publicar tarefas. Export objeto/JSON converte recursão do encoder em `ValueError` documentado. D-030 preserva expressamente ausência de teto fixo, inclusive 64; assinaturas/schema/formato exportável não mudam.
+
+O caso original de 5.000 níveis falha no encoder 3.11 e é aceito pelo 3.12; a correção respeita essa diferença. Sonda de 10.000 falha controladamente em ambos, sem mutação parcial. Seis regressões novas falham contra a base e passam corrigidas; **77/77** focadas em Python 3.11.16 e 3.12.3, incluindo atomicidade replace/merge, alvo em voo no merge, erro de export e round-trip 65/100/300. Sem testes vinculando o contrato a teto 64.
+
+Gates completos com lock em 3.11: **439/439**, zero falhas/skips/XPASS; integração separada **30 + 1 skip FAISS** sem IDs divergentes; coberturas fila/VRAM/temporal/Vita/núcleo **91/94/95/76/69%**; mutação canônica **84/84**, suplemento F-04 externo **5/5** mortos, zero sobreviventes/inconclusivos; Bandit **135 LOW, 0 MEDIUM/HIGH**. Ruff, compilação, requisitos/lock, actionlint/zizmor, triagem/check, B101, gaps, realidade sem diff, benchmarks sintéticos herdados e diff-check passaram. Comandos/limites e handoff para uma única revisão independente nova em [CONTINUATION.md](CONTINUATION.md#follow-up-f-04-sem-teto-fixo--2026-10-19); execução externa `20261019T041711Z-550824`. Não houve CI remoto ou publicação. Preflight não limita memória/bytes/nós, não torna `enqueue` imutável nem garante profundidade portátil. Os registros seguintes são históricos; não somar seus resultados aos atuais.
 
 ## Auditoria temporal local — 2026-10-19
 

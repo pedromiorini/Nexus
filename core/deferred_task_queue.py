@@ -201,7 +201,7 @@ class DeferredTaskQueue:
             return {"depth": len(self._heap), "max_attempts": self.max_attempts, "max_size": self.max_size, **self._stats}
 
     def export_snapshot(self, as_json: bool = False) -> Any:
-        """Exporta somente tarefas pendentes; nenhum processamento é disparado."""
+        """Exporta pendências; capacidade JSON excedida gera ValueError em ambos os modos."""
         with self._lock:
             payload = {
                 "schema": self.SNAPSHOT_SCHEMA,
@@ -213,10 +213,15 @@ class DeferredTaskQueue:
             }
             validated_tasks, _ = self._validate_snapshot(payload, replace=True)
             payload["tasks"] = validated_tasks
-            return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False) if as_json else payload
+            encoded = self._encode_snapshot(payload)
+            return encoded if as_json else payload
 
     def restore_snapshot(self, snapshot: Any, replace: bool = False) -> Dict[str, Any]:
-        """Valida o snapshot inteiro e restaura-o atomicamente, sem invalidar tarefas em voo."""
+        """Valida e testa JSON antes de mutar; falha de capacidade gera ValueError.
+
+        Sem teto fixo de profundidade: vale a capacidade do encoder neste ambiente.
+        Tarefas em voo não são invalidadas e extras ignorados não são serializados.
+        """
         payload = self._decode_snapshot(snapshot)
         with self._lock:
             if replace and self._in_flight:
@@ -227,6 +232,16 @@ class DeferredTaskQueue:
             if replace and len(tasks) > self.max_size:
                 raise ValueError("snapshot excede max_size da fila")
 
+            # Serializa somente dados capturados/validados, no mesmo envelope do export.
+            # Não percorre extensões ignoradas nem publica tarefas antes do preflight.
+            self._encode_snapshot({
+                "schema": self.SNAPSHOT_SCHEMA,
+                "generated_at": 0.0,
+                "max_attempts": self.max_attempts,
+                "max_size": self.max_size,
+                "statistics": snapshot_statistics,
+                "tasks": tasks,
+            })
             restored = [DeferredTask(**task) for task in tasks]
             staged_heap = [] if replace else list(self._heap)
             staged_tasks = {} if replace else dict(self._tasks)
@@ -246,6 +261,14 @@ class DeferredTaskQueue:
                 staged_heap, staged_tasks, staged_in_flight, staged_stats
             )
             return {"restored": len(restored), "depth": len(self._heap), "replaced": replace}
+
+    @staticmethod
+    def _encode_snapshot(payload: Dict[str, Any]) -> str:
+        """Usa o encoder real, sem orçamento arbitrário de profundidade."""
+        try:
+            return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        except RecursionError as exc:
+            raise ValueError("snapshot excede a capacidade de serialização JSON") from exc
 
     @staticmethod
     def _task_to_dict(task: DeferredTask) -> Dict[str, Any]:
