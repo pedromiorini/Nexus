@@ -20,6 +20,7 @@ import json
 import math
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -27,6 +28,14 @@ SCHEMA = "nexus.temporal_facts.v1"
 GENESIS = "0" * 64
 _FACT_KEYS = frozenset({"fact_id", "subject", "predicate", "object", "valid_from", "valid_to",
                         "recorded_at", "confidence", "source", "superseded_by", "metadata"})
+
+
+_EVENT_KEYS = {
+    "assert": frozenset({"seq", "prev", "hash", "kind", "recorded_at", "fact"}),
+    "close": frozenset({"seq", "prev", "hash", "kind", "recorded_at", "fact_id", "valid_to",
+                        "superseded_by"}),
+    "corroborate": frozenset({"seq", "prev", "hash", "kind", "recorded_at", "fact_id", "source"}),
+}
 
 
 @dataclass(frozen=True)
@@ -107,6 +116,26 @@ class TemporalFactStore:
         self._last_recorded = now
         return now
 
+    @contextmanager
+    def _transaction(self):
+        """Operação composta tudo-ou-nada: qualquer exceção desfaz eventos já anexados.
+
+        Chamar somente com ``self._lock`` adquirido. Cópias rasas da projeção custam
+        O(fatos + índice) por escrita; fatos são substituídos, nunca editados aqui.
+        A reversão não chama replay/deepcopy, que podem ter causado a falha original.
+        """
+        mark = (len(self._events), self._head, self._seq, self._last_recorded)
+        facts = self._facts.copy()
+        index = {key: list(ids) for key, ids in self._index.items()}
+        try:
+            yield
+        except BaseException:
+            count, head, seq, last_recorded = mark
+            del self._events[count:]
+            self._head, self._seq, self._last_recorded = head, seq, last_recorded
+            self._facts, self._index = facts, index
+            raise
+
     # ── log → projeção ───────────────────────────────────────────────────
     def _apply(self, event: Dict[str, Any]) -> None:
         kind = event["kind"]
@@ -130,7 +159,8 @@ class TemporalFactStore:
         event["seq"] = len(self._events) + 1
         event["prev"] = self._head
         event["hash"] = _digest(event)
-        self._events.append(copy.deepcopy(event))
+        stored = copy.deepcopy(event)  # pode falhar: antes de qualquer mutação do log
+        self._events.append(stored)
         self._head = event["hash"]
         self._apply(event)
 
@@ -164,7 +194,7 @@ class TemporalFactStore:
         except (OverflowError, RecursionError, TypeError, ValueError) as exc:
             raise ValueError("metadata não é serializável como JSON estrito") from exc
         requested_valid_from = None if valid_from is None else _number(valid_from, "valid_from")
-        with self._lock:
+        with self._lock, self._transaction():
             now = self._now()
             vf = now if requested_valid_from is None else requested_valid_from
             same = self._versions(subject, predicate)
@@ -203,7 +233,7 @@ class TemporalFactStore:
         if obj is not None:
             _text(obj, "object")
         requested_valid_to = None if valid_to is None else _number(valid_to, "valid_to")
-        with self._lock:
+        with self._lock, self._transaction():
             now = self._now()
             vt = now if requested_valid_to is None else requested_valid_to
             closed: List[TemporalFact] = []
@@ -274,7 +304,7 @@ class TemporalFactStore:
         if isinstance(snapshot, str):
             try:
                 snapshot = json.loads(snapshot, parse_constant=_reject_constant)
-            except ValueError as exc:
+            except (ValueError, RecursionError) as exc:
                 raise ValueError("snapshot JSON inválido") from exc
         if not isinstance(snapshot, dict) or snapshot.get("schema") != SCHEMA:
             raise ValueError("schema incompatível")
@@ -290,7 +320,7 @@ class TemporalFactStore:
             try:
                 chain_ok = raw.get("seq") == n and raw.get("prev") == store._head \
                     and raw.get("hash") == _digest(raw)
-            except (TypeError, ValueError) as exc:
+            except (TypeError, ValueError, RecursionError) as exc:
                 raise ValueError(f"evento {n} não serializável") from exc
             if not chain_ok:
                 raise ValueError(f"cadeia de hash inválida no evento {n}")
@@ -298,6 +328,10 @@ class TemporalFactStore:
             if recorded < store._last_recorded:
                 raise ValueError(f"recorded_at regride no evento {n}")
             kind = raw.get("kind")
+            if type(kind) is not str or kind not in _EVENT_KEYS:
+                raise ValueError(f"tipo de evento desconhecido no evento {n}")
+            if set(raw) != _EVENT_KEYS[kind]:
+                raise ValueError(f"campos do evento {n} inválidos para o tipo {kind!r}")
             if kind == "assert":
                 fact = raw.get("fact")
                 if not isinstance(fact, dict) or set(fact) != _FACT_KEYS:
@@ -342,10 +376,14 @@ class TemporalFactStore:
                     _text(raw.get("source"), "source")
             else:
                 raise ValueError(f"tipo de evento desconhecido no evento {n}")
-            store._events.append(copy.deepcopy(raw))
+            try:
+                stored = copy.deepcopy(raw)
+                store._apply(stored)
+            except RecursionError as exc:
+                raise ValueError(f"evento {n} excede a capacidade de cópia/replay") from exc
+            store._events.append(stored)
             store._head = raw["hash"]
             store._last_recorded = recorded
-            store._apply(raw)
         for event in store._events:
             target_id = event.get("superseded_by") if event["kind"] == "close" else None
             if target_id is None:

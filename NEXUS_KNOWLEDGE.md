@@ -3,9 +3,13 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 416
+tests: 439
 bandit_low: 135
 -->
+
+## Follow-up F-04 local — 2026-10-19
+
+Estado atual: branch isolada `fix/audit-json-preflight-20261019`, derivada exatamente de `6d145ccb7a7b2cb50ea0c1bbd1a5b38034d854e1`; preflight JSON antes de publicar restore e erro de export controlado, com 439 testes aprovados. D-030 preserva ausência de teto fixo de profundidade, inclusive 64. Proveniência, comandos, compatibilidade/limites e evidência em [CONTINUATION.md](CONTINUATION.md#follow-up-f-04-sem-teto-fixo--2026-10-19). A branch/commit revisados anteriores e os registros históricos foram preservados. Novo SHA/diff congelados para uma única revisão independente de Segurança, ainda pendente; o parecer anterior não cobre automaticamente esta mudança. Sem publicação ou mudança de `main`.
 
 ## Estado canônico da composição local — 2026-10-18
 
