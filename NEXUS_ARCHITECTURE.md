@@ -38,3 +38,10 @@ Ferramentas de auditoria e CI
 ## Risco estrutural principal
 
 `core/constitutional_brain.py` concentra aproximadamente 26,6 mil linhas, 267 classes e 843 funções segundo a auditoria atual. Modularização deve ser incremental, orientada por contratos e precedida por evidência local.
+
+
+## Contrato operacional do roteador (D-034)
+
+Em cache miss, o preflight de orçamento fecha a rota em negação/ausência/erro. A reserva de uma unidade é atômica no enforcer e ocorre na fronteira da chamada ao reasoner; falha conta como tentativa e cache hit não cobra. Sucesso de orquestração agora exige o produto funcional mínimo por tipo e o Swarm imposto pelo guard ético; falha requerida não é agregada/cacheada como sucesso e permanece sujeita a retry/descarte da fila. Enriquecimento opcional não é requisito de conclusão.
+
+A garantia é local à API do budget e ao CentralRouter, não à rota separada `think()` nem à concorrência geral do processo. CREATIVE e LEARNING preservam apenas seus produtos legados (comparação de futuros e registro de intenção), sem alegação de geração criativa ou aprendizado executado. Mapa, compatibilidade e limites em [D-034](NEXUS_DECISIONS.md#d-034--orçamento-e-conclusão-operacional-do-centralrouter).

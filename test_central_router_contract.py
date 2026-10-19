@@ -41,10 +41,13 @@ class CentralRouterContractTests(unittest.TestCase):
             ModuleType.BUDGET: SimpleNamespace(request_budget=lambda *args: True),
             ModuleType.LOG: SimpleNamespace(log_event=lambda *args: "test-hash"),
             ModuleType.WORLD_MODEL: world_model,
+            ModuleType.MCTS_PLANNER: SimpleNamespace(plan=lambda **kwargs: {"plan": []}),
         }
         router = CentralRouter(modules, Ethics())
         router.vram_guard = Guard()
-        router.routing_rules[RequestType.PLANNING] = [ModuleType.WORLD_MODEL]
+        router.routing_rules[RequestType.PLANNING] = [
+            ModuleType.WORLD_MODEL, ModuleType.MCTS_PLANNER,
+        ]
         router._aggregate_results = lambda results, request_type, context: {
             "observed_context": dict(context),
             "nested_output": {"values": [1]},
