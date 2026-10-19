@@ -3,9 +3,15 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 474
+tests: 477
 bandit_low: 135
 -->
+
+## D-027 — Leitura concorrente do head — 2026-10-19
+
+Base exata #49 `8f8834efba9011cd0d8a4bdfb449d3e862ee6814`, candidato local isolado `fix/temporal-head-lock-20261019`; SHA final por `HEAD` e `/workspace/nexus-temporal-head-lock-20261019-evidence/STATE_MANIFEST.json`. Somente `head_hash` passa a adquirir o RLock transacional: leitura de outra thread retorna o head pós-commit ou pós-rollback, sem expor o intermediário. Events ordenam oito cenários (assert inicial, substituição, corroboração e retração × sucesso/rollback), com controle normal/reentrante. Red/green reproduzível por `run-red-green.sh`: **3 testes, 8 falhas de subteste na base; 45/45 focados corrigidos**. Cem repetições: 300 testes/800 cenários aprovados; Python 3.12.3: 39/39 temporais.
+
+Execução completa `20261019T164801Z-624895` de `run-gates.sh` externo: **477/477**, zero falhas/skips/XPASS; integração **30 + 1 skip FAISS** sem IDs divergentes; coberturas branch fila/VRAM/temporal/Vita/núcleo **91/94/95/76/70%**; mutação canônica **102/102 mortas**, zero sobreviventes/timeouts/não aplicadas, catálogo inalterado. Bandit **135 LOW, 0 MEDIUM/HIGH**. Lint, compile, requisitos/lock sem mudanças, actionlint/zizmor, triagem/B101/gaps, realidade reproduzida sem diff e diff-check aprovados. Benchmarks herdados são apenas checks sintéticos. Logs/comandos/relatórios, patch congelado e única revisão independente ficam no diretório externo; procedimento e limitações em [CONTINUATION.md](CONTINUATION.md#isolamento-de-head_hash--2026-10-19). Sem publicação ou alteração de PRs/main; checkout sujo preservado. Não garante atomicidade de chamadas múltiplas, observação reentrante dentro de callbacks de escrita, concorrência geral ou transação com o grafo. Resultados locais, não CI remoto nem prova de capacidade geral. Entradas seguintes históricas.
 
 ## A07 — Preflight da projeção NetworkX — 2026-10-19
 
