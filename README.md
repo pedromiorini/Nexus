@@ -8,6 +8,10 @@ O Nexus Constitutional é um **protótipo experimental de arquitetura neuro-simb
 
 > Nomes de módulos, banners de execução e testes de demonstração não constituem prova de inteligência geral, consciência ou prontidão para produção.
 
+## Follow-up local de atomicidade temporal — 2026-10-19
+
+Na branch local `fix/audit-atomic-restore-20261019`, derivada de `f025204339b3dc5ae1f345e98be7f6f7fbcb2498`, a correção temporal em `e8af0ac3da71fa62bebdbcae2f110a7365af2535` mede **433/433 testes**, sem falhas/skips, em Python 3.11.16 com lock; integração separada 30 aprovações + 1 skip FAISS. Gates e limites estão em [CONTINUATION.md](CONTINUATION.md#auditoria-temporal-local--2026-10-19). Não há teto 64 novo: D-030 permanece, e o problema de contexto profundo da fila continua aberto. É um follow-up não publicado, com revisão final de Segurança pendente; não altera os resultados históricos abaixo nem o candidato #46.
+
 ## Evidências locais da composição — 2026-10-18
 
 Resultados medidos no candidato `3ddc68d06853ba211bb6c04a02743565c28bd19c`, branch `audit/consolidated-38-45-20261018`, em Python 3.11.16 com o lock instalado com hashes. Inventário, comandos, ambiente e limites estão em [AUDIT_COMPOSITION.md](AUDIT_COMPOSITION.md#evidência-combinada); logs e manifesto desse commit estão em `/workspace/nexus-consolidation-evidence/`. Esta é uma validação local (`ci_run=not_ci`), não uma execução de CI remoto nem o estado publicado de `main`.

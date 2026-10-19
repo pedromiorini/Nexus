@@ -3,9 +3,27 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 416
+tests: 433
 bandit_low: 135
 -->
+
+## Auditoria temporal local — 2026-10-19
+
+Branch nova `fix/audit-atomic-restore-20261019`, worktree `/workspace/Nexus-audit-atomic-20261019`, derivada exatamente de `f025204339b3dc5ae1f345e98be7f6f7fbcb2498`. Implementação/testes: `e8af0ac3da71fa62bebdbcae2f110a7365af2535`; o checkpoint documental posterior é identificado por `HEAD` e pelo manifesto externo pós-commit em `/workspace/nexus-audit-20261019-evidence/STATE_MANIFEST.json`. Base histórica: `812ebd02b0c82ecc3169d620e36d25592b1d6727`. A ref local `main` já apontava para `7c8a187c1465c6db39777f5e9dc16efb112e1121` na abertura; não foi alterada. Sem consulta/publicação remota; preservar candidato #46, refs preexistentes e `/workspace/Nexus` sujo.
+
+**Contrato:** `assert_fact` (incluindo corroboração) e `retract` revertem eventos, head, sequência, watermark, fatos e índice se uma etapa lança exceção, inclusive projeção/cópia de retorno. Rollback usa cópias rasas anteriores, não replay/deepcopy: custa O(fatos + índice) por escrita. Não garante recuperação de esgotamento de memória ou Python hostil. Restore temporal converte `RecursionError` de parse/hash/cópia/replay em `ValueError`; eventos exigem campos exatos por tipo e `kind` string built-in. Exports normais preservam schema, hashes e assinaturas; eventos externos com campos adicionais, antes aceitos, passam a ser rejeitados. Hashes não são autenticação.
+
+**D-030 preservado:** nenhum teto 64, nenhuma alteração da fila ou de `_json_value`. Metadata previamente aceita com 100 contêineres continua em round-trip; limites práticos do interpretador/JSON permanecem. F-04 reproduzido: a fila restaura contexto de 5.000 níveis, mas seu export JSON lança `RecursionError`. Fica aberto por determinação do owner; o patch anexo não foi aplicado integralmente.
+
+**Red/green independente:** candidato Python 3.12.3 + metadata de 600 níveis deixa `close` sem sucessor e o snapshot não restaura (F-01). Python 3.11.16 rejeita esse input antes de mutar, mas falhas injetadas confirmam falta de atomicidade também ali. Os 17 testes finais contra o original: 10 falhas/6 erros em 3.11; 11 falhas/6 erros em 3.12, incluindo subcasos. Com a correção: 17/17 em ambos. Sondas dependentes de 64 ficam somente na evidência externa, fora da suíte aprovada.
+
+**Gates locais:** Python 3.11.16, venv existente sem pip, lock verificado com hashes por `uv pip install --python /workspace/nexus-consolidation-evidence/venv/bin/python --require-hashes -r requirements-ci.lock`; NetworkX 3.6.1/numpy 2.4.6. Roteiro: `bash /workspace/nexus-audit-20261019-evidence/run-gates.sh`, com comandos/logs em `commands.tsv` e `checks.tsv`. Ordem: focados → Ruff/actionlint/zizmor → compileall → suíte integral → cobertura/integração/pisos → mutação → Bandit/triagem/auditorias → realidade → benchmarks/resumo → manifesto/consistência pós-commit. Suíte/resumo **433/433**, zero falhas/skips/XPASS; integração separada **30 aprovados + 1 skip FAISS**, zero IDs faltantes/inesperados/conflitantes. Coberturas fila/VRAM/temporal/Vita/núcleo **91/94/95/76/69%**, pisos **90/90/90/70/62%**. Mutação canônica **84/84**, suplemento temporal externo **12/12** mortos, zero sobreviventes/inconclusivos/não aplicados. Bandit **135 LOW, 0 MEDIUM/HIGH**. Triagem/check, B101, gaps, realidade sem diff, dry-run de requisitos, actionlint 1.7.12, zizmor 1.31.1 e diff-check passam. Repetições por módulo da CI estão no discover, não todas repetidas como invocações independentes. `ci_run=not_ci`; nenhum CI remoto atribuído a esta branch.
+
+**Outros achados/limites:** F-03 já rejeitado pelo candidato (`statistics.depth` extra e JSON profundo → `ValueError`). F-05 não confirma a alegação sobre o perfil: dev inclui `requirements-ci.in`, que já fixa NetworkX; o lock também o inclui. F-06 segue diagnóstico documentado, não cancelamento. Não reavaliados main, PRs individuais, Dependabot, GPU, transação grafo↔ledger, vazamentos gerais ou outras concorrências; psutil/FAISS/SentenceTransformers ausentes. Benchmarks herdados continuam checks sintéticos internos, não validação científica nova. Sem teto de bytes/nós ou garantia de profundidade portátil entre ambientes.
+
+**Decisão pendente do owner:** 64 não decorre dos registros canônicos (D-030 declara sem novo teto). Se um orçamento fixo for autorizado, proposta concreta: no máximo 64 contêineres em um caminho incluindo raiz, 64 aceito/65 rejeitado, com revisão explícita de D-030 e avaliação/migração de snapshots legados. Rejeitaria entradas antes aceitas; o número não foi escolhido por benchmark. Alternativa sem teto fixo: preflight de serialização antes de publicar restore, com falha atômica; também altera a faixa antes aceita. Nenhuma dessas políticas foi implementada.
+
+**Handoff:** congelar diff/SHA após gates para o coordenador obter **uma única revisão independente de Segurança**, focada em rollback/restore. Revisão final ainda pendente; reabrir só por achado concreto ou mudança do diff. Sem push, PR, merge, fechamento de PR ou mudança de main.
 
 ## Estado canônico da composição local — 2026-10-18
 

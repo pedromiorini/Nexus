@@ -3,9 +3,15 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 416
+tests: 433
 bandit_low: 135
 -->
+
+## Auditoria temporal local — 2026-10-19
+
+Sobre `f025204339b3dc5ae1f345e98be7f6f7fbcb2498`, implementação `e8af0ac3da71fa62bebdbcae2f110a7365af2535`, branch local `fix/audit-atomic-restore-20261019`: F-01 e F-02 reproduzidos e corrigidos sem teto de profundidade novo. Rollback cobre ledger/projeção/IDs/watermark; restore temporal rejeita campos extras e normaliza erros de recursão. Custo de cópias da projeção O(fatos + índice) por escrita. D-030 permanece; F-04 e proposta de teto 64 aguardam decisão explícita do owner.
+
+Evidência medida: 17 testes novos red/green em Python 3.11.16 e 3.12.3; suíte com lock em 3.11 **433/433**, sem falhas/skips/XPASS; integração **30 + 1 skip FAISS**; coberturas fila/VRAM/temporal/Vita/núcleo **91/94/95/76/69%**; mutação canônica **84/84** e suplemento temporal externo **12/12** mortos, sem inconclusivos; Bandit **135 LOW, 0 MEDIUM/HIGH**. Demais gates e limites em [CONTINUATION.md](CONTINUATION.md#auditoria-temporal-local--2026-10-19); roteiro/logs/atestação pós-commit em `/workspace/nexus-audit-20261019-evidence/`. `HEAD` identifica o checkpoint final; não houve CI remoto, publicação ou revisão final de Segurança nesta etapa. Resultados abaixo continuam históricos e não são prova de capacidade geral.
 
 ## Estado canônico da composição local — 2026-10-18
 

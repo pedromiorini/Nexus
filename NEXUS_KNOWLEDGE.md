@@ -3,9 +3,13 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 416
+tests: 433
 bandit_low: 135
 -->
+
+## Follow-up temporal local — 2026-10-19
+
+Estado atual nesta branch local: correção de atomicidade/restore temporal, 433 testes aprovados, sem adoção de teto 64 nem alteração de D-030. Proveniência, comandos, resultados e limitações em [CONTINUATION.md](CONTINUATION.md#auditoria-temporal-local--2026-10-19). Os registros da composição abaixo são históricos; o candidato publicado foi preservado. Revisão final independente de Segurança pendente no SHA congelado.
 
 ## Estado canônico da composição local — 2026-10-18
 
