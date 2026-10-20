@@ -7,6 +7,13 @@ log; ``known_at`` reconstrói o que o sistema acreditava em um instante passado.
 Predicados funcionais (um valor por vez, ex.: "mora_em") substituem o valor
 anterior; os demais são multivalorados e apenas acumulam.
 
+Domínio numérico: tempos (incluindo relógio, escrita, snapshots e consultas)
+aceitam floats finitos e inteiros exatamente representáveis como float, isto é,
+int(float(x)) == x. Bool, inteiros não exatos e fora da faixa float geram
+ValueError antes de alterar o estado; não há arredondamento silencioso de int.
+Confidence mantém o domínio finito [0, 1]. Compatibilidade com snapshots externos
+é desconhecida: inteiros temporais antes aceitos com perda agora são rejeitados.
+
 Limites: a substituição é determinística ("o mais recente vence"), sem arbitragem
 por confiança; a cadeia de hash detecta edição e remoção no meio, mas truncamento
 final só é detectado com ``expected_head`` guardado fora do arquivo; as consultas
@@ -20,6 +27,7 @@ import json
 import math
 import threading
 import time
+from bisect import bisect_left
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
@@ -66,9 +74,18 @@ def _reject_constant(name: str) -> Any:
 
 
 def _number(value: Any, name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    """Converte somente números finitos, sem perda de precisão de inteiros."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{name} deve ser um número finito")
-    return float(value)
+    try:
+        number = float(value)
+    except OverflowError as exc:
+        raise ValueError(f"{name} fora da faixa de float finito") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{name} deve ser um número finito")
+    if isinstance(value, int) and int(number) != value:
+        raise ValueError(f"{name} deve ser um inteiro exatamente representável como float")
+    return number
 
 
 def _text(value: Any, name: str) -> str:
@@ -300,7 +317,12 @@ class TemporalFactStore:
     def from_snapshot(cls, snapshot: Union[Dict[str, Any], str], *,
                       clock: Callable[[], float] = time.time,
                       expected_head: Optional[str] = None) -> "TemporalFactStore":
-        """Valida todo o payload (schema, cadeia, tipos, referências, invariantes) antes de devolver."""
+        """Valida payload e cada corte completo de recorded_at observável por known_at.
+
+        O índice local ordena intervalos não vazios por chave funcional. Busca de
+        vizinhos custa O(log m); inserção/remoção em lista custa O(m) no pior
+        caso, com m intervalos na chave, sem varrer o ledger a cada corte.
+        """
         if isinstance(snapshot, str):
             try:
                 snapshot = json.loads(snapshot, parse_constant=_reject_constant)
@@ -314,6 +336,37 @@ class TemporalFactStore:
         if not isinstance(events, list):
             raise ValueError("events inválido")
         store = cls(functional_predicates=funcs, clock=clock)
+        windows: Dict[Tuple[str, str], List[Tuple[float, str]]] = {}
+        indexed = set()
+        dirty = set()
+
+        def validate_cut() -> None:
+            # Remover TODOS os alterados antes de reinserir a projeção final:
+            # assert/close no mesmo timestamp pode ter overlap intermediário.
+            changed = [store._facts[i] for i in sorted(dirty)]
+            for fact in changed:
+                if fact.fact_id in indexed:
+                    entries = windows[(fact.subject, fact.predicate)]
+                    entries.pop(bisect_left(entries, (fact.valid_from, fact.fact_id)))
+                    indexed.remove(fact.fact_id)
+            for fact in changed:
+                if fact.valid_to == fact.valid_from:
+                    continue  # [t, t) é vazio, inclusive dentro de outra janela
+                entries = windows.setdefault((fact.subject, fact.predicate), [])
+                entry = (fact.valid_from, fact.fact_id)
+                pos = bisect_left(entries, entry)
+                neighbors = entries[max(0, pos - 1):pos + 1]
+                for _, other_id in neighbors:
+                    other = store._facts[other_id]
+                    if ((other.valid_to is None or fact.valid_from < other.valid_to)
+                            and (fact.valid_to is None or other.valid_from < fact.valid_to)):
+                        raise ValueError("invariantes violadas: janelas sobrepostas em "
+                                         f"({fact.subject}, {fact.predicate}) no corte "
+                                         f"recorded_at={store._last_recorded}")
+                entries.insert(pos, entry)
+                indexed.add(fact.fact_id)
+            dirty.clear()
+
         for n, raw in enumerate(events, 1):
             if not isinstance(raw, dict):
                 raise ValueError(f"evento {n} inválido")
@@ -327,6 +380,8 @@ class TemporalFactStore:
             recorded = _number(raw.get("recorded_at"), "recorded_at")
             if recorded < store._last_recorded:
                 raise ValueError(f"recorded_at regride no evento {n}")
+            if recorded > store._last_recorded:
+                validate_cut()
             kind = raw.get("kind")
             if type(kind) is not str or kind not in _EVENT_KEYS:
                 raise ValueError(f"tipo de evento desconhecido no evento {n}")
@@ -384,6 +439,11 @@ class TemporalFactStore:
             store._events.append(stored)
             store._head = raw["hash"]
             store._last_recorded = recorded
+            if kind in ("assert", "close"):
+                fact_id = stored["fact"]["fact_id"] if kind == "assert" else stored["fact_id"]
+                if store._facts[fact_id].predicate in store._functional:
+                    dirty.add(fact_id)
+        validate_cut()
         for event in store._events:
             target_id = event.get("superseded_by") if event["kind"] == "close" else None
             if target_id is None:

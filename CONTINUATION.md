@@ -3,9 +3,65 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 439
+tests: 460
 bandit_low: 135
 -->
+
+## Inteiros temporais sem perda silenciosa — 2026-10-20
+
+**Proveniência e autorização:** somente a WIP em `/workspace/Nexus-audit-json-preflight-20261019`, branch `fix/audit-json-preflight-20261019`, HEAD/base exata `2ba63f3041a7f8e001b69c8363856a5178d8a308`, pai `6d145ccb7a7b2cb50ea0c1bbd1a5b38034d854e1`. Entrada já continha os quatro arquivos modificados e `test_temporal_snapshot_cuts_contract.py` não rastreado, com índice vazio; diff e módulo iniciais preservados externamente. Nenhum stage, commit, push, PR, merge, mudança de main ou acesso remoto. Demais worktrees não operadas. Marcadores representam a WIP, não o HEAD puro. Todo registro abaixo desta seção é histórico, inclusive as afirmações anteriores sobre writer/AST e revisão.
+
+**Contrato e implementação:** `_number` converte para float com proteção de `OverflowError`, exige finitude e, para int, `int(float(x)) == x`; caso contrário lança `ValueError` com nome do campo antes de alterar estado. Bool continua rejeitado. A mesma fronteira cobre clock, assert/retract/close, `valid_from`/`valid_to`, `recorded_at` do evento e do fato no restore, e `valid_at`/`known_at`. `2**53`, `2**53+2`, negativos exatos e `2**100` continuam válidos: não foi criado teto `2**53`, nem armazenamento de inteiros arbitrários. Confidence válido [0,1] preservado. Schema, assinaturas e hashes dos valores aceitos não mudam. Compatibilidade externa **desconhecida**: snapshots com inteiros antes aceitos com perda agora falham; nenhum corpus externo ou migração. A observação de precedência não executada é baixa/não bloqueadora e não foi implementada.
+
+**Red/green:** sete métodos novos em `ExactTemporalNumbersContract`, sem duplicar o round-trip do writer já existente em `test_temporal_facts_contract.py:88–96` (a alegação externa de ausência é falsa). Cobrem `2**53`, vizinho `2**53+1`, negativo inexato, `10**400`, bool, snapshot objeto/JSON com selagem independente, cut adversarial que antes gerava `KeyError`, consultas com `ValueError` e igualdade de eventos/head/seq/fatos/índice/last_recorded após escrita/clock inválidos. Contra a WIP anterior à correção: 7 testes, **28 falhas de subteste/20 erros** em Python 3.11.16 e 3.12.3; corrigido: 7/7 em ambos. Focados: **71/71 no 3.11**, **65/65 no 3.12** sem integração do grafo. A tentativa inicial de importar integração em 3.12 falhou por NumPy ausente; seu log foi retido. Nenhuma suíte completa/integração foi validada em 3.12.
+
+**Gates atuais:** `run-gates.sh`, prefixo `20261020T044513Z-733506`, Python 3.11.16 no perfil existente com lock/requisitos em dry-run, NetworkX 3.6.1/numpy 2.4.6. Suíte completa, cobertura e sumário: **460/460**, zero falhas/skips/XPASS; integração separada **30 aprovados + 1 skip FAISS**, sem missing/unexpected/conflicting. Coberturas fila/VRAM/temporal/Vita/núcleo **91/94/96/76/69%**, pisos **90/90/90/70/62%**. Mutação canônica **84/84**, suplemento WIP de cortes reexecutado **8/8** e suplemento numérico **4/4** mortos, zero sobreviventes/inconclusivos/não aplicados. Bandit **135 LOW, 0 MEDIUM/HIGH**; Ruff, compileall, actionlint/zizmor, triagem/check, B101, gaps, realidade (idêntica à versionada), benchmarks CLI sintéticos herdados e diff-check aprovados. Relatórios versionados não sobrescritos; módulos repetidos individualmente na CI estão incluídos no discover, não todos reexecutados isoladamente. Não há nova medição de custo ou alegação de capacidade/produção.
+
+**Comandos e artefatos:** `E=/workspace/nexus-temporal-exact-int-20261020-evidence`, `P=/workspace/nexus-consolidation-evidence/venv/bin/python`, executados no checkout autorizado:
+
+```bash
+PYTHONPATH=. "$P" "$E/check-numbers.py" red    # exit 1 esperado, WIP anterior em memória
+PYTHONPATH=. "$P" "$E/check-numbers.py" green  # exit 0; também com /usr/bin/python3
+PYTHONPATH=. "$P" "$E/check-numbers.py"        # 4 mutantes numéricos
+PYTHONPATH=. "$P" "$E/mutation-cuts.py"        # 8 mutantes da WIP preservada
+bash "$E/run-gates.sh"
+PYTHONPATH=. "$P" "$E/check-state.py"
+git diff --check
+```
+
+`*-commands.tsv`/`*-checks.tsv` e logs/JSON/XML registram comandos e exits. `LOCAL_WIP_MANIFEST.json` identifica `dirty_local_wip`, `not_ci`, escopo não commitado e hash do módulo: nunca `clean_required` nem atestação de CI remoto. A auditoria global de state consistency aponta drift de contagem em `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md` (439, já fora de sincronia com os 453 da WIP de entrada); esses arquivos foram preservados. A auditoria separada dos dois documentos desta WIP é o check de consistência escopado, não substitui nem declara verde o global. Resultados em `state-consistency-global.json` e `state-consistency-scoped.json`.
+
+**Congelamento/revisão:** os mesmos cinco caminhos da entrada, sem alterações staged. `frozen.diff` inclui explicitamente o teste não rastreado; SHA-256, hashes de arquivos e confirmação de preservação em `FROZEN_STATE.json`. Pedir uma única re-revisão final de QA desse conteúdo congelado; parecer externo em `QA_FINAL.md`, sem reabrir salvo achado concreto. Não reavaliados Python hostil/subclasses numéricas adversariais, float já arredondado pelo chamador, esgotamento de recursos, sincronização de produtores, GPU, persistência, transação grafo↔ledger ou concorrência geral. Hash não é autenticação; `expected_head` externo continua necessário contra truncamento.
+
+## Restore temporal consistente em todo corte — 2026-10-19
+
+**Estado autorizado e verificado antes de editar:** checkout limpo `/workspace/Nexus-audit-json-preflight-20261019`, branch `fix/audit-json-preflight-20261019`, HEAD/base exata `2ba63f3041a7f8e001b69c8363856a5178d8a308`, pai `6d145ccb7a7b2cb50ea0c1bbd1a5b38034d854e1`. O resultado é um diff local sobre essa base, **sem commit, push, PR, merge ou alteração remota**. Não operar em `/workspace/Nexus` sujo nem nas demais worktrees; nenhum arquivo ou estado delas foi alterado. Remotes/worktrees apenas inventariados via metadados locais, sem fetch ou acesso remoto. Marcadores acima descrevem testes do conteúdo de trabalho, não atestação do HEAD puro. Seções seguintes são históricas.
+
+**Contrato aprovado:** `TemporalFactStore.from_snapshot` rejeita overlap funcional após cada grupo distinto completo de `recorded_at`, pois `known_at` inclui todos os eventos cujo registro é menor ou igual ao corte. Antes do primeiro grupo a projeção é vazia; entre grupos ela não muda; validar seus finais cobre todos os instantes consultáveis. Não validar dentro de um timestamp. Close posterior não conserta um corte histórico inválido. Close+assert no mesmo timestamp, adjacência semiaberta, intervalos vazios e overlaps não funcionais permanecem aceitos. Writer/schema/hashes/assinaturas preservados; AST confirma que somente `from_snapshot` mudou entre os métodos da classe. Compatibilidade com snapshots externos é desconhecida: históricos inconsistentes antes restauráveis passam a ser rejeitados. Sem levantamento de corpus externo ou migração automática.
+
+**Estratégia/custo:** índice temporário ordenado por chave funcional `(subject, predicate)` só com intervalos não vazios. Cada corte remove todos os IDs alterados antes de reinserir seus valores finais; vizinhos bastam porque a projeção anterior já era válida. Corroboração e chaves não funcionais não entram no índice. Busca O(log m), movimento em lista O(m) por alteração, ordenação dos IDs sujos por corte e memória auxiliar O(fatos funcionais), além do replay e checker global terminal herdados. Não revarre o ledger por corte. Chave quente reversa ainda permite custo quadrático; não há novo teto nem garantia de latência/recursos.
+
+**Red/green:** `test_temporal_snapshot_cuts_contract.py`, 14 testes novos em objeto/JSON com selagem independente, `expected_head` e payload inalterado. Inclui 80 ledgers com seed `20261019` contra oráculo par-a-par de todos os cortes. Contra a base: 14 testes, 10 falhas de subteste, sem erros; corrigido: 14/14 em Python 3.11.16 e 3.12.3. Focados iniciais: 62/62 em 3.11 e 56/56 em 3.12 (este sem módulo de integração); essas contagens antecedem a conclusão do novo módulo. Rodada final dos focados/gates registrada externamente. Suplemento de mutação: inicialmente encontrou lacuna de teste no vizinho à direita, coberta antes do congelamento; final 8/8 mortos, zero sobreviventes/inconclusivos/não aplicados.
+
+**Comandos reproduzíveis**, executados no checkout autorizado (saídas em `/workspace/nexus-temporal-cuts-20261019-evidence/`, abreviado `E`):
+
+```bash
+P=/workspace/nexus-consolidation-evidence/venv/bin/python
+E=/workspace/nexus-temporal-cuts-20261019-evidence
+PYTHONPATH=. "$P" "$E/run-red-green.py" base     # exit 1 esperado
+PYTHONPATH=. "$P" "$E/run-red-green.py" current  # exit 0
+# Repetidos com python3 (3.12.3); logs base/current-311/312.log.
+"$P" "$E/mutation-cuts.py"
+"$P" "$E/benchmark/benchmark_temporal_restore.py"
+bash "$E/run-gates.sh"
+git diff --check
+```
+
+`run-gates.sh` registra cada comando/exit em `*-commands.tsv`/`*-checks.tsv`, logs e JSON/XML externos; prefixo final em `final-run-prefix.txt`. A base temporal usada no red é `git show 2ba63f3:core/temporal_facts.py`, capturada em `base_temporal_facts.py`; não troca arquivos da worktree. Benchmarks constroem os payloads fora do trecho medido. Três repetições para 4.000 chaves distintas: medianas terminal/local/global por evento **0,186/0,217/15,588 s** (global bruto 15,588/15,407/16,981). Chave única adjacente crescente: **0,187/0,213/4,133 s**; reversa: **0,207/0,223/4,261 s**. Há medidas 1k/2k e hashes/ambiente/brutos em `benchmark/temporal_restore_benchmark.json`. Antecedente 13,52/0,216 s pertence a outra medição, não é resultado atual. Global por evento também rejeita incorretamente um corte válido com assert+close; é referência sintética de custo, não solução correta. Nenhum teste CI usa wall clock.
+
+**Gates locais:** Python 3.11.16 com lock em dry-run, NetworkX 3.6.1/numpy 2.4.6; suíte/resumo **453/453**, zero falhas/skips/XPASS. Integração separada **30 + 1 skip FAISS**, sem missing/unexpected/conflicting. Coberturas fila/VRAM/temporal/Vita/núcleo **91/94/96/76/69%**, pisos **90/90/90/70/62%**. Mutação canônica **84/84**, suplemento novo **8/8** mortos. Bandit **135 LOW, 0 MEDIUM/HIGH**; triagem/check, B101, gaps, Ruff, compileall, requisitos/lock, actionlint 1.7.12, zizmor 1.31.1, realidade idêntica aos relatórios versionados, benchmarks herdados sintéticos e diff-check aprovados. Relatórios versionados desnecessários não foram sobrescritos; os módulos individuais repetidos pela CI estão no discover, não todos reexecutados isoladamente. Não gerar atestação pós-commit `clean_required` nem alegar CI remoto para um diff não commitado.
+
+**Congelamento/QA e limites:** apenas `core/temporal_facts.py`, `test_temporal_snapshot_cuts_contract.py`, `NEXUS_DECISIONS.md`, `NEXUS_EVIDENCE.md` e `CONTINUATION.md` pertencem a esta alteração. Diff congelado + SHA-256 e hashes dos arquivos em `E/frozen.diff`, `E/frozen.diff.sha256` e `E/FROZEN_STATE.json`; parecer de uma única revisão final independente em `E/QA_FINAL.md`. O parecer é externo para não alterar o diff após revisão; reabrir só por achado concreto ou diff alterado. Não commit/push/PR/merge. Não reavaliados recursos extremos, sincronização de produtores do snapshot, Python hostil, GPU, persistência, transação grafo↔ledger, concorrência geral ou compatibilidade externa. Hash não é autenticação; `expected_head` externo continua necessário contra truncamento. Evidência de custo é sintética/local, não capacidade geral ou prontidão para produção.
 
 ## Follow-up F-04 sem teto fixo — 2026-10-19
 
