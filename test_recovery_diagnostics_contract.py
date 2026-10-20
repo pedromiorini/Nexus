@@ -1,9 +1,10 @@
 import io
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -173,6 +174,120 @@ class RecoveryDiagnosticsContractTests(unittest.TestCase):
         payload["diagnostics"]["severity"] = []
         with self.assertRaisesRegex(ValueError, "invalid_severity"):
             render_dashboard(payload)
+
+    def _snapshot_json_with_number(self, token, depth=0):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        nested = '"NUMBER_TOKEN"'
+        for _ in range(depth):
+            nested = '{"nested":[' + nested + ']}'
+        snapshot["events"] = [{
+            "event_type": "numeric_control", "timestamp": 1.0,
+            "payload": {"value": "NESTED_TOKEN"},
+        }]
+        return json.dumps(snapshot).replace('"NESTED_TOKEN"', nested).replace('"NUMBER_TOKEN"', token)
+
+    @contextmanager
+    def _snapshot_source(self, encoded, stdin):
+        if stdin:
+            with patch("sys.stdin", io.StringIO(encoded)):
+                yield "-"
+        else:
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "snapshot.json"
+                path.write_text(encoded, encoding="utf-8")
+                yield str(path)
+
+    def _run_dashboard(self, encoded, stdin):
+        with self._snapshot_source(encoded, stdin) as source:
+            return subprocess.run(
+                [sys.executable, "-m", "tools.diagnostics_dashboard", source],
+                input=encoded if stdin else None, capture_output=True, text=True,
+                cwd=Path(__file__).resolve().parent, timeout=15, check=False,
+            )
+
+    def test_dashboard_loaders_reject_nested_float_overflow(self):
+        for token in ("1e400", "-1e400"):
+            for depth in (0, 1, 32):
+                for stdin in (False, True):
+                    with self.subTest(token=token, depth=depth, stdin=stdin):
+                        encoded = self._snapshot_json_with_number(token, depth)
+                        with self._snapshot_source(encoded, stdin) as source:
+                            with self.assertRaisesRegex(ValueError, "finite"):
+                                load_snapshot(source)
+
+    def test_dashboard_cli_rejects_nested_float_overflow_without_output(self):
+        for token in ("1e400", "-1e400"):
+            for depth in (0, 32):
+                for stdin in (False, True):
+                    with self.subTest(token=token, depth=depth, stdin=stdin):
+                        result = self._run_dashboard(self._snapshot_json_with_number(token, depth), stdin)
+                        self.assertEqual(result.returncode, 2)
+                        self.assertEqual(result.stdout, "")
+                        self.assertIn("dashboard error:", result.stderr)
+                        self.assertIn("finite", result.stderr)
+                        self.assertNotIn("Traceback", result.stderr)
+
+    def test_dashboard_loaders_reject_nonstandard_numeric_constants(self):
+        for token in ("NaN", "Infinity", "-Infinity"):
+            for stdin in (False, True):
+                with self.subTest(token=token, stdin=stdin):
+                    encoded = self._snapshot_json_with_number(token, 2)
+                    with self._snapshot_source(encoded, stdin) as source:
+                        with self.assertRaisesRegex(ValueError, "non-standard JSON constant"):
+                            load_snapshot(source)
+
+    def test_dashboard_cli_rejects_nonstandard_numeric_constants(self):
+        for token in ("NaN", "Infinity", "-Infinity"):
+            for stdin in (False, True):
+                with self.subTest(token=token, stdin=stdin):
+                    result = self._run_dashboard(self._snapshot_json_with_number(token, 2), stdin)
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn("dashboard error:", result.stderr)
+                    self.assertNotIn("Traceback", result.stderr)
+
+    def test_dashboard_loaders_preserve_finite_numbers_and_large_integers(self):
+        tokens = ("0.0", "-0.0", "1.25", "-2.5e-3", "5e-324",
+                  "1.7976931348623157e308", "-1.7976931348623157e308", "9" * 1000)
+        for token in tokens:
+            for stdin in (False, True):
+                with self.subTest(token=token, stdin=stdin):
+                    encoded = self._snapshot_json_with_number(token, 2)
+                    with self._snapshot_source(encoded, stdin) as source:
+                        snapshot = load_snapshot(source)
+                    value = snapshot["events"][0]["payload"]["value"]["nested"][0]["nested"][0]
+                    expected = json.loads(token)
+                    self.assertIs(type(value), type(expected))
+                    if isinstance(expected, float):
+                        self.assertEqual(value.hex(), expected.hex())
+                    else:
+                        self.assertEqual(value, expected)
+                    self.assertIn("NEXUS RECOVERY DASHBOARD", render_dashboard(snapshot))
+
+    def test_dashboard_cli_accepts_finite_boundary_and_common_numbers(self):
+        for token in ("1.7976931348623157e308", "-1.7976931348623157e308", "1.25", "-2.5e-3"):
+            for stdin in (False, True):
+                with self.subTest(token=token, stdin=stdin):
+                    result = self._run_dashboard(self._snapshot_json_with_number(token, 2), stdin)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn("NEXUS RECOVERY DASHBOARD", result.stdout)
+                    self.assertEqual(result.stderr, "")
+
+    def test_dashboard_numeric_tokens_beyond_decoder_depth_fail_operationally(self):
+        # Numeric hooks do not replace the native decoder's recursion boundary.
+        depth = max(10000, sys.getrecursionlimit() + 100)
+        for token in ("1.25", "1e400", "-1e400"):
+            encoded = "[" * depth + token + "]" * depth
+            for stdin in (False, True):
+                with self.subTest(token=token, stdin=stdin):
+                    with self._snapshot_source(encoded, stdin) as source:
+                        with self.assertRaises(RecursionError):
+                            load_snapshot(source)
+                    result = self._run_dashboard(encoded, stdin)
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn("dashboard error:", result.stderr)
+                    self.assertNotIn("Traceback", result.stderr)
 
     def test_nonfinite_metrics_are_rejected_and_json_export_is_strict(self):
         for value in (float("inf"), float("-inf"), float("nan")):

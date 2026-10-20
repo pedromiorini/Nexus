@@ -3,17 +3,39 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 309
+tests: 316
 bandit_low: 131
 -->
 
-## Fronteira CLI do dashboard: recursão do decoder — 2026-10-20
+## Composição validada localmente sobre a PR #58 — 2026-10-20
+
+Base comum remota `d435083bb4c893a58128cee6cfa00f65bba7fe02`; pai do candidato `fef00882baf19694fe04956d82af096f266ae2d3` (head da #58 OPEN/DRAFT), acrescido somente do diff de overflow `af4f489889fd914e4316bd099a680dad26e47e71` e do contrato da interação. A captura CLI de `RecursionError` e seus seis testes permanecem; os dois loaders agora rejeitam float que decodifica para infinito e constantes não JSON, sem alterar valores finitos nem bridge/schema/writer/profundidade. Worktree `/workspace/Nexus-diagnostics-combined-pr58-20261020`, branch `fix/diagnostics-combined-pr58-local-20261020`.
+
+Evidência nova da árvore combinada: red com 26 testes/32 falhas de subcasos antes dos hooks; green 26/26 em Python 3.11.16 e 3.12.3. Suíte ampla 3.11: **316 executados, 314 aprovados, 2 skips NetworkX, 0 falhas/XPASS**; integração **30 aprovados e 1 skip FAISS**, sem conflitos/ausências/inesperados. Mutação versionada **63/63 mortas** e contraprova externa de recursão **1/1 morta**, em campanhas separadas e sem timeout. Ao remover a captura, reaparecem 2 erros CLI e 6 falhas da interação; baseline e composição intacta passam. Cobertura passou todos os pisos: fila 95%, VRAM 94%, temporal 93%, Vita 76%, núcleo 68%; dashboard 96% informativo.
+
+Compile/Ruff/actionlint/zizmor offline, segurança e auditorias pertinentes passaram; Bandit **131 LOW, nenhum MEDIUM/HIGH/erro de análise**, sem clearance de segurança. Regressão explícita dos auditores/manifesto 38/38; relatórios de realidade sem drift. Comandos exatos, hashes, artefatos e limites estão na seção de composição de `CONTINUATION.md` e em `/workspace/nexus-diagnostics-combined-evidence-20261020`. Resultados abaixo são históricos de árvores isoladas, não resultados combinados.
+
+Não há novo limite de recursos/profundidade nem mudança da precisão/underflow do float. O decoder pode falhar por recursão antes de alcançar qualquer token; callers diretos preservam essa exceção e a CLI a converte em erro operacional. Suíte ampla/mutação somente em 3.11; 3.12 focado. Sem benchmarks novos, CI hospedada, atestação operacional fabricada, push, alteração de PR, merge ou mudança das fontes/main/checkout sujo. Hash do commit e revisão final no handoff externo.
+
+## Histórico da PR #58 isolada — fronteira CLI do dashboard: recursão do decoder — 2026-10-20
 
 Base exata `d435083bb4c893a58128cee6cfa00f65bba7fe02`; candidato local na branch `fix/diagnostics-recursion-error-20261020`. O red registrou dois `RecursionError` escapando de `main` (arquivo e stdin). A captura adicional transforma ambos em exit 2, stdout vazio e stderr iniciado por `dashboard error:`, sem traceback; `load_snapshot` e o parser permanecem inalterados. Os seis novos contratos também preservam propagação direta e snapshots válidos rasos nos dois caminhos.
 
 Evidência local: 19/19 contratos em Python 3.11.16 e 3.12.3; suíte completa em 3.11 com 309 executados, 307 aprovados e 2 skips NetworkX; integração 30 aprovações/1 skip FAISS; mutation existente 58/58 mortas e mutante específico adicional 1/1 morto. Ruff/compile/lint de workflows/auditorias pertinentes passaram, sem drift dos relatórios de realidade; Bandit 131 LOW, nenhum MEDIUM/HIGH. Cobertura acima de todos os pisos existentes. Comandos exatos, hashes funcionais, localização dos logs e limitações estão na seção correspondente de `CONTINUATION.md`; hash do commit final no handoff externo, não autorreferente.
 
 Limite: não há novo teto de profundidade nem garantia de recursos; a fixture profunda foi ajustada para ultrapassar também o limite C do Python 3.12, enquanto o caso exato de 2.000 arrays foi confirmado em subprocessos 3.11. Sem claims de capacidade ou segurança geral, novos benchmarks ou execução de CLIs de benchmark; nenhuma publicação/CI hospedada nesta rodada.
+
+## Histórico da branch-fonte isolada — overflow de float no carregador do dashboard — 2026-10-20
+
+> Evidência histórica exclusiva de `af4f489889fd914e4316bd099a680dad26e47e71`, sobre `d435083bb4c893a58128cee6cfa00f65bba7fe02`; não representa a composição sobre a #58 nem seus resultados atuais. Referências a “esta branch” abaixo descrevem somente a branch-fonte original.
+
+- **Base/isolamento:** `d435083bb4c893a58128cee6cfa00f65bba7fe02`, confirmada por `git ls-remote origin refs/heads/main`; branch independente `fix/diagnostics-float-overflow-20261020`, worktree `/workspace/Nexus-diagnostics-float-overflow-20261020`, criada limpa diretamente nessa base. Nenhum cherry-pick da PR #58 nem alteração das outras worktrees.
+- **Correção de contexto confirmada:** `gh pr view <n> --repo pedromiorini/Nexus --json number,baseRefName,headRefName,headRefOid,files` para #52–#58 mostrou que #52–#57 não tocam dashboard/teste de recovery; #58 **toca ambos**, com head `fef00882baf19694fe04956d82af096f266ae2d3`. Essa PR e seus refs/conteúdo permanecem preservados. #57 toca `tools/targeted_mutation.py`: os novos mutantes desta branch também exigirão reconciliação futura nesse arquivo, além dos ledgers compartilhados.
+- **Fato/red:** tokens JSON sintaticamente válidos `1e400` e `-1e400`, em `events[].payload` e contêineres alternados dict/list, eram decodificados como infinitos. Antes do patch, `PYTHONPATH=. <PY> -m unittest -v test_recovery_diagnostics_contract` executou 19 testes e registrou 32 falhas de subcasos nos runtimes Python 3.11.16 e 3.12.3: 12 de overflow nos loaders, 8 na CLI e 12 de constantes não padrão. Controles finitos já passavam. A base indicada não configurava `parse_constant` no dashboard; a rejeição prévia do bridge para strings não protegia esse caminho de leitura.
+- **Contrato/green:** `parse_float` converte com `float` e rejeita resultado não finito antes de entregar qualquer snapshot; `parse_constant` rejeita `NaN`, `Infinity`, `-Infinity`. Ambos os hooks são configurados em arquivo e stdin. São preservados o tipo/valor dos floats finitos, sinal de zero, subnormal, `1.7976931348623157e308` e seu negativo, valores comuns e inteiro de 1.000 dígitos. O hook independe da profundidade no domínio que o decoder nativo consegue processar; não há travessia pós-decode nem teto novo de profundidade, tamanho, precisão ou inteiros. Schema, bridge, writer e saída para entrada válida não mudam.
+- **Regressões:** seis novos testes cobrem overflow positivo/negativo nas profundidades adicionais 0, 1 e 32 em ambos os loaders; subprocessos reais da CLI confirmam exit 2, stdout vazio, stderr com diagnóstico e sem traceback; controles finitos em arquivo/stdin confirmam exit 0 e stderr vazio. O mesmo comando focado passou 19/19 em 3.11 e 3.12 depois da correção.
+- **Revisão independente focada:** nenhum bloqueio encontrado na fronteira numérica. A captura de `RecursionError` da #58 é semanticamente ortogonal; uma integração futura deverá preservar essa captura e combinar os testes sobrepostos. Ela não foi copiada para esta branch. Limite: esta revisão não atesta segurança geral nem integração já realizada.
+- **Validação ampla, comandos, hashes e limitações:** registrados na rodada correspondente de `CONTINUATION.md`; resultados são locais, não checks hospedados. Os marcadores de contagem foram sincronizados nos quatro documentos canônicos, sem alterar disposições de segurança ou reescrever histórico.
 
 Snapshot histórico: manifesto `nexus-state-manifest` do commit `5b8bed8125002e25eb066620af67d3a65d44e59f` (CI run `38907987512`), com 200/200 testes `unittest`, 31 verificações integradas inventariadas (30 aprovadas, 1 ignorada por FAISS opcional ausente e 0 falhas) e 131 achados Bandit LOW (0 MEDIUM/HIGH). Esse snapshot e os resultados locais do benchmark v1 não representam o estado atual.
 A PR #24 partiu do `main` pós-PR #23 (`e3cc760597aa1782aef9879a8f88ee6f48032348`) e foi mesclada em `main` como `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`; os dois checks oficiais passaram. Seus resultados locais de 240/240 testes permanecem históricos; a branch seguinte registra a nova validação em seção própria.

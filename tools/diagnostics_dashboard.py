@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -14,10 +15,24 @@ from typing import Any
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
 
 
+def _parse_finite_float(token: str) -> float:
+    value = float(token)
+    if not math.isfinite(value):
+        raise ValueError("JSON float must decode to a finite value")
+    return value
+
+
+def _reject_json_constant(token: str) -> None:
+    raise ValueError(f"non-standard JSON constant: {token}")
+
+
 def load_snapshot(source: str) -> Any:
     if source == "-":
-        return json.load(sys.stdin)
-    return json.loads(Path(source).read_text(encoding="utf-8"))
+        return json.load(sys.stdin, parse_float=_parse_finite_float, parse_constant=_reject_json_constant)
+    return json.loads(
+        Path(source).read_text(encoding="utf-8"),
+        parse_float=_parse_finite_float, parse_constant=_reject_json_constant,
+    )
 
 
 def render_dashboard(snapshot: Any) -> str:
