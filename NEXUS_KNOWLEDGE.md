@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 307
 bandit_low: 131
 -->
 

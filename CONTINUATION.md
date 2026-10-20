@@ -3,11 +3,23 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 307
 bandit_low: 131
 -->
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
+
+## Rodada local — duplicatas no resumo integrado — 2026-10-20
+
+- **Base exata:** `d435083bb4c893a58128cee6cfa00f65bba7fe02`; branch `fix/integrated-summary-duplicates-20261020`, worktree exclusiva `/workspace/Nexus-integrated-summary-duplicates-20261020`. O checkout sujo `/workspace/Nexus`, a referência `/workspace/Nexus-audit-json-preflight-20261019` e as demais worktrees foram preservados. Nenhum fetch, push, PR, merge ou alteração de `main`.
+- **Contrato:** cada ocorrência terminal reconhecida de PASS/SKIP incrementa a contagem do ID. Mais de uma ocorrência, inclusive PASS/SKIP mistos ou IDs inesperados, aparece uma única vez na lista ordenada `duplicates` e força `result=failed`. `passed`, `skipped`, `missing`, `unexpected`, `conflicting`, regexes, schema 1 e retransmissão original permanecem como antes. Chamadas repetidas a `build_summary` não contam novamente o buffer consumido.
+- **Antes/depois:** `$PY -m unittest -v test_integrated_suite_summary.py`: baseline original 6/6; regressões sobre implementação original: 10 testes, 2 falhas por resultado incorretamente `passed` (PASS repetido e SKIP repetido), 5 erros de ausência do novo campo. Após correção: os 10 contratos passam; com `test_state_manifest.py test_test_summary.py`, 18/18. Quatro métodos novos cobrem combinações terminais, IDs inesperados/fracionários, ordenação, chunks, ausência de newline final, idempotência, JSON e stream intacto.
+- **Ambiente local:** `PY=/tmp/nexus-ci311/bin/python` (3.11.16), `PYTHONPATH=.`, `NEXUS_AUDIT_DB=/workspace/nexus-summary-duplicates-evidence-20261020/audit.sqlite3`, `COVERAGE_FILE=/workspace/nexus-summary-duplicates-evidence-20261020/.coverage`. Ambiente já disponível, sem reinstalar lock.
+- **Gates e comandos reais:** `$PY -m coverage run --branch -m unittest discover -p 'test_*.py'` e `$PY tools/test_summary.py --output /workspace/nexus-summary-duplicates-evidence-20261020/test-summary.json`: ambos executaram 307 testes, 305 aprovados, 2 skips NetworkX opcional ausente, 0 falhas/XPASS. `NEXUS_INTEGRATED_SUMMARY=/workspace/nexus-summary-duplicates-evidence-20261020/integrated-summary.json $PY -m coverage run --append --branch core/constitutional_brain.py`: 31 IDs esperados, 30 passes e 1 skip FAISS opcional; missing/unexpected/conflicting/duplicates vazios, exit 0.
+- **Cobertura:** `$PY -m coverage report --include='<arquivo>' --fail-under=<limite>` aprovou fila 95% (>=90), VRAM 94% (>=90), temporal 93% (>=90), Vita 76% (>=70) e núcleo 68% (>=62). Arquivo afetado `core/integrated_suite_summary.py`: 99%; cobertura não é prova de completude semântica.
+- **Demais gates:** `python -m ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py` e `$PY -m compileall -q core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py` aprovados; `$PY tools/targeted_mutation.py`: 58/58 mortos, 0 sobreviventes/não aplicados (mutações preexistentes, não específicas do tally). `$PY -m bandit -r core vita tools -f json -o /workspace/nexus-summary-duplicates-evidence-20261020/bandit-report.json`: 131 LOW, 0 MEDIUM/HIGH, 0 erros; triagem `tools/security_triage.py ... SECURITY_TRIAGE.md --check` aprovada, assim como `tools/embedded_assert_audit.py` e `tools/implementation_gap_audit.py`. `$PY tools/reality_audit.py` seguido de `git diff --exit-code -- AUDIT_REALITY_REPORT.md audit_reality.json`: relatórios inalterados. `git diff --check`: aprovado.
+- **Documentação:** os quatro marcadores estruturados passam de 303 para 307 testes efetivamente executados. Não foi fabricado manifesto com `gates_status=success` nem run hospedado. Gates de workflow não modificado e instalação de dependências não foram repetidos. Não foram executadas CLIs de benchmarks, sondas sintéticas ou trabalho separado de WorldModel; os contratos preexistentes continuam incluídos na suíte completa.
+- **Revisão e limite do consumidor:** revisão independente somente leitura não encontrou bloqueios. `tools/state_manifest.py` ainda classifica um resumo cuja única causa de falha seja duplicidade como `invalid_summary`, em vez de atribuir contagem explícita a duplicatas. Continua fail-closed: o auditor operacional rejeita esse estado e o runner integrado já sai com erro por `result=failed`; o gerador isolado de manifesto não garante exit não zero. Atualizar esse consumidor/mensagem de erro do demo fica fora desta correção mínima. Evidências brutas e script reproduzível: `/workspace/nexus-summary-duplicates-evidence-20261020/`. O hash do commit local final é entregue externamente para evitar autorreferência.
 
 ## Rodada local — gatilho de PR para qualquer destino — 2026-10-19
 
