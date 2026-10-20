@@ -8,16 +8,18 @@ O Nexus Constitutional é um **protótipo experimental de arquitetura neuro-simb
 
 > Nomes de módulos, banners de execução e testes de demonstração não constituem prova de inteligência geral, consciência ou prontidão para produção.
 
-## Evidências atualmente verificadas
+## Evidências locais da composição — 2026-10-18
+
+Resultados medidos no candidato `3ddc68d06853ba211bb6c04a02743565c28bd19c`, branch `audit/consolidated-38-45-20261018`, em Python 3.11.16 com o lock instalado com hashes. Inventário, comandos, ambiente e limites estão em [AUDIT_COMPOSITION.md](AUDIT_COMPOSITION.md#evidência-combinada); logs e manifesto desse commit estão em `/workspace/nexus-consolidation-evidence/`. Esta é uma validação local (`ci_run=not_ci`), não uma execução de CI remoto nem o estado publicado de `main`.
 
 | Área | Evidência | Limite da afirmação |
 |---|---|---|
-| Núcleo constitucional | O manifesto do CI de `main` no commit `5b8bed8` registrou 31 verificações integradas: 30 aprovadas e 1 ignorada pela ausência opcional de FAISS; nenhuma falhou | São verificações do próprio projeto, não uma avaliação externa de capacidade geral |
-| Fila de tarefas adiadas | 21 testes unitários e de integração | Cobre contratos da fila e reprocessamento, não carga distribuída de produção |
+| Suíte combinada e núcleo | 416 testes executados e aprovados, sem falhas ou skips; separadamente, 31 verificações integradas: 30 aprovadas e 1 ignorada pela ausência opcional de FAISS | São verificações do próprio projeto, não uma avaliação externa de capacidade geral |
+| Fila de tarefas adiadas | Contratos de fila, reprocessamento, snapshot e atomicidade incluídos na suíte combinada; arquivos `test_deferred_task_queue.py`, `test_deferred_task_snapshot.py` e `test_consolidated_pr_contract.py` | Não estabelece carga distribuída de produção nem entrega exatamente uma vez |
 | Diagnóstico de recuperação | Exportação versionada `nexus.recovery.diagnostics.v1` e validador formal | O schema garante estrutura, não a correção de decisões cognitivas |
 | Auditoria Vita | Eventos, transições e métricas persistidos em SQLite | A análise é local e limitada ao histórico disponível |
-| CI | Workflow executa lint (ruff, actionlint, zizmor), compilação, testes de contrato e regressão, suíte integrada, cobertura com pisos, mutation testing (58 mutantes escolhidos; o score vale só para eles) e auditorias de segurança e de realidade, com ações fixadas por SHA; o gate usa Python 3.11 | A execução depende do ambiente e das dependências instaladas no runner |
-| Cobertura | Relatório combinado de linhas e branches (testes + suíte integrada) é retido por 14 dias; pisos de cobertura total por arquivo: fila 90%, guard de VRAM 90%, ledger temporal 90%, bridge Vita 70%, núcleo 62% | Cobertura não substitui testes de propriedades, segurança ou mutation testing |
+| Gates locais e workflow | Lint, compilação, contratos, integração, cobertura e auditorias aprovados localmente; mutação canônica: 84/84 mortas, sem sobreviventes ou inconclusivas; suplemento VRAM externo: 10/10 mortas, separado do catálogo canônico | O score vale somente para os mutantes escolhidos; o suplemento não é uma etapa do workflow e nenhum CI remoto foi executado para este candidato |
+| Cobertura | Cobertura combinada de linhas e branches medida localmente: fila 91%, guard de VRAM 94%, ledger temporal 94%, bridge Vita 76%, núcleo 69%; pisos respectivos 90/90/90/70/62% | Cobertura não substitui testes de propriedades, segurança ou mutation testing; a retenção de 14 dias é política do workflow remoto, não destes logs locais |
 
 ## Componentes principais
 
@@ -49,11 +51,35 @@ Use Python 3.11 (a versão verificada no CI). Python 3.12 e 3.13 podem funcionar
 
 ```bash
 python3 -m pip install -r requirements.txt      # execução (numpy)
-python3 -m pip install -r requirements-dev.txt  # testes e CI local (hypothesis, coverage, bandit, ruff...)
+python3 -m pip install -r requirements-dev.txt  # desenvolvimento/testes, incluindo NetworkX
 export PYTHONPATH=.
 python3 -m unittest discover -v -p 'test_*.py'  # todos os testes
 python3 core/constitutional_brain.py            # suíte integrada embutida (recusa python -O)
 python3 tools/reality_audit.py                  # regenera os relatórios de realidade
+```
+
+### Perfis de dependências
+
+`requirements.txt` contém somente o runtime obrigatório (`numpy>=1.26,<3`).
+`requirements_constitutional.txt` é um alias desse perfil, não uma lista independente.
+NetworkX, psutil, faiss-cpu e sentence-transformers continuam opcionais em execução;
+não são vendorados. Para ativar somente o backend de grafos, use `python3 -m pip install networkx`.
+
+`requirements-ci.in` herda o runtime e fixa as dependências diretas de testes e gates.
+`requirements-dev.txt` herda esse mesmo perfil, incluindo NetworkX para executar seus
+contratos localmente, e acrescenta zizmor (mesma versão do binário usado no CI).
+actionlint continua sendo um binário externo ao pip, com versão e SHA-256 no workflow.
+Sem NetworkX, os dois contratos específicos desse backend são pulados; os contratos
+independentes do backend continuam disponíveis no runtime mínimo.
+
+O CI instala `requirements-ci.lock` com `--require-hashes`; o lock inclui as dependências
+transitivas e deve ser regenerado quando o perfil compartilhado ou o runtime mudar:
+
+```bash
+uv pip compile --generate-hashes --python-version 3.11 \
+  --output-file requirements-ci.lock requirements-ci.in
+python3 -m pip install --require-hashes -r requirements-ci.lock  # reproduzir o ambiente Python do CI
+python3 -m unittest -v test_dependency_profiles_contract.py test_knowledge_graph_contract.py
 ```
 
 Os traces de depuração do núcleo ficam silenciosos por padrão; defina `NEXUS_DEBUG=1` para vê-los. `NEXUS_AUDIT_DB` define o caminho do banco de auditoria Vita (padrão: `nexus_audit.sqlite3` no diretório atual).
@@ -73,9 +99,11 @@ O diagnóstico inclui severidade, eventos analisados, pausas, recuperações, ta
 
 ## Snapshot da fila de tarefas adiadas
 
-A `DeferredTaskQueue` expõe `export_snapshot(as_json=True)` e `restore_snapshot(snapshot, replace=False)` para transportar tarefas pendentes entre processos ou pontos de recuperação. O contrato é versionado como `nexus.deferred_task_queue.v1` e preserva prioridade, contexto, tentativas, razão, IDs e ordem de criação. A restauração valida o payload inteiro antes de alterar a fila, rejeita schema incompatível, IDs duplicados, tipos inválidos e excesso de capacidade, e não executa processadores ou callbacks.
+A `DeferredTaskQueue` expõe `export_snapshot(as_json=True)` e `restore_snapshot(snapshot, replace=False)` para transportar tarefas pendentes entre processos ou pontos de recuperação. O contrato é versionado como `nexus.deferred_task_queue.v1` e preserva prioridade, contexto, tentativas, razão, IDs e ordenação da fila. A restauração valida o payload inteiro e prepara heap, índice e estatísticas temporários antes de publicar o novo estado; não executa processadores ou callbacks.
 
-Os contextos são copiados nas fronteiras de exportação e restauração para evitar referências mutáveis compartilhadas. Timestamps devem ser finitos; na restauração, contextos precisam ser serializáveis como JSON estrito; limites e contadores devem usar inteiros não negativos (`bool` não é aceito como inteiro do contrato). Snapshots inválidos são rejeitados sem alterar o estado da fila, inclusive com `replace=True`.
+Contextos são aceitos somente como árvores JSON nativas: dicionários/listas nativos, chaves string recursivas, escalares JSON e números finitos. Tuplas, subclasses de contêiner, chaves não string, ciclos e objetos arbitrários são rejeitados tanto no export (objeto e JSON) quanto no restore, antes de copiar ou alterar a fila; as cópias nas fronteiras não compartilham referências mutáveis com a fila ou com o snapshot. Fora de `context`, raiz e registros de tarefa aceitam campos extras somente com chaves `str` built-in; seus valores são ignorados, sem traversal, `deepcopy`, validação ou cópia para tarefas internas. `statistics` exige exatamente `enqueued`, `retried`, `completed` e `discarded`, com valores inteiros built-in não negativos. Todas as chaves de raiz, tarefa e estatísticas são verificadas como `str` exato antes de lookup/membership; JSON textual rejeita chaves duplicadas em todos os objetos. Envelopes/registros ainda aceitam subclasses de `dict`/`list`, copiadas por métodos base. Os campos escalares exigem tipos built-in exatos: texto usa `str`, limites/prioridades/tentativas/contadores usam `int`, timestamps usam `int` ou `float` finitos; subclasses escalares e `bool` são rejeitados antes de comparação/operação ou construção de tarefa. Uma tarefa pendente precisa ter `attempts < max_attempts`.
+
+`replace=False` incorpora as tarefas pendentes e mantém os contadores do destino; `replace=True` substitui tarefas e importa os quatro contadores do snapshot. Falhas durante a preparação preservam integralmente o estado anterior em ambos os modos. `max_size` limita a quantidade de tarefas pendentes, não bytes nem profundidade do contexto: não foi introduzido um teto de payload nesta versão, então o chamador deve controlar o tamanho dos snapshots conforme seus recursos. Em aninhamentos extremos, o parser/encoder JSON padrão ainda pode rejeitar a entrada ao atingir seu limite de recursão.
 
 Esse recurso **não é persistência física em disco**, não oferece locking distribuído e não garante entrega exatamente uma vez. O consumidor deve armazenar o JSON, controlar concorrência e decidir quando usar `replace=True` para substituir uma fila em memória. Exemplos mínimos:
 

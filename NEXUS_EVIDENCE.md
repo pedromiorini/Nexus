@@ -3,9 +3,35 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
-bandit_low: 131
+tests: 416
+bandit_low: 135
 -->
+
+## Estado canônico da composição local — 2026-10-18
+
+Candidato isolado em `audit/consolidated-38-45-20261018`, baseado exatamente em
+`812ebd02b0c82ecc3169d620e36d25592b1d6727` (`origin/main` local inventariado).
+Inclui os heads exatos das PRs #38–#45 por merges locais; não é um merge em
+`main`, publicação ou execução de CI remoto. #12–#14 ficam fora: #41 já alinha
+os perfis e o lock, e nenhum dos três bumps é dependência funcional obrigatória.
+Inventário, contratos, comandos, resultados e plano seguro: [AUDIT_COMPOSITION.md](AUDIT_COMPOSITION.md).
+
+Os registros abaixo de outras branches/rodadas são **históricos**, não resultados
+da composição. Os marcadores atuais refletem somente a suíte combinada; `HEAD`
+é resolvido pelo manifesto pós-commit, com `ci_run=not_ci`. Não somar contagens
+isoladas nem atribuir evidência sintética a capacidade geral.
+
+## Histórico: integração VRAM isolada — evidência local de 2026-10-18
+
+Base `812ebd02b0c82ecc3169d620e36d25592b1d6727`; branch `fix/vram-integrated-2026-10-18`; SHA do commit de implementação integrada (código/testes) `9b657011d0b0b0eec61fad53b3d353717c109e4d`. Esse não é o hash do checkpoint documental: o follow-up dos registros é um commit posterior, identificado pelo `HEAD` do branch e pelo manifesto pós-commit em `/workspace/nexus-vram-integrated-evidence/STATE_MANIFEST.json`. Composição dos patches `4073eb298cb5fe0b3ca1db58a1b38d91c330afbb` e `41bb57143152486588c1b15431b879849ab2ecb0` (origem documental final `985917446f25c79d526c9ba2aca7f5d33187dd5d`), sem modificar/publicar as origens. Os resultados abaixo foram medidos juntos, não somados a partir de relatórios isolados.
+
+**Contrato:** rejeitar booleanos em ambos os limites com `TypeError`; nos três counters, exigir inteiro built-in não negativo, rejeitando tipos com `TypeError` e negativos com `ValueError` antes de decisão/telemetria. Preservam-se limiares inclusivos, valores válidos, zeros, indisponibilidade e timestamp. Na base, os testes combinados produziram 145 falhas de subteste e 7 erros em 19 testes; com os dois patches, 19/19 passaram.
+
+**Execução combinada:** 310/310 unittest, zero falhas/skips/XPASS; integração 30 aprovados + 1 skip FAISS; cobertura branch fila/VRAM/temporal/Vita/núcleo 95/94/93/76/68%, acima de 90/90/90/70/62. Mutation canônico 58/58 e suplementar externo 10/10 mortos, zero sobreviventes/não aplicados. Bandit 131 LOW, zero MEDIUM/HIGH; triagem, B101, gaps, realidade sem diff, lint, compilação, actionlint/zizmor e dry-run de requisitos passaram. Benchmarks herdados: v1 preserva `unsupported_interface`; v2 128/128 dentro de `1e-12`, erro máximo `2.7755575615628914e-16`, 4/4 controles rejeitados. Comandos, seed, taskset hash, ambiente e limites em `CONTINUATION.md`; logs em `/workspace/nexus-vram-integrated-evidence/`. Manifesto/consistência são regenerados após commit, sem atribuir CI remoto (`not_ci`).
+
+**Comparação histórica:** limites isolados 305 executados (303 aprovados + 2 skips NetworkX) / 14 VRAM; counters isolados 308/308 / 17 VRAM; combinado 310/310 / 19 VRAM com NetworkX presente. Métricas arredondadas de cobertura, integração, mutation canônico e Bandit permanecem iguais; suplemento cresce de 7 para 10 mutantes. Não houve reexecução ou mudança das origens.
+
+**Limites:** somente validação na construção; sem imutabilidade, validação pós-atribuição, coerência física dos counters ou proteção contra Python hostil. Sem GPU real, sem mudança CUDA/mitigação e sem nova política geral dos outros tipos numéricos dos limites. Python 3.12.3 local, não 3.11 de CI. Checks sintéticos internos, Bandit e revisão focal não estabelecem capacidade geral nem segurança de produção. Histórico abaixo permanece histórico.
 
 Snapshot histórico: manifesto `nexus-state-manifest` do commit `5b8bed8125002e25eb066620af67d3a65d44e59f` (CI run `38907987512`), com 200/200 testes `unittest`, 31 verificações integradas inventariadas (30 aprovadas, 1 ignorada por FAISS opcional ausente e 0 falhas) e 131 achados Bandit LOW (0 MEDIUM/HIGH). Esse snapshot e os resultados locais do benchmark v1 não representam o estado atual.
 A PR #24 partiu do `main` pós-PR #23 (`e3cc760597aa1782aef9879a8f88ee6f48032348`) e foi mesclada em `main` como `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`; os dois checks oficiais passaram. Seus resultados locais de 240/240 testes permanecem históricos; a branch seguinte registra a nova validação em seção própria.
@@ -25,6 +51,7 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Atenção bottom-up | parcial/verificado no contrato | contraste e movimento opcionais, saliência limitada e fallbacks testados | sem sinais observados, usa heurística; não é percepção biológica |
 | Integração/orquestração | parcial/verificado no contrato | média de sinergia calculada sobre integrações registradas | score individual ainda é heurístico por nomes; não demonstra inteligência emergente |
 | Grafo de conhecimento | parcial/verificado no contrato | entidades únicas por ID, média de confiança e índice de tipo consistente | sem consistência distribuída ou validação externa do conhecimento |
+| Ledger temporal | verificado nos contratos; integração proposta nesta branch | janelas semiabertas, `known_at`, correções retroativas, replay/hash-chain e mapeamento opt-in de relações com proveniência | ainda sem persistência SQLite ou ingestão automatizada das alegações documentais; sem transação distribuída com o grafo |
 | Planejamento MCTS | parcial/verificado no contrato | `None` usa ações padrão e lista vazia permanece vazia | recompensas e rollouts continuam heurísticos; não é prova de planejamento geral |
 | Telemetria | parcial/verificado | Vita, audit log SQLite serializado e guard de VRAM | dependente do ambiente; sem locking distribuído ou exactly-once |
 | Segurança | parcial | Bandit 131 LOW, triagem, auditorias AST e testes negativos | não substitui threat model ou revisão manual completa |
@@ -32,6 +59,13 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Benchmark sintético | verificado localmente nos protocolos v1 e v2 | v1 preserva as métricas composicional/causal/incerteza; v2 mede 128 modelos explícitos, erro absoluto máximo `2,7756e-16`, 128/128 casos dentro de `1e-12` e 4/4 controles inválidos rejeitados | trilha POMDP do v1 continua não suportada; v2 não aprende modelos nem escolhe políticas; não valida teorias cognitivas |
 | Autonomia geral | não demonstrada | nenhuma evidência válida no repositório | não fazer esse claim |
 | AGI/ASI/consciência | não demonstradas | explicitamente negadas pela documentação | nomes e banners não contam como evidência |
+
+## Integração temporal opt-in do grafo — validação local em 2026-10-17
+
+- `RealKnowledgeGraph` aceita um `TemporalFactStore` opcional. Quando fornecido, `add_relation` mapeia origem/tipo/destino, confiança, fonte e `valid_from`; predicados funcionais não são inferidos e precisam estar declarados no store.
+- O registro temporal ocorre antes de criar nós ou alterar índices, rejeições não deixam estado parcial no grafo, e `properties` não é serializado implicitamente como metadata. As projeções e `find_relations` legados continuam preservados.
+- Evidência: 309/309 testes unittest; suíte integrada 30 aprovados + 1 skip opcional; contratos focados 11/11; cobertura 100% em linhas e branches de `RealKnowledgeGraph.__init__` e `add_relation`; 62/62 mutantes direcionados mortos; Ruff passou. Os checks oficiais do run `39015023676` passaram 2/2 no commit de implementação `865063d21de9e986f9a502a790bfac2b68f7f801`; consulte a PR #38 para o estado do HEAD mais recente.
+- A fonte literal de cada fato ainda é fornecida pelo chamador; esta mudança não importa automaticamente medições do resumo de CI para o ledger. Persistência SQLite é a próxima etapa separada.
 
 ## Verificação local da branch de correção — 2026-10-16
 
@@ -202,3 +236,15 @@ Correção: `search_episodes` rejeita bool e tipos não inteiros com `TypeError`
 `test_episodic_memory_search_limits_contract.py` cobre limites negativos nos dois ramos de query e prova ausência de SQL, rejeição de bool/float/string/None, zero sem consulta e preservação de limite positivo. Validação final: 11/11 contratos episódicos focados e unittest 275/275; integração 30 aprovados + 1 skip FAISS opcional; cobertura 95/94/76/68%; mutation 58/58 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW e nenhum MEDIUM/HIGH. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e benchmarks oficiais passaram. O POMDP v2 obteve 128/128 casos dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e rejeitou 4/4 controles inválidos. O relatório de realidade foi regenerado para refletir as sete linhas acrescentadas ao núcleo.
 
 Fonte normativa: [SQLite Language Reference — SELECT, seção LIMIT](https://www.sqlite.org/lang_select.html), que especifica que um LIMIT negativo não estabelece teto para as linhas retornadas.
+
+## Hardening das fronteiras de snapshot da fila — validação local, 2026-10-17
+
+Base: branch `fix/queue-snapshot-hardening-2026-10-17`, derivada de `origin/main` em `812ebd02b0c82ecc3169d620e36d25592b1d6727`. A versão `nexus.deferred_task_queue.v1` e as assinaturas públicas foram mantidas.
+
+A inspeção e as regressões no checkout limpo confirmaram que isolamento de contexto aninhado, rejeição de timestamps NaN/±Infinity e rejeição de `bool` nos campos inteiros já funcionavam; esses defeitos alegados não foram tratados como atuais. Foram reproduzidas as lacunas reais: estatísticas com chaves extras podiam contaminar os contadores internos; `attempts == max_attempts` era aceito como pendência; a validação via `deepcopy` podia executar `__deepcopy__` de um objeto arbitrário; e uma falha injetada no segundo `heappush` deixava restore parcialmente aplicado. Revisões posteriores reproduziram TOCTOU de `task_id`, subclass `int` de `priority` executando `__neg__`, e `__eq__` de chaves não-string colidentes executado por lookup/membership em raiz/tarefas antes da rejeição (um hook em raiz; dois em tarefa). As regressões agora confirmam zero hooks e estado intacto nos dois modos. A decisão final preserva extras de raiz/tarefa com chaves built-in `str`, ignorando seus valores (incluindo object/inf) sem `deepcopy` ou propagação interna; estatísticas continuam com conjunto exato de quatro chaves. JSON textual com duplicatas foi aceito antes da correção; agora `object_pairs_hook` rejeita duplicatas em todos os níveis, inclusive dentro de `context`. `enqueue()` ainda usa `deepcopy`, assunto fora do escopo desta mudança.
+
+A correção valida e copia árvores JSON nativas iterativamente, rejeita constantes JSON não padronizadas e chaves JSON duplicadas, exige chaves built-in `str` antes de qualquer lookup/membership, mantém extras de raiz/tarefa string-key sem inspecionar seus valores, exige estatísticas com exatamente quatro contadores inteiros built-in não negativos, e usa tipos exatos para campos escalares. Heap, índice, IDs em voo e contadores são montados temporariamente; extras ignorados não são propagados a tarefas internas e a troca de referências acontece só ao fim. `replace=False` preserva os contadores do destino; `replace=True` importa os do snapshot. Não foi adicionado teto de bytes ou profundidade.
+
+Validação factual: `PYTHONPATH=. coverage run --branch -m unittest discover -p 'test_*.py'` executou 318 testes, com 316 aprovados, 2 skips por NetworkX opcional ausente e nenhuma falha; cobertura branch de `core/deferred_task_queue.py`: 91%. Os contratos de fila e snapshot passaram 51/51 tanto em Python 3.12.3 como em Python 3.11.16; nesta última versão, NumPy 2.4.6 foi usado somente em `/tmp` para permitir importar o roteador. A suíte integrada embutida passou 30 checks, ignorou 1 check opcional de FAISS e não teve faltantes. `compileall` passou em Python 3.12.3 e nos três arquivos alterados em Python 3.11.16. Ruff 0.16.10, actionlint 1.7.12 e zizmor 1.31.1 passaram. O mutation gate matou 80/80 mutantes aplicáveis, com 0 sobreviventes e 0 não aplicados. Bandit encontrou 131 LOW, 0 MEDIUM/HIGH; a triagem versionada passou em `--check` (o comando Bandit retorna 1 pelos LOW, comportamento previsto no workflow). `tools/reality_audit.py` foi executado: 27.549 linhas, 269 classes e 875 funções; os relatórios versionados permaneceram sem diff. `git diff --check` passou.
+
+Limites e proveniência: o parser/encoder JSON padrão pode rejeitar aninhamentos extremos; não há orçamento explícito de payload. O produtor deve sincronizar mutações concorrentes do snapshot se exigir uma visão coerente. `enqueue()` continua aceitando seu contrato de contexto anterior e pode executar hooks de `deepcopy`; os métodos da fila ainda expõem objetos mutáveis fora das fronteiras de snapshot. A busca de callsites encontrou `restore_snapshot` somente na implementação e nos testes, sem uso de produção no checkout. Não houve push/merge; por isso não há resultado de CI oficial associado a esta branch.

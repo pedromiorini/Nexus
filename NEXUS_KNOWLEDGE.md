@@ -3,9 +3,23 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
-bandit_low: 131
+tests: 416
+bandit_low: 135
 -->
+
+## Estado canônico da composição local — 2026-10-18
+
+Candidato isolado em `audit/consolidated-38-45-20261018`, baseado exatamente em
+`812ebd02b0c82ecc3169d620e36d25592b1d6727` (`origin/main` local inventariado).
+Inclui os heads exatos das PRs #38–#45 por merges locais; não é um merge em
+`main`, publicação ou execução de CI remoto. #12–#14 ficam fora: #41 já alinha
+os perfis e o lock, e nenhum dos três bumps é dependência funcional obrigatória.
+Inventário, contratos, comandos, resultados e plano seguro: [AUDIT_COMPOSITION.md](AUDIT_COMPOSITION.md).
+
+Os registros abaixo de outras branches/rodadas são **históricos**, não resultados
+da composição. Os marcadores atuais refletem somente a suíte combinada; `HEAD`
+é resolvido pelo manifesto pós-commit, com `ci_run=not_ci`. Não somar contagens
+isoladas nem atribuir evidência sintética a capacidade geral.
 
 ## Fonte de verdade
 
@@ -22,6 +36,14 @@ Para o estado atual, usar esta ordem:
 9. nomes, comentários e banners.
 
 Conflitos não devem ser resolvidos silenciosamente.
+
+## Histórico: estado após a PR #37
+
+- `main` inclui o núcleo `TemporalFactStore` e o contrato de relações múltiplas no grafo via PR #37, merge commit `812ebd02b0c82ecc3169d620e36d25592b1d6727`.
+- O ledger continua somente em memória; snapshots são validados por replay, mas ainda não há persistência SQLite.
+- A branch `feat/temporal-ledger-integration-2026-10-17` propõe injeção opt-in do store em `RealKnowledgeGraph`; o caminho padrão sem store permanece legado, e predicados funcionais são escolhidos pelo chamador.
+- Validação local: 309/309 testes unittest, 11/11 contratos focados, cobertura 100% em linhas e branches dos dois métodos alterados e 62/62 mutantes direcionados mortos. Os dois checks oficiais do run `39015023676` passaram no commit de implementação `865063d21de9e986f9a502a790bfac2b68f7f801`; consulte a PR #38 para o estado do HEAD mais recente.
+- Persistência SQLite e ingestão de alegações de evidência por comando medidor são etapas separadas e ainda não implementadas.
 
 ## Estado histórico verificado em 2026-10-05
 
@@ -208,3 +230,12 @@ O manifesto distingue `discovered_static` (inventário AST) de `executed`, `pass
 - A alteração foi desenvolvida na branch `fix/episodic-search-nonnegative-limit-2026-10-16`, baseada em `main` pós-PR #32 (`b07254307a23cdaef68f7c2b0d23010ac0827580`), e incorporada à `main` pela PR #34 no merge commit `51373dc77179e4edd094df14290f91aa9c8d8060`. A [documentação oficial SQLite](https://www.sqlite.org/lang_select.html) é a fonte para a semântica negativa de `LIMIT`.
 
 - Validação desta branch: unittest 275/275, 11/11 contratos episódicos focados, cobertura 95/94/76/68%, mutation 58/58 (100%) e Bandit 131 LOW/0 MEDIUM/HIGH. Lint, workflows, auditorias e benchmarks oficiais passaram; no POMDP v2, 128/128 ficaram dentro de `1e-12` e 4/4 controles inválidos foram rejeitados.
+
+
+## Fronteiras do snapshot da fila — branch local de 2026-10-17
+
+O estado atual está na branch `fix/queue-snapshot-hardening-2026-10-17`, baseada em `origin/main` `812ebd02b0c82ecc3169d620e36d25592b1d6727`. O contrato `nexus.deferred_task_queue.v1` e as assinaturas públicas não mudaram. Contextos são árvores JSON nativas estritas; timestamps são finitos e campos escalares exigem tipos built-in exatos, sem `bool` nos campos inteiros. Raiz e registros de tarefa toleram extensões com chaves `str` exatas, mas ignoram seus valores sem deep copy ou propagação para tarefas internas; todas as chaves de raiz/tarefa/estatísticas são verificadas antes de lookup/membership. Estatísticas exigem exatamente `enqueued`, `retried`, `completed`, `discarded`; JSON textual rejeita chaves duplicadas em todos os objetos. Subclasses externas `dict`/`list` continuam aceitas; subclasses escalares são rejeitadas antes de hooks/comparações. O restore publica heap/índice/estatísticas apenas depois de staging completo. `replace=False` preserva contadores do destino; `replace=True` importa os do snapshot.
+
+No baseline deste checkout, isolamento de referências aninhadas, timestamps finitos e rejeição de bool já passavam; as lacunas reproduzidas foram chaves estatísticas extras, tarefa pendente exaurida, hooks de `__deepcopy__`/`__eq__`, duplicatas JSON e restauração parcialmente aplicada sob falha de staging. Revisões independentes identificaram também TOCTOU de `task_id` e um `int` subclassificado em `priority` que executava `__neg__` em `DeferredTask.__post_init__`. Os testes demonstram rejeição de chaves não-string antes de hooks, extensões string-key root/task ignoradas sem cópia profunda, rejeição de duplicatas e estado intacto nos dois modos de restore, preservando subclasses de containers externos. Validação atual: 318 testes (316 aprovados, 2 skips opcionais), 51/51 contratos focados em Python 3.11/3.12, 80/80 mutantes mortos e cobertura branch da fila de 91%; os detalhes estão em `NEXUS_EVIDENCE.md`.
+
+Não inferir isolamento geral da fila: `enqueue()` ainda usa `deepcopy` sobre o contexto recebido e tarefas podem continuar mutáveis fora da fronteira de snapshot. Não foi criado limite de bytes/profundidade; o parser/encoder padrão pode rejeitar aninhamento extremo. A origem do dict/list deve ser sincronizada durante snapshot se exigir consistência contra escrita concorrente. Não há callsite de produção de restore encontrado neste checkout; a branch não foi publicada e ainda não tem CI oficial.
