@@ -150,12 +150,18 @@ def audit(manifest_path: Path, root: Path = ROOT) -> dict[str, Any]:
     documents: dict[str, dict[str, str]] = {}
     conflicts: list[dict[str, str]] = []
     errors = _operational_errors(manifest)
+    bandit_low = manifest["security"]["bandit"]["severity"]["LOW"]
+    bandit_low_valid = type(bandit_low) is int and bandit_low >= 0
+    if not bandit_low_valid:
+        errors.append("manifesto: security.bandit.severity.LOW deve ser inteiro built-in não negativo")
     for name in DOCUMENTS:
         path = root / name
         try:
             claims = _parse_marker(path.read_text(encoding="utf-8"), name)
             documents[name] = claims
             for field in sorted(REQUIRED):
+                if field == "bandit_low" and not bandit_low_valid:
+                    continue
                 value = claims[field]
                 resolved = expected[field] if value in {"HEAD", "CURRENT_RUN"} else value
                 if resolved != expected[field]:

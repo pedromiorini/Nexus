@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 306
 bandit_low: 131
 -->
 
@@ -202,3 +202,11 @@ Correção: `search_episodes` rejeita bool e tipos não inteiros com `TypeError`
 `test_episodic_memory_search_limits_contract.py` cobre limites negativos nos dois ramos de query e prova ausência de SQL, rejeição de bool/float/string/None, zero sem consulta e preservação de limite positivo. Validação final: 11/11 contratos episódicos focados e unittest 275/275; integração 30 aprovados + 1 skip FAISS opcional; cobertura 95/94/76/68%; mutation 58/58 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW e nenhum MEDIUM/HIGH. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e benchmarks oficiais passaram. O POMDP v2 obteve 128/128 casos dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e rejeitou 4/4 controles inválidos. O relatório de realidade foi regenerado para refletir as sete linhas acrescentadas ao núcleo.
 
 Fonte normativa: [SQLite Language Reference — SELECT, seção LIMIT](https://www.sqlite.org/lang_select.html), que especifica que um LIMIT negativo não estabelece teto para as linhas retornadas.
+
+## Validação local de LOW no auditor de consistência — 2026-10-20
+
+Base exata `d435083bb4c893a58128cee6cfa00f65bba7fe02`, branch isolada `fix/state-consistency-low-validation-20261020`. O baseline aceitou os quinze valores inválidos das novas regressões quando os documentos repetiam o valor: contagens negativas, booleanos, floats, strings, null, NaN/infinitos e contêineres. Também comparou um LOW inválido com os documentos: 16 falhas de subcasos em 11 métodos antes da correção. O auditor agora exige inteiro built-in não negativo e registra erro antes de qualquer comparação dessa métrica, sem alterar valores válidos.
+
+Evidência local: 25 contratos focados aprovados; suíte completa 306 executados, 304 aprovados e dois skips opcionais NetworkX; integração 30 aprovados e um skip FAISS. Mutação existente 58/58 e cinco mutações locais da nova guarda mortas; zero sobreviventes/não aplicadas. Compilação, Ruff, actionlint, zizmor, triagem Bandit e auditorias AST/realidade aprovados; 131 LOW, zero MEDIUM/HIGH/erros de análise. Isso é evidência de contrato local, não clearance de segurança nem validação de capacidades gerais.
+
+Comandos, blobs Git do código/testes, ambiente, pisos de cobertura e limites estão na rodada correspondente de `CONTINUATION.md`. Não se alterou o gerador do manifesto, o workflow, dependências ou PRs. Sem execução hospedada ou autorização para publicação; o manifesto local conserva `not_ci`, que bloqueia a atestação operacional. O hash do commit final e a revisão independente são entregues no handoff externo.
