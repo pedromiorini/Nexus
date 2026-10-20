@@ -3,11 +3,28 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 305
 bandit_low: 131
 -->
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
+
+## Rodada local — igualdade exata na guarda de triagem — 2026-10-20
+
+- **Base e isolamento:** `d435083bb4c893a58128cee6cfa00f65bba7fe02`, igual a `origin/main` local; branch nova `fix/security-triage-main-guard-20261020`, worktree `/workspace/Nexus-security-main-guard-20261020`, inicialmente limpa. Sem fetch, push, PR, merge ou alteração de `main`. `/workspace/Nexus` permanece suja e intocada; a worktree de referência `Nexus-test-summary-empty-suite-20261020` permanece limpa em `5c704129e93d4ce73e4144b904c3272a1db582d2`. Nenhuma outra worktree foi usada para escrita.
+- **Contrato:** `_is_main_guard` exige `ast.If`, comparação única `Eq`, esquerda `Name('__name__')` e direita `Constant('__main__')`. Não reconhece `!=`, identidade, membership, operadores relacionais, outro valor/nome ou cadeia; a forma convencional com aspas simples/duplas e parênteses permanece reconhecida. São cinco condições adicionais, sem dependência nova nem refatoração.
+- **Regressão antes/depois:** `$PY -m unittest -v test_security_triage.py` antes da correção executou 8 testes com 18 falhas de subcasos (exit 1). Depois, `$PY -m unittest -v test_security_triage.py test_embedded_assert_audit.py` aprovou 12/12. As regressões verificam o predicado, guard/corpo no escopo e agrupamento de 2 findings sem perda de contagem. Os arquivos temporários são fixtures de contrato, não um finding observado no source atual; não foi feita sondagem sintética nem executada CLI de benchmark.
+- **Ambiente e evidência:** comandos abaixo executados nesta worktree, `PY=/tmp/nexus-ci311/bin/python` (3.11.16), `E=/workspace/nexus-main-guard-evidence-20261020`, `PYTHONPATH=.`. Suíte/integração usam `NEXUS_AUDIT_DB=$E/nexus-audit.sqlite3`, `COVERAGE_FILE=$E/.coverage`, `NEXUS_INTEGRATED_SUMMARY=$E/integrated-summary.json`; mutação usa `$E/mutation-audit.sqlite3`. Logs e relatórios locais ficam em `$E`, fora do stage.
+  - `$PY -m coverage run --branch -m unittest discover -p 'test_*.py'` e `$PY tools/test_summary.py --output "$E/test-summary.json"`: ambos aprovados; resumo final 305 executados, 303 aprovados, 2 skips por NetworkX opcional ausente, 0 falhas/XPASS.
+  - `$PY -m coverage run --append --branch core/constitutional_brain.py`: 30 verificações aprovadas, 1 skip FAISS opcional, sem ausentes/conflitantes/inesperadas.
+  - `$PY -m coverage report --include='<arquivo>' --fail-under=<piso>`: fila 95% (piso 90), VRAM 94% (90), fatos temporais 93% (90), Vita 76% (70), núcleo 68% (62). `$PY -m coverage report --include='tools/security_triage.py'`: 96%; `$PY -m coverage xml -o "$E/coverage.xml"` gerado.
+  - `$PY tools/targeted_mutation.py`: 58/58 mutações existentes mortas, 0 sobreviventes/não aplicadas, em cópia temporária isolada. Esse gate não contém mutantes específicos deste predicado; a evidência direta da correção são as regressões antes/depois.
+  - `python -m ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py` (Ruff 0.17.1), `$PY -m compileall -q core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`, `/tmp/nexus-ci-tools/actionlint .github/workflows/*.yml` (1.7.12), `/tmp/nexus-ci-tools/zizmor --offline --no-progress .github/workflows` (1.31.1): aprovados.
+  - `$PY tools/reality_audit.py` e `git diff --exit-code -- AUDIT_REALITY_REPORT.md audit_reality.json`: aprovados, relatórios inalterados.
+  - `$PY -m bandit -r core vita tools -f json -o "$E/bandit-report.json"`: 131 LOW, 0 MEDIUM/HIGH e nenhum erro de análise (exit de findings tratado e JSON verificado). `$PY tools/security_triage.py "$E/bandit-report.json" SECURITY_TRIAGE.md --check`: aprovado; corpo do relatório permanece igual. `$PY tools/embedded_assert_audit.py "$E/bandit-report.json" core/constitutional_brain.py`: 111 B101, nenhum assert fora do bloco. `$PY tools/implementation_gap_audit.py core/constitutional_brain.py --output "$E/implementation-gaps.json"`: 0 pass-only/NotImplementedError.
+- **Documentação mínima:** contagem `tests` dos quatro blocos estruturados passa a 305; histórico e demais claims permanecem. Não há decisão arquitetural nova. O ledger aponta para esta evidência local.
+- **Revisão independente:** QA/Segurança aprovou o diff de implementação e testes, sem bloqueadores, e reexecutou os 12 contratos focados com sucesso. A mutação ainda estava pendente durante aquela revisão; seu resultado final acima foi observado posteriormente, sem atribuí-lo ao revisor.
+- **Limites:** validação local com ferramentas já disponíveis, sem reinstalar o lock e sem equivalência declarada ao CI hospedado. Sem manifesto/atestação de job remoto ou `gates_status=success` fabricado. Os testes da suíte incluem os contratos de benchmarks existentes, mas suas CLIs não foram executadas. Não muda disposições por ID, tratamento de `else`, escopos/cache ou outras limitações herdadas; triagem continua inventário conservador, não clearance de segurança. Hash do commit local final informado no handoff externo para evitar autorreferência.
 
 ## Rodada local — gatilho de PR para qualquer destino — 2026-10-19
 

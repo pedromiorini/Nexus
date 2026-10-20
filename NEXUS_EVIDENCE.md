@@ -3,9 +3,13 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 305
 bandit_low: 131
 -->
+
+## Igualdade exata na guarda de triagem — 2026-10-20
+
+Na base `d435083bb4c893a58128cee6cfa00f65bba7fe02`, duas regressões novas reproduziram o reconhecimento indevido de comparações não-main. Após cinco condições adicionais no predicado, 12 contratos focados passaram; suíte completa: 305 executados, 303 aprovados, 2 skips opcionais e 0 falhas/XPASS. Bandit mantém 131 LOW, sem MEDIUM/HIGH, e a triagem versionada não mudou de corpo. Comandos, revisão independente e limites estão na [rodada local correspondente de CONTINUATION.md](CONTINUATION.md#rodada-local--igualdade-exata-na-guarda-de-triagem--2026-10-20). Evidência de classificação AST, não de clearance de segurança nem de CI remoto.
 
 Snapshot histórico: manifesto `nexus-state-manifest` do commit `5b8bed8125002e25eb066620af67d3a65d44e59f` (CI run `38907987512`), com 200/200 testes `unittest`, 31 verificações integradas inventariadas (30 aprovadas, 1 ignorada por FAISS opcional ausente e 0 falhas) e 131 achados Bandit LOW (0 MEDIUM/HIGH). Esse snapshot e os resultados locais do benchmark v1 não representam o estado atual.
 A PR #24 partiu do `main` pós-PR #23 (`e3cc760597aa1782aef9879a8f88ee6f48032348`) e foi mesclada em `main` como `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`; os dois checks oficiais passaram. Seus resultados locais de 240/240 testes permanecem históricos; a branch seguinte registra a nova validação em seção própria.
