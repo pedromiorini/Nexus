@@ -9,7 +9,35 @@ bandit_low: 131
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
-## Estado atual
+## Rodada local — gatilho de PR para qualquer destino — 2026-10-19
+
+- **Base exata:** `812ebd02b0c82ecc3169d620e36d25592b1d6727`, confirmada em `origin/main`, sem fetch nem alteração de `main`. Branch local `fix/ci-pr-target-any-branch-20261019`, worktree `/workspace/Nexus-ci-trigger-any-branch-20261019`, criada limpa. O checkout sujo `/workspace/Nexus` e as demais worktrees não foram alterados.
+- **Contrato:** `pull_request` não filtra a branch de destino, permitindo PRs encadeadas; `push` continua restrito a `main`. Foi removida somente a linha `branches: [main]` sob `pull_request`. Não foram alterados tipos de eventos padrão, permissões `contents: read`, concurrency/cancelamento, jobs, steps, pins SHA/checksums ou `persist-credentials: false`; não foi usado `pull_request_target`.
+- **Reprodução:** antes da mudança, a leitura YAML encontrou `pull_request.branches == [main]`, violando o contrato. Depois, o teste local abaixo confirmou a remoção exata de uma linha e a preservação byte a byte de todo o restante do workflow:
+
+  ```sh
+  python - <<'PY'
+  from pathlib import Path
+  import subprocess
+  p = '.github/workflows/nexus-contract-gate.yml'
+  base = subprocess.check_output(['git', 'show', '812ebd02b0c82ecc3169d620e36d25592b1d6727:' + p], text=True)
+  assert Path(p).read_text() == base.replace('  pull_request:\n    branches: [main]\n', '  pull_request:\n', 1)
+  PY
+  ```
+
+- **Comandos e resultados locais:** executados na worktree acima; `PY=/tmp/nexus-ci311/bin/python` (Python 3.11.16), `PYTHONPATH=.`, `NEXUS_AUDIT_DB=/tmp/nexus-ci-trigger-any-branch-20261019.sqlite3` para a suíte e integração.
+  - `/tmp/nexus-ci-tools/actionlint .github/workflows/*.yml` (1.7.12) e `/tmp/nexus-ci-tools/zizmor --offline --no-progress .github/workflows` (1.31.1): aprovados, nenhum finding. Leitura com `yaml.BaseLoader` também confirmou apenas `push.branches: [main]` e `pull_request` sem configuração/filtros.
+  - `$PY tools/reality_audit.py` e `git diff --exit-code -- AUDIT_REALITY_REPORT.md audit_reality.json`: aprovados, relatórios versionados inalterados.
+  - `python -m ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py` (Ruff 0.17.1) e `$PY -m compileall -q core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`: aprovados.
+  - `$PY tools/test_summary.py --output test-summary.json`: 303 executados, 301 aprovados, 2 skips por NetworkX opcional ausente, 0 falhas/XPASS.
+  - `NEXUS_INTEGRATED_SUMMARY=integrated-summary.json $PY core/constitutional_brain.py`: 30 verificações aprovadas, 1 skip FAISS opcional, nenhuma ausente/conflitante/inesperada.
+  - `$PY -m unittest -v test_reality_audit.py test_state_consistency_audit.py test_state_manifest.py`: 32 contratos aprovados. A atestação operacional via `tools/state_consistency_audit.py --manifest ...` não foi declarada: não há manifesto de um job de gates concluído nesta rodada; não se fabricou `gates_status=success` nem um run hospedado. Os marcadores estruturados atuais permanecem inalterados.
+  - `$PY -m bandit -r core vita tools -f json -o bandit-report.json` e `$PY tools/security_triage.py bandit-report.json SECURITY_TRIAGE.md --check`: triagem aprovada, 131 LOW, nenhum MEDIUM/HIGH ou erro de análise. LOW não é clearance de segurança.
+  - `git diff --check`: aprovado. Apenas workflow e este handoff fazem parte do patch; relatórios locais ignorados não entram no commit.
+- **Limites:** validação local em ambiente já disponível, sem reinstalação do lock; não equivale ao ambiente hospedado. Cobertura, mutation e benchmarks não foram reexecutados para esta exclusão de filtro; código Python e steps não mudaram. O filtro removido permite o disparo, mas não garante execução diante de conflitos, políticas, aprovação de forks ou outros bloqueios do provedor. PRs draft não ganham novos tipos de evento com esta mudança. Não há execução retroativa garantida para PRs abertas, nem alteração das PRs #47–#50. Um run remoto só poderá ocorrer após push/PR autorizado e evento elegível; nenhum push, PR, merge ou auto-merge foi feito.
+- **Revisão:** congelar este diff de dois arquivos para uma única revisão independente de CI/security; reabrir somente por achado concreto. Se gates e revisão passarem, produzir somente commit local. O hash final do commit e o resultado da revisão ficam no handoff externo, evitando autorreferência no próprio commit.
+
+## Estado herdado (histórico; não é a validação desta rodada)
 
 - **Base auditada nesta rodada:** `main` estava no merge documental da PR #35, commit `047c4ba6bb4fb22e3dbe3251c8aee9bf986e0583`; a base funcional permanece no merge da PR #34 (`51373dc77179e4edd094df14290f91aa9c8d8060`), que contém as PRs #32, #33 e #34.
 - **Política de integração:** mudanças futuras devem permanecer em branches isoladas e ser mescladas somente mediante autorização específica.
@@ -193,4 +221,4 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 
 ## Próxima ação
 
-Concluir os gates da branch de auditoria e acompanhar os checks e a revisão da PR #36; corrigir regressões antes de qualquer merge. A PR #32 já está integrada; a PR #36 permanece aberta e qualquer merge exige autorização específica. Depois, continuar a auditoria independente de outras fronteiras; `ToolDefinition.requires_permission`/`permission_level` ainda não têm enforcement e a validação recursiva dos membros de contêiner permanece fora do contrato.
+Após revisão e commit local desta correção, aguardar autorização específica antes de qualquer publicação ou integração. Não alterar a cadeia de PRs existente. As referências anteriores à PR #36 são históricas, não uma instrução operacional atual. A auditoria de outras fronteiras fica fora desta rodada; `ToolDefinition.requires_permission`/`permission_level` e validação recursiva dos membros de contêiner não foram examinados aqui.
