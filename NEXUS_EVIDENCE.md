@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 311
 bandit_low: 131
 -->
 
@@ -32,6 +32,16 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Benchmark sintético | verificado localmente nos protocolos v1 e v2 | v1 preserva as métricas composicional/causal/incerteza; v2 mede 128 modelos explícitos, erro absoluto máximo `2,7756e-16`, 128/128 casos dentro de `1e-12` e 4/4 controles inválidos rejeitados | trilha POMDP do v1 continua não suportada; v2 não aprende modelos nem escolhe políticas; não valida teorias cognitivas |
 | Autonomia geral | não demonstrada | nenhuma evidência válida no repositório | não fazer esse claim |
 | AGI/ASI/consciência | não demonstradas | explicitamente negadas pela documentação | nomes e banners não contam como evidência |
+
+## Resumo de testes inválido não é ausência — validação local, 2026-10-20
+
+Base `d435083bb4c893a58128cee6cfa00f65bba7fe02`, branch `fix/state-manifest-invalid-summary-20261020`. A implementação original classificou JSON malformado, `42`, `null`, booleanos, campos `result` não hashable e leitura negada como `not_generated`; os 14 testes atuais do manifesto contra o arquivo original produziram 11 falhas de subcasos. A correção separa ausência (`FileNotFoundError`) de resumo inválido, valida a raiz objeto e o tipo de `result`, preservando os campos válidos e o schema. Os testes conferem também a propagação integral em `build_manifest()`.
+
+`/tmp/nexus-ci311/bin/python -m unittest -v test_state_manifest.py test_state_consistency_audit.py test_test_summary.py test_integrated_suite_summary.py`: 30 aprovados. Suíte completa: 311 executados, 309 aprovados, 2 skips opcionais NetworkX, 0 falhas/XPASS; integração: 30 aprovados + 1 skip FAISS. Mutação existente 58/58 mortas e seis mutantes adicionais locais do status/guardas/propagação detectados. Bandit: 131 LOW, nenhum MEDIUM/HIGH/erro; auditorias de realidade, asserts e lacunas aprovadas. Comandos, versões, cobertura e limites detalhados em `CONTINUATION.md` na rodada correspondente.
+
+A revisão independente encontrou ainda UTF-8 inválido escapando como exceção e constantes `NaN`/`Infinity` aceitas em extras aninhados. As regressões reproduziram 1 erro e 3 falhas, corrigidos por captura dos erros de decodificação e parser JSON estrito; os 15 métodos finais do manifesto e os gates foram reexecutados.
+
+Esta é evidência de contrato local, não CI hospedado nem garantia de segurança. Não houve reinstalação do lock. O manifesto local permanece `not_ci`, e o auditor operacional o rejeita como esperado somente pela ausência de gates CI concluídos, sem conflitos documentais; seu fail-closed não foi alterado.
 
 ## Verificação local da branch de correção — 2026-10-16
 
