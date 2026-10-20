@@ -7,7 +7,8 @@ núcleo monolítico inteiro.
 
 Segurança operacional: as mutações são aplicadas em uma CÓPIA TEMPORÁRIA do repositório;
 a árvore de trabalho nunca é modificada (antes, um processo interrompido podia deixar
-código mutado no lugar). Mutante que excede o tempo limite conta como morto.
+código mutado no lugar). Timeout é inconclusivo: não demonstra que os testes detectaram
+a mutação.
 """
 from __future__ import annotations
 
@@ -269,7 +270,7 @@ MUTATIONS = [
 ]
 
 
-def run_tests(workdir: Path, tests: tuple[str, ...]) -> tuple[int, str]:
+def run_tests(workdir: Path, tests: tuple[str, ...]) -> tuple[int | None, str]:
     try:
         completed = subprocess.run(
             [sys.executable, "-m", "unittest", *tests],
@@ -281,8 +282,15 @@ def run_tests(workdir: Path, tests: tuple[str, ...]) -> tuple[int, str]:
             timeout=TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired:
-        return 124, f"timeout após {TIMEOUT_SECONDS}s (mutante considerado morto)"
+        return None, f"timeout após {TIMEOUT_SECONDS}s (resultado inconclusivo)"
     return completed.returncode, completed.stdout[-3000:]
+
+
+def classify_mutation_result(exit_code: int | None) -> str:
+    """Separa execução inconclusiva de mutantes detectados ou sobreviventes."""
+    if exit_code is None:
+        return "timeout"
+    return "killed" if exit_code != 0 else "survived"
 
 
 def main() -> int:
@@ -311,13 +319,14 @@ def main() -> int:
                 "name": mutation.name,
                 "target": mutation.target,
                 "tests": list(mutation.tests),
-                "status": "killed" if code != 0 else "survived",
+                "status": classify_mutation_result(code),
                 "exit_code": code,
                 "duration_seconds": round(time.time() - started, 3),
                 "output_tail": output,
             })
     killed = sum(item.get("status") == "killed" for item in results)
     survived = sum(item.get("status") == "survived" for item in results)
+    timed_out = sum(item.get("status") == "timeout" for item in results)
     not_applied = sum(item.get("status") == "not_applied" for item in results)
     applicable = killed + survived
     score = round(100 * killed / applicable, 2) if applicable else 0.0
@@ -331,6 +340,7 @@ def main() -> int:
             "applicable": applicable,
             "killed": killed,
             "survived": survived,
+            "timed_out": timed_out,
             "not_applied": not_applied,
             "score_percent": score,
         },
@@ -340,7 +350,7 @@ def main() -> int:
     for item in results:
         if item["status"] != "killed":
             print(f"  {item['status']}: {item['name']} ({item['target']})", file=sys.stderr)
-    return 0 if applicable == len(MUTATIONS) and survived == 0 else 1
+    return 0 if applicable == len(MUTATIONS) and survived == 0 and timed_out == 0 else 1
 
 
 if __name__ == "__main__":

@@ -229,13 +229,13 @@ class DeferredTaskSnapshotTests(unittest.TestCase):
         discarded.discard(task.task_id)
         self.assertEqual(discarded.statistics()["discarded"], 1)
 
-    def test_processor_exception_is_recorded_and_retried(self):
+    def test_processor_exception_is_sanitized_and_retried(self):
         queue = DeferredTaskQueue(max_attempts=2)
         queue.enqueue("boom")
         failures = []
         result = queue.consume(lambda task: (_ for _ in ()).throw(RuntimeError("bad")), on_failure=failures.append)
         self.assertEqual(result["retried"], 1)
-        self.assertEqual(failures[0].last_reason, "RuntimeError: bad")
+        self.assertEqual(failures[0].last_reason, "RuntimeError: processor raised an exception")
 
     def test_consume_breaks_if_pop_returns_none(self):
         queue = DeferredTaskQueue()

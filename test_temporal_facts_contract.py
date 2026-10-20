@@ -92,6 +92,8 @@ class TemporalFactContract(unittest.TestCase):
         s.assert_fact("ana", "mora_em", "C", valid_from=5)
         got = [(f.object, f.valid_from, f.valid_to) for f in s.history("ana", "mora_em")]
         self.assertEqual(got, [("A", 0.0, 5.0), ("C", 5.0, 10.0), ("B", 10.0, None)])
+        restored = TemporalFactStore.from_snapshot(s.export_snapshot(as_json=True), clock=Clock(100.0))
+        self.assertEqual(restored.history("ana", "mora_em"), s.history("ana", "mora_em"))
 
     def test_returned_facts_are_isolated_copies(self):
         s = store()
@@ -130,6 +132,23 @@ class TemporalFactContract(unittest.TestCase):
         self.assertEqual(new.fact_id, "tf-000002")
         restored = TemporalFactStore.from_snapshot(s.export_snapshot(as_json=True), clock=c)
         self.assertEqual(restored.history("ana", "mora_em"), s.history("ana", "mora_em"))
+        self.assertEqual(old.fact_id, "tf-000001")
+
+    def test_unserializable_metadata_is_rejected_before_closing_existing_fact(self):
+        c = Clock(100.0)
+        s = store(c)
+        old = s.assert_fact("ana", "mora_em", "A")
+        before = s.export_snapshot()
+
+        c.t = 200.0
+        with self.assertRaises(ValueError):
+            s.assert_fact("ana", "mora_em", "B", metadata={"oversized": 10 ** 5000})
+
+        self.assertEqual(s.export_snapshot(), before)
+        self.assertIsNone(s.history("ana", "mora_em")[0].valid_to)
+        new = s.assert_fact("ana", "mora_em", "B")
+        self.assertEqual(new.fact_id, "tf-000002")
+        self.assertEqual(s.history("ana", "mora_em")[0].valid_to, 200.0)
         self.assertEqual(old.fact_id, "tf-000001")
 
     def test_clock_never_goes_backwards(self):
@@ -344,6 +363,87 @@ class SnapshotContract(unittest.TestCase):
         snap = s.export_snapshot()
         snap["events"].clear()
         self.assertGreater(len(s.export_snapshot()["events"]), 0)
+
+    def test_restore_rejects_lossy_metadata_and_invalid_close_replay(self):
+        from core import temporal_facts as tf
+
+        def rechain(snapshot):
+            previous = tf.GENESIS
+            for sequence, event in enumerate(snapshot["events"], 1):
+                event["seq"] = sequence
+                event["prev"] = previous
+                event["hash"] = tf._digest(event)
+                previous = event["hash"]
+            snapshot["head"] = previous
+
+        source, clock = self.build()
+        original = source.export_snapshot()
+        for metadata in ({1: "integer key"}, {"items": (1, 2)}):
+            malformed = copy.deepcopy(original)
+            malformed["events"][0]["fact"]["metadata"] = metadata
+            rechain(malformed)
+            with self.subTest(metadata=metadata), self.assertRaises(ValueError):
+                TemporalFactStore.from_snapshot(malformed, clock=clock)
+
+        clock = Clock(20.0)
+        source = store(clock)
+        fact = source.assert_fact("ana", "mora_em", "A", valid_from=10.0)
+        source.retract("ana", "mora_em", valid_to=12.0)
+        base = source.export_snapshot()
+
+        before_start = copy.deepcopy(base)
+        before_start["events"][-1]["valid_to"] = 9.0
+        rechain(before_start)
+
+        self_superseded = copy.deepcopy(base)
+        self_superseded["events"][-1]["valid_to"] = 10.0
+        self_superseded["events"][-1]["superseded_by"] = fact.fact_id
+        rechain(self_superseded)
+
+        extended = copy.deepcopy(base)
+        extended["events"].append({
+            "kind": "close",
+            "fact_id": fact.fact_id,
+            "valid_to": 13.0,
+            "superseded_by": None,
+            "recorded_at": 21.0,
+        })
+        rechain(extended)
+
+        for malformed in (before_start, self_superseded, extended):
+            with self.subTest(events=malformed["events"]), self.assertRaises(ValueError):
+                TemporalFactStore.from_snapshot(malformed, clock=clock)
+
+        clock = Clock(20.0)
+        source = store(clock)
+        prior = source.assert_fact("ana", "mora_em", "A", valid_from=10.0)
+        source.assert_fact("ana", "mora_em", "B", valid_from=12.0)
+
+        conflicting_close = source.export_snapshot()
+        conflicting_close["events"].append({
+            "kind": "close",
+            "fact_id": prior.fact_id,
+            "valid_to": 12.0,
+            "superseded_by": None,
+            "recorded_at": 21.0,
+        })
+        rechain(conflicting_close)
+        with self.assertRaises(ValueError):
+            TemporalFactStore.from_snapshot(conflicting_close, clock=clock)
+
+        shortened = source.export_snapshot()
+        shortened["events"].append({
+            "kind": "close",
+            "fact_id": prior.fact_id,
+            "valid_to": 11.0,
+            "superseded_by": None,
+            "recorded_at": 21.0,
+        })
+        rechain(shortened)
+        restored = TemporalFactStore.from_snapshot(shortened, clock=clock)
+        restored_prior = restored.history("ana", "mora_em")[0]
+        self.assertEqual(restored_prior.valid_to, 11.0)
+        self.assertIsNone(restored_prior.superseded_by)
 
 
 if __name__ == "__main__":
