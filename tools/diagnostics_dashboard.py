@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         print(render_dashboard(load_snapshot(args.snapshot)))
-    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+    except (OSError, json.JSONDecodeError, TypeError, ValueError, RecursionError) as exc:
         print(f"dashboard error: {exc}", file=sys.stderr)
         return 2
     return 0

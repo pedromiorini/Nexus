@@ -3,11 +3,26 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 309
 bandit_low: 131
 -->
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
+
+## Rodada local — erro de recursão no dashboard — 2026-10-20
+
+- **Base exata:** `d435083bb4c893a58128cee6cfa00f65bba7fe02`, confirmada por `git ls-remote origin refs/heads/main` e `origin/main`. Branch `fix/diagnostics-recursion-error-20261020`, worktree criada limpa em `/workspace/Nexus-diagnostics-recursion-20261020`. `main` local permaneceu em `7c8a187c1465c6db39777f5e9dc16efb112e1121`; não foi atualizado. Checkout sujo `/workspace/Nexus` e outras worktrees preservados. A branch `fix/diagnostics-strict-json-20261020` permanece em `08eabcb403a8de4b011abdc125ea8ae44326bf27`, somente contexto, sem cherry-pick.
+- **Contrato/decisão:** adicionar somente `RecursionError` ao tratamento de erro de `main`. Arquivo/stdin que excedam a capacidade do decoder retornam 2, stdout vazio e `dashboard error:` em stderr, sem traceback. `load_snapshot` não muda e continua propagando a exceção para callers diretos. Nenhum limite de profundidade, normalização JSON, dependência ou refatoração foi introduzido.
+- **Red/green:** antes do patch, 19 contratos executados, exatamente dois erros por `RecursionError` nos caminhos CLI de arquivo/stdin; controles rasos e callers diretos passaram. Após o patch, 19/19 em Python 3.11.16 e 3.12.3. Fixture final usa `max(10000, sys.getrecursionlimit() + 100)` apenas no teste: neste Python 3.12, o decoder aceita 2.000 arrays, diferentemente do 3.11. O mutante que remove somente a nova captura reproduz os mesmos dois erros com a fixture final. Subprocessos reais em 3.11 com exatamente 2.000 arrays confirmaram os dois caminhos com exit 2/stdout vazio/erro legível/sem traceback.
+- **Proveniência funcional (SHA-256):** `tools/diagnostics_dashboard.py`: `2c54cc5878c119860b000aae6a17a476aa0676597b1b2462ac80aaf5ccc01129`; `test_recovery_diagnostics_contract.py`: `f41c499066081e95bc4d3d45257eec5c91e47cba1d149d411324c506fc377ed4`. O hash do commit final fica no handoff externo para evitar autorreferência. Esta seção descreve o candidato local, não um run hospedado.
+- **Ambiente/comandos:** `PY=/tmp/nexus-ci311/bin/python`, `PYTHONPATH=.`, `E=/workspace/nexus-diagnostics-recursion-evidence-20261020`, `NEXUS_AUDIT_DB=$E/<gate>.sqlite3`; ambientes preexistentes, sem instalação de dependências. Logs e scripts de reprodução ficam fora do commit em `$E`.
+  - `$PY -m unittest -v test_recovery_diagnostics_contract.py` e `python -m unittest -v test_recovery_diagnostics_contract.py`: 19/19 cada; seis novos testes protegem os dois caminhos CLI, propagação direta e snapshots rasos com Unicode, valores finitos, booleanos e null.
+  - `COVERAGE_FILE=$E/.coverage $PY -m coverage run --branch tools/test_summary.py --output $E/test-summary.json`: 309 executados, 307 aprovados, 2 skips por NetworkX opcional ausente, 0 falhas/XPASS. A suíte completa inclui testes existentes dos protocolos sintéticos; nenhuma CLI de benchmark foi executada nem benchmark alterado.
+  - `COVERAGE_FILE=$E/.coverage NEXUS_INTEGRATED_SUMMARY=$E/integrated-summary.json $PY -m coverage run --append --branch core/constitutional_brain.py`: 30 aprovados, 1 skip FAISS opcional, nenhuma ausência/conflito/ID inesperado. `$PY -m coverage report --include=<arquivo> --fail-under=<piso>` com o mesmo `COVERAGE_FILE`: fila 95% (90), VRAM 94% (90), temporal 93% (90), Vita 76% (70), núcleo 68% (62); dashboard 95% informativo.
+  - `$PY tools/targeted_mutation.py`: 58/58 mortas, 0 sobreviventes/não aplicadas. `$PY $E/dashboard_mutation.py`: mutante específico adicional morto, baseline aprovado e cópia temporária isolada; não altera o gate versionado.
+  - `bash $E/run-gates.sh`: Ruff, compileall, actionlint 1.7.12, zizmor 1.31.1 offline, auditoria de realidade sem drift dos relatórios, Bandit/triagem, auditorias AST/asserts/gaps e 32 contratos dos auditores/manifesto aprovados. Bandit: 131 LOW, 0 MEDIUM/HIGH, nenhum erro de análise; não é clearance de segurança. Comandos completos estão no script e `gates.log`; nenhum relatório gerado/banco integra o patch.
+- **Documentação:** apenas ledger/handoff e os quatro marcadores obrigatórios de contagem atual passam a 309; Constituição/arquitetura/decisões permanecem inalteradas. Marcadores `HEAD`/`CURRENT_RUN` são resolvidos pelo gate associado, não alegam CI remoto já executado. A atestação de job hospedado não foi executada nem fabricada.
+- **Limites:** captura não limita CPU/memória nem garante aceitação de JSON arbitrariamente profundo; profundidade suportada continua dependente do decoder/runtime. Suíte completa e mutation em 3.11; somente contratos focados adicionais em 3.12. Sem revisão independente, pois diff funcional é uma única extensão da captura e não revelou risco adicional concreto. Sem push, PR, merge, alteração de main, outras worktrees ou dependências.
 
 ## Rodada local — gatilho de PR para qualquer destino — 2026-10-19
 

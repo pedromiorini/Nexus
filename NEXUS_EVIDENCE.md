@@ -3,9 +3,17 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 309
 bandit_low: 131
 -->
+
+## Fronteira CLI do dashboard: recursão do decoder — 2026-10-20
+
+Base exata `d435083bb4c893a58128cee6cfa00f65bba7fe02`; candidato local na branch `fix/diagnostics-recursion-error-20261020`. O red registrou dois `RecursionError` escapando de `main` (arquivo e stdin). A captura adicional transforma ambos em exit 2, stdout vazio e stderr iniciado por `dashboard error:`, sem traceback; `load_snapshot` e o parser permanecem inalterados. Os seis novos contratos também preservam propagação direta e snapshots válidos rasos nos dois caminhos.
+
+Evidência local: 19/19 contratos em Python 3.11.16 e 3.12.3; suíte completa em 3.11 com 309 executados, 307 aprovados e 2 skips NetworkX; integração 30 aprovações/1 skip FAISS; mutation existente 58/58 mortas e mutante específico adicional 1/1 morto. Ruff/compile/lint de workflows/auditorias pertinentes passaram, sem drift dos relatórios de realidade; Bandit 131 LOW, nenhum MEDIUM/HIGH. Cobertura acima de todos os pisos existentes. Comandos exatos, hashes funcionais, localização dos logs e limitações estão na seção correspondente de `CONTINUATION.md`; hash do commit final no handoff externo, não autorreferente.
+
+Limite: não há novo teto de profundidade nem garantia de recursos; a fixture profunda foi ajustada para ultrapassar também o limite C do Python 3.12, enquanto o caso exato de 2.000 arrays foi confirmado em subprocessos 3.11. Sem claims de capacidade ou segurança geral, novos benchmarks ou execução de CLIs de benchmark; nenhuma publicação/CI hospedada nesta rodada.
 
 Snapshot histórico: manifesto `nexus-state-manifest` do commit `5b8bed8125002e25eb066620af67d3a65d44e59f` (CI run `38907987512`), com 200/200 testes `unittest`, 31 verificações integradas inventariadas (30 aprovadas, 1 ignorada por FAISS opcional ausente e 0 falhas) e 131 achados Bandit LOW (0 MEDIUM/HIGH). Esse snapshot e os resultados locais do benchmark v1 não representam o estado atual.
 A PR #24 partiu do `main` pós-PR #23 (`e3cc760597aa1782aef9879a8f88ee6f48032348`) e foi mesclada em `main` como `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`; os dois checks oficiais passaram. Seus resultados locais de 240/240 testes permanecem históricos; a branch seguinte registra a nova validação em seção própria.

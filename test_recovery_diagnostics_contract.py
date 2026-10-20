@@ -1,10 +1,16 @@
+import io
 import json
+import sys
+import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
+from unittest.mock import patch
 
 from hypothesis import given, settings, strategies as st
 
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
-from tools.diagnostics_dashboard import render_dashboard
+from tools.diagnostics_dashboard import load_snapshot, main, render_dashboard
 
 
 class RecoveryDiagnosticsContractTests(unittest.TestCase):
@@ -59,6 +65,63 @@ class RecoveryDiagnosticsContractTests(unittest.TestCase):
     def test_dashboard_rejects_invalid_snapshot(self):
         with self.assertRaises(ValueError):
             render_dashboard({"schema": "nexus.recovery.diagnostics.v9"})
+
+    def _assert_dashboard_deep_json(self, source, *, direct=False):
+        # Exceed Python and C decoder limits (which differ on Python 3.12).
+        # This fixture does not define an application depth policy.
+        depth = max(10000, sys.getrecursionlimit() + 100)
+        text = "[" * depth + "0" + "]" * depth
+        if source != "-":
+            Path(source).write_text(text, encoding="utf-8")
+        with patch("sys.stdin", io.StringIO(text)):
+            if direct:
+                with self.assertRaises(RecursionError):
+                    load_snapshot(source)
+                return
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                self.assertEqual(main([source]), 2)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertTrue(stderr.getvalue().startswith("dashboard error:"))
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_dashboard_file_cli_reports_excessive_nesting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self._assert_dashboard_deep_json(str(Path(directory) / "snapshot.json"))
+
+    def test_dashboard_stdin_cli_reports_excessive_nesting(self):
+        self._assert_dashboard_deep_json("-")
+
+    def test_dashboard_file_loader_preserves_recursion_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self._assert_dashboard_deep_json(str(Path(directory) / "snapshot.json"), direct=True)
+
+    def test_dashboard_stdin_loader_preserves_recursion_error(self):
+        self._assert_dashboard_deep_json("-", direct=True)
+
+    def _assert_dashboard_shallow_json(self, source):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        snapshot["events"] = [{
+            "event_type": "probe", "timestamp": 1.0,
+            "payload": {"nested": [None, True, False, 0, -7, 1.25, "ação", {"key": "value"}]},
+        }]
+        text = json.dumps(snapshot, ensure_ascii=False, allow_nan=False)
+        if source != "-":
+            Path(source).write_text(text, encoding="utf-8")
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with patch("sys.stdin", io.StringIO(text)):
+            self.assertEqual(load_snapshot(source), snapshot)
+        with patch("sys.stdin", io.StringIO(text)), redirect_stdout(stdout), redirect_stderr(stderr):
+            self.assertEqual(main([source]), 0)
+        self.assertEqual(stdout.getvalue(), render_dashboard(snapshot) + "\n")
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_dashboard_file_preserves_valid_shallow_json(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self._assert_dashboard_shallow_json(str(Path(directory) / "snapshot.json"))
+
+    def test_dashboard_stdin_preserves_valid_shallow_json(self):
+        self._assert_dashboard_shallow_json("-")
 
     def test_incompatible_version_is_rejected(self):
         payload = self.bridge.export_recovery_diagnostics()
