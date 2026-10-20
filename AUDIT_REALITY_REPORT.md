@@ -42,6 +42,8 @@ O núcleo analisado possui **27549 linhas**, **269 classes** e **875 funções**
 - `test_mcts_action_contract.py`: existe.
 - `core/constitutional_brain.py`: existe.
 - `tools/reality_audit.py`: existe.
+- `test_dependency_profiles_contract.py`: existe.
+- `test_knowledge_graph_contract.py`: existe.
 - `test_deferred_task_snapshot.py`: existe.
 - `test_memory_sql_contract.py`: existe.
 - `test_jailbreak_detector_contract.py`: existe.

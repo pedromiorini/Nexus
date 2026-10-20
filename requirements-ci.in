@@ -1,9 +1,13 @@
-# Dependências diretas usadas pelos testes e gates de CI.
+# Perfil compartilhado de testes e gates Python (desenvolvimento e CI).
+# Runtime obrigatório é herdado, sem promover backends opcionais a obrigatórios.
+-r requirements.txt
+# Versões diretas alinhadas ao lock; atualizações devem regenerá-lo.
+numpy==2.4.6
+coverage==7.16.2
+hypothesis==6.170.0
+bandit==1.9.4
+ruff==0.16.10
+# Opcional em runtime; instalado aqui para não pular os contratos desse backend.
+networkx==3.6.1
 # Atualização controlada: uv pip compile --generate-hashes --python-version 3.11 \
 #   --output-file requirements-ci.lock requirements-ci.in
-numpy
-coverage
-hypothesis
-bandit
-ruff==0.16.10
-networkx
