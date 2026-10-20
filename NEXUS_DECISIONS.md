@@ -240,22 +240,32 @@
 - **Limitação:** limites positivos altos continuam permitidos e podem selecionar todos os episódios existentes; esta decisão não cria teto de memória nem altera query/status.
 - **Reversibilidade:** simples; remover a validação restaura o comportamento anterior, inclusive `LIMIT < 0` sem teto.
 
-## D-027 — Fatos temporais como livro-razão de eventos encadeados (proposta, branch isolada)
+## D-027 — Fatos temporais como livro-razão de eventos encadeados
 
-- **Status:** proposta em branch `feat/temporal-fact-ledger-2026-10-17`; não mesclada. Mesclar somente com autorização específica.
+- **Status:** incorporada à `main` pela PR #37, merge commit `812ebd02b0c82ecc3169d620e36d25592b1d6727`.
 - **Decisão:** módulo novo `core/temporal_facts.py` (`TemporalFactStore`), somente biblioteca padrão, em vez de estender `RealKnowledgeGraph`. Fatos têm janela de validade `[valid_from, valid_to)` e `recorded_at`; invalidar é anexar um evento `close` a um log encadeado por SHA-256, nunca editar ou apagar. O estado atual é uma projeção do log e `known_at` reconstrói a crença passada.
 - **Contexto:** `resolve_conflicts` nunca encontra versões múltiplas porque `add_entity` sobrescreve a entidade; o grafo não tem noção de validade nem de proveniência.
 - **Motivo:** separar tempo do fato de tempo de registro permite correção retroativa sem reescrever o passado. Apenas predicados declarados `functional` substituem o valor anterior; os demais acumulam, para não destruir fatos multivalorados.
 - **Evidência:** `test_temporal_facts_contract.py` cobre janelas semiabertas, `known_at`, inserção retroativa, retração, corroboração idempotente, round-trip de snapshot, adulteração/remoção/reordenação/truncamento, invariantes aleatórios e regressões para metadados JSON inválidos, watermarks após timestamp inválido e referências `superseded_by` incoerentes. A suíte completa mediu 303 testes aprovados; a integração mediu 30 aprovados e 1 skip opcional; cobertura combinada do módulo: 93% (piso 90%). Mutation testing específico para este módulo não foi medido nesta rodada.
 - **Referência:** modelo bi-temporal do Graphiti/Zep (`valid_at`/`invalid_at` e `created_at`/`expired_at`), com a diferença de que aqui a detecção de conflito é determinística, por predicado funcional, e não feita por LLM.
-- **Limitações:** o mais recente vence, sem arbitragem por confiança; truncamento final só é detectado com `expected_head` guardado fora do arquivo; consultas com `known_at` reconstroem a projeção (O(eventos)); ainda não há persistência SQLite nem integração com `RealKnowledgeGraph`.
-- **Reversibilidade:** simples; o módulo é isolado e nenhum código existente o importa.
+- **Limitações:** o mais recente vence, sem arbitragem por confiança; truncamento final só é detectado com `expected_head` guardado fora do arquivo; consultas com `known_at` reconstroem a projeção (O(eventos)); ainda não há persistência SQLite. A integração opt-in com `RealKnowledgeGraph` é proposta em D-029.
+- **Reversibilidade:** o núcleo permanece independente da persistência; a integração opt-in do grafo é registrada separadamente em D-029.
 
 ## D-028 — Aresta NetworkX acumula os tipos de relação do mesmo par de nós
 
-- **Status:** proposta no mesmo branch.
+- **Status:** incorporada à `main` pela PR #37, merge commit `812ebd02b0c82ecc3169d620e36d25592b1d6727`.
 - **Decisão:** `RealKnowledgeGraph.add_relation` acumula os tipos em `relations` na aresta do `DiGraph` (`relation` continua sendo a última, por compatibilidade); atributos estruturais prevalecem sobre propriedades homônimas do chamador.
 - **Contexto:** `DiGraph` guarda uma aresta por par de nós; adicionar `mora_em` e depois `trabalha_em` entre os mesmos nós deixava 1 aresta com o atributo da última, enquanto `relation_index` registrava 2. O caminho de fallback (sem NetworkX) não tinha o problema.
 - **Evidência:** `test_knowledge_graph_contract.py` cobre relações múltiplas e propriedades chamadas `relations`; os testes do caminho NetworkX passaram com NetworkX 3.6.1. A dependência está agora no lock de CI com hashes, de modo que o caminho `DiGraph` é exercitado no gate.
-- **Limitação:** o grafo ainda não distingue relações repetidas por tempo; isso é escopo de D-027.
+- **Limitação:** sem store temporal injetado, as relações do grafo continuam sem semântica temporal; a integração opt-in é D-029.
 - **Reversibilidade:** simples; remover o acúmulo restaura o comportamento anterior.
+
+
+## D-029 — Integração temporal opt-in do RealKnowledgeGraph
+
+- **Status:** proposta na branch `feat/temporal-ledger-integration-2026-10-17`, PR #38 aberta para revisão individual; os dois checks oficiais do run `39015023676` passaram no commit de implementação `865063d21de9e986f9a502a790bfac2b68f7f801`. Não mesclar sem autorização explícita.
+- **Decisão:** `RealKnowledgeGraph` aceita `temporal_store` como argumento keyword-only opcional. Ausente por padrão, mantém o caminho legado. Quando fornecido, `add_relation` registra `source_id → subject`, `relation_type → predicate`, `target_id → object`, além de `confidence`, `source` e `valid_from`, antes de criar entidades ou alterar índices. Predicados funcionais são declarados pelo chamador ao construir o store; não há defaults implícitos. `properties` não é encaminhado como metadata temporal.
+- **Contexto:** D-027 entregou o ledger em memória, ainda isolado do grafo. A integração automática poderia alterar validações e projeções legadas; a injeção opt-in separa os dois caminhos e mantém `find_relations`, `relation_index` e a aresta NetworkX como projeções já existentes.
+- **Evidência:** `test_temporal_graph_integration_contract.py` cobre padrão desativado, mapeamento/proveniência, predicados funcionais explícitos, ausência de mutação parcial em rejeições, metadata não inferida e fallback sem NetworkX. Validação local: 309/309 testes; contratos focados 11/11; cobertura dos métodos alterados `__init__` 18/18 linhas e 2/2 branches, `add_relation` 22/22 linhas e 12/12 branches; mutation testing 62/62 mortos, 0 sobreviventes e 0 não aplicados; Ruff passou. Os dois checks oficiais do run `39015023676` passaram no commit de implementação `865063d21de9e986f9a502a790bfac2b68f7f801`; consulte a PR #38 para o estado do HEAD mais recente.
+- **Limitações:** o store continua apenas em memória; não há persistência SQLite nem ingestão automatizada das alegações de `NEXUS_EVIDENCE.md`. Após um append temporal bem-sucedido, uma falha inesperada na projeção do grafo não pode ser revertida por transação compartilhada; preflight de propriedades e validação temporal acontecem antes das mutações principais.
+- **Reversibilidade:** simples; omitir `temporal_store` preserva o uso atual sem exigir configuração nova.
