@@ -259,3 +259,11 @@
 - **Evidência:** `test_knowledge_graph_contract.py` cobre relações múltiplas e propriedades chamadas `relations`; os testes do caminho NetworkX passaram com NetworkX 3.6.1. A dependência está agora no lock de CI com hashes, de modo que o caminho `DiGraph` é exercitado no gate.
 - **Limitação:** o grafo ainda não distingue relações repetidas por tempo; isso é escopo de D-027.
 - **Reversibilidade:** simples; remover o acúmulo restaura o comportamento anterior.
+
+## D-029 — Exceção B101 somente para guarda direta do módulo
+
+- **Decisão:** `tools/embedded_assert_audit.py` procura a comparação convencional `__name__ == '__main__'` somente em `ast.Module.body`, preservando o predicado existente e as faixas de linhas do corpo positivo. Guardas em função, função assíncrona, classe ou outro bloco não criam exceções. A busca de todos os `ast.Assert` continua recursiva e independente dos findings Bandit.
+- **Contexto:** em `d435083bb4c893a58128cee6cfa00f65bba7fe02`, `ast.walk` aceitava uma guarda dentro de `helper()` como demonstração do módulo, deixando `assert False` sem finding passar com `ok=True`.
+- **Evidência:** sete novos métodos de regressão, incluindo nove contextos aninhados com/sem B101 e com/sem demonstração legítima adicional; o mutante `embedded_assert_only_module_level_guards` restaura `ast.walk` e é morto. Comandos, resultados locais e limites estão em `CONTINUATION.md` e `NEXUS_EVIDENCE.md` na rodada de 2026-10-20.
+- **Limites:** verificação sintática de localização, não análise de fluxo, segurança dos asserts ou validação do schema/filename do relatório Bandit. Conteúdo dentro da faixa de uma guarda legítima mantém a exceção anterior; `else` fica fora. Não se ampliam as formas de comparação aceitas, nem se altera a triagem separada de escopos de `tools/security_triage.py`.
+- **Reversibilidade:** simples; uma troca de iteração, acompanhada das regressões e do mutante. Não muda workflow, núcleo, dependências ou API pública.

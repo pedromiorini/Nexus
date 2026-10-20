@@ -3,11 +3,28 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 310
 bandit_low: 131
 -->
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
+
+## Rodada local — guarda B101 direta do módulo — 2026-10-20
+
+- **Base e isolamento:** `d435083bb4c893a58128cee6cfa00f65bba7fe02`, confirmada por `git ls-remote origin refs/heads/main` e pela ref local `origin/main`. Nova branch `fix/embedded-assert-module-guard-20261020`, worktree `/workspace/Nexus-embedded-assert-module-guard-20261020`, criada limpa nessa base exata. `/workspace/Nexus` permanece suja em `a676ee600e03fd377386cd05adbe20b01908103b`; a referência `/workspace/Nexus-state-consistency-low-20261020` permanece limpa em `a6539319f3d76964be5ed68c05802bf5d8534a37`. Não alterar outras worktrees nem `main`.
+- **Contrato e implementação:** somente `ast.If` em `ast.Module.body` com a comparação convencional já reconhecida cria faixa de exceção. Asserts continuam sendo procurados recursivamente; B101 fora da faixa continua sendo reportado mesmo sem `ast.Assert` correspondente. Guardas aninhadas não criam faixas; o corpo positivo de uma guarda legítima preserva sua exceção lexical e o `else` fica fora. Não há mudança em núcleo, workflow, dependências ou triagem de escopos separada.
+- **Red/green:** `test_embedded_assert_audit.py` ganhou sete métodos (11 no total). Antes da mudança no auditor, a execução retornou saída 1 e 37 falhas de subcasos em três métodos; após a troca de `ast.walk(tree)` por `tree.body`, 11/11 passaram. Nove contextos aninhados são exercitados com/sem B101 e com/sem guarda de módulo adicional; há controle de B101 sem assert, `else`, comparação não convencional e guarda legítima. Suíte focada ampliada: 32/32.
+- **Ambiente:** `PY=/tmp/nexus-ci311/bin/python` (3.11.16), `PYTHONPATH=.`, `NEXUS_AUDIT_DB=/tmp/nexus-embedded-guard-20261020/<gate>.sqlite3`; coverage 7.16.2, Bandit 1.9.4, Hypothesis 6.170.0, NumPy 2.4.6; Ruff 0.17.1 via `python -m ruff`. Ferramentas previamente disponíveis, sem instalação/alteração de dependências. Logs locais em `/tmp/nexus-embedded-guard-20261020/`.
+- **Comandos e resultados locais:**
+  - `$PY -m unittest -v test_embedded_assert_audit.py test_security_triage.py test_state_manifest.py test_state_consistency_audit.py`: 32 aprovados; `$PY -m unittest -v test_embedded_assert_audit.py`: 11 aprovados no green final.
+  - `COVERAGE_FILE=/tmp/nexus-embedded-guard-20261020/.coverage $PY -m coverage run --branch -m unittest discover -p 'test_*.py'`; com o mesmo `COVERAGE_FILE`, `NEXUS_INTEGRATED_SUMMARY=integrated-summary.json $PY -m coverage run --append --branch core/constitutional_brain.py`: suíte completa aprovada; integração 30 aprovados e 1 skip FAISS opcional, 0 ausentes/conflitantes/inesperados. `coverage report --include=<arquivo> --fail-under=<piso>` passou para fila 95%/90, VRAM 94%/90, fatos temporais 93%/90, Vita 76%/70 e núcleo 68%/62. Auditor B101: 76%, sem piso novo; CLI real também executada fora da medição.
+  - `$PY tools/test_summary.py --output test-summary.json`: 310 executados, 308 aprovados, 2 skips por NetworkX opcional ausente, 0 falhas/XPASS. Os quatro marcadores atuais de testes foram sincronizados em 310; números históricos permanecem preservados.
+  - `$PY tools/targeted_mutation.py`: 59 declarados/aplicáveis/mortos, 0 sobreviventes/não aplicados; cópia temporária isolada. Novo mutante `embedded_assert_only_module_level_guards` restaura a travessia vulnerável e morre com saída 1, não por timeout.
+  - `python -m ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`; `$PY -m compileall -q core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`; `/tmp/nexus-ci-tools/actionlint .github/workflows/*.yml` (1.7.12); `/tmp/nexus-ci-tools/zizmor --offline --no-progress .github/workflows` (1.31.1): aprovados, nenhum finding dos linters de workflow.
+  - `$PY tools/reality_audit.py`; `git diff --exit-code -- AUDIT_REALITY_REPORT.md audit_reality.json`: aprovados e relatórios versionados inalterados. `$PY tools/implementation_gap_audit.py core/constitutional_brain.py --output implementation-gaps.json`: 0 pass-only/NotImplementedError.
+  - `$PY -m bandit -r core vita tools -f json -o bandit-report.json` retorna o status informativo de findings LOW; JSON conferido: 131 LOW, 0 MEDIUM/HIGH e 0 erros de análise. `$PY tools/security_triage.py bandit-report.json SECURITY_TRIAGE.md --check`: aprovado. `$PY tools/embedded_assert_audit.py bandit-report.json core/constitutional_brain.py`: `ok=true`, 111 B101, faixa `25680–27549`, nenhum finding/assert fora. LOW não é clearance.
+- **Limites:** validação local com ambiente existente, não reinstalação do lock nem CI hospedado. NetworkX e FAISS opcionais indisponíveis; seus caminhos não foram validados aqui. Sem novas sondas sintéticas ou CLIs adicionais de benchmark; os testes de benchmark existentes estão na suíte completa. A atestação operacional de consistência requer `ci.gates_status=success` de um job concluído: não fabricar esse status, run remoto ou manifesto de commit limpo. O auditor é sintático, não uma análise de fluxo/segurança; schema/filename dos findings e a triagem separada não foram endurecidos nesta rodada.
+- **Revisão e entrega:** após consolidar estes registros, congelar o diff completo para uma única revisão independente focada de QA/Segurança; reabrir somente por achado concreto ou diff alterado. O resultado da revisão, SHA-256 do diff e hash do commit aprovado ficam no handoff externo, evitando autorreferência ou alteração documental após a revisão. Stage explícito e somente commit local se aprovado; sem push, PR, merge ou mudanças em `main`.
 
 ## Rodada local — gatilho de PR para qualquer destino — 2026-10-19
 

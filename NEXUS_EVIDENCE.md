@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 310
 bandit_low: 131
 -->
 
@@ -202,3 +202,13 @@ Correção: `search_episodes` rejeita bool e tipos não inteiros com `TypeError`
 `test_episodic_memory_search_limits_contract.py` cobre limites negativos nos dois ramos de query e prova ausência de SQL, rejeição de bool/float/string/None, zero sem consulta e preservação de limite positivo. Validação final: 11/11 contratos episódicos focados e unittest 275/275; integração 30 aprovados + 1 skip FAISS opcional; cobertura 95/94/76/68%; mutation 58/58 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW e nenhum MEDIUM/HIGH. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e benchmarks oficiais passaram. O POMDP v2 obteve 128/128 casos dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e rejeitou 4/4 controles inválidos. O relatório de realidade foi regenerado para refletir as sete linhas acrescentadas ao núcleo.
 
 Fonte normativa: [SQLite Language Reference — SELECT, seção LIMIT](https://www.sqlite.org/lang_select.html), que especifica que um LIMIT negativo não estabelece teto para as linhas retornadas.
+
+## Guarda demonstrativa direta do módulo — 2026-10-20
+
+Base exata: `d435083bb4c893a58128cee6cfa00f65bba7fe02`; branch local `fix/embedded-assert-module-guard-20261020`. A regressão de função usa exatamente `def helper():\n    if __name__ == '__main__':\n        assert False\n`. Antes do patch, a faixa aninhada era aceita. Depois, nenhuma faixa é criada para essa guarda, a linha 3 fica em `assert_lines_outside_main` e `ok=False`, inclusive sem finding.
+
+Red: os 11 métodos do auditor executaram na implementação original, com 37 falhas de subcasos em três métodos (18 cenários com B101, 18 sem findings e um finding sem assert). Green: 11/11 métodos; contratos focados do auditor, triagem, manifesto e consistência: 32/32. Os nove contextos são função, função assíncrona, classe, `if`, `for`, `while`, `with`, `try` e `else`; cada contexto é testado com/sem uma guarda legítima de módulo adicional. Controles preservam a comparação convencional, aspas simples/duplas e conteúdo aninhado dentro da demonstração legítima; excluem o `else` da guarda e comparações não convencionais.
+
+Resultados locais em Python 3.11.16, sem instalar dependências: suíte completa 310 executados, 308 aprovados, 2 skips por NetworkX opcional ausente, 0 falhas/XPASS; integração 30 aprovações e 1 skip FAISS opcional, sem IDs ausentes, conflitantes ou inesperados. Cobertura combinada: fila 95%, VRAM 94%, fatos temporais 93%, Vita 76%, núcleo 68%; auditor B101 76% (inclui CLI não coberta pela medição unitária; CLI real executada separadamente). Mutation: 59/59 aplicáveis mortos, sem sobreviventes/não aplicados; o novo mutante morreu com saída 1, sem timeout. Ruff, compileall, actionlint, zizmor, auditoria de realidade e auditorias AST passaram. Bandit 131 LOW, 0 MEDIUM/HIGH e nenhum erro de análise; triagem aprovada e 111 B101 preservados na faixa real `25680–27549`, sem findings/asserts fora. Relatórios versionados de realidade inalterados.
+
+Comandos reproduzíveis e limitações operacionais estão na rodada correspondente de `CONTINUATION.md`. Esta é evidência local de um contrato sintático, não CI hospedado nem clearance de segurança. Não houve nova sonda sintética ou execução adicional das CLIs de benchmark; os contratos de benchmark já existentes continuam dentro da suíte completa. Não se fabricou `gates_status=success`: a atestação operacional depende do job hospedado concluído. Quatro marcadores atuais passam de 303 para 310 testes executados; histórico, findings e disposições não são reescritos.
