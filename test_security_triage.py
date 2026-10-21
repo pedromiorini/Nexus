@@ -1,12 +1,72 @@
+import ast
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from tools.security_triage import build_report, classify, main, merge_state_block, resolve_scope
+from tools.security_triage import _is_main_guard, build_report, classify, main, merge_state_block, resolve_scope
 
 
 class SecurityTriageTests(unittest.TestCase):
+    def test_main_guard_requires_exact_single_equality(self):
+        cases = (
+            ("__name__ == '__main__'", True),
+            ('(__name__ == "__main__")', True),
+            ("__name__ != '__main__'", False),
+            ("__name__ is '__main__'", False),
+            ("__name__ is not '__main__'", False),
+            ("__name__ in ('__main__',)", False),
+            ("__name__ not in ('__main__',)", False),
+            ("__name__ < '__main__'", False),
+            ("__name__ <= '__main__'", False),
+            ("__name__ > '__main__'", False),
+            ("__name__ >= '__main__'", False),
+            ("__name__ == 'other'", False),
+            ("__name__ == None", False),
+            ("__name__ == main_name", False),
+            ("__name__ == '__main__' == other", False),
+            ("'__main__' == __name__", False),
+            ("other == '__main__'", False),
+            ("__name__", False),
+        )
+        for condition, expected in cases:
+            with self.subTest(condition=condition):
+                node = ast.parse(f"if {condition}:\n    pass\n").body[0]
+                self.assertEqual(_is_main_guard(node), expected)
+        self.assertFalse(_is_main_guard(ast.parse("__name__ == '__main__'")))
+
+    def test_scope_and_report_do_not_label_other_comparisons_as_main(self):
+        conditions = (
+            ("__name__ == '__main__'", "<__main__ block>"),
+            ("__name__ != '__main__'", "<module>"),
+            ("__name__ is '__main__'", "<module>"),
+            ("__name__ in ('__main__',)", "<module>"),
+            ("__name__ == 'other'", "<module>"),
+            ("__name__ == '__main__' == other", "<module>"),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for index, (condition, expected) in enumerate(conditions):
+                with self.subTest(condition=condition):
+                    filename = f"case_{index}.py"
+                    # Keep an unrelated scope so module lines resolve, not <unresolved>.
+                    (root / filename).write_text(
+                        f"def anchor():\n    return None\n\nif {condition}:\n    assert True\n",
+                        encoding="utf-8",
+                    )
+                    payload = {"results": [
+                        {"test_id": "B101", "issue_severity": "LOW",
+                         "filename": filename, "line_number": line}
+                        for line in (4, 5)
+                    ]}
+                    for line in (4, 5):
+                        self.assertEqual(resolve_scope(filename, line, root), expected)
+                    report = build_report(payload, root=root)
+                    self.assertIn("Total findings: **2**", report)
+                    self.assertIn(f"`{expected}` | 2 |", report)
+                    if expected == "<module>":
+                        self.assertNotIn("<__main__ block>", report)
+
     def test_known_findings_have_explicit_dispositions(self):
         self.assertEqual(classify({"test_id": "B608"}), "sql_construction_high_priority_review")
         self.assertEqual(classify({"test_id": "B311"}), "simulation_only_random_review")

@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 310
+tests: CURRENT_TESTS
 bandit_low: 131
 -->
 
@@ -208,3 +208,9 @@ O manifesto distingue `discovered_static` (inventário AST) de `executed`, `pass
 - A alteração foi desenvolvida na branch `fix/episodic-search-nonnegative-limit-2026-10-16`, baseada em `main` pós-PR #32 (`b07254307a23cdaef68f7c2b0d23010ac0827580`), e incorporada à `main` pela PR #34 no merge commit `51373dc77179e4edd094df14290f91aa9c8d8060`. A [documentação oficial SQLite](https://www.sqlite.org/lang_select.html) é a fonte para a semântica negativa de `LIMIT`.
 
 - Validação desta branch: unittest 275/275, 11/11 contratos episódicos focados, cobertura 95/94/76/68%, mutation 58/58 (100%) e Bandit 131 LOW/0 MEDIUM/HIGH. Lint, workflows, auditorias e benchmarks oficiais passaram; no POMDP v2, 128/128 ficaram dentro de `1e-12` e 4/4 controles inválidos foram rejeitados.
+
+## Inventário de `NotImplementedError` como classe — 2026-10-21
+
+`tools/implementation_gap_audit.py` reconhece alvos explícitos de `raise` com nome `NotImplementedError` ou atributo final `.NotImplementedError`, com ou sem chamada. Contabiliza o alvo uma vez e não a causa `from`; não executa fonte, resolve aliases ou distingue shadowing. O schema/retorno CLI e a classificação pass-only permanecem intactos. Cinco métodos em `test_implementation_gap_raise_class_contract.py` protegem positivos e negativos; na base `d435083bb4c893a58128cee6cfa00f65bba7fe02` quatro falham e após a correção passam.
+
+Validação local da branch `fix/gap-audit-exception-class-20261021`: 24/24 contratos focados e 308/308 na suíte, tanto em Python 3.11 quanto 3.12; integração 30 aprovações e um skip FAISS. Gates amplos adicionais em 3.11 constam em `CONTINUATION.md` e `NEXUS_EVIDENCE.md`. Não confundir esta contagem com a WIP `window_seconds` separada nem com um run de CI hospedado. A decisão `known_at` continua pendente do owner; nenhum contrato temporal foi alterado.

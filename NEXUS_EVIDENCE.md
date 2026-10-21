@@ -3,9 +3,19 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 310
+tests: CURRENT_TESTS
 bandit_low: 131
 -->
+
+## Duplicatas terminais no resumo integrado — validação local 2026-10-20
+
+Base `d435083bb4c893a58128cee6cfa00f65bba7fe02`, branch `fix/integrated-summary-duplicates-20261020`: regressões reproduziram PASS/PASS e SKIP/SKIP indevidamente aprovados antes do patch. O tally agora expõe `duplicates` e falha com resultados terminais repetidos, preservando stream e categorias existentes. Após a correção: 10 contratos focados aprovados; suíte completa executada duas vezes (com cobertura e `tools/test_summary.py`), 307 executados/305 aprovados/2 skips opcionais/0 falhas; integração real 30 passes/1 skip e nenhuma duplicata. Gates de cobertura, Ruff, compilação, auditorias e 58 mutações preexistentes aprovados; Bandit 131 LOW e nenhum MEDIUM/HIGH. Comandos, limitações e proveniência estão na seção correspondente de `CONTINUATION.md`.
+
+Esta é evidência de contrato de software local, não de capacidade cognitiva nem CI hospedado. O consumidor legado do manifesto permanece fail-closed (`invalid_summary` para falha causada apenas por duplicata), sem contabilização específica nova. Nenhuma sonda sintética, CLI de benchmark ou evolução separada de WorldModel foi executada nesta rodada.
+
+## Igualdade exata na guarda de triagem — 2026-10-20
+
+Na base `d435083bb4c893a58128cee6cfa00f65bba7fe02`, duas regressões novas reproduziram o reconhecimento indevido de comparações não-main. Após cinco condições adicionais no predicado, 12 contratos focados passaram; suíte completa: 305 executados, 303 aprovados, 2 skips opcionais e 0 falhas/XPASS. Bandit mantém 131 LOW, sem MEDIUM/HIGH, e a triagem versionada não mudou de corpo. Comandos, revisão independente e limites estão na [rodada local correspondente de CONTINUATION.md](CONTINUATION.md#rodada-local--igualdade-exata-na-guarda-de-triagem--2026-10-20). Evidência de classificação AST, não de clearance de segurança nem de CI remoto.
 
 Snapshot histórico: manifesto `nexus-state-manifest` do commit `5b8bed8125002e25eb066620af67d3a65d44e59f` (CI run `38907987512`), com 200/200 testes `unittest`, 31 verificações integradas inventariadas (30 aprovadas, 1 ignorada por FAISS opcional ausente e 0 falhas) e 131 achados Bandit LOW (0 MEDIUM/HIGH). Esse snapshot e os resultados locais do benchmark v1 não representam o estado atual.
 A PR #24 partiu do `main` pós-PR #23 (`e3cc760597aa1782aef9879a8f88ee6f48032348`) e foi mesclada em `main` como `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`; os dois checks oficiais passaram. Seus resultados locais de 240/240 testes permanecem históricos; a branch seguinte registra a nova validação em seção própria.
@@ -32,6 +42,16 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Benchmark sintético | verificado localmente nos protocolos v1 e v2 | v1 preserva as métricas composicional/causal/incerteza; v2 mede 128 modelos explícitos, erro absoluto máximo `2,7756e-16`, 128/128 casos dentro de `1e-12` e 4/4 controles inválidos rejeitados | trilha POMDP do v1 continua não suportada; v2 não aprende modelos nem escolhe políticas; não valida teorias cognitivas |
 | Autonomia geral | não demonstrada | nenhuma evidência válida no repositório | não fazer esse claim |
 | AGI/ASI/consciência | não demonstradas | explicitamente negadas pela documentação | nomes e banners não contam como evidência |
+
+## Resumo de testes inválido não é ausência — validação local, 2026-10-20
+
+Base `d435083bb4c893a58128cee6cfa00f65bba7fe02`, branch `fix/state-manifest-invalid-summary-20261020`. A implementação original classificou JSON malformado, `42`, `null`, booleanos, campos `result` não hashable e leitura negada como `not_generated`; os 14 testes atuais do manifesto contra o arquivo original produziram 11 falhas de subcasos. A correção separa ausência (`FileNotFoundError`) de resumo inválido, valida a raiz objeto e o tipo de `result`, preservando os campos válidos e o schema. Os testes conferem também a propagação integral em `build_manifest()`.
+
+`/tmp/nexus-ci311/bin/python -m unittest -v test_state_manifest.py test_state_consistency_audit.py test_test_summary.py test_integrated_suite_summary.py`: 30 aprovados. Suíte completa: 311 executados, 309 aprovados, 2 skips opcionais NetworkX, 0 falhas/XPASS; integração: 30 aprovados + 1 skip FAISS. Mutação existente 58/58 mortas e seis mutantes adicionais locais do status/guardas/propagação detectados. Bandit: 131 LOW, nenhum MEDIUM/HIGH/erro; auditorias de realidade, asserts e lacunas aprovadas. Comandos, versões, cobertura e limites detalhados em `CONTINUATION.md` na rodada correspondente.
+
+A revisão independente encontrou ainda UTF-8 inválido escapando como exceção e constantes `NaN`/`Infinity` aceitas em extras aninhados. As regressões reproduziram 1 erro e 3 falhas, corrigidos por captura dos erros de decodificação e parser JSON estrito; os 15 métodos finais do manifesto e os gates foram reexecutados.
+
+Esta é evidência de contrato local, não CI hospedado nem garantia de segurança. Não houve reinstalação do lock. O manifesto local permanece `not_ci`, e o auditor operacional o rejeita como esperado somente pela ausência de gates CI concluídos, sem conflitos documentais; seu fail-closed não foi alterado.
 
 ## Verificação local da branch de correção — 2026-10-16
 
@@ -203,6 +223,29 @@ Correção: `search_episodes` rejeita bool e tipos não inteiros com `TypeError`
 
 Fonte normativa: [SQLite Language Reference — SELECT, seção LIMIT](https://www.sqlite.org/lang_select.html), que especifica que um LIMIT negativo não estabelece teto para as linhas retornadas.
 
+## Resumo unittest vazio não aprova o gate — 2026-10-20
+
+**Fato reproduzido:** na base `d435083bb4c893a58128cee6cfa00f65bba7fe02`, uma descoberta sem testes emitia contagens zeradas, `result=passed` e exit 0. Na branch local `fix/test-summary-empty-suite-20261020`, a aprovação do resumo passa a exigir pelo menos um teste executado e sucesso do unittest. Vazio mantém todos os contadores em zero, mas produz `result=failed` e exit 1. Nenhum teste falho artificial é somado, e o resumo da suíte integrada permanece inalterado.
+
+**Evidência:** `$PY -m unittest -v test_test_summary.py` com `PY=/tmp/nexus-ci311/bin/python`: antes da correção, 4 testes com 3 falhas de asserção em 2 casos, demonstrando separadamente resumo vazio, JSON do CLI real e código de saída; depois, 4/4 aprovados. Os controles protegem pass, skip-only, expected-failure-only, XPASS e contagem única de múltiplos subtests falhos. Blobs Git validados: `tools/test_summary.py=0110883147e80e3de56e0b1a387ed87fe78016af`, `test_test_summary.py=207a9aa7e0ec2e13134b823497986e39a92157a2`; hash do commit final no handoff externo. Comandos exatos e ambiente estão na seção correspondente de `CONTINUATION.md`.
+
+**Verificação local:** suíte completa com cobertura e CLI final: 306 executados, 304 aprovados, 2 skips por NetworkX ausente, 0 falhas/XPASS; integrada 30 aprovações e 1 skip FAISS. Cobertura fila/VRAM/temporal/Vita/núcleo: 95/94/93/76/68%, pisos aprovados. Gate de mutação herdado: 58/58 mortos, 0 sobreviventes/não aplicados/timeouts; não inclui mutantes da guarda nova. Ruff, compileall, actionlint, zizmor, auditorias de realidade/asserts/lacunas, Bandit e triagem passaram; 131 LOW e 0 MEDIUM/HIGH/erros de análise não constituem garantia de segurança. Saídas em `/tmp/nexus-empty-suite-20261020`, fora da árvore versionada; os quatro marcadores canônicos foram sincronizados para 306.
+
+**Limites:** ambiente local Python 3.11.16 sem reinstalação do lock; Ruff 0.17.1 em vez do pin 0.16.10, NetworkX opcional não exercitado. Não houve nova sondagem sintética, execução de CLIs de benchmark, publicação ou run remoto. Sem atestação de CI fabricada. O texto padrão do unittest para vazio ainda é `OK`, mas o JSON final é `failed` e a saída do processo é 1. O leitor herdado do manifesto rejeita o vazio falho como `invalid_summary`; continua falhando fechado e não foi modificado. Testes internos e mutação não são evidência de capacidade geral.
+## Validação local de LOW no auditor de consistência — 2026-10-20
+
+Base exata `d435083bb4c893a58128cee6cfa00f65bba7fe02`, branch isolada `fix/state-consistency-low-validation-20261020`. O baseline aceitou os quinze valores inválidos das novas regressões quando os documentos repetiam o valor: contagens negativas, booleanos, floats, strings, null, NaN/infinitos e contêineres. Também comparou um LOW inválido com os documentos: 16 falhas de subcasos em 11 métodos antes da correção. O auditor agora exige inteiro built-in não negativo e registra erro antes de qualquer comparação dessa métrica, sem alterar valores válidos.
+
+Evidência local: 25 contratos focados aprovados; suíte completa 306 executados, 304 aprovados e dois skips opcionais NetworkX; integração 30 aprovados e um skip FAISS. Mutação existente 58/58 e cinco mutações locais da nova guarda mortas; zero sobreviventes/não aplicadas. Compilação, Ruff, actionlint, zizmor, triagem Bandit e auditorias AST/realidade aprovados; 131 LOW, zero MEDIUM/HIGH/erros de análise. Isso é evidência de contrato local, não clearance de segurança nem validação de capacidades gerais.
+
+Comandos, blobs Git do código/testes, ambiente, pisos de cobertura e limites estão na rodada correspondente de `CONTINUATION.md`. Não se alterou o gerador do manifesto, o workflow, dependências ou PRs. Sem execução hospedada ou autorização para publicação; o manifesto local conserva `not_ci`, que bloqueia a atestação operacional. O hash do commit final e a revisão independente são entregues no handoff externo.
+## Inventário de classe explícita em `raise` — 2026-10-21
+
+Base `d435083bb4c893a58128cee6cfa00f65bba7fe02`; branch local `fix/gap-audit-exception-class-20261021`. O auditor AST retornava zero para `raise NotImplementedError` e uma ocorrência para a chamada equivalente. A [referência Python de raise](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement) aceita tanto classe quanto instância; a correção reconhece o alvo nome/atributo sem exigir chamada, sem executar fonte ou resolver nomes.
+
+RED na base: cinco métodos novos executados, quatro afetados por oito falhas de assertivas/subcasos, um aprovado. GREEN: 24/24 contratos focados e suíte 308/308 em Python 3.11.16 e 3.12.3; integração 30 aprovadas + 1 skip opcional em ambas. Em 3.11: cobertura do auditor 94%; pisos de fila/VRAM/temporal/Vita/core aprovados (95/94/93/76/68%); mutation existente 58/58 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW, zero MEDIUM/HIGH/erros. Ruff, compileall, actionlint, zizmor, requirements dry-run, auditorias e benchmarks CLI existentes aprovados. Inventário do núcleo permanece zero pass-only e zero NotImplementedError. Não é evidência de ausência geral de lacunas, segurança completa ou capacidade cognitiva.
+
+Comandos, ambientes, limites e inventário de sobreposição estão em `CONTINUATION.md`; logs e comandos brutos em `/workspace/nexus-gap-audit-class-evidence-20261021/validation.json`, `red.log`, `green311.log`, `green312.log` e `run_gates.py`. Ambientes anteriores do lock reutilizados, sem reinstalação. Nenhum CI hospedado/push/PR/merge foi executado. WIP `window_seconds` não incorporada; `known_at` permanece pendente. Nenhuma decisão anterior foi refutada.
 ## Guarda demonstrativa direta do módulo — 2026-10-20
 
 Base exata: `d435083bb4c893a58128cee6cfa00f65bba7fe02`; branch local `fix/embedded-assert-module-guard-20261020`. A regressão de função usa exatamente `def helper():\n    if __name__ == '__main__':\n        assert False\n`. Antes do patch, a faixa aninhada era aceita. Depois, nenhuma faixa é criada para essa guarda, a linha 3 fica em `assert_lines_outside_main` e `ok=False`, inclusive sem finding.
