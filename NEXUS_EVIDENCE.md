@@ -65,6 +65,7 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Atenção bottom-up | parcial/verificado no contrato | contraste e movimento opcionais, saliência limitada e fallbacks testados | sem sinais observados, usa heurística; não é percepção biológica |
 | Integração/orquestração | parcial/verificado no contrato | média de sinergia calculada sobre integrações registradas | score individual ainda é heurístico por nomes; não demonstra inteligência emergente |
 | Grafo de conhecimento | parcial/verificado no contrato | entidades únicas por ID, média de confiança e índice de tipo consistente | sem consistência distribuída ou validação externa do conhecimento |
+| Transferência meta/domínio | verificado no contrato local de 2026-10-21 | `transfer_knowledge` devolve `MetaTransferMapping`; o nome `TransferMapping` permanece a forma do POST 48; bool, NaN, infinito e negativo são rejeitados | `transfer_quality` pode exceder 1; heurística por token, não transferência aprendida; mutação posterior ao init não é revalidada |
 | Planejamento MCTS | parcial/verificado no contrato | `None` usa ações padrão e lista vazia permanece vazia | recompensas e rollouts continuam heurísticos; não é prova de planejamento geral |
 | Telemetria | parcial/verificado | Vita, audit log SQLite serializado e guard de VRAM | dependente do ambiente; sem locking distribuído ou exactly-once |
 | Segurança | parcial | Bandit 131 LOW, triagem, auditorias AST e testes negativos | não substitui threat model ou revisão manual completa |
@@ -107,6 +108,36 @@ Esta é evidência de contrato local, não CI hospedado nem garantia de seguran�
 - Benchmark v2 local: 128 casos gerados pela seed `20261016`, 635 probabilidades, MAE `3.001891167837976e-17`, erro máximo `2.7755575615628914e-16`, 128/128 dentro da tolerância e quatro controles negativos rejeitados; taskset SHA-256 `232371d0e8e948f4b0a004261e3d271b1003aed8d0de8c931d3439f9d370d025`.
 - A seed fixa do CI (`20261016`) passa explicitamente a precisão e os quatro controles negativos; teste injetando posterior incorreto verifica que a CLI grava o relatório e retorna código 1, cobrindo a falha fechada.
 - O benchmark v1 continuou com status `unsupported_interface` para observação parcial e sua implementação/protocolo não foram alterados. As métricas detalhadas acima são locais; posteriormente, a PR #24 foi mesclada após ambos os checks oficiais passarem.
+
+## Contrato de TransferMapping — 2026-10-21
+
+Medição local no commit `4e971f38854dedecac68a55f08125cde01d27992` (Python 3.12.3, branch `cursor/transfer-mapping-contract-5517`). O marcador acima passou a `tests: 320` por causa desta execução. Seções anteriores que citam 303, 275, 254 ou outras contagens descrevem rodadas passadas.
+
+### Fato
+
+- As duas classes `TransferMapping` entram no commit `1f952a9` (2026-08-05). Depois do import, o nome global tem os campos do POST 48. A anotação de retorno de `RealMetaLearningStrategies.transfer_knowledge` conserva a classe do POST 38.
+- Comando de reprodução, antes do patch: `PYTHONPATH=. python3` chamando `transfer_knowledge("visual_cortex", "visual_planning")`. Resultado: `TypeError: TransferMapping.__init__() got an unexpected keyword argument 'transfer_strength'`.
+- `PYTHONPATH=. python3 -m unittest -v test_transfer_mapping_contract.py` antes da edição do núcleo: `FAILED (failures=17, errors=7)`. No commit citado: `Ran 17 tests in 0.152s` / `OK`.
+- `python3 -m ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py` (Ruff 0.16.10): `All checks passed`.
+- `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-transfer-mapping.sqlite3 python3 tools/test_summary.py --output /tmp/test-summary.json`: executed 320, passed 318, failed 0, skipped 2, unexpected_successes 0, result passed (`Ran 320 tests in 5.177s`).
+- `NEXUS_INTEGRATED_SUMMARY=/tmp/integrated-summary.json PYTHONPATH=. python3 core/constitutional_brain.py`: 30 passed, 1 skipped (id `"0"`, log `TEST 0: Keyword Fallback Mode (FAISS not available)`), 0 missing, `result=passed`, exit code 0.
+- `python3 tools/reality_audit.py`: núcleo com 27591 linhas, 269 classes e 878 funções. Esses relatórios estão no mesmo commit de código.
+
+### Inferência
+
+- A causa do `TypeError` é a colisão de nome no módulo: a busca global na hora da chamada vê a segunda classe. A anotação, avaliada na definição, ainda aponta para a primeira. Isso sobreviveu à comparação dos `id` das duas classes depois do import completo.
+
+### Hipótese
+
+- **Excluídas nesta rodada:** substituição intencional pelo POST 48 (H1); forma do POST 48 morta (H2); dataclass única com campos opcionais (H4); falha por import parcial (H5). Condições e o que as derrubou estão em `CONTINUATION.md`.
+- **Sobrevivente:** as duas formas são pretendidas e o nome duplicado é o defeito (H3). Os testes feitos até aqui não a falsificaram. Isso não é prova de que não exista outro call site externo, fora deste repositório, dependente do nome antigo.
+
+### Limitações
+
+- Bandit, cobertura, mutation testing e CI hospedado não foram reexecutados. `bandit_low: 131` não é medição desta rodada.
+- `transfer_quality` acima de 1 continua válido: a heurística de cobertura pode produzi-lo. Não houve normalização silenciosa.
+- O ramo integrado que chama `find_transferable_knowledge(..., target_task=question)` não foi alterado. O parâmetro não existe na assinatura. A suíte integrada terminou sem traceback; não se verificou o caso em que já existe domínio fonte registrado.
+- A transferência por sobreposição de tokens não é aprendizado entre domínios.
 
 ## Categorias de resultado
 

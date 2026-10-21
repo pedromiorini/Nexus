@@ -146,6 +146,85 @@ bandit_low: 131
   - `bash $E/run-gates.sh`: Ruff, compileall, actionlint 1.7.12, zizmor 1.31.1 offline, auditoria de realidade sem drift dos relatórios, Bandit/triagem, auditorias AST/asserts/gaps e 32 contratos dos auditores/manifesto aprovados. Bandit: 131 LOW, 0 MEDIUM/HIGH, nenhum erro de análise; não é clearance de segurança. Comandos completos estão no script e `gates.log`; nenhum relatório gerado/banco integra o patch.
 - **Documentação:** apenas ledger/handoff e os quatro marcadores obrigatórios de contagem atual passam a 309; Constituição/arquitetura/decisões permanecem inalteradas. Marcadores `HEAD`/`CURRENT_RUN` são resolvidos pelo gate associado, não alegam CI remoto já executado. A atestação de job hospedado não foi executada nem fabricada.
 - **Limites:** captura não limita CPU/memória nem garante aceitação de JSON arbitrariamente profundo; profundidade suportada continua dependente do decoder/runtime. Suíte completa e mutation em 3.11; somente contratos focados adicionais em 3.12. Sem revisão independente, pois diff funcional é uma única extensão da captura e não revelou risco adicional concreto. Sem push, PR, merge, alteração de main, outras worktrees ou dependências.
+## TransferMapping duplicado — 2026-10-21
+
+Validação local no commit de código `4e971f38854dedecac68a55f08125cde01d27992` (branch `cursor/transfer-mapping-contract-5517`, base `main` `d435083`). Python 3.12.3. O commit de documentação posterior não altera o código sob teste. PR #61, sem merge. Nenhum outro PR aberto alterava `TransferMapping`; a PR #60 só adiciona `AUDIT.md`.
+
+### Fato
+
+- `git blame` nas duas classes e `git log -S 'class TransferMapping' -- core/constitutional_brain.py` apontam ambas para `1f952a9` (2026-08-05). Não há commit posterior de substituição.
+- Depois do import, `dataclasses.fields(TransferMapping)` é `mapping_id`, `source_domain`, `target_domain`, `transferable_knowledge`, `transfer_quality`. A anotação de retorno de `transfer_knowledge` é outro objeto, com `transfer_strength`, `shared_features` e `adaptation_required`.
+- Reprodução, antes do patch:
+
+  ```sh
+  PYTHONPATH=. python3 - << 'PY'
+  from core.constitutional_brain import RealMetaLearningStrategies, TransferMapping
+  import dataclasses
+  print([f.name for f in dataclasses.fields(TransferMapping)])
+  RealMetaLearningStrategies().transfer_knowledge("visual_cortex", "visual_planning")
+  PY
+  ```
+
+  Resultado: campos do POST 48 e `TypeError: TransferMapping.__init__() got an unexpected keyword argument 'transfer_strength'`.
+- O contrato `test_transfer_mapping_contract.py`, executado antes de editar o núcleo:
+
+  ```sh
+  PYTHONPATH=. python3 -m unittest -v test_transfer_mapping_contract.py
+  ```
+
+  `FAILED (failures=17, errors=7)`. Os erros de `transfer_knowledge` são o `TypeError` acima. Domínio `bool`/`None`/`int` produz `AttributeError: ... no attribute 'lower'`. Bool, NaN, infinito e negativo são aceitos nos dois construtores.
+- O mesmo comando, no commit de código: `Ran 17 tests in 0.152s` / `OK`.
+- Ruff 0.16.10:
+
+  ```sh
+  python3 -m ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py
+  ```
+
+  `All checks passed`.
+- Suíte completa:
+
+  ```sh
+  PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-transfer-mapping.sqlite3 python3 tools/test_summary.py --output /tmp/test-summary.json
+  ```
+
+  `Ran 320 tests in 5.177s` / `OK (skipped=2)`. Resumo: executed 320, passed 318, failed 0, skipped 2, unexpected_successes 0, result passed.
+- Suíte integrada:
+
+  ```sh
+  NEXUS_INTEGRATED_SUMMARY=/tmp/integrated-summary.json PYTHONPATH=. python3 core/constitutional_brain.py
+  ```
+
+  Saída: `EMBEDDED CHECKS: 30 passed, 1 skipped, 0 missing`. O JSON tem `result=passed`, skip no id `"0"`. O log marca `TEST 0: Keyword Fallback Mode (FAISS not available)`. Exit code 0.
+- `python3 tools/reality_audit.py` regenerou os relatórios versionados: 27591 linhas, 269 classes, 878 funções no núcleo. O inventário de frases fortes de capacidade permanece 51.
+- `find_transferable_knowledge` no raciocínio integrado (por volta da linha 24738) ainda é chamado com `target_task=`. Esse parâmetro não existe na assinatura. O log integrado não contém traceback.
+
+### Inferência
+
+- O `TypeError` vem da revinculação do nome global: a chamada resolve `TransferMapping` para a classe do POST 48, definida depois. A anotação de retorno, avaliada na definição do método, ainda segura a classe do POST 38. Não é um alias de import parcial: a falha permanece depois do import completo.
+- Os 2 skips da suíte unittest coincidem com a ausência de NetworkX (`importlib.util.find_spec("networkx")` é `None`) e com os dois únicos `skipUnless` da descoberta, em `test_knowledge_graph_contract.py`. O resumo de verbosidade 1 não imprimiu os nomes.
+
+### Hipótese
+
+- **H1, excluída:** o POST 48 substituiu de propósito o POST 38. Não há commit de substituição, e o corpo de `transfer_knowledge` ainda passa `transfer_strength`.
+- **H2, excluída:** só a forma do POST 38 é pretendida. `find_transferable_knowledge` e `execute_transfer` constroem e leem a forma do POST 48, e essa chamada sucede com domínios válidos.
+- **H3, sobrevivente nos testes desta rodada:** as duas formas são pretendidas. O defeito é a colisão de nome. A correção mantém `TransferMapping` como a forma do POST 48 e devolve a forma do POST 38 em `MetaTransferMapping`. Ainda não está falsificada: os dois caminhos válidos passaram e os tipos são distintos.
+- **H4, excluída como desenho:** unir os campos com defaults. Os call sites são disjuntos, e defaults aceitariam mapeamento incompleto. O contrato exige tipos distintos e campos obrigatórios.
+- **H5, excluída:** falha por ordem de import. A chamada após o import completo ainda levantava `TypeError`.
+
+### O que mudou
+
+- `MetaTransferMapping` guarda a forma do POST 38. `transfer_knowledge` constrói essa classe e rejeita domínio que não seja `str` antes de incrementar contadores.
+- `__post_init__` rejeita `bool`, não-reais, NaN, infinitos e negativos, sem converter o valor guardado. `transfer_strength` e `adaptation_required` ficam em `[0, 1]`. `transfer_quality` fica finito e `>= 0`, e pode ser `> 1`.
+- O contrato ficou na raiz, não em `tests/`: `unittest discover` não entra em diretório sem `__init__.py`, e o CI usa o glob `test_*.py`.
+
+### Limitações
+
+- Bandit, cobertura e mutation testing não foram reexecutados. `bandit_low: 131` no marcador continua o valor da triagem anterior, não uma medição desta rodada.
+- Não há run de CI hospedado para este commit. Os números acima são locais.
+- `transfer_quality > 1` continua aceito porque `_calculate_transfer_quality` pode ultrapassar 1 quando a cobertura excede os requisitos. Rejeitar isso quebraria um caminho que hoje sucede. Não houve clamp silencioso.
+- Atribuir um campo depois de `__post_init__` não revalida. As dataclasses não foram congeladas.
+- A sobreposição de features em `transfer_knowledge` é heurística por token `_`. Não é transferência aprendida.
+- O call site `target_task=` do raciocínio integrado não foi corrigido nem exercido com um domínio fonte já registrado. Permanece não verificado se esse ramo levanta `TypeError` quando `find_best_source_domain` devolve um nome.
 
 ## Rodada local — gatilho de PR para qualquer destino — 2026-10-19
 

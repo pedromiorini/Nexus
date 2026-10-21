@@ -3,9 +3,9 @@
   "scope": "conservative reality audit",
   "principle": "names, banners and demo asserts are not proof of general intelligence or production readiness",
   "static_evidence": {
-    "core_lines": 27549,
+    "core_lines": 27591,
     "classes": 269,
-    "functions": 875,
+    "functions": 878,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
