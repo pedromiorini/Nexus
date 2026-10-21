@@ -10,8 +10,9 @@ import argparse
 import fnmatch
 import hashlib
 import json
+import re
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -78,6 +79,16 @@ def validate(root: Path, registro: Path, claims_path: Path, now: datetime,
         if ag["id"] in ids:
             errors.append(f"{label}: id duplicado")
         ids.add(ag["id"])
+        if "uid" in ag and (not isinstance(ag["uid"], str) or not ag["uid"]):
+            errors.append(f"{label}: uid deve ser string não vazia")
+        last_seen = ag["last_seen"]
+        if not isinstance(last_seen, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", last_seen):
+            errors.append(f"{label}: last_seen deve ser string no formato YYYY-MM-DD")
+        else:
+            try:
+                date.fromisoformat(last_seen)
+            except ValueError:
+                errors.append(f"{label}: last_seen deve ser uma data real")
         ins = ag["instrucoes"] or {}
         if ins.get("arquivo") != atual.get("arquivo"):
             errors.append(f"{label}: instruções seguidas não são as atuais ({ins.get('arquivo')})")

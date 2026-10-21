@@ -1,8 +1,9 @@
 import hashlib
+import json
 import shutil
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -47,6 +48,70 @@ class AgentRegistryContract(unittest.TestCase):
 
     def test_valid_registry_passes(self):
         self.assertEqual(self._run(), ([], []))
+
+    def test_last_seen_valid_calendar_dates_pass(self):
+        for value in ("2026-10-21", "2024-02-29", "0001-01-01", "9999-12-31"):
+            with self.subTest(value=value):
+                self.reg["agentes"][0]["last_seen"] = value
+                self.assertEqual(self._run(), ([], []))
+
+    def test_last_seen_rejects_invalid_values_without_coercion(self):
+        invalid = ("2026-02-30", "2025-02-29", "2026-13-01", "0000-01-01",
+                   "invalid", "", True, False, [], ["2026-10-21"], 20261021, None,
+                   date(2026, 10, 21), datetime(2026, 10, 21))
+        for value in invalid:
+            with self.subTest(value=value):
+                self.reg["agentes"][0]["last_seen"] = value
+                errors, _ = self._run()
+                self.assertTrue(any("last_seen" in e for e in errors), errors)
+
+    def test_last_seen_rejects_alternative_formats(self):
+        for value in ("20261021", "2026-W43-3", "2026-1-01", "2026-10-1",
+                      "21/10/2026", "2026/10/21", "2026-10-21T00:00:00",
+                      " 2026-10-21", "2026-10-21 ", "2026-10-21\n", "２０２６-１０-２１"):
+            with self.subTest(value=value):
+                self.reg["agentes"][0]["last_seen"] = value
+                errors, _ = self._run()
+                self.assertTrue(any("last_seen" in e for e in errors), errors)
+
+    def test_last_seen_is_required(self):
+        del self.reg["agentes"][0]["last_seen"]
+        errors, _ = self._run()
+        self.assertTrue(any("last_seen" in e for e in errors), errors)
+
+    def test_uid_is_optional_and_preserved_exactly(self):
+        uid = "hAVRxhnxpHyGN2av2zCZQn"
+        self.reg["agentes"][0]["uid"] = uid
+        self.assertEqual(self._run(), ([], []))
+        saved = yaml.safe_load((self.tmp / REG).read_text(encoding="utf-8"))
+        self.assertEqual(saved["agentes"][0]["uid"], uid)
+        self.assertNotIn("uid", saved["agentes"][1])
+
+    def test_uid_when_present_must_be_a_nonempty_string(self):
+        for value in (None, True, 123, [], {}, ""):
+            with self.subTest(value=value):
+                self.reg["agentes"][0]["uid"] = value
+                errors, _ = self._run()
+                self.assertTrue(any("uid" in e for e in errors), errors)
+
+    def test_schema_declares_optional_uid_and_required_date(self):
+        schema = json.loads((self.tmp / "docs/agentes/schema/registro_agentes.schema.json").read_text())
+        agent = schema["$defs"]["agente"]
+        self.assertNotIn("uid", agent["required"])
+        self.assertEqual(agent["properties"]["uid"], {"type": "string", "minLength": 1})
+        self.assertIn("last_seen", agent["required"])
+        self.assertEqual(agent["properties"]["last_seen"]["type"], "string")
+        self.assertEqual(agent["properties"]["last_seen"]["format"], "date")
+
+    def test_repository_axis_identity_and_legacy_control(self):
+        agents = yaml.safe_load((ROOT / REG).read_text(encoding="utf-8"))["agentes"]
+        axis = [agent for agent in agents if agent["id"] == "axis"]
+        self.assertEqual(len(axis), 1)
+        self.assertEqual(axis[0]["uid"], "hAVRxhnxpHyGN2av2zCZQn")
+        grok = [agent for agent in agents if agent["id"] == "grok-bot"]
+        self.assertEqual(len(grok), 1)
+        self.assertEqual(grok[0]["last_seen"], "2026-10-21")
+        self.assertNotIn("uid", grok[0])
 
     def test_overlapping_claims_fail(self):
         self.claims["claims"][1]["arquivos"] = ["core/**"]

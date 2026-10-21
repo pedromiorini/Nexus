@@ -60,6 +60,31 @@ class Mutation:
 
 MUTATIONS = [
     Mutation(
+        "registry_last_seen_calendar", "tools/agente/validar_registro.py",
+        "date.fromisoformat(last_seen)", "pass",
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_last_seen_canonical_format", "tools/agente/validar_registro.py",
+        're.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", last_seen)', 'True',
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_last_seen_string_type", "tools/agente/validar_registro.py",
+        'not isinstance(last_seen, str)', 'False',
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_optional_uid_type", "tools/agente/validar_registro.py",
+        'not isinstance(ag["uid"], str)', 'False',
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_optional_uid_nonempty", "tools/agente/validar_registro.py",
+        'or not ag["uid"]', 'or False',
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
         "dashboard_float_finiteness_guard", "tools/diagnostics_dashboard.py",
         "if not math.isfinite(value):", "if False:", tests=DASHBOARD_NUMBERS,
     ),

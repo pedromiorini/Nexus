@@ -77,3 +77,12 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Correção local: restaurado somente o modo `100755` do runner, sem alterar seu conteúdo; acrescentado `test_documented_runner_is_directly_executable`, sem `bash` nem chmod no teste, sobre os 11 casos padrão.
 - Regra/checagem derivada: testar a forma de invocação documentada e incluir modos Git na identidade do diff congelado.
 - Status: registrada, sem promoção permanente; patch reprovado preservado como histórico, novo diff sujeito à nova revisão final independente de Segurança.
+
+### L-007 — Formato date no schema não era aplicado pelo validador
+- Data: 2026-10-21
+- Verificador que deveria ter falhado: `tools/agente/validar_registro.py` e contrato do registro na base `b2b01f2c6b044f0f7f1b60ec1e9c0d615fa4d296`.
+- Fato observado: o RED de `test_agent_registry_contract.py` aceitou datas impossíveis, formatos alternativos, bool, lista, null e objetos de data carregados do YAML. Ausência já era rejeitada; o controle válido continuou aceito.
+- Causa (Fato): o validador consultava os campos `required` do schema, mas não aplicava `type`/`format` de `last_seen`.
+- Correção local: checar string, formato ASCII exato e calendário real, sem coerção; regressões e mutantes específicos no mesmo patch autorizado do registro Axis. Logs e comandos na nova rodada de `CONTINUATION.md`.
+- Regra/checagem derivada: declaração de formato em schema não substitui teste negativo do caminho efetivamente executado; parser ISO sozinho também aceita formatos compactos/semanais.
+- Status: registrada; sem promoção das instruções, publicação ou alegação de validação genérica de todo o schema.
