@@ -3,7 +3,7 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 303
+tests: 308
 bandit_low: 131
 -->
 
@@ -202,3 +202,11 @@ Correção: `search_episodes` rejeita bool e tipos não inteiros com `TypeError`
 `test_episodic_memory_search_limits_contract.py` cobre limites negativos nos dois ramos de query e prova ausência de SQL, rejeição de bool/float/string/None, zero sem consulta e preservação de limite positivo. Validação final: 11/11 contratos episódicos focados e unittest 275/275; integração 30 aprovados + 1 skip FAISS opcional; cobertura 95/94/76/68%; mutation 58/58 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW e nenhum MEDIUM/HIGH. Ruff, compileall, actionlint, zizmor, auditorias AST/realidade/gaps e benchmarks oficiais passaram. O POMDP v2 obteve 128/128 casos dentro de `1e-12` (erro máximo `2.7755575615628914e-16`) e rejeitou 4/4 controles inválidos. O relatório de realidade foi regenerado para refletir as sete linhas acrescentadas ao núcleo.
 
 Fonte normativa: [SQLite Language Reference — SELECT, seção LIMIT](https://www.sqlite.org/lang_select.html), que especifica que um LIMIT negativo não estabelece teto para as linhas retornadas.
+
+## Inventário de classe explícita em `raise` — 2026-10-21
+
+Base `d435083bb4c893a58128cee6cfa00f65bba7fe02`; branch local `fix/gap-audit-exception-class-20261021`. O auditor AST retornava zero para `raise NotImplementedError` e uma ocorrência para a chamada equivalente. A [referência Python de raise](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement) aceita tanto classe quanto instância; a correção reconhece o alvo nome/atributo sem exigir chamada, sem executar fonte ou resolver nomes.
+
+RED na base: cinco métodos novos executados, quatro afetados por oito falhas de assertivas/subcasos, um aprovado. GREEN: 24/24 contratos focados e suíte 308/308 em Python 3.11.16 e 3.12.3; integração 30 aprovadas + 1 skip opcional em ambas. Em 3.11: cobertura do auditor 94%; pisos de fila/VRAM/temporal/Vita/core aprovados (95/94/93/76/68%); mutation existente 58/58 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW, zero MEDIUM/HIGH/erros. Ruff, compileall, actionlint, zizmor, requirements dry-run, auditorias e benchmarks CLI existentes aprovados. Inventário do núcleo permanece zero pass-only e zero NotImplementedError. Não é evidência de ausência geral de lacunas, segurança completa ou capacidade cognitiva.
+
+Comandos, ambientes, limites e inventário de sobreposição estão em `CONTINUATION.md`; logs e comandos brutos em `/workspace/nexus-gap-audit-class-evidence-20261021/validation.json`, `red.log`, `green311.log`, `green312.log` e `run_gates.py`. Ambientes anteriores do lock reutilizados, sem reinstalação. Nenhum CI hospedado/push/PR/merge foi executado. WIP `window_seconds` não incorporada; `known_at` permanece pendente. Nenhuma decisão anterior foi refutada.
