@@ -1,0 +1,40 @@
+# Registro de agentes do Nexus (protegido por CODEOWNERS: @pedromiorini).
+# Cada agente se declara ANTES do 1º PR. Validado por tools/agente/validar_registro.py.
+# Autodeclaração é Hipótese: só o hash das instruções e os claims são verificados mecanicamente.
+schema_version: 1
+instrucoes_atuais:
+  arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md
+  versao: "3.3"
+agentes:
+  - id: grok-bot
+    operador: pedromiorini
+    ferramenta: Grok Bot (subagentes locais no box; agentes de nuvem quando liberados)
+    modelo: não declarado pelo provedor
+    instrucoes:
+      arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md
+      sha256: c0d036106f7a532717484b38fcda60ff1086d7ef9d3ebae2f189b48f658b61c4
+      versao_aceita: "3.3"
+    conhecimentos: [CI do Nexus, state_consistency_audit, gate de mutação, triagem de PRs]
+    skills: [safe-gh-batch-actions, conflict-resolution-handoff-docs, contract-first-bugfix, multi-agent-pr-triage, repo-agent-dispatch, repo-evidence-audit]
+    escopo_arquivos: [docs/agentes/**, tools/agente/**, .github/**]
+    limites: [sem merge sem aprovação do Pedro, rascunho por padrão, nunca imprimir segredos]
+    assinaturas_commit: ["grokbot@users.noreply.github.com"]
+    contato: pedromiorini (GitHub)
+    last_seen: "2026-10-21"
+# Modelo para novos agentes (copie, preencha e abra PR; não invente dados):
+#  - id: <slug-unico>
+#    operador: <conta GitHub responsável>
+#    ferramenta: <produto>
+#    modelo: <modelo ou "não declarado">
+#    instrucoes: {arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md, sha256: <sha256sum do arquivo>, versao_aceita: "3.3"}
+#    conhecimentos: [...]
+#    skills: [...]
+#    escopo_arquivos: [<globs>]
+#    limites: [...]
+#    assinaturas_commit: [<e-mail do autor dos commits>]
+#    contato: <...>
+#    last_seen: "AAAA-MM-DD"
+# NÃO DECLARADOS (autores de commit em main, git log 25007c5; aguardam declaração):
+#   Manus AI <manus@manus.im>; Cue Agent <cue-agent@users.noreply.github.com>; Axis <axis603@bot.cue.im>;
+#   Claude <noreply@anthropic.com>; Cursor Agent <cursoragent@cursor.com>; dependabot[bot] (bot, isento).
+#   Autores de PR via gh: pedromiorini, app/dependabot.
