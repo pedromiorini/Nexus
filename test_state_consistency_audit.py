@@ -59,6 +59,44 @@ class StateConsistencyAuditTests(unittest.TestCase):
         self.assertEqual(report["status"], "fail")
         self.assertIn("tests", {item["field"] for item in report["conflicts"]})
 
+    def test_invalid_bandit_low_fails_even_when_documents_agree(self):
+        values = (-1, True, False, 0.0, 1.0, -1.5, "bad", "0", "1", None,
+                  float("nan"), float("inf"), float("-inf"), [], {})
+        for value in values:
+            with self.subTest(value=value):
+                directory, manifest = self._write_fixture(bandit_low=value)
+                report = audit(manifest, directory)
+                self.assertEqual(report["status"], "fail")
+                self.assertEqual(report["conflicts"], [])
+                self.assertEqual(report["errors"], [
+                    "manifesto: security.bandit.severity.LOW deve ser inteiro built-in não negativo"
+                ])
+
+    def test_invalid_bandit_low_is_not_compared_with_documents(self):
+        directory, manifest = self._write_fixture(
+            bandit_low=-1,
+            marker_overrides={name: {"bandit_low": "0"} for name in DOCUMENTS},
+        )
+        report = audit(manifest, directory)
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(report["conflicts"], [])
+        self.assertEqual(set(report["documents"]), set(DOCUMENTS))
+        self.assertTrue(any("security.bandit.severity.LOW" in error for error in report["errors"]))
+
+    def test_nonnegative_integer_bandit_low_preserves_valid_report(self):
+        for value in (0, 1, 131, 10**30):
+            with self.subTest(value=value):
+                directory, manifest = self._write_fixture(bandit_low=value)
+                report = audit(manifest, directory)
+                self.assertEqual(report["status"], "pass")
+                self.assertEqual(report["manifest"], {
+                    "commit": "abc123", "ci_run": "12345", "tests": "107",
+                    "bandit_low": str(value),
+                })
+                self.assertEqual(report["errors"], [])
+                self.assertEqual(report["conflicts"], [])
+                self.assertEqual(report["schema_version"], 1)
+
     def test_divergent_commit_and_security_are_conflicts(self):
         directory, manifest = self._write_fixture(
             marker_overrides={

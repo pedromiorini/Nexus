@@ -41,6 +41,7 @@ TOOL_CACHE_STORE = ("test_tool_cache_store_contract.py",)
 TOOL_CACHE_HIT = ("test_tool_cache_hit_contract.py",)
 MEMORY_SQL = ("test_memory_sql_contract.py",)
 EPISODIC_SEARCH_LIMIT = ("test_episodic_memory_search_limits_contract.py",)
+DASHBOARD_NUMBERS = ("test_recovery_diagnostics_contract.py",)
 COPY_IGNORE = shutil.ignore_patterns(
     ".git", "__pycache__", ".venv", "venv", ".hypothesis", ".ruff_cache", ".mypy_cache",
     "*.sqlite3", "*.db", ".coverage*", "coverage.xml", "targeted_mutation_report.json",
@@ -58,6 +59,37 @@ class Mutation:
 
 
 MUTATIONS = [
+    Mutation(
+        "dashboard_float_finiteness_guard", "tools/diagnostics_dashboard.py",
+        "if not math.isfinite(value):", "if False:", tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "dashboard_stdin_float_decoder", "tools/diagnostics_dashboard.py",
+        "json.load(sys.stdin, parse_float=_parse_finite_float,",
+        "json.load(sys.stdin, parse_float=float,", tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "dashboard_file_float_decoder", "tools/diagnostics_dashboard.py",
+        "        parse_float=_parse_finite_float, parse_constant=_reject_json_constant,",
+        "        parse_float=float, parse_constant=_reject_json_constant,", tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "dashboard_stdin_constant_decoder", "tools/diagnostics_dashboard.py",
+        "json.load(sys.stdin, parse_float=_parse_finite_float, parse_constant=_reject_json_constant)",
+        "json.load(sys.stdin, parse_float=_parse_finite_float)", tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "dashboard_file_constant_decoder", "tools/diagnostics_dashboard.py",
+        "        parse_float=_parse_finite_float, parse_constant=_reject_json_constant,",
+        "        parse_float=_parse_finite_float,", tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "embedded_assert_only_module_level_guards",
+        "tools/embedded_assert_audit.py",
+        "for node in tree.body:",
+        "for node in ast.walk(tree):",
+        tests=("test_embedded_assert_audit.py",),
+    ),
     Mutation("queue_capacity_guard", "core/deferred_task_queue.py", "max_attempts < 1", "max_attempts < 0"),
     Mutation("queue_priority_direction", "core/deferred_task_queue.py", "(-self.priority, self.created_at)", "(self.priority, self.created_at)"),
     Mutation("queue_pressure_guard", "core/deferred_task_queue.py", "if pressure_critical or not self._heap:", "if pressure_critical and not self._heap:"),

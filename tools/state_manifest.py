@@ -46,27 +46,36 @@ def _test_count() -> int:
     return count
 
 
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"Invalid JSON constant: {value}")
+
+
 def _test_summary() -> dict[str, Any]:
     path = ROOT / "test-summary.json"
     try:
-        summary = json.loads(path.read_text(encoding="utf-8"))
-        required = ("executed", "passed", "failed", "skipped", "unexpected_successes", "result")
-        if not all(key in summary for key in required):
-            return {"status": "invalid_summary"}
-        counts = ("executed", "passed", "failed", "skipped", "unexpected_successes")
-        if any(type(summary[key]) is not int or summary[key] < 0 for key in counts):
-            return {"status": "invalid_summary"}
-        if summary["unexpected_successes"] > summary["failed"]:
-            return {"status": "invalid_summary"}
-        if summary["passed"] + summary["failed"] + summary["skipped"] != summary["executed"]:
-            return {"status": "invalid_summary"}
-        if summary["result"] not in {"passed", "failed"}:
-            return {"status": "invalid_summary"}
-        if (summary["result"] == "passed") != (summary["failed"] == 0):
-            return {"status": "invalid_summary"}
-        return {"status": "generated", **{key: summary[key] for key in required}}
-    except (OSError, json.JSONDecodeError, TypeError):
+        summary = json.loads(path.read_text(encoding="utf-8"), parse_constant=_reject_json_constant)
+    except FileNotFoundError:
         return {"status": "not_generated"}
+    except (OSError, ValueError):  # Includes JSONDecodeError and UnicodeDecodeError.
+        return {"status": "invalid_summary"}
+
+    if not isinstance(summary, dict):
+        return {"status": "invalid_summary"}
+    required = ("executed", "passed", "failed", "skipped", "unexpected_successes", "result")
+    if not all(key in summary for key in required):
+        return {"status": "invalid_summary"}
+    counts = ("executed", "passed", "failed", "skipped", "unexpected_successes")
+    if any(type(summary[key]) is not int or summary[key] < 0 for key in counts):
+        return {"status": "invalid_summary"}
+    if summary["unexpected_successes"] > summary["failed"]:
+        return {"status": "invalid_summary"}
+    if summary["passed"] + summary["failed"] + summary["skipped"] != summary["executed"]:
+        return {"status": "invalid_summary"}
+    if not isinstance(summary["result"], str) or summary["result"] not in {"passed", "failed"}:
+        return {"status": "invalid_summary"}
+    if (summary["result"] == "passed") != (summary["failed"] == 0):
+        return {"status": "invalid_summary"}
+    return {"status": "generated", **{key: summary[key] for key in required}}
 
 
 def _integrated_summary() -> dict[str, Any]:
