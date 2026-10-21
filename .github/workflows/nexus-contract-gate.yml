@@ -308,8 +308,8 @@ jobs:
 
   state-manifest:
     name: Final state attestation
-    needs: contract-gate
-    if: needs.contract-gate.result == 'success'
+    needs: [contract-gate, agent-guard-replay]
+    if: needs.contract-gate.result == 'success' && needs.agent-guard-replay.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
