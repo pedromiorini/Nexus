@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# gh falso: CHECKS=fail|pass  STATE=CLEAN|DIRTY ; registra acoes
+echo "$*" >> "$LOG"
+case "$1 $2" in
+ "pr checks") [[ $CHECKS == pass ]] && { echo "ok"; exit 0; } || { echo "X Contract gate fail"; exit 1; } ;;
+ "pr view") echo "$STATE";;
+ "pr ready"|"pr merge") echo "ACAO $*";;
+esac
