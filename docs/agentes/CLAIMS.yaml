@@ -1,9 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: registro de agentes e claims
-    arquivos: [docs/agentes/REGISTRO_AGENTES.yaml, docs/agentes/CLAIMS.yaml, docs/agentes/schema/**, tools/agente/validar_registro.py, test_agent_registry_contract.py]
-    pr: null
-    expira_em: "2026-10-24T23:59:00-03:00"
+claims: []  # claim do grok-bot (registro, #67) removido após o merge 3c3b038

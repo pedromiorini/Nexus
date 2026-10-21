@@ -51,3 +51,12 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Correção: comandos que alteram estado do GitHub passaram a rodar com `set -euo pipefail` e sem pipes no caminho de decisão; "pronto" e merge só depois de CI 2/2 verde confirmado no head enviado.
 - Regra/checagem derivada: toda automação que faz push, marca pronto, mescla ou fecha PR roda com `set -euo pipefail`; nunca filtrar com `| grep` a saída de um passo cujo código de saída decide o próximo.
 - Status: registrada (alto risco → candidata a promoção nas instruções).
+
+### L-004 — PR do registro misturou workflow com docs (#67)
+- Data: 2026-10-21
+- Verificador: nenhum; detectado por revisão contra a v3 §11 item 6 ("Workflows, dependências/lock e permissões: PR dedicado, nunca misturado").
+- Fato observado: o #67 (mesclado como `3c3b038`) alterou `.github/workflows/nexus-contract-gate.yml` junto com docs, schema, validador e testes.
+- Causa (Inferência): o pedido descrevia tudo como um único entregável e a regra não foi checada antes do commit.
+- Correção: os PRs seguintes separam workflow de docs (um tema por PR).
+- Regra/checagem derivada: antes do commit, se `git diff --cached --name-only` incluir `.github/workflows/` junto com outro caminho, dividir o PR. Candidata a checagem automática no `predeleg.sh`.
+- Status: registrada.
