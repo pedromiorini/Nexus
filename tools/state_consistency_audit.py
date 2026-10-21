@@ -26,6 +26,10 @@ MARKER_RE = re.compile(
 MARKER_START_RE = re.compile(r"<!--\s*NEXUS-CURRENT-STATE\b")
 LINE_RE = re.compile(r"^\s*(?P<key>[a-z][a-z0-9_]*)\s*:\s*(?P<value>\S+)\s*$")
 REQUIRED = {"commit", "ci_run", "tests", "bandit_low"}
+# Sentinelas resolvidas a partir do manifesto do CI. Cada uma só é válida no próprio
+# campo; números literais continuam exigindo igualdade exata. ``CURRENT_TESTS`` evita
+# que cada PR que adiciona testes edite o contador nos quatro documentos (decisão D1).
+SENTINELS = {"commit": "HEAD", "ci_run": "CURRENT_RUN", "tests": "CURRENT_TESTS"}
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -163,7 +167,7 @@ def audit(manifest_path: Path, root: Path = ROOT) -> dict[str, Any]:
                 if field == "bandit_low" and not bandit_low_valid:
                     continue
                 value = claims[field]
-                resolved = expected[field] if value in {"HEAD", "CURRENT_RUN"} else value
+                resolved = expected[field] if value == SENTINELS.get(field) else value
                 if resolved != expected[field]:
                     conflicts.append({
                         "document": name,
