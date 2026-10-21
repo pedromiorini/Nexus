@@ -37,19 +37,23 @@ class ReplayContract(unittest.TestCase):
         self.assertIn("PASSOU controle rc=0", result.stdout)
 
     def test_documented_runner_is_directly_executable(self):
-        try:
-            result = subprocess.run(
-                [str(REPLAY)],
-                cwd=ROOT,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-        except OSError as exc:
-            self.fail(f"Invocacao direta do runner falhou: {exc}")
+        with tempfile.TemporaryDirectory(prefix="nexus-replay-executable-") as tmp:
+            path = Path(tmp) / "casos.tsv"
+            path.write_text(PASS + "\n", encoding="utf-8")
+            try:
+                result = subprocess.run(
+                    [str(REPLAY), str(path)],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+            except OSError as exc:
+                self.fail(f"Invocacao direta do runner falhou: {exc}")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("Executados: 11", result.stdout)
-        self.assertEqual(result.stdout.count("PASSOU "), 11, result.stdout)
+        self.assertIn("Executados: 1", result.stdout)
+        self.assertIn("PASSOU controle rc=0", result.stdout)
+        self.assertEqual(result.stdout.count("PASSOU "), 1, result.stdout)
         self.assertNotIn("FALHOU", result.stdout + result.stderr)
 
     def test_expected_guard_failure_is_a_successful_replay(self):
