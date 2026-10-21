@@ -1,0 +1,4 @@
+# Só tem efeito de bloqueio se a main exigir "Require review from Code Owners" (branch protection/ruleset).
+/docs/agentes/ @pedromiorini
+/AGENTS.md @pedromiorini
+/.github/CODEOWNERS @pedromiorini

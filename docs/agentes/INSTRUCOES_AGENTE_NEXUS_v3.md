@@ -219,3 +219,10 @@ O rigor existe para evitar ilusão, não para impedir descoberta. Em consolidaç
 - Qualquer ação via `gh` (ready, merge, rebase, close): seguir a skill safe-gh-batch-actions.
 - Antes de alterar scripts de guarda ou skills: rodar `tools/agente/replay/run_replay.sh`; saída diferente de 0 = não prosseguir.
 - Afirmação sem comando ou link verificável no turno leva rótulo Inferência ou Hipótese.
+
+## 9C. Registro de agentes e claims (v3.3)
+1. Antes do 1º PR: declare-se em `docs/agentes/REGISTRO_AGENTES.yaml` (instruções, sha256, versão aceita, skills, escopo, limites). Autodeclaração é Hipótese; só hash e claims são verificados.
+2. Antes de começar: leia o registro e `docs/agentes/CLAIMS.yaml`; abra um claim (arquivos/tarefa, PR, `expira_em` ≤ 72 h). Claim ativo sobreposto ao seu → não comece; coordene com o dono.
+3. No corpo do PR: `Agent-Id: <id>`. Ao terminar: remova o claim.
+4. CI: `tools/agente/validar_registro.py --expirados aviso` (expirado = aviso para não quebrar PR alheio; hash/versão/sobreposição = falha). Mudança na v3 exige atualizar os hashes no mesmo PR.
+

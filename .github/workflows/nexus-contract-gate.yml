@@ -166,6 +166,13 @@ jobs:
           PYTHONPATH: .
         run: python -m unittest -v test_state_consistency_audit.py
 
+      - name: Validate agent registry and claims
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest -v test_agent_registry_contract.py
+          python tools/agente/validar_registro.py --expirados aviso
+
       - name: Run reproducible capability benchmark
         env:
           PYTHONPATH: .
