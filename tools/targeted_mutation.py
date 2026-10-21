@@ -83,6 +83,13 @@ MUTATIONS = [
         "        parse_float=_parse_finite_float, parse_constant=_reject_json_constant,",
         "        parse_float=_parse_finite_float,", tests=DASHBOARD_NUMBERS,
     ),
+    Mutation(
+        "embedded_assert_only_module_level_guards",
+        "tools/embedded_assert_audit.py",
+        "for node in tree.body:",
+        "for node in ast.walk(tree):",
+        tests=("test_embedded_assert_audit.py",),
+    ),
     Mutation("queue_capacity_guard", "core/deferred_task_queue.py", "max_attempts < 1", "max_attempts < 0"),
     Mutation("queue_priority_direction", "core/deferred_task_queue.py", "(-self.priority, self.created_at)", "(self.priority, self.created_at)"),
     Mutation("queue_pressure_guard", "core/deferred_task_queue.py", "if pressure_critical or not self._heap:", "if pressure_critical and not self._heap:"),
