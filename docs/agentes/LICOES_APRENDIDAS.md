@@ -60,3 +60,20 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Correção: os PRs seguintes separam workflow de docs (um tema por PR).
 - Regra/checagem derivada: antes do commit, se `git diff --cached --name-only` incluir `.github/workflows/` junto com outro caminho, dividir o PR. Candidata a checagem automática no `predeleg.sh`.
 - Status: registrada.
+
+### L-005 — Replay sem casos ou sem leitura retornava sucesso
+- Data: 2026-10-21
+- Verificador que deveria ter falhado: `tools/agente/replay/run_replay.sh`; dependência incompleta do job `Final state attestation` no candidato da #69.
+- Fato observado: no head `ca36166a8bc4f35fc1036867d01e8f6f7054d855`, arquivo vazio, comentários, caminho ausente, diretório e arquivo sem permissão de leitura retornaram 0. O replay normal tinha 11 casos e passou; não houve falha observada naquele run. A atestação dependia apenas do `contract-gate`.
+- Causa (Fato): `fail=0` permanecia intacto quando nenhuma iteração ocorria ou a leitura falhava; tipo desconhecido podia reutilizar `rc` anterior. `needs`/`if` não incluíam o replay.
+- Correção local: snapshot com leitura verificada, mínimo de um caso executado, rejeição de tipo desconhecido e atestação condicionada ao sucesso dos dois jobs; regressões em `test_agent_replay_contract.py`. Base e logs na nova seção correspondente de `CONTINUATION.md`.
+- Regra/checagem derivada: aprovação de um replay exige execução não-vazia e leitura concluída; atestação final deve depender de todos os gates que declara cobrir.
+- Status: registrada; patch local isolado, sem publicação nem promoção permanente. Revisão de Segurança única solicitada sobre o diff congelado; conclusão entregue no handoff externo.
+### L-006 — Teste com bash ocultou perda do modo executável
+- Data: 2026-10-21
+- Verificador: revisão independente de Segurança do patch local de replay; testes anteriores chamavam `bash` explicitamente.
+- Fato observado: o patch `a175daa4d98704bd0c4a608d18c0517ffffdf62ace488e598b1fd481276df9fd` foi reprovado por mudar o modo Git do runner de `100755` para `100644`. Nesta retomada, execução direta retornou 126, Permission denied; a nova regressão falhou antes da correção.
+- Causa (Fato): invocar `bash script` não exige o bit executável do script e não exercita a forma direta documentada.
+- Correção local: restaurado somente o modo `100755` do runner, sem alterar seu conteúdo; acrescentado `test_documented_runner_is_directly_executable`, sem `bash` nem chmod no teste, sobre os 11 casos padrão.
+- Regra/checagem derivada: testar a forma de invocação documentada e incluir modos Git na identidade do diff congelado.
+- Status: registrada, sem promoção permanente; patch reprovado preservado como histórico, novo diff sujeito à nova revisão final independente de Segurança.
