@@ -259,3 +259,13 @@
 - **Evidência:** `test_knowledge_graph_contract.py` cobre relações múltiplas e propriedades chamadas `relations`; os testes do caminho NetworkX passaram com NetworkX 3.6.1. A dependência está agora no lock de CI com hashes, de modo que o caminho `DiGraph` é exercitado no gate.
 - **Limitação:** o grafo ainda não distingue relações repetidas por tempo; isso é escopo de D-027.
 - **Reversibilidade:** simples; remover o acúmulo restaura o comportamento anterior.
+
+## D-029 — Contador de testes derivado do manifesto (`tests: CURRENT_TESTS`)
+
+- **Status:** proposta na branch `fix/handoff-counter-decoupling` (hipótese operacional até revisão humana).
+- **Decisão:** os blocos `NEXUS-CURRENT-STATE` declaram `tests: CURRENT_TESTS`; `tools/state_consistency_audit.py` resolve a sentinela para `verification.tests.executed` do manifesto da mesma execução, como já fazia com `commit: HEAD` e `ci_run: CURRENT_RUN`. Cada sentinela passa a valer só no próprio campo; números literais continuam exigindo igualdade exata.
+- **Contexto:** todo PR que adicionava teste editava `tests: N` em quatro documentos; PRs independentes conflitavam entre si (ex.: #52 × #53), embora cada um estivesse limpo contra `main`.
+- **Alternativas excluídas:** tolerância `>=` (aceita contagem desatualizada e deixa de detectar remoção de testes); fonte única em arquivo versionado (desloca o conflito para esse arquivo); fragmentos `handoff/` sozinhos (não removem o contador exigido pelo gate). Fragmentos podem ser adotados depois, de forma independente.
+- **Evidência:** `test_state_counter_sentinel_contract.py` (6 testes) falhou com 12 falhas antes da correção e passa depois; suíte completa 309/309 e `state_consistency_audit.py` aprovado localmente em 21/10/2026 (Python 3.13.5; CI hospedado não verificado).
+- **Limitação:** o número de testes deixa de ser legível nos documentos; a fonte passa a ser o artefato `nexus-state-manifest` do CI. A garantia do gate (claims atuais coerentes com a execução, execução aprovada) é preservada; ele continua não provando validade semântica dos testes. `bandit_low` continua literal (muda raramente).
+- **Reversibilidade:** simples; reverter o commit restaura literais.

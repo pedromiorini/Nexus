@@ -3,12 +3,18 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 306
+tests: CURRENT_TESTS
 bandit_low: 131
 -->
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
+## Rodada local — contador de testes derivado (D1) — 2026-10-21
+
+- **Base:** `d435083` (`main`), branch `fix/handoff-counter-decoupling`, sem push.
+- **Mudança:** `tests: CURRENT_TESTS` nos quatro blocos `NEXUS-CURRENT-STATE`; sentinelas restritas ao próprio campo (ver D-029). PRs futuros **não** precisam editar o contador.
+- **Comandos:** ruff 0.16.10 (lock) ok; compileall ok; reality audit sem diff; `unittest discover` 309 OK; suíte integrada 30 aprovadas/1 ignorada; mutação 58/58; Bandit 131 LOW; `state_manifest.py` + `state_consistency_audit.py` → `pass`; com literal `tests: 303` injetado → `fail` (conflito detectado).
+- **Limitações:** Python 3.13.5 local (CI usa 3.11); CI hospedado, actionlint e zizmor não executados nesta rodada.
 ## Rodada local — descoberta unittest vazia falha fechada — 2026-10-20
 
 - **Base exata:** `d435083bb4c893a58128cee6cfa00f65bba7fe02`, igual à ref local `origin/main` inspecionada, sem fetch nem alteração de `main`. Branch `fix/test-summary-empty-suite-20261020`, worktree criada limpa em `/workspace/Nexus-test-summary-empty-suite-20261020`. `/workspace/Nexus` permanece intocada; nenhuma edição foi feita nas demais worktrees. Não houve consulta remota, push, PR ou merge. A PR #52 e seu resumo integrado não fazem parte deste patch.
