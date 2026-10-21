@@ -12,9 +12,6 @@ bandit_low: 131
 Base `d435083bb4c893a58128cee6cfa00f65bba7fe02`, branch `fix/integrated-summary-duplicates-20261020`: regressões reproduziram PASS/PASS e SKIP/SKIP indevidamente aprovados antes do patch. O tally agora expõe `duplicates` e falha com resultados terminais repetidos, preservando stream e categorias existentes. Após a correção: 10 contratos focados aprovados; suíte completa executada duas vezes (com cobertura e `tools/test_summary.py`), 307 executados/305 aprovados/2 skips opcionais/0 falhas; integração real 30 passes/1 skip e nenhuma duplicata. Gates de cobertura, Ruff, compilação, auditorias e 58 mutações preexistentes aprovados; Bandit 131 LOW e nenhum MEDIUM/HIGH. Comandos, limitações e proveniência estão na seção correspondente de `CONTINUATION.md`.
 
 Esta é evidência de contrato de software local, não de capacidade cognitiva nem CI hospedado. O consumidor legado do manifesto permanece fail-closed (`invalid_summary` para falha causada apenas por duplicata), sem contabilização específica nova. Nenhuma sonda sintética, CLI de benchmark ou evolução separada de WorldModel foi executada nesta rodada.
-tests: CURRENT_TESTS
-bandit_low: 131
--->
 
 ## Igualdade exata na guarda de triagem — 2026-10-20
 
