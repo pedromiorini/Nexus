@@ -269,3 +269,10 @@
 - **Evidência:** `test_state_counter_sentinel_contract.py` (6 testes) falhou com 12 falhas antes da correção e passa depois; suíte completa 309/309 e `state_consistency_audit.py` aprovado localmente em 21/10/2026 (Python 3.13.5; CI hospedado não verificado).
 - **Limitação:** o número de testes deixa de ser legível nos documentos; a fonte passa a ser o artefato `nexus-state-manifest` do CI. A garantia do gate (claims atuais coerentes com a execução, execução aprovada) é preservada; ele continua não provando validade semântica dos testes. `bandit_low` continua literal (muda raramente).
 - **Reversibilidade:** simples; reverter o commit restaura literais.
+## D-029 — Exceção B101 somente para guarda direta do módulo
+
+- **Decisão:** `tools/embedded_assert_audit.py` procura a comparação convencional `__name__ == '__main__'` somente em `ast.Module.body`, preservando o predicado existente e as faixas de linhas do corpo positivo. Guardas em função, função assíncrona, classe ou outro bloco não criam exceções. A busca de todos os `ast.Assert` continua recursiva e independente dos findings Bandit.
+- **Contexto:** em `d435083bb4c893a58128cee6cfa00f65bba7fe02`, `ast.walk` aceitava uma guarda dentro de `helper()` como demonstração do módulo, deixando `assert False` sem finding passar com `ok=True`.
+- **Evidência:** sete novos métodos de regressão, incluindo nove contextos aninhados com/sem B101 e com/sem demonstração legítima adicional; o mutante `embedded_assert_only_module_level_guards` restaura `ast.walk` e é morto. Comandos, resultados locais e limites estão em `CONTINUATION.md` e `NEXUS_EVIDENCE.md` na rodada de 2026-10-20.
+- **Limites:** verificação sintática de localização, não análise de fluxo, segurança dos asserts ou validação do schema/filename do relatório Bandit. Conteúdo dentro da faixa de uma guarda legítima mantém a exceção anterior; `else` fica fora. Não se ampliam as formas de comparação aceitas, nem se altera a triagem separada de escopos de `tools/security_triage.py`.
+- **Reversibilidade:** simples; uma troca de iteração, acompanhada das regressões e do mutante. Não muda workflow, núcleo, dependências ou API pública.
