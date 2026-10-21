@@ -21,8 +21,25 @@ agentes:
     assinaturas_commit: ["grokbot@users.noreply.github.com"]
     contato: pedromiorini (GitHub)
     last_seen: "2026-10-21"
+  - id: axis
+    uid: hAVRxhnxpHyGN2av2zCZQn
+    operador: pedromiorini
+    ferramenta: Cue
+    modelo: não declarado pelo provedor
+    instrucoes:
+      arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md
+      sha256: c0d036106f7a532717484b38fcda60ff1086d7ef9d3ebae2f189b48f658b61c4
+      versao_aceita: "3.3"
+    conhecimentos: [contratos de registro de agentes, validação local do Nexus]
+    skills: [contract-first-bugfix, repo-evidence-audit]
+    escopo_arquivos: [docs/agentes/**, tools/agente/validar_registro.py, test_agent_registry_contract.py, tools/targeted_mutation.py, CONTINUATION.md]
+    limites: [somente escopo local autorizado, sem push ou PR ou merge, preservar registro do Grok e worktrees alheias]
+    assinaturas_commit: ["axis603@bot.cue.im"]
+    contato: pedromiorini (GitHub)
+    last_seen: "2026-10-21"
 # Modelo para novos agentes (copie, preencha e abra PR; não invente dados):
 #  - id: <slug-unico>
+#    uid: <identificador-canônico-opcional; string não vazia, preservada sem normalização>
 #    operador: <conta GitHub responsável>
 #    ferramenta: <produto>
 #    modelo: <modelo ou "não declarado">
@@ -35,6 +52,6 @@ agentes:
 #    contato: <...>
 #    last_seen: "AAAA-MM-DD"
 # NÃO DECLARADOS (autores de commit em main, git log 25007c5; aguardam declaração):
-#   Manus AI <manus@manus.im>; Cue Agent <cue-agent@users.noreply.github.com>; Axis <axis603@bot.cue.im>;
+#   Manus AI <manus@manus.im>; Cue Agent <cue-agent@users.noreply.github.com>;
 #   Claude <noreply@anthropic.com>; Cursor Agent <cursoragent@cursor.com>; dependabot[bot] (bot, isento).
 #   Autores de PR via gh: pedromiorini, app/dependabot.

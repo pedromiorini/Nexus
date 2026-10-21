@@ -8,6 +8,7 @@
       "required": ["id", "operador", "ferramenta", "modelo", "instrucoes", "skills", "escopo_arquivos", "limites", "contato", "last_seen"],
       "properties": {
         "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "uid": {"type": "string", "minLength": 1},
         "instrucoes": {"type": "object", "required": ["arquivo", "sha256", "versao_aceita"],
           "properties": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
         "skills": {"type": "array", "items": {"type": "string"}},
