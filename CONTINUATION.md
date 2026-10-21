@@ -9,6 +9,13 @@ bandit_low: 131
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
+## Rodada local — contador de testes derivado (D1) — 2026-10-21
+
+- **Base:** `d435083` (`main`), branch `fix/handoff-counter-decoupling`, sem push.
+- **Mudança:** `tests: CURRENT_TESTS` nos quatro blocos `NEXUS-CURRENT-STATE`; sentinelas restritas ao próprio campo (ver D-029). PRs futuros **não** precisam editar o contador.
+- **Comandos:** ruff 0.16.10 (lock) ok; compileall ok; reality audit sem diff; `unittest discover` 309 OK; suíte integrada 30 aprovadas/1 ignorada; mutação 58/58; Bandit 131 LOW; `state_manifest.py` + `state_consistency_audit.py` → `pass`; com literal `tests: 303` injetado → `fail` (conflito detectado).
+- **Limitações:** Python 3.13.5 local (CI usa 3.11); CI hospedado, actionlint e zizmor não executados nesta rodada.
+
 ## Rodada local — gatilho de PR para qualquer destino — 2026-10-19
 
 - **Base exata:** `812ebd02b0c82ecc3169d620e36d25592b1d6727`, confirmada em `origin/main`, sem fetch nem alteração de `main`. Branch local `fix/ci-pr-target-any-branch-20261019`, worktree `/workspace/Nexus-ci-trigger-any-branch-20261019`, criada limpa. O checkout sujo `/workspace/Nexus` e as demais worktrees não foram alterados.
