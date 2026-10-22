@@ -32,6 +32,9 @@ MCTS_INPUT = ("test_mcts_planner_input_contract.py", "test_mcts_planner_extracti
 MCTS_TESTS = ("test_mcts_planner_extraction_contract.py", "test_mcts_action_contract.py")
 _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")'
 
+CAUSAL = "core/cognitivo/causal_world_model.py"
+CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
+
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
 
 PC_LEARNING = ("test_predictive_learning_contract.py",)
@@ -165,6 +168,21 @@ MUTATIONS = [
              'if exploration_constant < 0:', 'if exploration_constant < -1:', tests=MCTS_INPUT),
     Mutation("mcts_guard_exploration_zero_allowed", MCTS,
              'if exploration_constant < 0:', 'if exploration_constant <= 0:', tests=MCTS_INPUT),
+    Mutation("causal_lazy_cause_group", CAUSAL, r"r'(.+?)\s+causes?\s+(.+)'", r"r'(.+)\s+causes?\s+(.+)'",
+             tests=CAUSAL_TESTS),
+    Mutation("causal_case_sensitive", CAUSAL, "text, re.IGNORECASE)", "text)", tests=CAUSAL_TESTS),
+    Mutation("causal_confidence", CAUSAL, "effect, 0.9,", "effect, 0.8,", tests=CAUSAL_TESTS),
+    Mutation("causal_counter_not_incremented", CAUSAL, "self.relations_extracted += 1", "pass",
+             tests=CAUSAL_TESTS),
+    Mutation("causal_graph_not_updated", CAUSAL, 'self.causal_graph["adjacency"][cause].add(effect)', "pass",
+             tests=CAUSAL_TESTS),
+    Mutation("world_patch_not_secure", CAUSAL, 'state.state["system_status"] = "secure"',
+             'state.state["system_status"] = "stable_"', tests=CAUSAL_TESTS),
+    Mutation("world_ignore_alert_noop", CAUSAL, 'state.state["system_status"] = "compromised"', "pass",
+             tests=CAUSAL_TESTS),
+    Mutation("world_shallow_copy_mutates_state", CAUSAL, "copy.deepcopy(self.current_state)",
+             "self.current_state", tests=CAUSAL_TESTS),
+    Mutation("world_compare_picks_min", CAUSAL, "best_idx = max(", "best_idx = min(", tests=CAUSAL_TESTS),
 ]
 
 

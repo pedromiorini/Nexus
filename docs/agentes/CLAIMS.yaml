@@ -3,9 +3,15 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "Registro do resultado negativo M6 (NMCS) na AUDITORIA; código preservado no #93"
+    tarefa: "Extração move-only de causal+world model para core/cognitivo e auditoria funcional (C1-C3)"
     arquivos:
+      - core/cognitivo/causal_world_model.py
+      - core/constitutional_brain.py
+      - test_causal_world_model_extraction_contract.py
+      - tools/cognitivo_mutation.py
+      - tools/cognitivo_eval.py
+      - AUDIT_REALITY_REPORT.md
+      - audit_reality.json
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - docs/agentes/CLAIMS.yaml
-    pr: 94
-    expira_em: "2026-10-25T18:00:00+00:00"
+    expira_em: "2026-10-26T18:00:00+00:00"
