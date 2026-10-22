@@ -1,19 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "Extrair RealEpisodicMemory do monólito para core/cognitivo/episodic_memory.py (strangler, sem mudança de comportamento)"
-    arquivos:
-      - core/constitutional_brain.py  # só as linhas 2105-2323 (Episode/RealEpisodicMemory)
-      - core/cognitivo/__init__.py
-      - core/cognitivo/episodic_memory.py
-      - test_episodic_memory_extraction_contract.py
-      - tools/cognitivo_mutation.py
-      - tools/targeted_mutation.py  # só target das 3 entradas episódicas (autorizado por Pedro 22/10)
-      - AUDIT_REALITY_REPORT.md
-      - audit_reality.json
-      - .gitignore
-      - docs/agentes/CLAIMS.yaml
-    pr: 80
-    expira_em: "2026-10-25T12:00:00+00:00"
+claims: []
