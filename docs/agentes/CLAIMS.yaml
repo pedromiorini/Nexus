@@ -10,9 +10,10 @@ claims:
       - core/cognitivo/episodic_memory.py
       - test_episodic_memory_extraction_contract.py
       - tools/cognitivo_mutation.py
+      - tools/targeted_mutation.py  # só target das 3 entradas episódicas (autorizado por Pedro 22/10)
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
       - .gitignore
       - docs/agentes/CLAIMS.yaml
-    pr: null
+    pr: 80
     expira_em: "2026-10-25T12:00:00+00:00"
