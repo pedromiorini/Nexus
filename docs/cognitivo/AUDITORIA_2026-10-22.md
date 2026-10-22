@@ -151,3 +151,27 @@ Medido em 22/10/2026 com `python tools/cognitivo_eval.py --capability mcts --cri
 - **Limite de qualquer algoritmo neste cenário:** com 2000 avaliações, P(ótimo) ≤ 2000/7 776 ≈ 0,257. A agulha do ramo enganoso não tem sinal nos irmãos.
 - **Desvio de processo:** os testes de contrato foram escritos logo após o código, mas antes de qualquer push do código. O pré-registro dos critérios foi respeitado.
 - **Hipóteses ainda NÃO testadas** (cada uma exige pré-registro novo): NRPA (Rosin, IJCAI 2011), o termo de variância do SP-MCTS (Schadd et al. 2008) e progressive widening/bias.
+
+---
+
+## Auditoria funcional C — raciocínio causal + modelo de mundo (pré-registro)
+
+Registrado **antes** de qualquer execução, em commit próprio, sobre `core/cognitivo/causal_world_model.py` (extraído no #95, move-only). Propósito declarado no código: POST7 "Deep Causal Reasoning" (extrair relações causa→efeito de texto e manter um grafo causal) e POST13 "World Model & Simulation" (prever as consequências de sequências de ações e escolher o melhor futuro). Avaliador: `tools/cognitivo_eval.py --capability causal --criteria v1`. Conjuntos congelados abaixo; qualquer mudança neles invalida a rodada.
+
+**Conjunto L (extração, 30 frases, rótulo = par (causa, efeito) normalizado em minúsculas, ou ∅):**
+- 18 positivas, 6 formas (3 cada): `X causes Y`, `X cause Y` (plural), `Y because X`/`Y because of X`, `X leads to Y`, `X results in Y`, `Y due to X`.
+- 12 negativas: 4 negações (`X does not cause Y`, `X never causes Y`, `X doesn't cause Y`, `there is no evidence that X causes Y`), 4 correlações (`X is correlated with Y`, `X and Y co-occur`, `X is associated with Y`, `X often appears with Y`), 4 sem relação contendo a substring "cause" (`because`, `causeway`, `the cause is unknown`, `causal models are hard`).
+- Acerto = par extraído igual ao rótulo (após `strip().lower()` e remoção de pontuação final); par extra numa negativa = FP.
+
+**Critérios (falsificáveis, com baseline definido a priori):**
+
+| id | propósito | métrica | limite | baseline de referência |
+|---|---|---|---|---|
+| C1a | extrair causalidade expressa em linguagem natural | F1 em L | ≥ 0.70 | regex só `causes?` (o próprio desenho atual) — documenta-se, não é alvo |
+| C1b | não afirmar causa negada/correlacional | taxa de FP nas 12 negativas | ≤ 0.10 | extrair sempre que houver "cause" |
+| C2a | prever consequências das ações que o próprio sistema oferece | fração de ações do vocabulário de consumidores (`RealMCTSPlanner` default + benchmark) com efeito ≠ no-op **ou** aviso explícito | ≥ 0.80 | — |
+| C2b | não mascarar ação desconhecida | `simulate(["UNKNOWN_X"])` produz `warnings` não vazio | verdadeiro | — |
+| C3 | escolher o melhor futuro | acurácia top-1 em 6 conjuntos de futuros com ordem verdadeira estrita (inclui 3 conjuntos em que todos falham mas um é menos ruim: `vulnerable` > `compromised`) | ≥ 5/6 | escolher índice 0 |
+| C4 | integrar o grafo causal ao modelo de mundo | após `extract_causal_relations("DEPLOY_FIX causes system_status secure")`, `simulate(["DEPLOY_FIX"])` reflete o efeito | verdadeiro | — |
+
+Regra: nenhum ajuste de código nesta rodada (apenas medir); lacunas e opções de correção com base em literatura são registradas abaixo após a execução.
