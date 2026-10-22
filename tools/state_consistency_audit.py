@@ -1,8 +1,10 @@
 """Verifica drift entre o manifesto factual e os claims atuais dos documentos.
 
 Os blocos ``NEXUS-CURRENT-STATE`` são a interface estável entre documentação
-humana e o artefato JSON produzido pelo CI. Texto histórico fora desses blocos
-não é considerado estado atual e não causa falha.
+humana e o artefato JSON produzido pelo CI. Prosa histórica fora desses blocos
+não é estado atual e não causa falha. Linha na coluna 0, fora do bloco, com
+``commit:``, ``ci_run:``, ``tests:``, ``bandit_low:`` ou um ``-->`` isolado é
+falha: é o mesmo critério de ``tools/agente/replay/check_resolution.sh`` (L-002).
 """
 from __future__ import annotations
 
@@ -30,6 +32,27 @@ REQUIRED = {"commit", "ci_run", "tests", "bandit_low"}
 # campo; números literais continuam exigindo igualdade exata. ``CURRENT_TESTS`` evita
 # que cada PR que adiciona testes edite o contador nos quatro documentos (decisão D1).
 SENTINELS = {"commit": "HEAD", "ci_run": "CURRENT_RUN", "tests": "CURRENT_TESTS"}
+# Coluna 0, igual a check_resolution.sh. Não casa linha indentada, sem espaço
+# depois dos dois-pontos, nem chave com maiúscula.
+_BLOCK_OPEN_RE = re.compile(r"^<!--\s*NEXUS-CURRENT-STATE\b")
+_BLOCK_CLOSE_RE = re.compile(r"^-->$")
+_STRAY_STATE_RE = re.compile(r"^(?:commit|ci_run|tests|bandit_low): |^-->$")
+
+
+def _stray_state_lines(text: str) -> list[tuple[int, str]]:
+    """Linhas de estado na coluna 0 fora de um bloco NEXUS-CURRENT-STATE."""
+    in_block = False
+    found: list[tuple[int, str]] = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        if not in_block and _BLOCK_OPEN_RE.match(line):
+            in_block = True
+            continue
+        if in_block and _BLOCK_CLOSE_RE.match(line):
+            in_block = False
+            continue
+        if not in_block and _STRAY_STATE_RE.match(line):
+            found.append((number, line))
+    return found
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -161,7 +184,16 @@ def audit(manifest_path: Path, root: Path = ROOT) -> dict[str, Any]:
     for name in DOCUMENTS:
         path = root / name
         try:
-            claims = _parse_marker(path.read_text(encoding="utf-8"), name)
+            text = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            errors.append(str(exc))
+            continue
+        for number, line in _stray_state_lines(text):
+            errors.append(
+                f"{name}: linha de estado fora do bloco NEXUS-CURRENT-STATE: {number}: {line}"
+            )
+        try:
+            claims = _parse_marker(text, name)
             documents[name] = claims
             for field in sorted(REQUIRED):
                 if field == "bandit_low" and not bandit_low_valid:
