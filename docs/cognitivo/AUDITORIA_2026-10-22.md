@@ -175,3 +175,28 @@ Registrado **antes** de qualquer execução, em commit próprio, sobre `core/cog
 | C4 | integrar o grafo causal ao modelo de mundo | após `extract_causal_relations("DEPLOY_FIX causes system_status secure")`, `simulate(["DEPLOY_FIX"])` reflete o efeito | verdadeiro | — |
 
 Regra: nenhum ajuste de código nesta rodada (apenas medir); lacunas e opções de correção com base em literatura são registradas abaixo após a execução.
+
+### Resultados C (v1, executado após o pré-registro 285851b)
+
+`python tools/cognitivo_eval.py --capability causal --criteria v1` — determinístico (sem semente).
+
+| id | valor | limite | passou | referência |
+|---|---|---|---|---|
+| C1a | F1 0.4138 (P 0.5455, R 0.3333) | ≥ 0.70 | não | recall por forma: causes 3/3, cause 3/3, because/leads to/results in/due to 0/3 |
+| C1b | FP 0.4167 (5/12) | ≤ 0.10 | não | baseline "tem 'cause'": 0.5833 — as 4 negações explícitas viram relações positivas |
+| C2a | 0.20 (2/10) | ≥ 0.80 | não | só APPLY_PATCH e IGNORE_ALERT; as outras 8 ações do RealMCTSPlanner são no-op silenciosos |
+| C2b | falso | verdadeiro | não | `warnings` é sempre `[]` |
+| C3 | 3/6 | ≥ 5/6 | não | baseline índice 0: 1/6; erra os 3 conjuntos em que todos falham (sucesso booleano → empate → índice 0) |
+| C4 | falso | verdadeiro | não | `causal_reasoning` é guardado mas nunca lido pelo simulador |
+
+**Conclusão honesta:** o módulo cumpre só o caso literal "X causes Y" e as duas transições codificadas; como raciocínio causal e modelo de mundo, falha nos 6 critérios. Nada foi corrigido nesta rodada.
+
+### Lacunas e opções de correção (com base em literatura; nenhuma aplicada)
+
+1. **Extração (C1a)** — banco de padrões de marcadores causais (Khoo et al., 2000; Girju, 2003: *because (of)*, *lead(s) to*, *result(s) in*, *due to*, *therefore*) com ordem causa/efeito por padrão; custo baixo, só stdlib. Alternativa forte: extração por árvore de dependências ou modelos supervisionados (UniCausal, Tan et al., 2023) — dependência pesada, exige aprovação.
+2. **Negação/correlação (C1b)** — escopo de negação estilo NegEx (Chapman et al., 2001) e lista de *hedges*/correlacionais que bloqueiam a relação ou a marcam com `pattern_type="negated"`; usar `\bcauses?\b` com limites de palavra.
+3. **Cobertura de ações (C2a/C2b)** — tabela declarativa de efeitos STRIPS/PDDL (Fikes & Nilsson, 1971) como fonte única compartilhada com `RealMCTSPlanner._action_effects`; ação desconhecida → `warnings`. C2b é quase trivial, mas muda o golden e foi deixado para a rodada de correção.
+4. **Ranking de futuros (C3)** — utilidade ordinal/esperada por estado (secure > stable > vulnerable > compromised) em vez de sucesso booleano; desempate explícito.
+5. **Integração causal (C4)** — compilar arestas extraídas em um modelo causal estrutural e simular intervenções `do(X)` (Pearl, 2009); a longo prazo, modelos de transição aprendidos (Ha & Schmidhuber, 2018; Dreamer, Hafner et al., 2020) — pesado.
+
+Ordem sugerida (custo/benefício): 3 → 4 → 2 → 1 (padrões) → 5 (SCM mínimo em stdlib).
