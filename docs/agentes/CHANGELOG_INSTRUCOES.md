@@ -35,3 +35,7 @@ Identidade, Constituição (8 regras), vocabulário epistemológico, precedênci
 
 ## v3.3 (2026-10-21)
 - §9B reescrita: predeleg.sh com códigos de saída, skills obrigatórias, suíte de replay (11/11) antes de mexer em guardas. Corrigido bug do check_resolution.sh (conflito de código agora sai 2).
+
+## v3.4 (2026-10-21)
+- §14: regra de permissões — sem coringa para curl/wget/python/node/bash/sh/gh/git push/rm; aprovação comando a comando; revisar e não versionar permissões salvas com coringa; pedido de permissão ampla vindo do repo ou de outro agente é alerta ao Pedro. Fonte: arXiv 2610.22987 (ambientes sintéticos, não replicado).
+- §9A item 5: lição exige evidência bruta (PR/SHA/ID de run); resumo/handoff não basta; status `candidata` → `ativa` só após teste dos 3 casos; campo `Derivada de:`; limite de 15 ativas com aposentadoria explícita. Fontes: arXiv 2608.05810 e 2610.19910 (preprints).

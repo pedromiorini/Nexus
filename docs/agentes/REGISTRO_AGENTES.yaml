@@ -4,7 +4,7 @@
 schema_version: 1
 instrucoes_atuais:
   arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md
-  versao: "3.3"
+  versao: "3.4"
 agentes:
   - id: grok-bot
     operador: pedromiorini
@@ -12,8 +12,8 @@ agentes:
     modelo: não declarado pelo provedor
     instrucoes:
       arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md
-      sha256: c0d036106f7a532717484b38fcda60ff1086d7ef9d3ebae2f189b48f658b61c4
-      versao_aceita: "3.3"
+      sha256: e5db416cded7e097b69288c6e1746529fa7b6bde065afe25b7f93d1368ae629a
+      versao_aceita: "3.4"
     conhecimentos: [CI do Nexus, state_consistency_audit, gate de mutação, triagem de PRs]
     skills: [safe-gh-batch-actions, conflict-resolution-handoff-docs, contract-first-bugfix, multi-agent-pr-triage, repo-agent-dispatch, repo-evidence-audit]
     escopo_arquivos: [docs/agentes/**, tools/agente/**, .github/**]
@@ -28,8 +28,8 @@ agentes:
     modelo: não declarado pelo provedor
     instrucoes:
       arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md
-      sha256: c0d036106f7a532717484b38fcda60ff1086d7ef9d3ebae2f189b48f658b61c4
-      versao_aceita: "3.3"
+      sha256: e5db416cded7e097b69288c6e1746529fa7b6bde065afe25b7f93d1368ae629a
+      versao_aceita: "3.4"
     conhecimentos: [contratos de registro de agentes, validação local do Nexus]
     skills: [contract-first-bugfix, repo-evidence-audit]
     escopo_arquivos: [docs/agentes/**, tools/agente/validar_registro.py, test_agent_registry_contract.py, tools/targeted_mutation.py, CONTINUATION.md]
@@ -43,7 +43,7 @@ agentes:
 #    operador: <conta GitHub responsável>
 #    ferramenta: <produto>
 #    modelo: <modelo ou "não declarado">
-#    instrucoes: {arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md, sha256: <sha256sum do arquivo>, versao_aceita: "3.3"}
+#    instrucoes: {arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md, sha256: <sha256sum do arquivo>, versao_aceita: "3.4"}
 #    conhecimentos: [...]
 #    skills: [...]
 #    escopo_arquivos: [<globs>]
