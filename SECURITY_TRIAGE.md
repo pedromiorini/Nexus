@@ -9,8 +9,8 @@ bandit_low: 131
 
 > This is a conservative inventory, not a clearance report. Findings remain open until reviewed and fixed or explicitly justified.
 
-- Total findings: **132**
-- Severity counts: LOW=132
+- Total findings: **131**
+- Severity counts: LOW=131
 
 ## Dispositions
 
@@ -18,7 +18,7 @@ bandit_low: 131
 |---|---:|---|
 | `controlled_subprocess_review` | 4 | Mutation harness subprocess; keep inputs fixed and review execution boundaries. |
 | `embedded_demo_assert_review` | 111 | Assertions inside the legacy __main__ demonstration block; keep them out of production contracts and migrate incrementally. |
-| `simulation_only_random_review` | 17 | Randomness reviewed as simulation/heuristic behavior; keep it out of secrets and security decisions. |
+| `simulation_only_random_review` | 16 | Randomness reviewed as simulation/heuristic behavior; keep it out of secrets and security decisions. |
 
 ## Findings
 
@@ -28,8 +28,7 @@ Agrupados por escopo (sem números de linha, que mudam a cada edição).
 |---|---|---|---|---:|---|
 | `B101` | LOW | `core/constitutional_brain.py` | `<__main__ block>` | 111 | `embedded_demo_assert_review` |
 | `B311` | LOW | `core/cognitivo/mcts_planner.py` | `RealMCTSPlanner._expand` | 1 | `simulation_only_random_review` |
-| `B311` | LOW | `core/cognitivo/mcts_planner.py` | `RealMCTSPlanner._nmcs_rollout` | 1 | `simulation_only_random_review` |
-| `B311` | LOW | `core/cognitivo/mcts_planner.py` | `RealMCTSPlanner._simulate` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/cognitivo/mcts_planner.py` | `RealMCTSPlanner._rollout_from` | 1 | `simulation_only_random_review` |
 | `B311` | LOW | `core/constitutional_brain.py` | `AudioProcessor.detect_emotion_from_voice` | 1 | `simulation_only_random_review` |
 | `B311` | LOW | `core/constitutional_brain.py` | `CognitiveFlexibility.adapt_to_context` | 1 | `simulation_only_random_review` |
 | `B311` | LOW | `core/constitutional_brain.py` | `ConceptualBlender.generate_multiple_blends` | 2 | `simulation_only_random_review` |

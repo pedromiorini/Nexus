@@ -206,7 +206,10 @@ class RealMCTSPlanner:
         depth = node.depth
         if depth > 0:  # prefixo = nó da árvore; max_depth é horizonte, não obrigação
             self._record_found(self._evaluate_state(state, goal), state)
+        return self._rollout_from(state, depth, goal)[0]
 
+    def _rollout_from(self, state: Dict, depth: int, goal: str) -> tuple:
+        """Ações aleatórias até max_depth (ou sem ações); avalia e registra o estado final."""
         while depth < self.max_depth:
             actions = self._get_available_actions(state, depth)
             if not actions:
@@ -217,7 +220,7 @@ class RealMCTSPlanner:
 
         reward = self._evaluate_state(state, goal)
         self._record_found(reward, state)
-        return reward
+        return reward, state
 
     def _record_found(self, reward: float, state: Dict) -> None:
         if reward > 0 and (self._best_found is None or reward > self._best_found[0]):
@@ -417,22 +420,18 @@ class RealMCTSPlanner:
         if self._nmcs_budget <= 0:
             return None
         self._nmcs_budget -= 1
-        actions = self._get_available_actions(state, self._nmcs_depth(state))
-        if actions and self._nmcs_depth(state) > 0:  # prefixo também é plano candidato
+        depth = self._nmcs_depth(state)
+        terminal = depth >= self.max_depth or not self._get_available_actions(state, depth)
+        if depth > 0 and not terminal:  # prefixo também é plano candidato
             self._record_found(self._evaluate_state(state, goal), state)
-        while actions:
-            state = self._apply_action(state, random.choice(actions))
-            actions = self._get_available_actions(state, self._nmcs_depth(state))
-        reward = self._evaluate_state(state, goal)
-        self._record_found(reward, state)
-        return reward, state
+        return self._rollout_from(state, depth, goal)
 
     def _nmcs(self, state: Dict, goal: str, level: int) -> Optional[tuple]:
         """Nível n: em cada passo, testa cada ação com busca de nível n-1 e segue a melhor sequência."""
         if level == 0:
             return self._nmcs_rollout(state, goal)
         best = None
-        while self._nmcs_budget > 0:
+        while self._nmcs_budget > 0 and self._nmcs_depth(state) < self.max_depth:
             actions = self._get_available_actions(state, self._nmcs_depth(state))
             if not actions:
                 break
