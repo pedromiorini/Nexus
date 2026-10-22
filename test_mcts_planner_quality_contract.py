@@ -9,10 +9,12 @@ from tools.cognitivo_eval import eval_mcts
 class MCTSPlannerQualityContractTests(unittest.TestCase):
     def test_preregistered_criteria_pass(self):
         checks = {c["id"]: c for c in eval_mcts()}
+        self.assertEqual(checks["M3"]["criteria"], "v2")
         for cid in ("M1", "M2", "M4", "M5"):
             self.assertTrue(checks[cid]["passed"], checks[cid])
-        # M3 pré-registrado exige regret(2000) < regret(50) estrito; com ambos no ótimo (0.0) o
-        # critério é inatingível (efeito teto). Aqui só a forma fraca; emenda depende do Pedro.
+        # M3 v2 (max_depth=8, `<` estrito) FALHA neste PR: os dois regrets seguem em 0,0 (teto persiste).
+        # Pela regra da v2 o critério não é reajustado; falha reportada ao Pedro. Aqui só a forma fraca
+        # (sem regressão com mais iterações).
         self.assertLessEqual(checks["M3"]["value"], checks["M3"]["regret_50"])
 
     def test_caller_action_list_is_not_mutated(self):
