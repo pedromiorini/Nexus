@@ -10,6 +10,7 @@ import math
 import random
 import time
 from dataclasses import dataclass, field
+from numbers import Real
 from typing import Any, Dict, List, Optional
 
 __all__ = ["MCTSNode", "PlanResult", "RealMCTSPlanner"]
@@ -102,6 +103,16 @@ class RealMCTSPlanner:
         exploration_constant: float = 1.414,
         max_depth: int = 5
     ):
+        if isinstance(exploration_constant, bool) or not isinstance(exploration_constant, Real):
+            raise TypeError("exploration_constant must be a real number")
+        if not math.isfinite(exploration_constant):
+            raise ValueError("exploration_constant must be finite")
+        if exploration_constant < 0:
+            raise ValueError("exploration_constant must be non-negative")
+        if isinstance(max_depth, bool) or not isinstance(max_depth, int):
+            raise TypeError("max_depth must be an integer")
+        if max_depth <= 0:
+            raise ValueError("max_depth must be positive")
         self.world_model = world_model
         self.causal_reasoning = causal_reasoning
         self.episodic_memory = episodic_memory
@@ -337,6 +348,14 @@ class RealMCTSPlanner:
         Returns:
             PlanResult com melhor sequência e alternativas
         """
+        if goal is None:
+            raise ValueError("goal is required")
+        if not isinstance(goal, str):
+            raise TypeError("goal must be a string")
+        if isinstance(max_iterations, bool) or not isinstance(max_iterations, int):
+            raise TypeError("max_iterations must be an integer")
+        if max_iterations < 0:
+            raise ValueError("max_iterations must be non-negative")
         start_time = time.time()
         self.total_plans += 1
 
