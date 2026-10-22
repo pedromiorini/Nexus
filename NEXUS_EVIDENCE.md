@@ -3,35 +3,95 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 416
+tests: CURRENT_TESTS
 bandit_low: 135
 -->
 
-## Estado canônico da composição local — 2026-10-18
+## Revalidação local sobre a3f929f — 2026-10-22
 
-Candidato isolado em `audit/consolidated-38-45-20261018`, baseado exatamente em
-`812ebd02b0c82ecc3169d620e36d25592b1d6727` (`origin/main` local inventariado).
-Inclui os heads exatos das PRs #38–#45 por merges locais; não é um merge em
-`main`, publicação ou execução de CI remoto. #12–#14 ficam fora: #41 já alinha
-os perfis e o lock, e nenhum dos três bumps é dependência funcional obrigatória.
-Inventário, contratos, comandos, resultados e plano seguro: [AUDIT_COMPOSITION.md](AUDIT_COMPOSITION.md).
+Composição não commitada do head #46 `f3044bad` com a main exata `a3f929f`;
+identidade completa, resolução e limites na [rodada de revalidação](CONTINUATION.md#revalidação-local-da-composição-sobre-a3f929f--2026-10-22).
+Medições desta rodada são somente as dos comandos/logs e do manifesto local em
+`/workspace/pr46-revalidation-a3f929f-evidence-20261022/`; `HEAD` é âncora,
+`candidate_tree` identifica os bytes compostos e `ci_run=not_ci`.
+A v3.4.1 e o replay atualizado da #74 foram preservados; CI #74 relatada pelo
+owner é contexto histórico, não CI desta composição.
 
-Os registros abaixo de outras branches/rodadas são **históricos**, não resultados
-da composição. Os marcadores atuais refletem somente a suíte combinada; `HEAD`
-é resolvido pelo manifesto pós-commit, com `ci_run=not_ci`. Não somar contagens
-isoladas nem atribuir evidência sintética a capacidade geral.
+**Histórico abaixo:** checkpoints 517/96, 545/112 e 548/113 e os respectivos
+pareceres pertencem às árvores antigas. Nenhuma contagem ou aprovação anterior
+foi transferida para a composição nova. As correções são preservadas, mas a
+validação e a única revisão final desta rodada são evidências novas separadas.
 
-## Histórico: integração VRAM isolada — evidência local de 2026-10-18
 
-Base `812ebd02b0c82ecc3169d620e36d25592b1d6727`; branch `fix/vram-integrated-2026-10-18`; SHA do commit de implementação integrada (código/testes) `9b657011d0b0b0eec61fad53b3d353717c109e4d`. Esse não é o hash do checkpoint documental: o follow-up dos registros é um commit posterior, identificado pelo `HEAD` do branch e pelo manifesto pós-commit em `/workspace/nexus-vram-integrated-evidence/STATE_MANIFEST.json`. Composição dos patches `4073eb298cb5fe0b3ca1db58a1b38d91c330afbb` e `41bb57143152486588c1b15431b879849ab2ecb0` (origem documental final `985917446f25c79d526c9ba2aca7f5d33187dd5d`), sem modificar/publicar as origens. Os resultados abaixo foram medidos juntos, não somados a partir de relatórios isolados.
+## Checkpoint histórico após preflight de self — 2026-10-21
 
-**Contrato:** rejeitar booleanos em ambos os limites com `TypeError`; nos três counters, exigir inteiro built-in não negativo, rejeitando tipos com `TypeError` e negativos com `ValueError` antes de decisão/telemetria. Preservam-se limiares inclusivos, valores válidos, zeros, indisponibilidade e timestamp. Na base, os testes combinados produziram 145 falhas de subteste e 7 erros em 19 testes; com os dois patches, 19/19 passaram.
+Candidata local não commitada de `f3044bad` + `a663a55`, corrigida a partir da
+tree BLOQUEADA `972747bebe1b9a16d79b158ab11caf9365cd618a`: **548/548 testes**,
+0 falhas/skips/XPASS; integração separada **30 aprovações + 1 skip FAISS**;
+Bandit **135 LOW, 0 MEDIUM/HIGH/erros**; mutação **113 declaradas/aplicadas/mortas**,
+0 sobreviventes/timeouts/não aplicadas. Preserva os 112 nomes anteriores e seu
+alias histórico; contagem de mutantes não é contagem de defeitos independentes.
+A rejeição de `self` ocorre antes de ledger/projeção, com regressões de atomicidade
+e controle positivo do fallback. Comandos, proveniência, revisão e limites na
+[rodada histórica de CONTINUATION](CONTINUATION.md#correção-local-da-colisão-self--2026-10-21)
+e em `/workspace/pr46-composition-evidence-20261021/self-collision-fix/`.
+O hash da tree final é registrado externamente em `candidate-tree.txt` e
+`provenance.json`, pois HEAD sozinho não identifica o composto. Gates locais
+não são aprovação independente integral, CI hospedado, segurança geral ou capacidade.
 
-**Execução combinada:** 310/310 unittest, zero falhas/skips/XPASS; integração 30 aprovados + 1 skip FAISS; cobertura branch fila/VRAM/temporal/Vita/núcleo 95/94/93/76/68%, acima de 90/90/90/70/62. Mutation canônico 58/58 e suplementar externo 10/10 mortos, zero sobreviventes/não aplicados. Bandit 131 LOW, zero MEDIUM/HIGH; triagem, B101, gaps, realidade sem diff, lint, compilação, actionlint/zizmor e dry-run de requisitos passaram. Benchmarks herdados: v1 preserva `unsupported_interface`; v2 128/128 dentro de `1e-12`, erro máximo `2.7755575615628914e-16`, 4/4 controles rejeitados. Comandos, seed, taskset hash, ambiente e limites em `CONTINUATION.md`; logs em `/workspace/nexus-vram-integrated-evidence/`. Manifesto/consistência são regenerados após commit, sem atribuir CI remoto (`not_ci`).
+## Checkpoint histórico inicial da composição local — 2026-10-21
 
-**Comparação histórica:** limites isolados 305 executados (303 aprovados + 2 skips NetworkX) / 14 VRAM; counters isolados 308/308 / 17 VRAM; combinado 310/310 / 19 VRAM com NetworkX presente. Métricas arredondadas de cobertura, integração, mutation canônico e Bandit permanecem iguais; suplemento cresce de 7 para 10 mutantes. Não houve reexecução ou mudança das origens.
+Checkpoint não commitado inicial de `f3044bad` + `a663a55`, não estado atual:
+517/517 testes, integração 30 aprovações + 1 skip FAISS, Bandit 135 LOW/0 MEDIUM/HIGH,
+catálogo 96/96 morto (inclui um par de aliases semânticos, não 96 defeitos
+independentes). Proveniência, comandos e limites preservados na seção
+[Composição local candidata da #46 com main](CONTINUATION.md#composição-local-candidata-da-46-com-main--2026-10-21).
+O checkpoint posterior da tree `972747bebe1b9a16d79b158ab11caf9365cd618a`
+mediu 545/545 testes e 112/112 mutantes mortos, mas foi BLOQUEADO em revisão
+independente pela colisão de `self`; não é aprovação de qualquer nova árvore.
+Registros históricos não são contagens aditivas nem validação de CI remoto.
 
-**Limites:** somente validação na construção; sem imutabilidade, validação pós-atribuição, coerência física dos counters ou proteção contra Python hostil. Sem GPU real, sem mudança CUDA/mitigação e sem nova política geral dos outros tipos numéricos dos limites. Python 3.12.3 local, não 3.11 de CI. Checks sintéticos internos, Bandit e revisão focal não estabelecem capacidade geral nem segurança de produção. Histórico abaixo permanece histórico.
+
+
+## Duplicatas terminais no resumo integrado — validação local 2026-10-20
+
+Base `d435083bb4c893a58128cee6cfa00f65bba7fe02`, branch `fix/integrated-summary-duplicates-20261020`: regressões reproduziram PASS/PASS e SKIP/SKIP indevidamente aprovados antes do patch. O tally agora expõe `duplicates` e falha com resultados terminais repetidos, preservando stream e categorias existentes. Após a correção: 10 contratos focados aprovados; suíte completa executada duas vezes (com cobertura e `tools/test_summary.py`), 307 executados/305 aprovados/2 skips opcionais/0 falhas; integração real 30 passes/1 skip e nenhuma duplicata. Gates de cobertura, Ruff, compilação, auditorias e 58 mutações preexistentes aprovados; Bandit 131 LOW e nenhum MEDIUM/HIGH. Comandos, limitações e proveniência estão na seção correspondente de `CONTINUATION.md`.
+
+Esta é evidência de contrato de software local, não de capacidade cognitiva nem CI hospedado. O consumidor legado do manifesto permanece fail-closed (`invalid_summary` para falha causada apenas por duplicata), sem contabilização específica nova. Nenhuma sonda sintética, CLI de benchmark ou evolução separada de WorldModel foi executada nesta rodada.
+
+## Igualdade exata na guarda de triagem — 2026-10-20
+
+Na base `d435083bb4c893a58128cee6cfa00f65bba7fe02`, duas regressões novas reproduziram o reconhecimento indevido de comparações não-main. Após cinco condições adicionais no predicado, 12 contratos focados passaram; suíte completa: 305 executados, 303 aprovados, 2 skips opcionais e 0 falhas/XPASS. Bandit mantém 131 LOW, sem MEDIUM/HIGH, e a triagem versionada não mudou de corpo. Comandos, revisão independente e limites estão na [rodada local correspondente de CONTINUATION.md](CONTINUATION.md#rodada-local--igualdade-exata-na-guarda-de-triagem--2026-10-20). Evidência de classificação AST, não de clearance de segurança nem de CI remoto.
+
+## Composição validada localmente sobre a PR #58 — 2026-10-20
+
+Base comum remota `d435083bb4c893a58128cee6cfa00f65bba7fe02`; pai do candidato `fef00882baf19694fe04956d82af096f266ae2d3` (head da #58 OPEN/DRAFT), acrescido somente do diff de overflow `af4f489889fd914e4316bd099a680dad26e47e71` e do contrato da interação. A captura CLI de `RecursionError` e seus seis testes permanecem; os dois loaders agora rejeitam float que decodifica para infinito e constantes não JSON, sem alterar valores finitos nem bridge/schema/writer/profundidade. Worktree `/workspace/Nexus-diagnostics-combined-pr58-20261020`, branch `fix/diagnostics-combined-pr58-local-20261020`.
+
+Evidência nova da árvore combinada: red com 26 testes/32 falhas de subcasos antes dos hooks; green 26/26 em Python 3.11.16 e 3.12.3. Suíte ampla 3.11: **316 executados, 314 aprovados, 2 skips NetworkX, 0 falhas/XPASS**; integração **30 aprovados e 1 skip FAISS**, sem conflitos/ausências/inesperados. Mutação versionada **63/63 mortas** e contraprova externa de recursão **1/1 morta**, em campanhas separadas e sem timeout. Ao remover a captura, reaparecem 2 erros CLI e 6 falhas da interação; baseline e composição intacta passam. Cobertura passou todos os pisos: fila 95%, VRAM 94%, temporal 93%, Vita 76%, núcleo 68%; dashboard 96% informativo.
+
+Compile/Ruff/actionlint/zizmor offline, segurança e auditorias pertinentes passaram; Bandit **131 LOW, nenhum MEDIUM/HIGH/erro de análise**, sem clearance de segurança. Regressão explícita dos auditores/manifesto 38/38; relatórios de realidade sem drift. Comandos exatos, hashes, artefatos e limites estão na seção de composição de `CONTINUATION.md` e em `/workspace/nexus-diagnostics-combined-evidence-20261020`. Resultados abaixo são históricos de árvores isoladas, não resultados combinados.
+
+Não há novo limite de recursos/profundidade nem mudança da precisão/underflow do float. O decoder pode falhar por recursão antes de alcançar qualquer token; callers diretos preservam essa exceção e a CLI a converte em erro operacional. Suíte ampla/mutação somente em 3.11; 3.12 focado. Sem benchmarks novos, CI hospedada, atestação operacional fabricada, push, alteração de PR, merge ou mudança das fontes/main/checkout sujo. Hash do commit e revisão final no handoff externo.
+
+## Histórico da PR #58 isolada — fronteira CLI do dashboard: recursão do decoder — 2026-10-20
+
+Base exata `d435083bb4c893a58128cee6cfa00f65bba7fe02`; candidato local na branch `fix/diagnostics-recursion-error-20261020`. O red registrou dois `RecursionError` escapando de `main` (arquivo e stdin). A captura adicional transforma ambos em exit 2, stdout vazio e stderr iniciado por `dashboard error:`, sem traceback; `load_snapshot` e o parser permanecem inalterados. Os seis novos contratos também preservam propagação direta e snapshots válidos rasos nos dois caminhos.
+
+Evidência local: 19/19 contratos em Python 3.11.16 e 3.12.3; suíte completa em 3.11 com 309 executados, 307 aprovados e 2 skips NetworkX; integração 30 aprovações/1 skip FAISS; mutation existente 58/58 mortas e mutante específico adicional 1/1 morto. Ruff/compile/lint de workflows/auditorias pertinentes passaram, sem drift dos relatórios de realidade; Bandit 131 LOW, nenhum MEDIUM/HIGH. Cobertura acima de todos os pisos existentes. Comandos exatos, hashes funcionais, localização dos logs e limitações estão na seção correspondente de `CONTINUATION.md`; hash do commit final no handoff externo, não autorreferente.
+
+Limite: não há novo teto de profundidade nem garantia de recursos; a fixture profunda foi ajustada para ultrapassar também o limite C do Python 3.12, enquanto o caso exato de 2.000 arrays foi confirmado em subprocessos 3.11. Sem claims de capacidade ou segurança geral, novos benchmarks ou execução de CLIs de benchmark; nenhuma publicação/CI hospedada nesta rodada.
+
+## Histórico da branch-fonte isolada — overflow de float no carregador do dashboard — 2026-10-20
+
+> Evidência histórica exclusiva de `af4f489889fd914e4316bd099a680dad26e47e71`, sobre `d435083bb4c893a58128cee6cfa00f65bba7fe02`; não representa a composição sobre a #58 nem seus resultados atuais. Referências a “esta branch” abaixo descrevem somente a branch-fonte original.
+
+- **Base/isolamento:** `d435083bb4c893a58128cee6cfa00f65bba7fe02`, confirmada por `git ls-remote origin refs/heads/main`; branch independente `fix/diagnostics-float-overflow-20261020`, worktree `/workspace/Nexus-diagnostics-float-overflow-20261020`, criada limpa diretamente nessa base. Nenhum cherry-pick da PR #58 nem alteração das outras worktrees.
+- **Correção de contexto confirmada:** `gh pr view <n> --repo pedromiorini/Nexus --json number,baseRefName,headRefName,headRefOid,files` para #52–#58 mostrou que #52–#57 não tocam dashboard/teste de recovery; #58 **toca ambos**, com head `fef00882baf19694fe04956d82af096f266ae2d3`. Essa PR e seus refs/conteúdo permanecem preservados. #57 toca `tools/targeted_mutation.py`: os novos mutantes desta branch também exigirão reconciliação futura nesse arquivo, além dos ledgers compartilhados.
+- **Fato/red:** tokens JSON sintaticamente válidos `1e400` e `-1e400`, em `events[].payload` e contêineres alternados dict/list, eram decodificados como infinitos. Antes do patch, `PYTHONPATH=. <PY> -m unittest -v test_recovery_diagnostics_contract` executou 19 testes e registrou 32 falhas de subcasos nos runtimes Python 3.11.16 e 3.12.3: 12 de overflow nos loaders, 8 na CLI e 12 de constantes não padrão. Controles finitos já passavam. A base indicada não configurava `parse_constant` no dashboard; a rejeição prévia do bridge para strings não protegia esse caminho de leitura.
+- **Contrato/green:** `parse_float` converte com `float` e rejeita resultado não finito antes de entregar qualquer snapshot; `parse_constant` rejeita `NaN`, `Infinity`, `-Infinity`. Ambos os hooks são configurados em arquivo e stdin. São preservados o tipo/valor dos floats finitos, sinal de zero, subnormal, `1.7976931348623157e308` e seu negativo, valores comuns e inteiro de 1.000 dígitos. O hook independe da profundidade no domínio que o decoder nativo consegue processar; não há travessia pós-decode nem teto novo de profundidade, tamanho, precisão ou inteiros. Schema, bridge, writer e saída para entrada válida não mudam.
+- **Regressões:** seis novos testes cobrem overflow positivo/negativo nas profundidades adicionais 0, 1 e 32 em ambos os loaders; subprocessos reais da CLI confirmam exit 2, stdout vazio, stderr com diagnóstico e sem traceback; controles finitos em arquivo/stdin confirmam exit 0 e stderr vazio. O mesmo comando focado passou 19/19 em 3.11 e 3.12 depois da correção.
+- **Revisão independente focada:** nenhum bloqueio encontrado na fronteira numérica. A captura de `RecursionError` da #58 é semanticamente ortogonal; uma integração futura deverá preservar essa captura e combinar os testes sobrepostos. Ela não foi copiada para esta branch. Limite: esta revisão não atesta segurança geral nem integração já realizada.
+- **Validação ampla, comandos, hashes e limitações:** registrados na rodada correspondente de `CONTINUATION.md`; resultados são locais, não checks hospedados. Os marcadores de contagem foram sincronizados nos quatro documentos canônicos, sem alterar disposições de segurança ou reescrever histórico.
 
 Snapshot histórico: manifesto `nexus-state-manifest` do commit `5b8bed8125002e25eb066620af67d3a65d44e59f` (CI run `38907987512`), com 200/200 testes `unittest`, 31 verificações integradas inventariadas (30 aprovadas, 1 ignorada por FAISS opcional ausente e 0 falhas) e 131 achados Bandit LOW (0 MEDIUM/HIGH). Esse snapshot e os resultados locais do benchmark v1 não representam o estado atual.
 A PR #24 partiu do `main` pós-PR #23 (`e3cc760597aa1782aef9879a8f88ee6f48032348`) e foi mesclada em `main` como `dd0a73c6e57dfcccf9b522b3d2dd3a4623cdc732`; os dois checks oficiais passaram. Seus resultados locais de 240/240 testes permanecem históricos; a branch seguinte registra a nova validação em seção própria.
@@ -52,6 +112,8 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 | Integração/orquestração | parcial/verificado no contrato | média de sinergia calculada sobre integrações registradas | score individual ainda é heurístico por nomes; não demonstra inteligência emergente |
 | Grafo de conhecimento | parcial/verificado no contrato | entidades únicas por ID, média de confiança e índice de tipo consistente | sem consistência distribuída ou validação externa do conhecimento |
 | Ledger temporal | verificado nos contratos; integração proposta nesta branch | janelas semiabertas, `known_at`, correções retroativas, replay/hash-chain e mapeamento opt-in de relações com proveniência | ainda sem persistência SQLite ou ingestão automatizada das alegações documentais; sem transação distribuída com o grafo |
+
+| Transferência meta/domínio | verificado no contrato local de 2026-10-21 | `transfer_knowledge` devolve `MetaTransferMapping`; o nome `TransferMapping` permanece a forma do POST 48; bool, NaN, infinito e negativo são rejeitados | `transfer_quality` pode exceder 1; heurística por token, não transferência aprendida; mutação posterior ao init não é revalidada |
 | Planejamento MCTS | parcial/verificado no contrato | `None` usa ações padrão e lista vazia permanece vazia | recompensas e rollouts continuam heurísticos; não é prova de planejamento geral |
 | Telemetria | parcial/verificado | Vita, audit log SQLite serializado e guard de VRAM | dependente do ambiente; sem locking distribuído ou exactly-once |
 | Segurança | parcial | Bandit 131 LOW, triagem, auditorias AST e testes negativos | não substitui threat model ou revisão manual completa |
@@ -66,6 +128,16 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 - O registro temporal ocorre antes de criar nós ou alterar índices, rejeições não deixam estado parcial no grafo, e `properties` não é serializado implicitamente como metadata. As projeções e `find_relations` legados continuam preservados.
 - Evidência: 309/309 testes unittest; suíte integrada 30 aprovados + 1 skip opcional; contratos focados 11/11; cobertura 100% em linhas e branches de `RealKnowledgeGraph.__init__` e `add_relation`; 62/62 mutantes direcionados mortos; Ruff passou. Os checks oficiais do run `39015023676` passaram 2/2 no commit de implementação `865063d21de9e986f9a502a790bfac2b68f7f801`; consulte a PR #38 para o estado do HEAD mais recente.
 - A fonte literal de cada fato ainda é fornecida pelo chamador; esta mudança não importa automaticamente medições do resumo de CI para o ledger. Persistência SQLite é a próxima etapa separada.
+
+## Resumo de testes inválido não é ausência — validação local, 2026-10-20
+
+Base `d435083bb4c893a58128cee6cfa00f65bba7fe02`, branch `fix/state-manifest-invalid-summary-20261020`. A implementação original classificou JSON malformado, `42`, `null`, booleanos, campos `result` não hashable e leitura negada como `not_generated`; os 14 testes atuais do manifesto contra o arquivo original produziram 11 falhas de subcasos. A correção separa ausência (`FileNotFoundError`) de resumo inválido, valida a raiz objeto e o tipo de `result`, preservando os campos válidos e o schema. Os testes conferem também a propagação integral em `build_manifest()`.
+
+`/tmp/nexus-ci311/bin/python -m unittest -v test_state_manifest.py test_state_consistency_audit.py test_test_summary.py test_integrated_suite_summary.py`: 30 aprovados. Suíte completa: 311 executados, 309 aprovados, 2 skips opcionais NetworkX, 0 falhas/XPASS; integração: 30 aprovados + 1 skip FAISS. Mutação existente 58/58 mortas e seis mutantes adicionais locais do status/guardas/propagação detectados. Bandit: 131 LOW, nenhum MEDIUM/HIGH/erro; auditorias de realidade, asserts e lacunas aprovadas. Comandos, versões, cobertura e limites detalhados em `CONTINUATION.md` na rodada correspondente.
+
+A revisão independente encontrou ainda UTF-8 inválido escapando como exceção e constantes `NaN`/`Infinity` aceitas em extras aninhados. As regressões reproduziram 1 erro e 3 falhas, corrigidos por captura dos erros de decodificação e parser JSON estrito; os 15 métodos finais do manifesto e os gates foram reexecutados.
+
+Esta é evidência de contrato local, não CI hospedado nem garantia de segurança. Não houve reinstalação do lock. O manifesto local permanece `not_ci`, e o auditor operacional o rejeita como esperado somente pela ausência de gates CI concluídos, sem conflitos documentais; seu fail-closed não foi alterado.
 
 ## Verificação local da branch de correção — 2026-10-16
 
@@ -91,6 +163,36 @@ Os checkpoints de 105 e 86 testes abaixo são históricos de marcos anteriores e
 - Benchmark v2 local: 128 casos gerados pela seed `20261016`, 635 probabilidades, MAE `3.001891167837976e-17`, erro máximo `2.7755575615628914e-16`, 128/128 dentro da tolerância e quatro controles negativos rejeitados; taskset SHA-256 `232371d0e8e948f4b0a004261e3d271b1003aed8d0de8c931d3439f9d370d025`.
 - A seed fixa do CI (`20261016`) passa explicitamente a precisão e os quatro controles negativos; teste injetando posterior incorreto verifica que a CLI grava o relatório e retorna código 1, cobrindo a falha fechada.
 - O benchmark v1 continuou com status `unsupported_interface` para observação parcial e sua implementação/protocolo não foram alterados. As métricas detalhadas acima são locais; posteriormente, a PR #24 foi mesclada após ambos os checks oficiais passarem.
+
+## Contrato de TransferMapping — 2026-10-21
+
+Medição local no commit `4e971f38854dedecac68a55f08125cde01d27992` (Python 3.12.3, branch `cursor/transfer-mapping-contract-5517`). O marcador acima passou a `tests: 320` por causa desta execução. Seções anteriores que citam 303, 275, 254 ou outras contagens descrevem rodadas passadas.
+
+### Fato
+
+- As duas classes `TransferMapping` entram no commit `1f952a9` (2026-08-05). Depois do import, o nome global tem os campos do POST 48. A anotação de retorno de `RealMetaLearningStrategies.transfer_knowledge` conserva a classe do POST 38.
+- Comando de reprodução, antes do patch: `PYTHONPATH=. python3` chamando `transfer_knowledge("visual_cortex", "visual_planning")`. Resultado: `TypeError: TransferMapping.__init__() got an unexpected keyword argument 'transfer_strength'`.
+- `PYTHONPATH=. python3 -m unittest -v test_transfer_mapping_contract.py` antes da edição do núcleo: `FAILED (failures=17, errors=7)`. No commit citado: `Ran 17 tests in 0.152s` / `OK`.
+- `python3 -m ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py` (Ruff 0.16.10): `All checks passed`.
+- `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-transfer-mapping.sqlite3 python3 tools/test_summary.py --output /tmp/test-summary.json`: executed 320, passed 318, failed 0, skipped 2, unexpected_successes 0, result passed (`Ran 320 tests in 5.177s`).
+- `NEXUS_INTEGRATED_SUMMARY=/tmp/integrated-summary.json PYTHONPATH=. python3 core/constitutional_brain.py`: 30 passed, 1 skipped (id `"0"`, log `TEST 0: Keyword Fallback Mode (FAISS not available)`), 0 missing, `result=passed`, exit code 0.
+- `python3 tools/reality_audit.py`: núcleo com 27591 linhas, 269 classes e 878 funções. Esses relatórios estão no mesmo commit de código.
+
+### Inferência
+
+- A causa do `TypeError` é a colisão de nome no módulo: a busca global na hora da chamada vê a segunda classe. A anotação, avaliada na definição, ainda aponta para a primeira. Isso sobreviveu à comparação dos `id` das duas classes depois do import completo.
+
+### Hipótese
+
+- **Excluídas nesta rodada:** substituição intencional pelo POST 48 (H1); forma do POST 48 morta (H2); dataclass única com campos opcionais (H4); falha por import parcial (H5). Condições e o que as derrubou estão em `CONTINUATION.md`.
+- **Sobrevivente:** as duas formas são pretendidas e o nome duplicado é o defeito (H3). Os testes feitos até aqui não a falsificaram. Isso não é prova de que não exista outro call site externo, fora deste repositório, dependente do nome antigo.
+
+### Limitações
+
+- Bandit, cobertura, mutation testing e CI hospedado não foram reexecutados. `bandit_low: 131` não é medição desta rodada.
+- `transfer_quality` acima de 1 continua válido: a heurística de cobertura pode produzi-lo. Não houve normalização silenciosa.
+- O ramo integrado que chama `find_transferable_knowledge(..., target_task=question)` não foi alterado. O parâmetro não existe na assinatura. A suíte integrada terminou sem traceback; não se verificou o caso em que já existe domínio fonte registrado.
+- A transferência por sobreposição de tokens não é aprendizado entre domínios.
 
 ## Categorias de resultado
 
@@ -248,3 +350,36 @@ A correção valida e copia árvores JSON nativas iterativamente, rejeita consta
 Validação factual: `PYTHONPATH=. coverage run --branch -m unittest discover -p 'test_*.py'` executou 318 testes, com 316 aprovados, 2 skips por NetworkX opcional ausente e nenhuma falha; cobertura branch de `core/deferred_task_queue.py`: 91%. Os contratos de fila e snapshot passaram 51/51 tanto em Python 3.12.3 como em Python 3.11.16; nesta última versão, NumPy 2.4.6 foi usado somente em `/tmp` para permitir importar o roteador. A suíte integrada embutida passou 30 checks, ignorou 1 check opcional de FAISS e não teve faltantes. `compileall` passou em Python 3.12.3 e nos três arquivos alterados em Python 3.11.16. Ruff 0.16.10, actionlint 1.7.12 e zizmor 1.31.1 passaram. O mutation gate matou 80/80 mutantes aplicáveis, com 0 sobreviventes e 0 não aplicados. Bandit encontrou 131 LOW, 0 MEDIUM/HIGH; a triagem versionada passou em `--check` (o comando Bandit retorna 1 pelos LOW, comportamento previsto no workflow). `tools/reality_audit.py` foi executado: 27.549 linhas, 269 classes e 875 funções; os relatórios versionados permaneceram sem diff. `git diff --check` passou.
 
 Limites e proveniência: o parser/encoder JSON padrão pode rejeitar aninhamentos extremos; não há orçamento explícito de payload. O produtor deve sincronizar mutações concorrentes do snapshot se exigir uma visão coerente. `enqueue()` continua aceitando seu contrato de contexto anterior e pode executar hooks de `deepcopy`; os métodos da fila ainda expõem objetos mutáveis fora das fronteiras de snapshot. A busca de callsites encontrou `restore_snapshot` somente na implementação e nos testes, sem uso de produção no checkout. Não houve push/merge; por isso não há resultado de CI oficial associado a esta branch.
+
+## Resumo unittest vazio não aprova o gate — 2026-10-20
+
+**Fato reproduzido:** na base `d435083bb4c893a58128cee6cfa00f65bba7fe02`, uma descoberta sem testes emitia contagens zeradas, `result=passed` e exit 0. Na branch local `fix/test-summary-empty-suite-20261020`, a aprovação do resumo passa a exigir pelo menos um teste executado e sucesso do unittest. Vazio mantém todos os contadores em zero, mas produz `result=failed` e exit 1. Nenhum teste falho artificial é somado, e o resumo da suíte integrada permanece inalterado.
+
+**Evidência:** `$PY -m unittest -v test_test_summary.py` com `PY=/tmp/nexus-ci311/bin/python`: antes da correção, 4 testes com 3 falhas de asserção em 2 casos, demonstrando separadamente resumo vazio, JSON do CLI real e código de saída; depois, 4/4 aprovados. Os controles protegem pass, skip-only, expected-failure-only, XPASS e contagem única de múltiplos subtests falhos. Blobs Git validados: `tools/test_summary.py=0110883147e80e3de56e0b1a387ed87fe78016af`, `test_test_summary.py=207a9aa7e0ec2e13134b823497986e39a92157a2`; hash do commit final no handoff externo. Comandos exatos e ambiente estão na seção correspondente de `CONTINUATION.md`.
+
+**Verificação local:** suíte completa com cobertura e CLI final: 306 executados, 304 aprovados, 2 skips por NetworkX ausente, 0 falhas/XPASS; integrada 30 aprovações e 1 skip FAISS. Cobertura fila/VRAM/temporal/Vita/núcleo: 95/94/93/76/68%, pisos aprovados. Gate de mutação herdado: 58/58 mortos, 0 sobreviventes/não aplicados/timeouts; não inclui mutantes da guarda nova. Ruff, compileall, actionlint, zizmor, auditorias de realidade/asserts/lacunas, Bandit e triagem passaram; 131 LOW e 0 MEDIUM/HIGH/erros de análise não constituem garantia de segurança. Saídas em `/tmp/nexus-empty-suite-20261020`, fora da árvore versionada; os quatro marcadores canônicos foram sincronizados para 306.
+
+**Limites:** ambiente local Python 3.11.16 sem reinstalação do lock; Ruff 0.17.1 em vez do pin 0.16.10, NetworkX opcional não exercitado. Não houve nova sondagem sintética, execução de CLIs de benchmark, publicação ou run remoto. Sem atestação de CI fabricada. O texto padrão do unittest para vazio ainda é `OK`, mas o JSON final é `failed` e a saída do processo é 1. O leitor herdado do manifesto rejeita o vazio falho como `invalid_summary`; continua falhando fechado e não foi modificado. Testes internos e mutação não são evidência de capacidade geral.
+## Validação local de LOW no auditor de consistência — 2026-10-20
+
+Base exata `d435083bb4c893a58128cee6cfa00f65bba7fe02`, branch isolada `fix/state-consistency-low-validation-20261020`. O baseline aceitou os quinze valores inválidos das novas regressões quando os documentos repetiam o valor: contagens negativas, booleanos, floats, strings, null, NaN/infinitos e contêineres. Também comparou um LOW inválido com os documentos: 16 falhas de subcasos em 11 métodos antes da correção. O auditor agora exige inteiro built-in não negativo e registra erro antes de qualquer comparação dessa métrica, sem alterar valores válidos.
+
+Evidência local: 25 contratos focados aprovados; suíte completa 306 executados, 304 aprovados e dois skips opcionais NetworkX; integração 30 aprovados e um skip FAISS. Mutação existente 58/58 e cinco mutações locais da nova guarda mortas; zero sobreviventes/não aplicadas. Compilação, Ruff, actionlint, zizmor, triagem Bandit e auditorias AST/realidade aprovados; 131 LOW, zero MEDIUM/HIGH/erros de análise. Isso é evidência de contrato local, não clearance de segurança nem validação de capacidades gerais.
+
+Comandos, blobs Git do código/testes, ambiente, pisos de cobertura e limites estão na rodada correspondente de `CONTINUATION.md`. Não se alterou o gerador do manifesto, o workflow, dependências ou PRs. Sem execução hospedada ou autorização para publicação; o manifesto local conserva `not_ci`, que bloqueia a atestação operacional. O hash do commit final e a revisão independente são entregues no handoff externo.
+## Inventário de classe explícita em `raise` — 2026-10-21
+
+Base `d435083bb4c893a58128cee6cfa00f65bba7fe02`; branch local `fix/gap-audit-exception-class-20261021`. O auditor AST retornava zero para `raise NotImplementedError` e uma ocorrência para a chamada equivalente. A [referência Python de raise](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement) aceita tanto classe quanto instância; a correção reconhece o alvo nome/atributo sem exigir chamada, sem executar fonte ou resolver nomes.
+
+RED na base: cinco métodos novos executados, quatro afetados por oito falhas de assertivas/subcasos, um aprovado. GREEN: 24/24 contratos focados e suíte 308/308 em Python 3.11.16 e 3.12.3; integração 30 aprovadas + 1 skip opcional em ambas. Em 3.11: cobertura do auditor 94%; pisos de fila/VRAM/temporal/Vita/core aprovados (95/94/93/76/68%); mutation existente 58/58 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW, zero MEDIUM/HIGH/erros. Ruff, compileall, actionlint, zizmor, requirements dry-run, auditorias e benchmarks CLI existentes aprovados. Inventário do núcleo permanece zero pass-only e zero NotImplementedError. Não é evidência de ausência geral de lacunas, segurança completa ou capacidade cognitiva.
+
+Comandos, ambientes, limites e inventário de sobreposição estão em `CONTINUATION.md`; logs e comandos brutos em `/workspace/nexus-gap-audit-class-evidence-20261021/validation.json`, `red.log`, `green311.log`, `green312.log` e `run_gates.py`. Ambientes anteriores do lock reutilizados, sem reinstalação. Nenhum CI hospedado/push/PR/merge foi executado. WIP `window_seconds` não incorporada; `known_at` permanece pendente. Nenhuma decisão anterior foi refutada.
+## Guarda demonstrativa direta do módulo — 2026-10-20
+
+Base exata: `d435083bb4c893a58128cee6cfa00f65bba7fe02`; branch local `fix/embedded-assert-module-guard-20261020`. A regressão de função usa exatamente `def helper():\n    if __name__ == '__main__':\n        assert False\n`. Antes do patch, a faixa aninhada era aceita. Depois, nenhuma faixa é criada para essa guarda, a linha 3 fica em `assert_lines_outside_main` e `ok=False`, inclusive sem finding.
+
+Red: os 11 métodos do auditor executaram na implementação original, com 37 falhas de subcasos em três métodos (18 cenários com B101, 18 sem findings e um finding sem assert). Green: 11/11 métodos; contratos focados do auditor, triagem, manifesto e consistência: 32/32. Os nove contextos são função, função assíncrona, classe, `if`, `for`, `while`, `with`, `try` e `else`; cada contexto é testado com/sem uma guarda legítima de módulo adicional. Controles preservam a comparação convencional, aspas simples/duplas e conteúdo aninhado dentro da demonstração legítima; excluem o `else` da guarda e comparações não convencionais.
+
+Resultados locais em Python 3.11.16, sem instalar dependências: suíte completa 310 executados, 308 aprovados, 2 skips por NetworkX opcional ausente, 0 falhas/XPASS; integração 30 aprovações e 1 skip FAISS opcional, sem IDs ausentes, conflitantes ou inesperados. Cobertura combinada: fila 95%, VRAM 94%, fatos temporais 93%, Vita 76%, núcleo 68%; auditor B101 76% (inclui CLI não coberta pela medição unitária; CLI real executada separadamente). Mutation: 59/59 aplicáveis mortos, sem sobreviventes/não aplicados; o novo mutante morreu com saída 1, sem timeout. Ruff, compileall, actionlint, zizmor, auditoria de realidade e auditorias AST passaram. Bandit 131 LOW, 0 MEDIUM/HIGH e nenhum erro de análise; triagem aprovada e 111 B101 preservados na faixa real `25680–27549`, sem findings/asserts fora. Relatórios versionados de realidade inalterados.
+
+Comandos reproduzíveis e limitações operacionais estão na rodada correspondente de `CONTINUATION.md`. Esta é evidência local de um contrato sintático, não CI hospedado nem clearance de segurança. Não houve nova sonda sintética ou execução adicional das CLIs de benchmark; os contratos de benchmark já existentes continuam dentro da suíte completa. Não se fabricou `gates_status=success`: a atestação operacional depende do job hospedado concluído. Quatro marcadores atuais passam de 303 para 310 testes executados; histórico, findings e disposições não são reescritos.

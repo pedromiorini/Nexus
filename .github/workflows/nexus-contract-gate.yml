@@ -169,6 +169,13 @@ jobs:
           PYTHONPATH: .
         run: python -m unittest -v test_state_consistency_audit.py
 
+      - name: Validate agent registry and claims
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest -v test_agent_registry_contract.py
+          python tools/agente/validar_registro.py --expirados aviso
+
       - name: Run reproducible capability benchmark
         env:
           PYTHONPATH: .
@@ -275,10 +282,37 @@ jobs:
             exit 1
           fi
 
+  agent-guard-replay:
+    name: Agent guard replay
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout full history (replay uses historical SHAs)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install ripgrep
+        run: sudo apt-get update -q && sudo apt-get install -y -q ripgrep
+
+      - name: Run agent guard replay (expected exit codes)
+        run: bash tools/agente/replay/run_replay.sh
+
+      - name: Replay must fail when expectations are inverted
+        run: |
+          sed 's/\t0$/\t9/' tools/agente/replay/casos.tsv > "$RUNNER_TEMP/adulterado.tsv"
+          if bash tools/agente/replay/run_replay.sh "$RUNNER_TEMP/adulterado.tsv"; then
+            echo "replay aceitou expectativas adulteradas" >&2
+            exit 1
+          fi
+
   state-manifest:
     name: Final state attestation
-    needs: contract-gate
-    if: needs.contract-gate.result == 'success'
+    needs: [contract-gate, agent-guard-replay]
+    if: needs.contract-gate.result == 'success' && needs.agent-guard-replay.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

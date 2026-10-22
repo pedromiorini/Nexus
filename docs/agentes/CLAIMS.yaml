@@ -1,0 +1,4 @@
+# Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
+# Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
+schema_version: 1
+claims: []

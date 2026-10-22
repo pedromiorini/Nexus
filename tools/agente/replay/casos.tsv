@@ -1,0 +1,12 @@
+# id	tipo	args	rc_esperado
+A1-origem	gh	fail CLEAN	1
+A1-anterior	gh	pass CLEAN	0
+A1-incompat	gh	pass DIRTY	2
+A2-origem	res	d074c15	1
+A2-anterior57	res	1bee13a	0
+A2-anterior61	res	b345203	0
+A2-incompat58	merge	aecb2c7 721eb9a	2
+C-origem58	pre	aecb2c7 721eb9a	2
+C-anterior57	pre	f5fec45 7eabba7	0
+C-anterior61	pre	eb706c7 d3e652f	0
+C-incompat-hash	pre	deadbeef 721eb9a	3

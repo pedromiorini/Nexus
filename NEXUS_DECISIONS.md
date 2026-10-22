@@ -304,3 +304,20 @@
 - **Documentação:** D-029 temporal e D-030 snapshot mantêm os IDs. Os registros de metacognição da #42, originalmente também D-029/D-030, são renumerados D-031/D-032, sem alterar conteúdo ou alegar novas avaliações. Resultados de branches permanecem históricos; marcadores atuais são únicos e vêm da execução combinada.
 - **Fronteiras:** restore da fila continua atomicamente staged; grafo/ledger continuam sem transação compartilhada, opt-in e em memória. Não criar atomicidade distribuída nem ampliar o runtime mínimo para resolver conflitos.
 - **Evidência e reversibilidade:** testes das interseções em `test_consolidated_pr_contract.py`, gates e evidência pós-commit no ledger da composição. A branch isolada pode ser abandonada sem tocar nas origens.
+
+## D-034 — Contador de testes derivado do manifesto (`tests: CURRENT_TESTS`)
+
+- **Status:** proposta na branch `fix/handoff-counter-decoupling` (hipótese operacional até revisão humana).
+- **Decisão:** os blocos `NEXUS-CURRENT-STATE` declaram `tests: CURRENT_TESTS`; `tools/state_consistency_audit.py` resolve a sentinela para `verification.tests.executed` do manifesto da mesma execução, como já fazia com `commit: HEAD` e `ci_run: CURRENT_RUN`. Cada sentinela passa a valer só no próprio campo; números literais continuam exigindo igualdade exata.
+- **Contexto:** todo PR que adicionava teste editava `tests: N` em quatro documentos; PRs independentes conflitavam entre si (ex.: #52 × #53), embora cada um estivesse limpo contra `main`.
+- **Alternativas excluídas:** tolerância `>=` (aceita contagem desatualizada e deixa de detectar remoção de testes); fonte única em arquivo versionado (desloca o conflito para esse arquivo); fragmentos `handoff/` sozinhos (não removem o contador exigido pelo gate). Fragmentos podem ser adotados depois, de forma independente.
+- **Evidência:** `test_state_counter_sentinel_contract.py` (6 testes) falhou com 12 falhas antes da correção e passa depois; suíte completa 309/309 e `state_consistency_audit.py` aprovado localmente em 21/10/2026 (Python 3.13.5; CI hospedado não verificado).
+- **Limitação:** o número de testes deixa de ser legível nos documentos; a fonte passa a ser o artefato `nexus-state-manifest` do CI. A garantia do gate (claims atuais coerentes com a execução, execução aprovada) é preservada; ele continua não provando validade semântica dos testes. `bandit_low` continua literal (muda raramente).
+- **Reversibilidade:** simples; reverter o commit restaura literais.
+## D-035 — Exceção B101 somente para guarda direta do módulo
+
+- **Decisão:** `tools/embedded_assert_audit.py` procura a comparação convencional `__name__ == '__main__'` somente em `ast.Module.body`, preservando o predicado existente e as faixas de linhas do corpo positivo. Guardas em função, função assíncrona, classe ou outro bloco não criam exceções. A busca de todos os `ast.Assert` continua recursiva e independente dos findings Bandit.
+- **Contexto:** em `d435083bb4c893a58128cee6cfa00f65bba7fe02`, `ast.walk` aceitava uma guarda dentro de `helper()` como demonstração do módulo, deixando `assert False` sem finding passar com `ok=True`.
+- **Evidência:** sete novos métodos de regressão, incluindo nove contextos aninhados com/sem B101 e com/sem demonstração legítima adicional; o mutante `embedded_assert_only_module_level_guards` restaura `ast.walk` e é morto. Comandos, resultados locais e limites estão em `CONTINUATION.md` e `NEXUS_EVIDENCE.md` na rodada de 2026-10-20.
+- **Limites:** verificação sintática de localização, não análise de fluxo, segurança dos asserts ou validação do schema/filename do relatório Bandit. Conteúdo dentro da faixa de uma guarda legítima mantém a exceção anterior; `else` fica fora. Não se ampliam as formas de comparação aceitas, nem se altera a triagem separada de escopos de `tools/security_triage.py`.
+- **Reversibilidade:** simples; uma troca de iteração, acompanhada das regressões e do mutante. Não muda workflow, núcleo, dependências ou API pública.
