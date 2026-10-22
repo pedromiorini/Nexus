@@ -24,6 +24,9 @@ EPISODIC = "core/cognitivo/episodic_memory.py"
 EXTRACTION = ("test_episodic_memory_extraction_contract.py",)
 LIMITS = ("test_episodic_memory_search_limits_contract.py", "test_episodic_memory_extraction_contract.py")
 STATS = ("test_episodic_memory_statistics_contract.py", "test_episodic_memory_extraction_contract.py")
+PREDICTIVE = "core/cognitivo/predictive_coding.py"
+POMDP = ("test_predictive_coding_extraction_contract.py", "test_pomdp_belief_filter_contract.py")
+PC_EXTRACTION = ("test_predictive_coding_extraction_contract.py",)
 _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")'
 
 MUTATIONS = [
@@ -48,6 +51,26 @@ MUTATIONS = [
              "from core.cognitivo.episodic_memory import Episode as _E, RealEpisodicMemory as _R\n"
              "class RealEpisodicMemory(_R):\n    pass\nEpisode = _E",
              tests=EXTRACTION),
+    Mutation("predictive_empty_states_accepted", PREDICTIVE,
+             "if not is_sequence(states) or len(states) == 0:",
+             "if not is_sequence(states):", tests=POMDP),
+    Mutation("predictive_prior_normalization", PREDICTIVE,
+             'if abs(math.fsum(prior_values) - 1.0) > tolerance:\n            raise ValueError("prior must be normalized to 1")',
+             'if False:\n            raise ValueError("prior must be normalized to 1")', tests=POMDP),
+    Mutation("predictive_zero_evidence_accepted", PREDICTIVE,
+             "if not math.isfinite(log_evidence):", "if False:", tests=POMDP),
+    Mutation("predictive_posterior_normalization", PREDICTIVE,
+             "math.exp(log_weight - log_evidence)", "math.exp(log_weight)", tests=POMDP),
+    Mutation("predictive_likelihood_length", PREDICTIVE,
+             "if not is_sequence(observation_likelihoods) or len(observation_likelihoods) != state_count:",
+             "if not is_sequence(observation_likelihoods):", tests=POMDP),
+    Mutation("predictive_module_pulls_monolith", PREDICTIVE,
+             "import math\n", "import math\nimport core.constitutional_brain  # noqa: F401\n", tests=PC_EXTRACTION),
+    Mutation("monolith_stops_reexporting_predictive", "core/constitutional_brain.py",
+             "from core.cognitivo.predictive_coding import Prediction, PredictionError, RealPredictiveCodingSystem",
+             "from core.cognitivo.predictive_coding import Prediction, PredictionError, RealPredictiveCodingSystem as _R\n"
+             "class RealPredictiveCodingSystem(_R):\n    pass",
+             tests=PC_EXTRACTION),
 ]
 
 

@@ -3,9 +3,9 @@
   "scope": "conservative reality audit",
   "principle": "names, banners and demo asserts are not proof of general intelligence or production readiness",
   "static_evidence": {
-    "core_lines": 27374,
-    "classes": 267,
-    "functions": 866,
+    "core_lines": 26922,
+    "classes": 264,
+    "functions": 851,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -59,7 +59,6 @@
       "RealMultimodalSystem.get_statistics",
       "RealNarrativeCoherenceLayer.get_life_story_summary",
       "RealNarrativeCoherenceLayer.get_statistics",
-      "RealPredictiveCodingSystem.get_statistics",
       "RealRSI.get_statistics",
       "RealRealTimeAdaptationEngine.get_statistics",
       "RealReminiscenceBumpClustering.get_statistics",
@@ -99,15 +98,15 @@
   "code_claims": [],
   "code_claim_inventory": {
     "by_level": {
-      "strong_capability_claim": 51,
-      "scientific_terminology": 233,
-      "neutral_identifier": 62
+      "strong_capability_claim": 49,
+      "scientific_terminology": 230,
+      "neutral_identifier": 61
     },
     "items": [
       {
         "level": "strong_capability_claim",
         "label": "ênfase 'REAL <Capacidade>'",
-        "occurrences": 46,
+        "occurrences": 45,
         "examples": [
           "POST12: Multimodal Processing System — REAL Multimodal Perception",
           "POST10: Theory of Mind — REAL Mental State Modeling",
@@ -133,14 +132,6 @@
         ]
       },
       {
-        "level": "strong_capability_claim",
-        "label": "máquina bayesiana afirmada",
-        "occurrences": 1,
-        "examples": [
-          "print(\"🧠📊 POST 33 - RealPredictiveCodingSystem initialized (Bayesian p"
-        ]
-      },
-      {
         "level": "scientific_terminology",
         "label": "consciência/consciousness",
         "occurrences": 203,
@@ -153,17 +144,17 @@
       {
         "level": "scientific_terminology",
         "label": "teorias nomeadas",
-        "occurrences": 30,
+        "occurrences": 27,
         "examples": [
           "POST10: Theory of Mind — REAL Mental State Modeling",
           "\"\"\"Estatísticas do Theory of Mind\"\"\"",
-          "POST33: Predictive Coding System — REAL Bayesian Prediction Machine"
+          "Conteúdo na Global Workspace (consciente)."
         ]
       },
       {
         "level": "neutral_identifier",
         "label": "classes com prefixo Real",
-        "occurrences": 62,
+        "occurrences": 61,
         "examples": [
           "class RealHierarchicalMemory:",
           "class RealKnowledgeGraph:",

@@ -1,4 +1,16 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "Extrair RealPredictiveCodingSystem do monólito para core/cognitivo/predictive_coding.py (strangler, sem mudança de comportamento)"
+    arquivos:
+      - core/constitutional_brain.py  # só Prediction/PredictionError/RealPredictiveCodingSystem
+      - core/cognitivo/predictive_coding.py
+      - test_predictive_coding_extraction_contract.py
+      - tools/cognitivo_mutation.py
+      - AUDIT_REALITY_REPORT.md
+      - audit_reality.json
+      - docs/agentes/CLAIMS.yaml
+    pr: 82
+    expira_em: "2026-10-25T15:00:00+00:00"
