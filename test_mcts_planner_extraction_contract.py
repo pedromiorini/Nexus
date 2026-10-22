@@ -5,9 +5,9 @@ Teste dos três casos (critérios escritos antes da extração):
     vita ou o monólito, e o monólito reexporta as MESMAS classes;
 (b) não regressão: com random.seed(20261016), o PlanResult (sem planning_time) tem o mesmo
     SHA-256 medido na main 4d54183;
-(c) caso incompatível: entrada ausente (goal=None) levanta erro; casos-limite atuais
-    (max_depth<=0, exploration_constant=NaN, max_iterations<=0, goal vazio) ficam
-    CARACTERIZADOS como estão hoje -- este PR não muda comportamento; endurecê-los é decisão separada.
+(c) caso incompatível: entrada ausente (goal=None) levanta ValueError; max_depth<=0,
+    exploration_constant=NaN e max_iterations<0 foram endurecidos (ValueError) em PR
+    próprio; max_iterations=0 e goal vazio seguem aceitos.
 """
 
 import dataclasses
@@ -24,8 +24,6 @@ ROOT = Path(__file__).resolve().parent
 GOLDEN_SHA256 = "47c6fda003aeeaa15c649a416eea7920d8d4bb6f6b23237cf64bc4524054ea12"
 SEED = 20261016
 GOAL = "secure the system"
-EMPTY_PLAN = {"best_action_sequence": [], "expected_reward": 0.0, "tree_nodes_created": 1,
-              "success_probability": 0.0, "alternative_plans": []}
 
 _BLOCKER = r"""
 import random, sys
@@ -81,25 +79,26 @@ class MCTSPlannerExtractionContractTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(text.encode("utf-8")).hexdigest(), GOLDEN_SHA256)
 
     def test_missing_goal_is_rejected(self):
-        with self.assertRaises(AttributeError):
+        with self.assertRaisesRegex(ValueError, "goal"):
             _plan(goal=None)
 
-    def test_characterize_non_positive_depth_returns_empty_plan(self):
-        for depth in (0, -1):
+    def test_hardened_edge_cases_are_rejected(self):
+        """Antes caracterizados (aceitos em silêncio); endurecidos em PR próprio."""
+        cases = [(ValueError, {"max_depth": 0}), (ValueError, {"max_depth": -1}),
+                 (ValueError, {"exploration_constant": float("nan")}), (ValueError, {"iterations": -1})]
+        for exc, kwargs in cases:
+            with self.subTest(kwargs=kwargs), self.assertRaises(exc):
+                _plan(**kwargs)
+
+    def test_max_depth_bounds_plan_length(self):
+        for depth in (1, 2):
             with self.subTest(max_depth=depth):
-                data = _plan(max_depth=depth)
-                self.assertEqual({k: data[k] for k in EMPTY_PLAN}, EMPTY_PLAN)
-                self.assertEqual(data["iterations_run"], 50)
+                data = _plan(max_depth=depth, iterations=200)
+                self.assertEqual(len(data["best_action_sequence"]), depth)
 
-    def test_characterize_nan_exploration_is_accepted(self):
-        data = _plan(exploration_constant=float("nan"))
-        self.assertEqual(data["best_action_sequence"], ["ESCALATE"])
-        self.assertEqual(data["tree_nodes_created"], 44)
-
-    def test_characterize_non_positive_iterations_and_empty_goal(self):
+    def test_zero_iterations_and_empty_goal_still_accepted(self):
         self.assertEqual(_plan(iterations=0)["iterations_run"], 0)
-        self.assertEqual(_plan(iterations=-1)["iterations_run"], -1)
-        self.assertEqual(_plan(iterations=-1)["best_action_sequence"], [])
+        self.assertEqual(_plan(iterations=0)["best_action_sequence"], [])
         self.assertEqual(_plan(goal="")["best_action_sequence"], ["ESCALATE", "IGNORE_ALERT"])
 
 

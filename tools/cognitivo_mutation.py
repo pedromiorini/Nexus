@@ -28,6 +28,7 @@ PREDICTIVE = "core/cognitivo/predictive_coding.py"
 POMDP = ("test_predictive_coding_extraction_contract.py", "test_pomdp_belief_filter_contract.py")
 PC_EXTRACTION = ("test_predictive_coding_extraction_contract.py",)
 MCTS = "core/cognitivo/mcts_planner.py"
+MCTS_INPUT = ("test_mcts_planner_input_contract.py", "test_mcts_planner_extraction_contract.py")
 MCTS_TESTS = ("test_mcts_planner_extraction_contract.py", "test_mcts_action_contract.py")
 _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")'
 
@@ -85,6 +86,42 @@ MUTATIONS = [
     Mutation("mcts_module_pulls_monolith", MCTS,
              "import copy\n", "import copy\nimport core.constitutional_brain  # noqa: F401\n",
              tests=("test_mcts_planner_extraction_contract.py",)),
+    Mutation("mcts_guard_exploration_type", MCTS,
+             'if isinstance(exploration_constant, bool) or not isinstance(exploration_constant, Real):',
+             'if False:', tests=MCTS_INPUT),
+    Mutation("mcts_guard_exploration_bool", MCTS,
+             'if isinstance(exploration_constant, bool) or not',
+             'if not', tests=MCTS_INPUT),
+    Mutation("mcts_guard_exploration_finite", MCTS,
+             'if not math.isfinite(exploration_constant):',
+             'if False:', tests=MCTS_INPUT),
+    Mutation("mcts_guard_depth_type", MCTS,
+             'if isinstance(max_depth, bool) or not isinstance(max_depth, int):',
+             'if False:', tests=MCTS_INPUT),
+    Mutation("mcts_guard_depth_bool", MCTS,
+             'if isinstance(max_depth, bool) or not isinstance(max_depth, int):',
+             'if not isinstance(max_depth, int):', tests=MCTS_INPUT),
+    Mutation("mcts_guard_depth_positive", MCTS,
+             'if max_depth <= 0:',
+             'if max_depth < 0:', tests=MCTS_INPUT),
+    Mutation("mcts_guard_goal_none", MCTS,
+             'if goal is None:\n            raise ValueError',
+             'if False:\n            raise ValueError', tests=MCTS_INPUT),
+    Mutation("mcts_guard_goal_type", MCTS,
+             'if not isinstance(goal, str):',
+             'if False:', tests=MCTS_INPUT),
+    Mutation("mcts_guard_iterations_type", MCTS,
+             'if isinstance(max_iterations, bool) or not isinstance(max_iterations, int):',
+             'if False:', tests=MCTS_INPUT),
+    Mutation("mcts_guard_iterations_bool", MCTS,
+             'if isinstance(max_iterations, bool) or not isinstance(max_iterations, int):',
+             'if not isinstance(max_iterations, int):', tests=MCTS_INPUT),
+    Mutation("mcts_guard_iterations_negative", MCTS,
+             'if max_iterations < 0:',
+             'if max_iterations < -1:', tests=MCTS_INPUT),
+    Mutation("mcts_guard_iterations_zero_allowed", MCTS,
+             'if max_iterations < 0:',
+             'if max_iterations <= 0:', tests=MCTS_INPUT),
 ]
 
 
