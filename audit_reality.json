@@ -24,9 +24,9 @@
       },
       {
         "path": "core/cognitivo/predictive_coding.py",
-        "lines": 470,
+        "lines": 490,
         "classes": 3,
-        "functions": 15
+        "functions": 17
       }
     ],
     "core_lines": 26526,

@@ -32,6 +32,8 @@ MCTS_INPUT = ("test_mcts_planner_input_contract.py", "test_mcts_planner_extracti
 MCTS_TESTS = ("test_mcts_planner_extraction_contract.py", "test_mcts_action_contract.py")
 _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")'
 
+PC_LEARNING = ("test_predictive_learning_contract.py",)
+
 RETRIEVAL = ("test_episodic_retrieval_contract.py",)
 
 MUTATIONS = [
@@ -43,6 +45,16 @@ MUTATIONS = [
              "            if False:\n                cursor.execute(", tests=RETRIEVAL),
     Mutation("episodic_like_fallback_keeps_substrings", EPISODIC, "        if len(rows) < limit:", "        if False:",
              tests=RETRIEVAL),
+    Mutation("predictive_level0_uses_learned_argmax", PREDICTIVE,
+             "max(self._sensory_distribution.items(), key=lambda item: item[1])",
+             "min(self._sensory_distribution.items(), key=lambda item: item[1])", tests=PC_LEARNING),
+    Mutation("predictive_cycle_learns_observation", PREDICTIVE,
+             '        self._learn_sensory(observation.get("sensory", "input"))\n', "", tests=PC_LEARNING),
+    Mutation("predictive_warmup_sample_mean", PREDICTIVE,
+             "alpha = max(self.learning_rates[0], 1.0 / self._sensory_observations)",
+             "alpha = self.learning_rates[0]", tests=PC_LEARNING),
+    Mutation("predictive_decays_previous_mass", PREDICTIVE,
+             "self._sensory_distribution[symbol] *= 1.0 - alpha", "pass", tests=PC_LEARNING),
     Mutation("episodic_search_rejects_boolean_and_non_integer_limit", EPISODIC, _GUARD,
              '"""Buscar episódios"""\n        if False:\n            raise TypeError("limit must be an integer")', tests=LIMITS),
     Mutation("episodic_search_rejects_negative_limit", EPISODIC,
