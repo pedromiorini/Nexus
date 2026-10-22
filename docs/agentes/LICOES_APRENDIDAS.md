@@ -22,7 +22,7 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 ## Regra de evidência e ativação (v3.4)
 - **Evidência bruta obrigatória:** toda lição cita PR, SHA e/ou ID de execução do CI que outro agente consiga conferir. Lição tirada só de resumo, handoff ou memória é **rejeitada** (registro incompleto ensina regra errada — arXiv 2610.19910, preprint).
 - **Candidata → ativa:** lição nova entra com `Status: candidata`; vira `ativa` só após replay/teste dos 3 casos (caso de origem, caso anterior bem-sucedido, caso semelhante incompatível), com o resultado registrado no PR.
-- **Limite:** no máximo **15** lições ativas/promovidas em uso. Para ativar outra, aposente uma explicitamente (`Status: aposentada`, data e motivo), sem apagar o texto (acúmulo sem filtro piora o agente — arXiv 2608.05810, preprint).
+- **Limite:** no máximo **15** lições ativas/promovidas em uso. Para ativar outra, aposente uma explicitamente (`Status: aposentada`, data e motivo), sem apagar o texto (15 é teto operacional escolhido para o Nexus, não resultado de paper; arXiv 2608.05810, preprint, só sustenta cautela com acúmulo sem filtro).
 - Entradas L-001..L-007 são anteriores à v3.4: mantêm o status original; o campo `Evidência` foi acrescentado só quando ela já constava no texto.
 
 ## Regra de promoção
@@ -99,5 +99,5 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Causa (Fato): o validador consultava os campos `required` do schema, mas não aplicava `type`/`format` de `last_seen`.
 - Correção local: checar string, formato ASCII exato e calendário real, sem coerção; regressões e mutantes específicos no mesmo patch autorizado do registro Axis. Logs e comandos na nova rodada de `CONTINUATION.md`.
 - Regra/checagem derivada: declaração de formato em schema não substitui teste negativo do caminho efetivamente executado; parser ISO sozinho também aceita formatos compactos/semanais.
-- Evidência: base `b2b01f2c6b044f0f7f1b60ec1e9c0d615fa4d296`.
+- Evidência: base `b2b01f2c6b044f0f7f1b60ec1e9c0d615fa4d296`; correção no PR #70 (head `10a48e81316b3f13c1cff414bbaa6dc91cf791a1`, merge `a663a55a560e00ae818e9c8f60aacd4cf9bd93f7`).
 - Status: registrada; sem promoção das instruções, publicação ou alegação de validação genérica de todo o schema.

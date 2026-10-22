@@ -12,7 +12,7 @@ agentes:
     modelo: não declarado pelo provedor
     instrucoes:
       arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md
-      sha256: e5db416cded7e097b69288c6e1746529fa7b6bde065afe25b7f93d1368ae629a
+      sha256: a85574f7490625b34e0fbdca750262ecb710b8afd5f673454e800e018d91681f
       versao_aceita: "3.4"
     conhecimentos: [CI do Nexus, state_consistency_audit, gate de mutação, triagem de PRs]
     skills: [safe-gh-batch-actions, conflict-resolution-handoff-docs, contract-first-bugfix, multi-agent-pr-triage, repo-agent-dispatch, repo-evidence-audit]
@@ -28,7 +28,7 @@ agentes:
     modelo: não declarado pelo provedor
     instrucoes:
       arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md
-      sha256: e5db416cded7e097b69288c6e1746529fa7b6bde065afe25b7f93d1368ae629a
+      sha256: a85574f7490625b34e0fbdca750262ecb710b8afd5f673454e800e018d91681f
       versao_aceita: "3.4"
     conhecimentos: [contratos de registro de agentes, validação local do Nexus]
     skills: [contract-first-bugfix, repo-evidence-audit]
