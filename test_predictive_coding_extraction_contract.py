@@ -87,6 +87,8 @@ class PredictiveCodingExtractionContractTests(unittest.TestCase):
         for name, args in cases.items():
             with self.subTest(case=name), self.assertRaises((ValueError, TypeError)):
                 pc.update_belief_state(*args)
+        with self.assertRaisesRegex(ValueError, "states must be a non-empty"):
+            pc.update_belief_state([], [], [], [])
 
 
 if __name__ == "__main__":
