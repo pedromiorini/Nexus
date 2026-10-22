@@ -46,6 +46,12 @@ class MCTSPlannerQualityContractTests(unittest.TestCase):
         plan = RealMCTSPlanner(max_depth=3).plan("reduce cost", max_iterations=2000)
         self.assertEqual(plan.best_action_sequence, ["APPLY_PATCH"])
 
+    def test_plan_never_exceeds_horizon(self):
+        for goal in ("improve stability", "secure the system"):
+            random.seed(3)
+            plan = RealMCTSPlanner(max_depth=1).plan(goal, max_iterations=300)
+            self.assertEqual(len(plan.best_action_sequence), 1, (goal, plan.best_action_sequence))
+
 
 if __name__ == "__main__":
     unittest.main()

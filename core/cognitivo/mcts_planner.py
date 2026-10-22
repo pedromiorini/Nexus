@@ -137,6 +137,11 @@ class RealMCTSPlanner:
             "INCREASE_LOGGING":   {"security": +0.3, "stability": +0.0, "cost": -0.1},
             "SHUTDOWN_SERVICE":   {"security": +0.8, "stability": -0.7, "cost": -0.2},
         }
+        # Escopo de um plan(): ações permitidas, efeitos de ações customizadas e
+        # melhor sequência completa encontrada nos rollouts (estratégia "top score").
+        self._plan_actions: Optional[List[str]] = None
+        self._plan_effects: Dict[str, Dict] = {}
+        self._best_found: Optional[tuple] = None
 
     # ─── Fase 1: SELEÇÃO ────────────────────────────────────────────────────
 
@@ -184,6 +189,8 @@ class RealMCTSPlanner:
         """
         state = copy.deepcopy(node.state)
         depth = node.depth
+        if depth > 0:  # prefixo = nó da árvore; max_depth é horizonte, não obrigação
+            self._record_found(self._evaluate_state(state, goal), state)
 
         while depth < self.max_depth:
             actions = self._get_available_actions(state, depth)
@@ -193,7 +200,13 @@ class RealMCTSPlanner:
             state = self._apply_action(state, action)
             depth += 1
 
-        return self._evaluate_state(state, goal)
+        reward = self._evaluate_state(state, goal)
+        self._record_found(reward, state)
+        return reward
+
+    def _record_found(self, reward: float, state: Dict) -> None:
+        if reward > 0 and (self._best_found is None or reward > self._best_found[0]):
+            self._best_found = (reward, list(state.get("steps_taken", [])))
 
     # ─── Fase 4: RETROPROPAGAÇÃO ─────────────────────────────────────────────
 
@@ -235,7 +248,8 @@ class RealMCTSPlanner:
         if depth >= self.max_depth:
             return []
 
-        all_actions = list(self._action_effects.keys())
+        all_actions = (list(self._plan_actions) if self._plan_actions is not None
+                       else list(self._action_effects.keys()))
 
         # Evitar ações que já foram tomadas recentemente
         taken = state.get("steps_taken", [])
@@ -247,7 +261,7 @@ class RealMCTSPlanner:
     def _apply_action(self, state: Dict, action: str) -> Dict:
         """Aplicar ação ao estado e retornar novo estado"""
         new_state = copy.deepcopy(state)
-        effects = self._action_effects.get(action, {})
+        effects = self._action_effects.get(action) or self._plan_effects.get(action, {})
 
         for metric, delta in effects.items():
             if metric in new_state:
@@ -362,22 +376,32 @@ class RealMCTSPlanner:
         # Estado inicial
         initial_state = self._get_initial_state(goal)
 
-        # Substituir ações disponíveis se fornecidas
-        if available_actions is not None:
-            # Registrar ações customizadas com efeitos neutros se desconhecidas
-            for action in available_actions:
-                if action not in self._action_effects:
-                    self._action_effects[action] = {
-                        "security": 0.1, "stability": 0.1, "cost": -0.1
-                    }
+        # Ações fornecidas valem em todas as profundidades, só neste plano; a lista do
+        # chamador é copiada e ações desconhecidas recebem efeitos neutros locais.
+        allowed = list(available_actions) if available_actions is not None else None
+        try:
+            self._plan_actions = allowed
+            self._plan_effects = {
+                action: {"security": 0.1, "stability": 0.1, "cost": -0.1}
+                for action in (allowed or []) if action not in self._action_effects
+            }
+            self._best_found = None
+            return self._run_plan(goal, initial_state, allowed, max_iterations, start_time)
+        finally:
+            self._plan_actions = None
+            self._plan_effects = {}
+            self._best_found = None
 
+    def _run_plan(self, goal: str, initial_state: Dict[str, Any], allowed: Optional[List[str]],
+                  max_iterations: int, start_time: float) -> PlanResult:
         # Criar raiz da árvore
+        prefix = len(initial_state.get("steps_taken", []))
         root = MCTSNode(
             state=initial_state,
             action_taken=None,
             parent=None,
             depth=0,
-            untried_actions=available_actions if available_actions is not None else (
+            untried_actions=list(allowed) if allowed is not None else (
                 self._get_available_actions(initial_state, 0)
             )
         )
@@ -401,7 +425,8 @@ class RealMCTSPlanner:
         self.total_iterations += max_iterations
 
         # ─── Extrair Resultados ──────────────────────────────────────────
-        best_sequence = self._extract_best_sequence(root)
+        best_sequence = (self._best_found[1][prefix:] if self._best_found is not None
+                         else self._extract_best_sequence(root))
         best_child = max(root.children, key=lambda c: c.avg_reward) if root.children else None
         expected_reward = best_child.avg_reward if best_child else 0.0
         alternatives = self._extract_alternatives(root)
