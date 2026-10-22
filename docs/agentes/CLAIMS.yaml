@@ -9,4 +9,5 @@ claims:
       - test_state_stray_marker_contract.py
       - docs/agentes/CLAIMS.yaml
       - docs/agentes/LICOES_APRENDIDAS.md
+    pr: 75
     expira_em: "2026-10-25T06:33:00+00:00"
