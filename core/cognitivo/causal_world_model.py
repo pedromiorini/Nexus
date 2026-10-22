@@ -8,6 +8,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from core.cognitivo.action_effects import ACTION_EFFECTS
+
 
 @dataclass
 class CausalRelation:
@@ -94,13 +96,11 @@ class RealWorldModelSimulator:
         warnings = []
 
         for action in actions:
-            if action == "APPLY_PATCH":
-                state.state["security_patch_applied"] = True
-                state.state["alert_level"] = "low"
-                state.state["system_status"] = "secure"
-            elif action == "IGNORE_ALERT":
-                state.state["alert_level"] = "critical"
-                state.state["system_status"] = "compromised"
+            entry = ACTION_EFFECTS.get(action)
+            if entry is None:
+                warnings.append(f"unknown action: {action!r}")
+                continue
+            state.state.update(entry["world"])
 
         # Evaluate success
         success = state.state.get("system_status") in ["secure", "stable"]
