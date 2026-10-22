@@ -3,9 +3,9 @@
   "scope": "conservative reality audit",
   "principle": "names, banners and demo asserts are not proof of general intelligence or production readiness",
   "static_evidence": {
-    "core_lines": 27591,
-    "classes": 269,
-    "functions": 878,
+    "core_lines": 27374,
+    "classes": 267,
+    "functions": 866,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -101,7 +101,7 @@
     "by_level": {
       "strong_capability_claim": 51,
       "scientific_terminology": 233,
-      "neutral_identifier": 63
+      "neutral_identifier": 62
     },
     "items": [
       {
@@ -163,7 +163,7 @@
       {
         "level": "neutral_identifier",
         "label": "classes com prefixo Real",
-        "occurrences": 63,
+        "occurrences": 62,
         "examples": [
           "class RealHierarchicalMemory:",
           "class RealKnowledgeGraph:",
