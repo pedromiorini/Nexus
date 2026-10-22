@@ -1,0 +1,7 @@
+# Âncora do correio (protegida por CODEOWNERS). Gerada por: tools/agente/correio.py ancora
+# head_verificado: último head da branch agentes/correio que o Pedro conferiu; se deixar de ser
+#   ancestral do head atual, o histórico foi reescrito e o validador falha.
+# aceitas_com_falha: SHAs de commits que o Pedro decidiu tolerar (viram aviso, não erro).
+schema_version: 1
+head_verificado: null
+aceitas_com_falha: []

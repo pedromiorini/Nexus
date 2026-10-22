@@ -8,6 +8,7 @@ Scripts shell usados pelos agentes antes de agir no GitHub. Não fazem parte do 
 | `preflight_rotina.sh` | Preflight da rotina diária (`NUVEM_STATUS=ok\|blocked`) | `MODO=nuvem` 0; `MODO=local` 10; `MODO=abortar` 3 |
 | `replay/check_resolution.sh <worktree> [arquivos]` | Após resolver conflito: marcadores, linhas de estado fora do bloco `NEXUS-CURRENT-STATE`, conflito de código | 0 ok; 1 falha; 2 conflito de código |
 | `replay/run_replay.sh [casos.tsv]` | Suíte de replay das falhas reais de 21/10/2026 (L-001..L-003) | 0 somente com ≥ 1 caso executado e todos os códigos esperados; 1 para entrada vazia/ilegível ou divergência |
+| `correio.py <subcomando>` | Correio dos agentes (branch `agentes/correio`): validar, ler, resumo, enviar, iniciar, ancora. Ver `docs/agentes/CORREIO.md` | 0 ok; 1 erro de validação ou envio |
 
 `replay/old.sh` é **intencionalmente defeituoso** (reproduz o pipe que engoliu o código de saída — L-003) e só é usado pelos casos do replay; `replay/fakegh` é um `gh` falso que registra ações sem tocar o GitHub. `replay/new.sh` é o fluxo correto.
 
