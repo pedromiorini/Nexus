@@ -109,6 +109,10 @@ class RealPredictiveCodingSystem:
         self.avg_error_magnitude = 0.0
         self.generative_model_updates: List[Dict[str, Any]] = []
 
+        # Nível 0: distribuição categórica aprendida por suavização exponencial
+        self._sensory_distribution: Dict[str, float] = {}
+        self._sensory_observations = 0
+
         print("🧠📊 POST 33 - RealPredictiveCodingSystem initialized (Bayesian prediction machine active)")
 
     @classmethod
@@ -259,6 +263,8 @@ class RealPredictiveCodingSystem:
         # Confidence baseado no nível (higher = more confident in abstractions)
         base_confidence = 0.5 + (level * 0.1)
         confidence = min(1.0, base_confidence)
+        if level == 0 and self._sensory_distribution:
+            predicted_value, confidence = max(self._sensory_distribution.items(), key=lambda item: item[1])
 
         prediction = Prediction(
             prediction_id=str(uuid.uuid4()),
@@ -291,6 +297,19 @@ class RealPredictiveCodingSystem:
             return "detected_features"
 
         return "intermediate_representation"
+
+    def sensory_distribution(self) -> Dict[str, float]:
+        """Cópia da distribuição preditiva aprendida no nível 0."""
+        return dict(self._sensory_distribution)
+
+    def _learn_sensory(self, observation: Any) -> None:
+        """Suavização exponencial da distribuição categórica (média amostral no aquecimento)."""
+        self._sensory_observations += 1
+        alpha = max(self.learning_rates[0], 1.0 / self._sensory_observations)
+        key = str(observation)
+        for symbol in self._sensory_distribution:
+            self._sensory_distribution[symbol] *= 1.0 - alpha
+        self._sensory_distribution[key] = self._sensory_distribution.get(key, 0.0) + alpha
 
     def compute_prediction_error(self, prediction: Prediction, 
                                  observation: Any) -> PredictionError:
@@ -452,6 +471,7 @@ class RealPredictiveCodingSystem:
         sensory_pred = results["predictions"][-1]  # Level 0
         error = self.compute_prediction_error(sensory_pred, observation.get("sensory", "input"))
         results["errors"].append(error)
+        self._learn_sensory(observation.get("sensory", "input"))
 
         # Minimize errors
         if self.minimize_prediction_error(error):
