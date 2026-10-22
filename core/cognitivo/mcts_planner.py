@@ -107,6 +107,8 @@ class RealMCTSPlanner:
             raise TypeError("exploration_constant must be a real number")
         if not math.isfinite(exploration_constant):
             raise ValueError("exploration_constant must be finite")
+        if exploration_constant < 0:
+            raise ValueError("exploration_constant must be non-negative")
         if isinstance(max_depth, bool) or not isinstance(max_depth, int):
             raise TypeError("max_depth must be an integer")
         if max_depth <= 0:

@@ -122,6 +122,10 @@ MUTATIONS = [
     Mutation("mcts_guard_iterations_zero_allowed", MCTS,
              'if max_iterations < 0:',
              'if max_iterations <= 0:', tests=MCTS_INPUT),
+    Mutation("mcts_guard_exploration_negative", MCTS,
+             'if exploration_constant < 0:', 'if exploration_constant < -1:', tests=MCTS_INPUT),
+    Mutation("mcts_guard_exploration_zero_allowed", MCTS,
+             'if exploration_constant < 0:', 'if exploration_constant <= 0:', tests=MCTS_INPUT),
 ]
 
 
