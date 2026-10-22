@@ -1,8 +1,4 @@
 # Claims (leases): vivem só no branch do PR aberto; o último commit do PR remove o claim antes do merge (§9C.3, v3.4.2).
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-- agente: grok-bot
-  tarefa: "v3.4.2: claim vive só no branch do PR (§9C.3)"
-  arquivos: [docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md, docs/agentes/CHANGELOG_INSTRUCOES.md, docs/agentes/REGISTRO_AGENTES.yaml, docs/agentes/CLAIMS.yaml, AGENTS.md]
-  expira_em: "2026-10-25T12:00:00Z"
+claims: []
