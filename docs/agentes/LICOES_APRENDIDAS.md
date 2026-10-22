@@ -14,8 +14,16 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Causa: Fato quando reproduzida; Inferência quando deduzida.
 - Correção: o que foi feito, com PR/commit.
 - Regra/checagem derivada: regra para as instruções ou checagem automática proposta.
-- Status: registrada | promovida (onde: instrução §/arquivo, ou teste/gate)
+- Evidência: PR, SHA e/ou ID de execução do CI verificáveis (obrigatório; "evidência: ver texto" só para entradas anteriores à v3.4).
+- Derivada de: lições em uso quando esta foi escrita (ex.: L-003) ou "nenhuma".
+- Status: candidata | ativa | promovida (onde: instrução §/arquivo, ou teste/gate) | aposentada (data, motivo)
 ```
+
+## Regra de evidência e ativação (v3.4)
+- **Evidência bruta obrigatória:** toda lição cita PR, SHA e/ou ID de execução do CI que outro agente consiga conferir. Lição tirada só de resumo, handoff ou memória é **rejeitada** (registro incompleto ensina regra errada — arXiv 2610.19910, preprint).
+- **Candidata → ativa:** lição nova entra com `Status: candidata`; vira `ativa` só após replay/teste dos 3 casos (caso de origem, caso anterior bem-sucedido, caso semelhante incompatível), com o resultado registrado no PR.
+- **Limite:** no máximo **15** lições ativas/promovidas em uso. Para ativar outra, aposente uma explicitamente (`Status: aposentada`, data e motivo), sem apagar o texto (15 é teto operacional escolhido para o Nexus, não resultado de paper; arXiv 2608.05810, preprint, só sustenta cautela com acúmulo sem filtro).
+- Entradas L-001..L-007 são anteriores à v3.4: mantêm o status original; o campo `Evidência` foi acrescentado só quando ela já constava no texto.
 
 ## Regra de promoção
 - Uma lição **repetida 2 vezes** ou de **alto risco** (estado compartilhado do GitHub, segurança, perda de dado, gate enfraquecido) deve ser promovida a regra nas instruções dos agentes **ou** a checagem automática (teste/gate).
@@ -32,6 +40,7 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Causa (Fato): o gate exigia número literal igual ao manifesto; o número mudava em todo PR.
 - Correção: #62 — sentinela `tests: CURRENT_TESTS`, resolvida a partir do manifesto do CI; sentinelas passaram a valer só no próprio campo.
 - Regra/checagem derivada: não copiar números gerados pela execução para documentos versionados; usar sentinela resolvida pelo gate. Contrato `test_state_counter_sentinel_contract.py`.
+- Evidência: #62; conflito #52 × #53 (`git merge-tree`).
 - Status: promovida (gate + contrato, #62).
 
 ### L-002 — Linhas soltas no `NEXUS_EVIDENCE.md` após resolver conflito
@@ -41,6 +50,7 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Causa (Fato): o trecho em conflito incluía o fim do bloco de estado + narrativa; o script de resolução concatenou os dois lados (união), duplicando o fim do bloco.
 - Correção: #63; script de resolução endurecido (mantém só o fim do bloco vindo de `main`, une a narrativa e recusa qualquer `tests:`/`bandit_low:` fora do bloco).
 - Regra/checagem derivada: após resolver conflito em documento com bloco de estado, verificar `grep -c '^tests: ' == 1` e ausência de marcadores `<<<<<<<`/`>>>>>>>` antes do push. Candidata a checagem automática: o gate falhar se `tests:`/`bandit_low:` aparecer fora do bloco (Inferência: teria barrado o #54).
+- Evidência: #54 (merge `d074c15`), #63.
 - Status: registrada (alto risco → candidata a promoção como gate).
 
 ### L-003 — Pipe engoliu código de saída e marcou o #58 como pronto
@@ -50,6 +60,7 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Causa (Fato): sem `pipefail`, o status de um pipe é o do último comando (`grep`), não o do script.
 - Correção: comandos que alteram estado do GitHub passaram a rodar com `set -euo pipefail` e sem pipes no caminho de decisão; "pronto" e merge só depois de CI 2/2 verde confirmado no head enviado.
 - Regra/checagem derivada: toda automação que faz push, marca pronto, mescla ou fecha PR roda com `set -euo pipefail`; nunca filtrar com `| grep` a saída de um passo cujo código de saída decide o próximo.
+- Evidência: #58 (conflito em `tools/targeted_mutation.py`; merge recusado pelo GitHub).
 - Status: registrada (alto risco → candidata a promoção nas instruções).
 
 ### L-004 — PR do registro misturou workflow com docs (#67)
@@ -59,6 +70,7 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Causa (Inferência): o pedido descrevia tudo como um único entregável e a regra não foi checada antes do commit.
 - Correção: os PRs seguintes separam workflow de docs (um tema por PR).
 - Regra/checagem derivada: antes do commit, se `git diff --cached --name-only` incluir `.github/workflows/` junto com outro caminho, dividir o PR. Candidata a checagem automática no `predeleg.sh`.
+- Evidência: #67 (merge `3c3b038`).
 - Status: registrada.
 
 ### L-005 — Replay sem casos ou sem leitura retornava sucesso
@@ -68,6 +80,7 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Causa (Fato): `fail=0` permanecia intacto quando nenhuma iteração ocorria ou a leitura falhava; tipo desconhecido podia reutilizar `rc` anterior. `needs`/`if` não incluíam o replay.
 - Correção local: snapshot com leitura verificada, mínimo de um caso executado, rejeição de tipo desconhecido e atestação condicionada ao sucesso dos dois jobs; regressões em `test_agent_replay_contract.py`. Base e logs na nova seção correspondente de `CONTINUATION.md`.
 - Regra/checagem derivada: aprovação de um replay exige execução não-vazia e leitura concluída; atestação final deve depender de todos os gates que declara cobrir.
+- Evidência: head `ca36166a8bc4f35fc1036867d01e8f6f7054d855` (candidato da #69).
 - Status: registrada; patch local isolado, sem publicação nem promoção permanente. Revisão de Segurança única solicitada sobre o diff congelado; conclusão entregue no handoff externo.
 ### L-006 — Teste com bash ocultou perda do modo executável
 - Data: 2026-10-21
@@ -76,6 +89,7 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Causa (Fato): invocar `bash script` não exige o bit executável do script e não exercita a forma direta documentada.
 - Correção local: restaurado somente o modo `100755` do runner, sem alterar seu conteúdo; acrescentado `test_documented_runner_is_directly_executable`, sem `bash` nem chmod no teste, sobre os 11 casos padrão.
 - Regra/checagem derivada: testar a forma de invocação documentada e incluir modos Git na identidade do diff congelado.
+- Evidência: patch `a175daa4d98704bd0c4a608d18c0517ffffdf62ace488e598b1fd481276df9fd` (reprovado).
 - Status: registrada, sem promoção permanente; patch reprovado preservado como histórico, novo diff sujeito à nova revisão final independente de Segurança.
 
 ### L-007 — Formato date no schema não era aplicado pelo validador
@@ -85,4 +99,5 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Causa (Fato): o validador consultava os campos `required` do schema, mas não aplicava `type`/`format` de `last_seen`.
 - Correção local: checar string, formato ASCII exato e calendário real, sem coerção; regressões e mutantes específicos no mesmo patch autorizado do registro Axis. Logs e comandos na nova rodada de `CONTINUATION.md`.
 - Regra/checagem derivada: declaração de formato em schema não substitui teste negativo do caminho efetivamente executado; parser ISO sozinho também aceita formatos compactos/semanais.
+- Evidência: base `b2b01f2c6b044f0f7f1b60ec1e9c0d615fa4d296`; correção no PR #70 (head `10a48e81316b3f13c1cff414bbaa6dc91cf791a1`, merge `a663a55a560e00ae818e9c8f60aacd4cf9bd93f7`).
 - Status: registrada; sem promoção das instruções, publicação ou alegação de validação genérica de todo o schema.
