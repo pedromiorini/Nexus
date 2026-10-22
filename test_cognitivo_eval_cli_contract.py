@@ -45,6 +45,18 @@ class CognitivoEvalCliContractTests(unittest.TestCase):
         pc4 = next(c for c in report["predictive"] if c["id"] == "PC4")
         self.assertTrue(pc4["passed"])
 
+    def test_unknown_criteria_version_is_usage_error(self):
+        code, err = self._run(["--capability", "predictive", "--criteria", "v9"])
+        self.assertEqual(code, cognitivo_eval.EXIT_USAGE)
+        self.assertIn("critérios", err)
+
+    def test_v1_and_v2_predictive_reports_are_distinct(self):
+        from tools.cognitivo_eval import eval_predictive
+        v1 = {c["id"]: c for c in eval_predictive("v1")}
+        v2 = {c["id"]: c for c in eval_predictive("v2")}
+        self.assertNotIn("criteria", v1["PC1"])
+        self.assertEqual(v2["PC1"]["seeds"], list(range(100, 120)))
+        self.assertIn("per_seed_pass_rate", v2["PC3"])
 
 if __name__ == "__main__":
     unittest.main()

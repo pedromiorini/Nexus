@@ -169,7 +169,7 @@ def _closed_form_posterior(prior, transition, likelihood):
     return [w / z for w in weights]
 
 
-def eval_predictive():
+def eval_predictive(criteria="v2"):
     from core.cognitivo.predictive_coding import RealPredictiveCodingSystem
 
     checks = []
@@ -210,7 +210,34 @@ def eval_predictive():
         expected = _closed_form_posterior(prior, transition, likelihood)
         worst = max(worst, max(abs(got[s] - e) for s, e in zip(states, expected)))
     checks.append(_check("PC4", worst, worst <= 1e-9, "erro máx <= 1e-9"))
+    if criteria == "v2":
+        checks = [c for c in checks if c["id"] not in ("PC1", "PC3")] + _predictive_v2()
     return checks
+
+
+PC_V2_SEEDS = tuple(range(100, 120))
+
+
+def _predictive_v2():
+    """PC1/PC3 v2: médias em 20 seeds fixas (AUDITORIA v2)."""
+    rates, persists, eces = [], [], []
+    for seed in PC_V2_SEEDS:
+        rng = random.Random(seed)  # nosec B311 - dados sintéticos de avaliação
+        stream = [_categorical(rng, (0.7, 0.2, 0.1)) for _ in range(500)]
+        errors, confidences = _run_pc(stream)
+        rates.append(sum(errors[-200:]) / 200)
+        persists.append(sum(_persistence(stream)[-200:]) / 200)
+        eces.append(_ece(confidences, errors))
+    n = len(PC_V2_SEEDS)
+    rate, persist, ece = sum(rates) / n, sum(persists) / n, sum(eces) / n
+    return [
+        _check("PC1", round(rate, 4), rate <= 0.35 and rate <= persist - 0.05,
+               "v2: média 20 seeds <=0.35 e <= persistência-0.05", criteria="v2", seeds=list(PC_V2_SEEDS),
+               baseline_persistence=round(persist, 4),
+               per_seed_pass_rate=round(sum(r <= 0.35 for r in rates) / n, 4)),
+        _check("PC3", round(ece, 4), ece <= 0.10, "v2: ECE médio 20 seeds <= 0.10", criteria="v2",
+               seeds=list(PC_V2_SEEDS), per_seed_pass_rate=round(sum(e <= 0.10 for e in eces) / n, 4)),
+    ]
 
 
 # ── MCTS ─────────────────────────────────────────────────────────────────────
@@ -240,7 +267,7 @@ def _all_sequences(planner, goal, depth):
     return out
 
 
-def eval_mcts():
+def eval_mcts(criteria="v2"):
     from core.cognitivo.mcts_planner import RealMCTSPlanner
 
     checks = []
@@ -281,6 +308,9 @@ def eval_mcts():
     checks.append(_check("M3", round(regret, 4), regret < regret50, "regret(2000) < regret(50)",
                          regret_50=round(regret50, 4)))
 
+    if criteria == "v2":
+        checks = [c for c in checks if c["id"] != "M3"] + [_mcts_m3_v2()]
+
     planner = RealMCTSPlanner(max_depth=3)
     effects_before = set(planner._action_effects)
     ok = True
@@ -306,6 +336,28 @@ def eval_mcts():
     return checks
 
 
+def _mcts_m3_v2(depth=8):
+    """M3 v2: horizonte 8; regret contra o melhor valor observado no cenário (AUDITORIA v2)."""
+    from core.cognitivo.mcts_planner import RealMCTSPlanner
+
+    ref = RealMCTSPlanner(max_depth=depth)
+    values = {2000: [], 50: []}
+    best = 0.0
+    for goal in GOALS:
+        per_goal = {2000: [], 50: []}
+        for seed in range(10):
+            for iterations in (2000, 50):
+                random.seed(seed)
+                plan = RealMCTSPlanner(max_depth=depth).plan(goal, max_iterations=iterations)
+                per_goal[iterations].append(_value(ref, goal, plan.best_action_sequence))
+        best = max(per_goal[2000] + per_goal[50])
+        for iterations in (2000, 50):
+            values[iterations] += [best - v for v in per_goal[iterations]]
+    regret, regret50 = (sum(values[k]) / len(values[k]) for k in (2000, 50))
+    return _check("M3", round(regret, 4), regret < regret50, "v2: max_depth=8, regret(2000) < regret(50)",
+                  criteria="v2", regret_50=round(regret50, 4))
+
+
 EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts}
 
 
@@ -313,6 +365,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--capability")
     parser.add_argument("--json", dest="json_path")
+    parser.add_argument("--criteria", default="v2")
     args = parser.parse_args(argv)
     cap = (args.capability or "").strip()
     if not cap:
@@ -321,9 +374,14 @@ def main(argv=None) -> int:
     if cap != "all" and cap not in CAPABILITIES:
         print(f"erro: capacidade desconhecida: {cap}", file=sys.stderr)
         return EXIT_USAGE
+    if args.criteria not in ("v1", "v2"):
+        print(f"erro: versão de critérios desconhecida: {args.criteria}", file=sys.stderr)
+        return EXIT_USAGE
     selected = CAPABILITIES if cap == "all" else (cap,)
-    report = {name: EVALUATORS[name]() for name in selected}
-    failed = [c["id"] for checks in report.values() for c in checks if not c["passed"] and not c.get("informative")]
+    report = {name: (EVALUATORS[name](args.criteria) if name != "episodic" else EVALUATORS[name]())
+              for name in selected}
+    report["criteria"] = args.criteria
+    failed = [c["id"] for name in selected for c in report[name] if not c["passed"] and not c.get("informative")]
     report["failed"] = failed
     text = json.dumps(report, indent=2, ensure_ascii=False, default=str)
     if args.json_path:
