@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
-CAPABILITIES = ("episodic", "predictive", "mcts")
+CAPABILITIES = ("episodic", "predictive", "mcts", "causal")
 
 TOPICS = [
     ("database", "migration", "rollback"), ("network", "latency", "spike"), ("disk", "quota", "exceeded"),
@@ -493,7 +493,109 @@ def _mcts_m3_v3(instances=V3_INSTANCES, seeds=V3_RUN_SEEDS, budgets=V3_BUDGETS):
     ]
 
 
-EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts}
+# ── Raciocínio causal + modelo de mundo (critérios C, pré-registrados em 285851b) ──
+
+CAUSAL_L = [
+    ("Smoking causes cancer", ("smoking", "cancer")),
+    ("Heavy rain causes floods", ("heavy rain", "floods")),
+    ("Memory leaks cause crashes", ("memory leaks", "crashes")),
+    ("Overheating and dust cause fan failure", ("overheating and dust", "fan failure")),
+    ("Expired certificates cause handshake errors", ("expired certificates", "handshake errors")),
+    ("Bad configs cause outages", ("bad configs", "outages")),
+    ("The service crashed because the disk was full", ("the disk was full", "the service crashed")),
+    ("Latency increased because of the cache eviction", ("the cache eviction", "latency increased")),
+    ("Logins failed because the token expired", ("the token expired", "logins failed")),
+    ("Stress leads to insomnia", ("stress", "insomnia")),
+    ("A missing index leads to slow queries", ("a missing index", "slow queries")),
+    ("Packet loss leads to retransmissions", ("packet loss", "retransmissions")),
+    ("Deforestation results in erosion", ("deforestation", "erosion")),
+    ("The misconfigured rule results in blocked traffic", ("the misconfigured rule", "blocked traffic")),
+    ("Unpatched systems result in breaches", ("unpatched systems", "breaches")),
+    ("Delays occurred due to the storm", ("the storm", "delays occurred")),
+    ("Data loss happened due to a failed backup", ("a failed backup", "data loss happened")),
+    ("Timeouts are due to DNS failures", ("dns failures", "timeouts are")),
+    ("Coffee does not cause cancer", None),
+    ("Vaccines never cause autism", None),
+    ("Logging doesn't cause outages", None),
+    ("There is no evidence that caffeine causes anxiety", None),
+    ("Ice cream sales are correlated with drownings", None),
+    ("Alerts and deploys co-occur", None),
+    ("Sleep is associated with mood", None),
+    ("Rain often appears with traffic", None),
+    ("We left early because", None),
+    ("The causeway was closed", None),
+    ("The cause is unknown", None),
+    ("Causal models are hard", None),
+]
+CAUSAL_ACTION_VOCAB = ("APPLY_PATCH", "IGNORE_ALERT", "ROLLBACK", "ESCALATE", "MONITOR", "ISOLATE_SYSTEM",
+                       "RESTORE_BACKUP", "DEPLOY_UPDATE", "INCREASE_LOGGING", "SHUTDOWN_SERVICE")
+CAUSAL_C3_SETS = [
+    ([["IGNORE_ALERT"], ["APPLY_PATCH"]], 1),
+    ([["APPLY_PATCH"], ["IGNORE_ALERT"]], 0),
+    ([["MONITOR"], ["APPLY_PATCH"], ["IGNORE_ALERT"]], 1),
+    ([["IGNORE_ALERT"], ["MONITOR"]], 1),
+    ([["IGNORE_ALERT"], ["ESCALATE"]], 1),
+    ([["IGNORE_ALERT", "MONITOR"], ["MONITOR", "MONITOR"], ["IGNORE_ALERT"]], 1),
+]
+
+
+def _norm(text):
+    return text.strip().lower().rstrip(".!?;,")
+
+
+def eval_causal(criteria="v1"):
+    from core.cognitivo.causal_world_model import RealCausalReasoning, RealWorldModelSimulator
+    tp = fp = fn = 0
+    neg_fp = 0
+    per_form = {}
+    for idx, (text, label) in enumerate(CAUSAL_L):
+        pairs = {(_norm(r.cause), _norm(r.effect)) for r in RealCausalReasoning().extract_causal_relations(text)}
+        if label is None:
+            fp += len(pairs)
+            neg_fp += bool(pairs)
+            continue
+        hit = label in pairs
+        tp += hit
+        fn += not hit
+        fp += len(pairs - {label})
+        per_form.setdefault(idx // 3, []).append(hit)
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    negatives = sum(label is None for _, label in CAUSAL_L)
+    fp_rate = neg_fp / negatives
+    wm = RealWorldModelSimulator()
+    initial = wm.current_state.state
+    covered = []
+    for action in CAUSAL_ACTION_VOCAB:
+        r = wm.simulate([action])
+        if r.final_state.state != initial or r.warnings:
+            covered.append(action)
+    coverage = len(covered) / len(CAUSAL_ACTION_VOCAB)
+    unknown_warned = bool(wm.simulate(["UNKNOWN_X"]).warnings)
+    correct = sum(wm.compare_futures(seqs)["best_future_index"] == best for seqs, best in CAUSAL_C3_SETS)
+    baseline_first = sum(best == 0 for _, best in CAUSAL_C3_SETS)
+    cr = RealCausalReasoning()
+    world = RealWorldModelSimulator(causal_reasoning=cr)
+    cr.extract_causal_relations("DEPLOY_FIX causes system_status secure")
+    integrated = world.simulate(["DEPLOY_FIX"]).final_state.state.get("system_status") == "secure"
+    forms = ["causes", "cause(pl)", "because", "leads to", "results in", "due to"]
+    return [
+        _check("C1a", round(f1, 4), f1 >= 0.70, "F1 em L >= 0.70", criteria="v1", precision=round(precision, 4),
+               recall=round(recall, 4), recall_by_form={forms[k]: f"{sum(v)}/{len(v)}" for k, v in per_form.items()}),
+        _check("C1b", round(fp_rate, 4), fp_rate <= 0.10, "FP nas 12 negativas <= 0.10", criteria="v1",
+               baseline_keyword_cause=round(sum("cause" in t.lower() for t, lab in CAUSAL_L if lab is None)
+                                            / negatives, 4)),
+        _check("C2a", round(coverage, 4), coverage >= 0.80, "ações do vocabulário com efeito ou aviso >= 0.80",
+               criteria="v1", covered=covered),
+        _check("C2b", unknown_warned, unknown_warned, "ação desconhecida gera warning", criteria="v1"),
+        _check("C3", f"{correct}/{len(CAUSAL_C3_SETS)}", correct >= 5, ">= 5/6 top-1", criteria="v1",
+               baseline_first_index=f"{baseline_first}/{len(CAUSAL_C3_SETS)}"),
+        _check("C4", integrated, integrated, "relação extraída altera simulação", criteria="v1"),
+    ]
+
+
+EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts, "causal": eval_causal}
 
 
 def main(argv=None) -> int:
