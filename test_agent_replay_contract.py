@@ -119,6 +119,30 @@ class ReplayContract(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("PASSOU controle rc=0", result.stdout)
 
+    MISSING = "0" * 40
+
+    def test_missing_sha_in_res_is_invalid_even_if_rc_matches(self):
+        result = self.run_table(PASS + f"\nA2-origem\tres\t{self.MISSING}\t1\n")
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("FALHOU A2-origem entrada invalida", result.stdout)
+        self.assertNotIn("PASSOU A2-origem", result.stdout)
+
+    def test_missing_sha_in_merge_is_invalid_even_if_rc_matches(self):
+        for args in (f"HEAD {self.MISSING}", f"{self.MISSING} HEAD"):
+            result = self.run_table(f"m\tmerge\t{args}\t0\n")
+            self.assertEqual(result.returncode, 4, args + result.stdout + result.stderr)
+            self.assertIn("FALHOU m entrada invalida", result.stdout)
+
+    def test_worktree_add_failure_is_invalid_input(self):
+        result = self.run_table("dup\tres\tHEAD\t0\ndup\tres\tHEAD\t0\n")
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("git worktree add falhou", result.stderr)
+
+    def test_pre_missing_hash_is_left_to_the_guard(self):
+        result = self.run_table("C-incompat-hash\tpre\tdeadbeef HEAD\t3\n")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("PASSOU C-incompat-hash rc=3", result.stdout)
+
     def test_unknown_case_cannot_reuse_previous_success(self):
         result = self.run_table(PASS + "\nignorado\tdesconhecido\tpass CLEAN\t0\n")
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
