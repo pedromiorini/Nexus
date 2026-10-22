@@ -3,14 +3,13 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "Extrair RealPredictiveCodingSystem do monólito para core/cognitivo/predictive_coding.py (strangler, sem mudança de comportamento)"
+    tarefa: "Gates de core/cognitivo: escopo do auditor de realidade (este PR) e workflow (PR de workflow separado, L-004). Substitui o claim do #82, já mesclado."
     arquivos:
-      - core/constitutional_brain.py  # só Prediction/PredictionError/RealPredictiveCodingSystem
-      - core/cognitivo/predictive_coding.py
-      - test_predictive_coding_extraction_contract.py
-      - tools/cognitivo_mutation.py
+      - tools/reality_audit.py
+      - test_reality_audit_cognitivo_contract.py
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
+      - .github/workflows/nexus-contract-gate.yml
       - docs/agentes/CLAIMS.yaml
-    pr: 82
-    expira_em: "2026-10-25T15:00:00+00:00"
+    pr: 83
+    expira_em: "2026-10-25T16:00:00+00:00"

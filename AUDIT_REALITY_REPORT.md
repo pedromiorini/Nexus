@@ -13,9 +13,10 @@ O núcleo analisado possui **26922 linhas**, **264 classes** e **851 funções**
 | Funções com retorno constante (estrito: só literais) | 2 | Possíveis heurísticas, stubs ou simplificações |
 | Funções que retornam dict/list/tuple literal com valores dinâmicos | 56 | Em geral getters e estatísticas; não são stubs por si só |
 | Padrões proibidos de alegação no código (gate: zero) | 0 | Cobre só as frases listadas em CODE_OVERCLAIMS; não significa ausência de linguagem de capacidade |
-| Frases fortes de capacidade no código (inventário; só pode diminuir) | 49 | Ênfase "REAL <Capacidade>", "REAL e FUNCIONAL", "100% funcional"; limite em test_reality_audit.py |
-| Terminologia científica no código (informativo) | 230 | Nomes de constructos modelados; não são alegações por si só |
-| Classes com prefixo Real (identificadores) | 61 | Nome histórico; renomear exige alias de compatibilidade |
+| Frases fortes de capacidade no código (inventário; só pode diminuir) | 51 | Ênfase "REAL <Capacidade>", "REAL e FUNCIONAL", "100% funcional"; limite em test_reality_audit.py |
+| Terminologia científica no código (informativo) | 233 | Nomes de constructos modelados; não são alegações por si só |
+| Classes com prefixo Real (identificadores) | 63 | Nome histórico; renomear exige alias de compatibilidade |
+| Módulos extraídos em core/cognitivo (inventário de alegações inclui estes) | 3 (706 linhas) | Fora das contagens do núcleo; cobertos pelos mesmos padrões de alegação |
 | Dependências opcionais sinalizadas | 2 | Fallbacks podem alterar o comportamento |
 
 ## Alegações (README e código-fonte)

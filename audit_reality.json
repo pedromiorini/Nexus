@@ -3,6 +3,26 @@
   "scope": "conservative reality audit",
   "principle": "names, banners and demo asserts are not proof of general intelligence or production readiness",
   "static_evidence": {
+    "extracted_modules": [
+      {
+        "path": "core/cognitivo/__init__.py",
+        "lines": 1,
+        "classes": 0,
+        "functions": 0
+      },
+      {
+        "path": "core/cognitivo/episodic_memory.py",
+        "lines": 235,
+        "classes": 2,
+        "functions": 12
+      },
+      {
+        "path": "core/cognitivo/predictive_coding.py",
+        "lines": 470,
+        "classes": 3,
+        "functions": 15
+      }
+    ],
     "core_lines": 26922,
     "classes": 264,
     "functions": 851,
@@ -98,15 +118,15 @@
   "code_claims": [],
   "code_claim_inventory": {
     "by_level": {
-      "strong_capability_claim": 49,
-      "scientific_terminology": 230,
-      "neutral_identifier": 61
+      "strong_capability_claim": 51,
+      "scientific_terminology": 233,
+      "neutral_identifier": 63
     },
     "items": [
       {
         "level": "strong_capability_claim",
         "label": "ênfase 'REAL <Capacidade>'",
-        "occurrences": 45,
+        "occurrences": 46,
         "examples": [
           "POST12: Multimodal Processing System — REAL Multimodal Perception",
           "POST10: Theory of Mind — REAL Mental State Modeling",
@@ -132,6 +152,14 @@
         ]
       },
       {
+        "level": "strong_capability_claim",
+        "label": "máquina bayesiana afirmada",
+        "occurrences": 1,
+        "examples": [
+          "print(\"🧠📊 POST 33 - RealPredictiveCodingSystem initialized (Bayesian p"
+        ]
+      },
+      {
         "level": "scientific_terminology",
         "label": "consciência/consciousness",
         "occurrences": 203,
@@ -144,7 +172,7 @@
       {
         "level": "scientific_terminology",
         "label": "teorias nomeadas",
-        "occurrences": 27,
+        "occurrences": 30,
         "examples": [
           "POST10: Theory of Mind — REAL Mental State Modeling",
           "\"\"\"Estatísticas do Theory of Mind\"\"\"",
@@ -154,7 +182,7 @@
       {
         "level": "neutral_identifier",
         "label": "classes com prefixo Real",
-        "occurrences": 61,
+        "occurrences": 63,
         "examples": [
           "class RealHierarchicalMemory:",
           "class RealKnowledgeGraph:",
