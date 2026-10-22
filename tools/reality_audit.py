@@ -10,11 +10,28 @@ from __future__ import annotations
 import ast
 import json
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 README = ROOT / "README.md"
 CORE = ROOT / "core" / "constitutional_brain.py"
+# Capacidades extraídas do monólito (strangler). Entram no inventário de alegações do código
+# e têm evidência estrutural própria; os números de `core_*` continuam só do monólito.
+COGNITIVO = ROOT / "core" / "cognitivo"
+EXIT_MISSING_INPUT = 2
+EXIT_EMPTY_INPUT = 3
+
+
+def cognitivo_files() -> list[Path]:
+    return sorted(COGNITIVO.glob("*.py")) if COGNITIVO.is_dir() else []
+
+
+def code_sources() -> str:
+    """Monólito + módulos extraídos, para que extrair código não esconda alegações do auditor."""
+    parts = [CORE.read_text(encoding="utf-8", errors="replace")]
+    parts.extend(path.read_text(encoding="utf-8", errors="replace") for path in cognitivo_files())
+    return "\n".join(parts)
 
 CLAIMS = {
     "AGI/ASI": r"\bAGI\b|\bASI\b|Artificial General Intelligence|Superintelligence",
@@ -98,7 +115,17 @@ def collect_static_evidence() -> dict:
                 dynamic_literals.append(qualnames[id(node)])
     source = CORE.read_text(encoding="utf-8", errors="replace")
     embedded_tests = len(re.findall(r"TEST \d+(?:\.\d+)? PASSED", source))
+    extracted = []
+    for path in cognitivo_files():
+        module_tree = parse_python(path)
+        extracted.append({
+            "path": path.relative_to(ROOT).as_posix(),
+            "lines": len(path.read_text(encoding="utf-8", errors="replace").splitlines()),
+            "classes": sum(isinstance(node, ast.ClassDef) for node in ast.walk(module_tree)),
+            "functions": sum(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) for node in ast.walk(module_tree)),
+        })
     return {
+        "extracted_modules": extracted,
         "core_lines": len(source.splitlines()),
         "classes": len(classes),
         "functions": len(functions),
@@ -145,7 +172,7 @@ def audit_claims(text: str | None = None) -> list[dict]:
 
 def audit_code_overclaims(source: str | None = None) -> list[dict]:
     if source is None:
-        source = CORE.read_text(encoding="utf-8", errors="replace")
+        source = code_sources()
     findings = []
     for label, pattern in CODE_OVERCLAIMS.items():
         occurrences = len(re.findall(pattern, source, flags=re.IGNORECASE))
@@ -161,7 +188,7 @@ def audit_code_overclaims(source: str | None = None) -> list[dict]:
 
 def audit_code_claim_inventory(source: str | None = None) -> dict:
     if source is None:
-        source = CORE.read_text(encoding="utf-8", errors="replace")
+        source = code_sources()
     items = []
     totals = {level: 0 for level in CLAIM_LEVELS}
     for level, label, pattern in CODE_CLAIM_LEVELS:
@@ -246,6 +273,8 @@ def markdown(report: dict) -> str:
     lines.append(f"| Frases fortes de capacidade no código (inventário; só pode diminuir) | {levels['strong_capability_claim']} | Ênfase \"REAL <Capacidade>\", \"REAL e FUNCIONAL\", \"100% funcional\"; limite em test_reality_audit.py |")
     lines.append(f"| Terminologia científica no código (informativo) | {levels['scientific_terminology']} | Nomes de constructos modelados; não são alegações por si só |")
     lines.append(f"| Classes com prefixo Real (identificadores) | {levels['neutral_identifier']} | Nome histórico; renomear exige alias de compatibilidade |")
+    extracted = evidence.get("extracted_modules", [])
+    lines.append(f"| Módulos extraídos em core/cognitivo (inventário de alegações inclui estes) | {len(extracted)} ({sum(item['lines'] for item in extracted)} linhas) | Fora das contagens do núcleo; cobertos pelos mesmos padrões de alegação |")
     lines.append(f"| Dependências opcionais sinalizadas | {len(evidence['optional_dependency_warnings'])} | Fallbacks podem alterar o comportamento |")
     lines.extend(["", "## Alegações (README e código-fonte)", ""])
     for claim in report["claims"] + report["code_claims"]:
@@ -265,8 +294,19 @@ def markdown(report: dict) -> str:
     return "\n".join(lines)
 
 
-if __name__ == "__main__":
+def main() -> int:
+    if not CORE.is_file():
+        print(f"entrada ausente: {CORE}", file=sys.stderr)
+        return EXIT_MISSING_INPUT
+    if not CORE.read_text(encoding="utf-8", errors="replace").strip():
+        print(f"entrada vazia: {CORE}", file=sys.stderr)
+        return EXIT_EMPTY_INPUT
     report = build_report()
     (ROOT / "AUDIT_REALITY_REPORT.md").write_text(markdown(report), encoding="utf-8")
     (ROOT / "audit_reality.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     print(markdown(report))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
