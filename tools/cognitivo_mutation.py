@@ -32,7 +32,17 @@ MCTS_INPUT = ("test_mcts_planner_input_contract.py", "test_mcts_planner_extracti
 MCTS_TESTS = ("test_mcts_planner_extraction_contract.py", "test_mcts_action_contract.py")
 _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")'
 
+RETRIEVAL = ("test_episodic_retrieval_contract.py",)
+
 MUTATIONS = [
+    Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
+             "ORDER BY m.start_timestamp DESC", tests=RETRIEVAL),
+    Mutation("episodic_fts_backfills_legacy_rows", EPISODIC, "WHERE episode_id NOT IN (SELECT episode_id FROM episodic_fts)",
+             "WHERE 0", tests=RETRIEVAL),
+    Mutation("episodic_fts_indexes_new_episode", EPISODIC, "            if self._fts_enabled:\n                cursor.execute(",
+             "            if False:\n                cursor.execute(", tests=RETRIEVAL),
+    Mutation("episodic_like_fallback_keeps_substrings", EPISODIC, "        if len(rows) < limit:", "        if False:",
+             tests=RETRIEVAL),
     Mutation("episodic_search_rejects_boolean_and_non_integer_limit", EPISODIC, _GUARD,
              '"""Buscar episódios"""\n        if False:\n            raise TypeError("limit must be an integer")', tests=LIMITS),
     Mutation("episodic_search_rejects_negative_limit", EPISODIC,
