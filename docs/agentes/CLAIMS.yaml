@@ -3,13 +3,9 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "M3 v3 pré-registrado: árvores sintéticas com ótimo exato no harness cognitivo (draft)"
+    tarefa: "Registro do resultado negativo M6 (NMCS) na AUDITORIA; código preservado no #93"
     arquivos:
       - docs/cognitivo/AUDITORIA_2026-10-22.md
-      - tools/cognitivo_eval.py
-      - test_cognitivo_eval_cli_contract.py
-      - AUDIT_REALITY_REPORT.md
-      - audit_reality.json
       - docs/agentes/CLAIMS.yaml
-    pr: 92
+    pr: 94
     expira_em: "2026-10-25T18:00:00+00:00"
