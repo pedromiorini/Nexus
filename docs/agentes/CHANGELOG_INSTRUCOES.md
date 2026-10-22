@@ -46,3 +46,8 @@ Identidade, Constituição (8 regras), vocabulário epistemológico, precedênci
 - "Teste dos três casos" com critério de aprovação explícito; política local sem verificação automática; distinto do replay de guardas.
 - Exceção explícita para registros legados (L-001..L-007); L-006 marcada com evidência legada (hash de patch local).
 - Fontes: 2610.19910 rebaixado a analogia; 2610.22987 descrito como preprint com testes em Claude Code e Codex CLI, sem replicação independente; lista de comandos é política local.
+
+## v3.4.2 (2026-10-22)
+- §9C.3: o claim vive só no branch do PR aberto; o último commit do mesmo PR o remove antes do merge (elimina PRs só de remoção como #72 e #76). Claims ativos = `main` + `CLAIMS.yaml` de cada PR aberto (comando `gh`/`git` documentado).
+- Motivo: no fluxo anterior o claim só chegava à `main` depois do trabalho mesclado, sem proteger nada. Teste dos três casos com critérios prévios no PR.
+- Pendente: leitura automática de claims de PRs abertos no validador (follow-up; arquivos do Axis não alterados).
