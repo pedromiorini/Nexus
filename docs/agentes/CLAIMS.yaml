@@ -3,22 +3,13 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "Auditoria funcional de core/cognitivo (harness + melhorias empilhadas em drafts), contract-first"
+    tarefa: "M3 v3 pré-registrado: árvores sintéticas com ótimo exato no harness cognitivo (draft)"
     arquivos:
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - tools/cognitivo_eval.py
       - test_cognitivo_eval_cli_contract.py
-      - core/cognitivo/episodic_memory.py
-      - test_episodic_retrieval_contract.py
-      - core/cognitivo/predictive_coding.py
-      - test_predictive_learning_contract.py
-      - core/cognitivo/mcts_planner.py
-      - test_mcts_planner_quality_contract.py
-      - test_mcts_planner_input_contract.py
-      - test_mcts_planner_extraction_contract.py
-      - tools/cognitivo_mutation.py
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
       - docs/agentes/CLAIMS.yaml
-    pr: 88
+    pr: null
     expira_em: "2026-10-25T18:00:00+00:00"
