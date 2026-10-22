@@ -101,3 +101,53 @@ Referências: docs `PESQUISA_MCTS_2026-10-22.md`; Schadd et al. 2008 (SP-MCTS); 
 | M3I (informativo) | Fração de execuções no ótimo com 2000; avaliações de folha até o ótimo, nas execuções que o atingem | — |
 
 Regra: se o M3 v3 falhar, os critérios não serão reajustados; a falha é reportada. Mudanças no planejador ficam fora deste PR.
+
+---
+
+## M6: qualidade de busca (22/10/2026 18:37, aprovada por Pedro; escrita ANTES de qualquer execução de candidato)
+As seções v1, v2 e v3 acima permanecem inalteradas. O M6 é um critério novo. Esta seção foi pré-registrada no commit `5b9ad36` (branch `cursor/mcts-search-m6`, PR #93) antes de qualquer execução.
+
+**Candidato pré-registrado (um só):** Nested Monte-Carlo Search (Cazenave, IJCAI 2009, https://www.ijcai.org/Proceedings/09/Papers/083.pdf),
+nível 2, com reinícios até esgotar o orçamento.
+- A melhor sequência encontrada é memorizada, no espírito do top score do SP-MCTS (Schadd et al. 2008).
+- **Ativação:** opt-in por `RealMCTSPlanner(strategy="nmcs")`. O padrão `strategy="uct"` mantém o comportamento atual.
+- **Orçamento equivalente:** `max_iterations` = número máximo de avaliações de folha (rollouts completos). A UCT faz uma por iteração.
+- **Fora deste PR:** NRPA (Rosin 2011), o termo de variância do SP-MCTS e progressive widening. Ficam para outra rodada, para manter um só candidato.
+
+**Cenário:** idêntico ao M3 v3. São as 20 instâncias `SyntheticTree(0..19)`, seeds de execução 0..9 com `random.seed(s)` antes de cada `plan`, e orçamento 2000.
+Ótimo exato por força bruta.
+
+**Baseline:** o planejador atual (`uct`) em main `76bce11`, medido no #92: fração no ótimo @2000 = 0,015 e regret médio @2000 = 0,1377.
+
+**Cota analítica (informativa, calculada antes):**
+- Com 2000 avaliações, nenhum algoritmo passa de P(ótimo) ≤ 2000/7 776 ≈ 0,257, porque a agulha é uniforme nas 7 776 folhas do ramo enganoso e independente dos demais valores.
+- A busca uniforme dá ≈ 2000/46 656 ≈ 0,043.
+
+| Id | Critério | Limite |
+|---|---|---|
+| M6a | Fração das 200 execuções que atingem o ótimo exato @2000 com `strategy="nmcs"` | **≥ 0,10** e > 0,015 |
+| M6b | Regret médio @2000 com `strategy="nmcs"` | **≤ 0,10** e < 0,1377 |
+| M6c (não regressão do candidato) | Com `strategy="nmcs"`: M1, M2, M4 e M5 (p95 de `plan(200)` ≤ 0,10 s) da v2, e M3 v3 | todos passam |
+| M6d (não regressão do padrão) | Com `strategy` omitido: plano do domínio padrão com seed fixa idêntico ao de main (golden SHA da extração), suíte, M1–M5 v2 e M3 v3 inalterados | idêntico |
+| M6e (API) | Assinaturas públicas compatíveis: `strategy` é opcional e só por palavra-chave; um valor desconhecido gera `ValueError` | — |
+
+**Sucesso** exige M6a e M6b e M6c e M6d e M6e. Se o candidato falhar, os limites não serão ajustados e a falha é reportada.
+Se o candidato passar, tornar `nmcs` o padrão fica como proposta ao Pedro, não neste PR.
+
+### Registro de resultados M6
+Medido em 22/10/2026 com `python tools/cognitivo_eval.py --capability mcts --criteria m6`. Os limites pré-registrados no commit `5b9ad36` não foram alterados.
+
+| Id | Valor (`nmcs`) | Baseline (`uct`) | Resultado |
+|---|---|---|---|
+| M6a | fração no ótimo @2000 = 0,010 | 0,015 | **FALHA** |
+| M6b | regret médio @2000 = 0,1283 | 0,1377 | **FALHA** (melhora, mas acima de 0,10) |
+| M6c | M1 = 0,75 (FALHA); M2 = 0,8708; M3 v3 passa; M4 passa; M5 p95 = 0,005 s | — | **FALHA** |
+| M6d | padrão inalterado: M1–M5 e M3 v3 passam, plano com seed fixa idêntico | — | passa |
+| M6e | API compatível | — | passa |
+
+**Conclusão:** o candidato NMCS nível 2 **não passa** (falha em M6a, M6b e M6c). O padrão `uct` não muda.
+- **Destino do código:** por decisão do Pedro (22/10 19:23), o código NMCS **não** entra na main.
+- **Onde recuperá-lo:** PR #93 (fechado sem merge), head `ea470fb`, branch `cursor/mcts-search-m6` mantida. Lá estão a estratégia opt-in, o harness `--criteria m6`, os testes e os mutantes.
+- **Limite de qualquer algoritmo neste cenário:** com 2000 avaliações, P(ótimo) ≤ 2000/7 776 ≈ 0,257. A agulha do ramo enganoso não tem sinal nos irmãos.
+- **Desvio de processo:** os testes de contrato foram escritos logo após o código, mas antes de qualquer push do código. O pré-registro dos critérios foi respeitado.
+- **Hipóteses ainda NÃO testadas** (cada uma exige pré-registro novo): NRPA (Rosin, IJCAI 2011), o termo de variância do SP-MCTS (Schadd et al. 2008) e progressive widening/bias.
