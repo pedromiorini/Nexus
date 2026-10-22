@@ -41,6 +41,13 @@ class CausalExtractionContractTests(unittest.TestCase):
                      "The cause is unknown", "Sleep is associated with mood", ""):
             self.assertEqual(pairs(text), [], text)
 
+    def test_one_relation_per_sentence_first_marker_wins(self):
+        self.assertEqual(pairs("Stress leads to insomnia because of cortisol"),
+                         [("Stress", "insomnia because of cortisol", "causal_verb")])
+
+    def test_negated_marker_stops_search(self):
+        self.assertEqual(pairs("Coffee does not cause cancer in most healthy adults because of genetics"), [])
+
     def test_graph_and_counter_follow_extractions(self):
         cr = RealCausalReasoning()
         cr.extract_causal_relations("Stress leads to insomnia")
