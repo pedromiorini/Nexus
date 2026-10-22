@@ -1,4 +1,17 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "Extrair RealMCTSPlanner do monólito para core/cognitivo/mcts_planner.py (strangler, sem mudança de comportamento)"
+    arquivos:
+      - core/constitutional_brain.py  # só MCTSNode/PlanResult/RealMCTSPlanner
+      - core/cognitivo/mcts_planner.py
+      - test_mcts_planner_extraction_contract.py
+      - tools/cognitivo_mutation.py
+      - SECURITY_TRIAGE.md  # só as 2 linhas B311 de RealMCTSPlanner (caminho)
+      - AUDIT_REALITY_REPORT.md
+      - audit_reality.json
+      - docs/agentes/CLAIMS.yaml
+    pr: 86
+    expira_em: "2026-10-25T17:00:00+00:00"

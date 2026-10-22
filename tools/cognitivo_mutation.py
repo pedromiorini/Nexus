@@ -27,6 +27,8 @@ STATS = ("test_episodic_memory_statistics_contract.py", "test_episodic_memory_ex
 PREDICTIVE = "core/cognitivo/predictive_coding.py"
 POMDP = ("test_predictive_coding_extraction_contract.py", "test_pomdp_belief_filter_contract.py")
 PC_EXTRACTION = ("test_predictive_coding_extraction_contract.py",)
+MCTS = "core/cognitivo/mcts_planner.py"
+MCTS_TESTS = ("test_mcts_planner_extraction_contract.py", "test_mcts_action_contract.py")
 _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")'
 
 MUTATIONS = [
@@ -71,6 +73,18 @@ MUTATIONS = [
              "from core.cognitivo.predictive_coding import Prediction, PredictionError, RealPredictiveCodingSystem as _R\n"
              "class RealPredictiveCodingSystem(_R):\n    pass",
              tests=PC_EXTRACTION),
+    Mutation("mcts_exploration_term_dropped", MCTS,
+             "exploration = exploration_constant * math.sqrt(", "exploration = 0.0 * math.sqrt(", tests=MCTS_TESTS),
+    Mutation("mcts_backprop_skips_reward", MCTS,
+             "current.total_reward += reward", "current.total_reward += 0.0", tests=MCTS_TESTS),
+    Mutation("mcts_depth_limit_off_by_one", MCTS,
+             "if depth >= self.max_depth:", "if depth > self.max_depth:", tests=MCTS_TESTS),
+    Mutation("mcts_best_child_by_min_reward", MCTS,
+             "best_child = max(root.children, key=lambda c: c.avg_reward)",
+             "best_child = min(root.children, key=lambda c: c.avg_reward)", tests=MCTS_TESTS),
+    Mutation("mcts_module_pulls_monolith", MCTS,
+             "import copy\n", "import copy\nimport core.constitutional_brain  # noqa: F401\n",
+             tests=("test_mcts_planner_extraction_contract.py",)),
 ]
 
 
