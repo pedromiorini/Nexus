@@ -230,3 +230,48 @@ Registrado antes de implementar/executar. Empilhado em R1 (#97) só para evitar 
 | não regressão | C2a ≥ 0.80, C2b verdadeiro; golden de extração inalterado (re-pin só com justificativa) | 0.80 / verdadeiro |
 
 Escopo: utilidade ordinal por `system_status` (secure > stable > isolated = offline = vulnerable > compromised), chave `(success, utilidade)`, empate → menor índice.
+
+---
+
+## Correção R3 — escopo de negação (NegEx) + "cause" como palavra inteira + banco de marcadores causais (pré-registro)
+
+Registrado antes de implementar/executar, junto com o conjunto **H** (escrito antes de qualquer código R3, nunca usado para ajustar padrões). Empilhado em R2 (#98) pelos mesmos arquivos append-only. Critérios C inalterados.
+
+| id | critério de sucesso R3 | antes (R2) |
+|---|---|---|
+| C1a (L) | F1 ≥ 0.70 | 0.4138 |
+| C1b (L) | FP ≤ 0.10 | 0.4167 |
+| H-F1 (guarda) | F1 em H ≥ 0.60 **e** F1(L) − F1(H) ≤ 0.20 | medido na execução |
+| H-FP (guarda) | FP nas negativas de H ≤ 0.20 | medido na execução |
+| não regressão | C2a/C2b/C3 mantidos; extração "X causes Y" do golden inalterada (re-pin só com justificativa) | 0.80 / verdadeiro / 6/6 |
+
+Mesma regra de acerto de L (par exato após `strip().lower()` e pontuação final removida).
+
+**Conjunto H (24 frases; 14 positivas, 10 negativas):**
+
+| # | frase | rótulo (causa, efeito) |
+|---|---|---|
+| 1 | Poor sanitation causes cholera | (poor sanitation, cholera) |
+| 2 | Frequent deploys cause regressions | (frequent deploys, regressions) |
+| 3 | The outage happened because the router failed | (the router failed, the outage happened) |
+| 4 | Prices rose because of the drought | (the drought, prices rose) |
+| 5 | Overfishing leads to population collapse | (overfishing, population collapse) |
+| 6 | Misuse of antibiotics leads to resistance | (misuse of antibiotics, resistance) |
+| 7 | The leak results in pressure loss | (the leak, pressure loss) |
+| 8 | Cancellations were due to the strike | (the strike, cancellations were) |
+| 9 | The fire was caused by faulty wiring | (faulty wiring, the fire) |
+| 10 | Heavy load triggers throttling | (heavy load, throttling) |
+| 11 | The disk filled up, so the job failed | (the disk filled up, the job failed) |
+| 12 | Inflation was driven by energy costs | (energy costs, inflation) |
+| 13 | As a result of the patch, crashes stopped | (the patch, crashes stopped) |
+| 14 | Stress contributes to heart disease | (stress, heart disease) |
+| 15 | Video games do not cause violence | ∅ |
+| 16 | It is false that vaccines cause autism | ∅ |
+| 17 | Coffee is not known to cause ulcers | ∅ |
+| 18 | Nothing suggests that 5G causes illness | ∅ |
+| 19 | Shark attacks rise with ice cream sales | ∅ |
+| 20 | Height is correlated with income | ∅ |
+| 21 | Umbrellas and rain appear together | ∅ |
+| 22 | Because is a conjunction | ∅ |
+| 23 | He gave no cause for alarm | ∅ |
+| 24 | Causality is a philosophical topic | ∅ |
