@@ -89,6 +89,7 @@ class EpisodicMemoryExtractionContractTests(unittest.TestCase):
         self.assertEqual(mem.get_statistics(),
                          {"episodes_created": 2, "episodes_closed": 1,
                           "total_links": 3, "avg_importance": 0.6})
+        self.assertEqual((mem.episodes_created, mem.episodes_closed), (2, 1))
         found = mem.search_episodes(limit=10)
         self.assertEqual([(e.episode_id, e.title, e.trigger_query, e.importance, e.status) for e in found],
                          [(a, "alpha", "q1", 0.9, "closed")])

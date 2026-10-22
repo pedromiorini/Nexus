@@ -4,7 +4,7 @@
 
 ## Evidência estrutural
 
-O núcleo analisado possui **27591 linhas**, **269 classes** e **878 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **2** funções com retorno constante simples e **31** marcadores de testes embutidos.
+O núcleo analisado possui **27374 linhas**, **267 classes** e **866 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **2** funções com retorno constante simples e **31** marcadores de testes embutidos.
 
 | Área | Resultado | Interpretação |
 |---|---:|---|
@@ -15,7 +15,7 @@ O núcleo analisado possui **27591 linhas**, **269 classes** e **878 funções**
 | Padrões proibidos de alegação no código (gate: zero) | 0 | Cobre só as frases listadas em CODE_OVERCLAIMS; não significa ausência de linguagem de capacidade |
 | Frases fortes de capacidade no código (inventário; só pode diminuir) | 51 | Ênfase "REAL <Capacidade>", "REAL e FUNCIONAL", "100% funcional"; limite em test_reality_audit.py |
 | Terminologia científica no código (informativo) | 233 | Nomes de constructos modelados; não são alegações por si só |
-| Classes com prefixo Real (identificadores) | 63 | Nome histórico; renomear exige alias de compatibilidade |
+| Classes com prefixo Real (identificadores) | 62 | Nome histórico; renomear exige alias de compatibilidade |
 | Dependências opcionais sinalizadas | 2 | Fallbacks podem alterar o comportamento |
 
 ## Alegações (README e código-fonte)

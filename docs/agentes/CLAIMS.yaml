@@ -10,6 +10,9 @@ claims:
       - core/cognitivo/episodic_memory.py
       - test_episodic_memory_extraction_contract.py
       - tools/cognitivo_mutation.py
+      - AUDIT_REALITY_REPORT.md
+      - audit_reality.json
+      - .gitignore
       - docs/agentes/CLAIMS.yaml
     pr: null
     expira_em: "2026-10-25T12:00:00+00:00"
