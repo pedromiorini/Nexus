@@ -37,6 +37,11 @@ class MCTSPlannerConstructorContractTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaisesRegex(TypeError, "max_depth"):
                 RealMCTSPlanner(max_depth=value)
 
+    def test_negative_exploration_constant_rejected(self):
+        for value in (-0.1, -1, -1.414):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "exploration_constant"):
+                RealMCTSPlanner(exploration_constant=value)
+
     def test_valid_constructor_values_accepted(self):
         planner = RealMCTSPlanner(exploration_constant=0, max_depth=1)
         self.assertEqual((planner.exploration_constant, planner.max_depth), (0, 1))
