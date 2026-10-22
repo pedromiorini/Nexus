@@ -33,7 +33,7 @@ precisa_pedro: false
 | Limite | 6 mensagens por thread (3 idas e voltas); a 7ª só como `pergunta`/`alerta` ao pedro |
 | Conteúdo | schema fechado, YAML sem alias/âncora/chave duplicada, ≤4 KB, varredura de segredos (o erro não ecoa o segredo) |
 
-`ler` roda a validação antes e **omite mensagens inválidas**; toda leitura começa com um aviso de dados não confiáveis.
+`ler` roda a validação antes e **omite mensagens inválidas**; toda leitura começa com um aviso de dados não confiáveis. O cursor de leitura guarda o **commit** lido, não o id: o id vem do relógio do remetente, e um id retroativo ou adiantado vira aviso, sem sumir da caixa de ninguém. O resumo neutraliza Markdown/HTML de texto não confiável (links, imagens) e os erros não ecoam caracteres de controle; o tamanho do arquivo é checado antes de ler o blob.
 
 ## Uso
 
@@ -53,7 +53,7 @@ python tools/agente/correio.py resumo        # o que está pendente com o Pedro
 3. Ruleset em `agentes/correio`: bloquear force-push e deleção, exigir commits assinados, push só para quem tem chave.
 4. Cada agente gera uma chave SSH de assinatura própria; o Pedro registra a pública em `CORREIO_ASSINANTES` (principal = id do registro).
 5. Atualizar `limites` no registro de cada agente que vai escrever. Hoje o Axis declara "sem push ou PR ou merge": o validador avisa e, sem essa mudança, ele não deveria enviar.
-6. De tempos em tempos: `correio.py ancora` e PR com a nova âncora.
+6. De tempos em tempos: `correio.py ancora` e PR com a nova âncora. **A âncora é a única defesa contra apagar a branch** enquanto não houver ruleset: com `head_verificado` preenchido, `correio.py ausente` (usado pelo CI quando a branch some) falha.
 7. Antes de haver chaves: `--assinaturas aviso` (identidade vira declaração, não prova).
 
 ## Limites (leia antes de confiar)
@@ -62,6 +62,8 @@ python tools/agente/correio.py resumo        # o que está pendente com o Pedro
 - **A branch é pública.** Nada de segredo, dado pessoal ou clínico. A varredura é heurística.
 - **Identidade só vale com chaves separadas por agente.** Credencial compartilhada ou chave comprometida anula a autenticidade. A regra "Require signed commits" do GitHub confere contra as chaves da conta; o mapeamento chave→agente é do `CORREIO_ASSINANTES`.
 - **Texto livre ainda é vetor de injeção.** Mitigação: aviso fixo, inválidas omitidas, agente nunca executa conteúdo nem aprova permissão a partir do correio.
+- **Rotação de chave.** O git confere `valid-after`/`valid-before` do `CORREIO_ASSINANTES` contra a data do commit, que o próprio signatário escolhe: validade de chave rotaciona, mas não aposenta uma chave vazada. Remover uma chave invalida as mensagens antigas dela; ancore antes e use `aceitas_com_falha`.
+- **Alerta.** Falha de workflow agendado só notifica quem criou ou editou por último o `cron` (ou quem o reativou); não há outro alerta. Sem atividade por 60 dias, o GitHub desativa o agendamento em repositório público.
 - **Latência.** O cron mínimo é de 5 min e pode atrasar; agentes só leem quando rodam.
 - **Custo.** A validação percorre todos os commits (~4 chamadas git por commit): bom para centenas de mensagens, a revisar para milhares.
 - **Não verificado em GitHub real:** rulesets, assinatura verificada pela plataforma e agendamento. Os testes usam git e SSH locais.

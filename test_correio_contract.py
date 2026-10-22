@@ -540,5 +540,120 @@ class EnviarDeFimAFim(CorreioBase):
         self.assertEqual(len(res.mensagens), 1)
 
 
+class MelhoriasGrok(CorreioBase):
+    """Lacunas achadas na auditoria do Grok Bot (22/10/2026)."""
+
+    def postar_id(self, repo, ident, **campos):
+        d = self.dados(1, **campos)
+        d["id"] = d["thread"] = ident
+        caminho = f"mensagens/{ident[:4]}-{ident[4:6]}-{ident[6:8]}/{ident}_{d['de']}_{d['para']}.yaml"
+        self.commitar(repo, d["de"], {caminho: yaml.safe_dump(d, sort_keys=False, allow_unicode=True)})
+        return d
+
+    def test_id_retroativo_vira_aviso_e_mensagem_continua_entregue(self):
+        repo = self.novo_repo()
+        self.raiz(repo)
+        self.postar_id(repo, "20261022T140000Z-0000000a")
+        self.postar_id(repo, "20261022T130000Z-0000000b")
+        res = self.rodar(repo)
+        self.assertEqual(res.erros, [])
+        self.assertTrue(any("fora de ordem" in a for a in res.avisos), res.avisos)
+        self.assertIn("20261022T130000Z-0000000b", res.mensagens)
+
+    def test_id_no_futuro_nao_contamina_a_ordem_das_seguintes(self):
+        repo = self.novo_repo()
+        self.raiz(repo)
+        self.postar_id(repo, "20271022T120000Z-0000000a")
+        self.postar_id(repo, "20261022T140000Z-0000000b")
+        res = self.rodar(repo)
+        self.assertEqual(res.erros, [])
+        self.assertTrue(any("no futuro" in a for a in res.avisos))
+        self.assertFalse(any("fora de ordem" in a for a in res.avisos), res.avisos)
+
+    def test_ler_usa_cursor_por_commit_e_nao_perde_id_um_pouco_mais_antigo(self):
+        repo = self.novo_repo()
+        self.raiz(repo)
+        self.postar_id(repo, "20261022T140500Z-0000000a", assunto="primeira")
+        base = ["--repo", str(repo), "--root", str(self.root), "--sem-sha", "--ref", "HEAD", "ler",
+                "--agente", "axis", "--sem-fetch"]
+
+        def executar(extra=()):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()), \
+                    mock.patch.object(correio, "datetime", wraps=datetime) as dt:
+                dt.now.return_value = NOW
+                self.assertEqual(main([*base, *extra]), 0)
+            return buf.getvalue()
+
+        self.assertIn("primeira", executar(["--marcar"]))
+        self.postar_id(repo, "20261022T140000Z-0000000b", assunto="segunda")  # 5 min antes: tolerado
+        saida = executar(["--marcar"])
+        self.assertIn("segunda", saida)
+        self.assertNotIn("primeira", saida)
+
+    def test_blob_grande_e_rejeitado_sem_ser_lido(self):
+        repo = self.novo_repo()
+        self.raiz(repo)
+        d = self.dados(1)
+        caminho = f"mensagens/2026-10-22/{d['id']}_grok-bot_axis.yaml"
+        self.commitar(repo, "grok-bot", {caminho: "x" * (2 * 1024 * 1024)})
+        with mock.patch.object(correio, "_git_bytes", side_effect=AssertionError("leu o blob")):
+            res = self.rodar(repo)
+        self.assertErro(res, "maior que")
+
+    def test_resumo_neutraliza_markdown_e_html(self):
+        repo = self.novo_repo()
+        self.raiz(repo)
+        self.postar(repo, 1, assunto="veja [aqui](https://x.example) <img src=x> ![p](y)")
+        texto = renderizar_resumo(self.rodar(repo), agora=NOW)
+        self.assertNotIn("](", texto)
+        self.assertNotIn("<img", texto)
+
+    def test_resumo_preserva_assunto_comum(self):
+        repo = self.novo_repo()
+        self.raiz(repo)
+        self.postar(repo, 1, assunto="Formato de last_seen no PR 70")
+        texto = renderizar_resumo(self.rodar(repo), agora=NOW)
+        self.assertIn("Formato de last", texto)
+        self.assertIn("seen no PR 70", texto)
+
+    def test_erro_nao_ecoa_caracteres_de_controle_do_caminho(self):
+        repo = self.novo_repo()
+        self.raiz(repo)
+        self.commitar(repo, "grok-bot", {"mensagens/a\x1b[31mb.yaml": "x: 1\n"})
+        res = self.rodar(repo)
+        self.assertTrue(res.erros)
+        self.assertFalse(any("\x1b" in e for e in res.erros))
+        self.assertFalse(any("\x1b" in linha for linha in renderizar_resumo(res, agora=NOW).splitlines()))
+
+    def test_branch_ausente_com_ancora_falha_e_sem_ancora_passa(self):
+        def rodar_ausente():
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                return main(["--root", str(self.root), "ausente"])
+
+        self.assertEqual(rodar_ausente(), 0)
+        (self.root / correio.ANCORA).write_text(yaml.safe_dump(
+            {"schema_version": 1, "head_verificado": "a" * 40, "aceitas_com_falha": []}))
+        self.assertEqual(rodar_ausente(), 1)
+
+    def test_id_duplicado_apos_remocao_e_rejeitado(self):
+        repo = self.novo_repo()
+        self.raiz(repo)
+        d, caminho = self.postar(repo, 1)
+        self.commitar(repo, "grok-bot", apagar=[caminho])
+        self.commitar(repo, "grok-bot", {caminho: yaml.safe_dump(d, sort_keys=False, allow_unicode=True)})
+        self.assertErro(self.rodar(repo), "id duplicado")
+
+    def test_segunda_raiz_por_merge_de_historico_alheio(self):
+        repo = self.novo_repo()
+        self.raiz(repo)
+        self.git(repo, "checkout", "-q", "--orphan", "outra")
+        self.git(repo, "rm", "-rq", "--cached", ".")
+        self.commitar(repo, PEDRO, {"OUTRA.md": "x\n"})
+        self.git(repo, "checkout", "-q", "-f", correio.BRANCH)
+        self.git(repo, "merge", "-q", "--allow-unrelated-histories", "-m", "m", "outra")
+        self.assertErro(self.rodar(repo), "segunda raiz")
+
+
 if __name__ == "__main__":
     unittest.main()

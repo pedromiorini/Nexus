@@ -1,6 +1,6 @@
 """Correio dos agentes: mensagens em YAML numa branch órfã e só de acréscimos.
 
-Subcomandos: validar | ler | resumo | enviar | iniciar | ancora.
+Subcomandos: validar | ler | resumo | enviar | iniciar | ancora | ausente.
 
 Regras (ver docs/agentes/CORREIO.md): cada commit da branch adiciona exatamente
 um arquivo mensagens/AAAA-MM-DD/<id>_<de>_<para>.yaml; nenhum commit edita,
@@ -40,6 +40,7 @@ MAX_MSGS_THREAD = 6  # 3 idas e voltas
 MAX_BYTES = 4096
 MAX_CORPO = 2000
 MAX_ASSUNTO = 120
+TOLERANCIA_RELOGIO = timedelta(minutes=10)  # id pode atrasar/adiantar até isto em relação à ordem dos commits
 
 CAMPOS = ("id", "thread", "de", "para", "tipo", "em_resposta_a", "assunto", "corpo",
           "evidencia", "precisa_pedro")
@@ -155,6 +156,19 @@ class Resultado:
     avisos: list[str] = field(default_factory=list)
     mensagens: dict[str, Msg] = field(default_factory=dict)
     head: str | None = None
+    ultimo_ts: datetime | None = None  # maior horário de id já aceito (ordem do histórico)
+
+
+def _quando(ident: str) -> datetime:
+    return datetime.strptime(ident[:16], "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+
+
+_MD_ESCAPE = {c: f"&#{ord(c)};" for c in "\\`*_[]()<>!|#~&"}
+
+
+def _md(texto: str) -> str:
+    """Texto não confiável dentro de Markdown (resumo do Actions): sem links, imagens ou HTML."""
+    return "".join(_MD_ESCAPE.get(c, c) for c in CONTROLE_RE.sub("", texto).replace("\n", " "))
 
 
 def _nfc(valor: object) -> object:
@@ -295,7 +309,7 @@ def _validar_commit(repo, sha, indice, res, threads, remetentes, destinatarios, 
     erros_locais: list[str] = []
 
     def erro(texto: str) -> None:
-        erros_locais.append(f"{pref} {texto}")
+        erros_locais.append(f"{pref} {CONTROLE_RE.sub('?', texto)}")
 
     pais = _git(repo, "rev-list", "--parents", "-n", "1", sha).split()[1:]
     if len(pais) > 1:
@@ -346,6 +360,9 @@ def _validar_commit(repo, sha, indice, res, threads, remetentes, destinatarios, 
         return
     data_dir, id_arq, de_arq, para_arq = casou.groups()
     try:
+        tamanho = _git(repo, "cat-file", "-s", f"{sha}:{caminho}").strip()
+        if not tamanho.isdigit() or int(tamanho) > MAX_BYTES:  # checa antes de ler o blob
+            raise ValueError(f"arquivo maior que {MAX_BYTES} bytes")
         bruto = _git_bytes(repo, "show", f"{sha}:{caminho}")
         if len(bruto) > MAX_BYTES:
             raise ValueError(f"arquivo maior que {MAX_BYTES} bytes")
@@ -374,6 +391,9 @@ def _validar_commit(repo, sha, indice, res, threads, remetentes, destinatarios, 
         res.erros.extend(erros_locais)
     else:
         res.mensagens[msg.id] = msg
+        quando = _quando(msg.id)
+        if quando <= agora + TOLERANCIA_RELOGIO:  # id no futuro do relógio não avança a base de ordem
+            res.ultimo_ts = quando if res.ultimo_ts is None else max(res.ultimo_ts, quando)
 
 
 def _validar_contexto(repo, msg, data_dir, id_arq, de_arq, para_arq, agente, res, threads,
@@ -393,9 +413,14 @@ def _validar_contexto(repo, msg, data_dir, id_arq, de_arq, para_arq, agente, res
     if msg.id in res.mensagens:
         erro("id duplicado")
     try:
-        quando = datetime.strptime(msg.id[:16], "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
-        if quando > agora + timedelta(minutes=10):
+        quando = _quando(msg.id)
+        # O id vem do relógio do remetente: é só rótulo. A ordem real é a dos commits (e o cursor
+        # do `ler` usa commits), então id adiantado ou retroativo vira aviso, não erro.
+        if quando > agora + TOLERANCIA_RELOGIO:
             res.avisos.append(f"mensagem {msg.id}: id no futuro (relógio do remetente?)")
+        if res.ultimo_ts is not None and quando < res.ultimo_ts - TOLERANCIA_RELOGIO:
+            res.avisos.append(f"mensagem {msg.id}: id fora de ordem, mais antigo que mensagem anterior "
+                              "(retroativo?); a ordem válida é a dos commits")
     except ValueError:
         erro("id com data inválida")
     if msg.tipo == "decisao" and msg.de != PEDRO:
@@ -465,7 +490,7 @@ def renderizar_resumo(res: Resultado, dias: int = 7, agora: datetime | None = No
         precisa = any(m.precisa_pedro for m in msgs if m.de != PEDRO)
         fechada = any(m.tipo in ENCERRAM for m in msgs)
         raiz = msgs[0]
-        linha = f"- `{thread}` {_limpo(raiz.assunto)} ({len(msgs)} msg; última de {msgs[-1].de})"
+        linha = f"- `{thread}` {_md(raiz.assunto)} ({len(msgs)} msg; última de {msgs[-1].de})"
         if precisa and not decidida:
             pendentes.append(linha)
         elif fechada and msgs[-1].id >= corte:
@@ -477,7 +502,7 @@ def renderizar_resumo(res: Resultado, dias: int = 7, agora: datetime | None = No
               *(combinados or ["- nada"]), "", f"## Threads abertas entre agentes ({len(abertas)})",
               *(abertas or ["- nada"])]
     if res.erros:
-        partes += ["", f"## Atenção: {len(res.erros)} erro(s) de validação", *(f"- {e}" for e in res.erros)]
+        partes += ["", f"## Atenção: {len(res.erros)} erro(s) de validação", *(f"- {_md(e)}" for e in res.erros)]
     return "\n".join(partes) + "\n"
 
 
@@ -526,8 +551,16 @@ def cmd_ler(args) -> int:
     _imprimir(res)
     cursor = _cursor(args.repo, args.agente)
     visto = cursor.read_text(encoding="utf-8").strip() if cursor.is_file() else ""
+    # Cursor = commit já lido (não o id: id vem do relógio do remetente e pode ser mais antigo).
+    lidos: set[str] = set()
+    if visto and res.head:
+        if re.fullmatch(r"[0-9a-f]{40}", visto) and _git_ok(args.repo, "merge-base", "--is-ancestor",
+                                                             visto, res.head):
+            lidos = set(_git(args.repo, "rev-list", visto).split())
+        else:
+            print("AVISO: cursor de leitura inválido ou fora do histórico; mostrando tudo", file=sys.stderr)
     novas = [m for m in res.mensagens.values()
-             if m.id > visto and m.de != args.agente and m.para in {args.agente, TODOS}]
+             if m.commit not in lidos and m.de != args.agente and m.para in {args.agente, TODOS}]
     print(AVISO_LEITURA)
     if res.erros:
         print(f"[{len(res.erros)} erro(s) de validação: mensagens inválidas foram omitidas]")
@@ -544,8 +577,8 @@ def cmd_ler(args) -> int:
         print(_limpo(m.corpo))
     if not novas:
         print("\n(sem mensagens novas)")
-    if args.marcar and res.mensagens:
-        cursor.write_text(max(res.mensagens) + "\n", encoding="utf-8")
+    if args.marcar and res.head:
+        cursor.write_text(res.head + "\n", encoding="utf-8")
     return 0
 
 
@@ -651,6 +684,18 @@ def cmd_ancora(args) -> int:
     return 0
 
 
+def cmd_ausente(args) -> int:
+    """Branch do correio não existe: normal antes do `iniciar`; com âncora, foi apagada."""
+    arq = args.root / ANCORA
+    ancora = _carregar_arquivo(arq) if arq.is_file() else {}
+    if ancora.get("head_verificado"):
+        print(f"ERRO: a branch {BRANCH} não existe, mas a âncora registra o head "
+              f"{str(ancora['head_verificado'])[:12]}: a branch foi apagada", file=sys.stderr)
+        return 1
+    print(f"A branch {BRANCH} ainda não existe; nada a validar.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--repo", type=Path, default=Path.cwd())
@@ -687,6 +732,8 @@ def main(argv: list[str] | None = None) -> int:
     i.set_defaults(fn=cmd_iniciar)
     a = sub.add_parser("ancora")
     a.set_defaults(fn=cmd_ancora)
+    au = sub.add_parser("ausente", help="uso do CI quando a branch não existe")
+    au.set_defaults(fn=cmd_ausente)
     args = p.parse_args(argv)
     try:
         return args.fn(args)
