@@ -12,9 +12,9 @@
       },
       {
         "path": "core/cognitivo/episodic_memory.py",
-        "lines": 235,
+        "lines": 280,
         "classes": 2,
-        "functions": 12
+        "functions": 14
       },
       {
         "path": "core/cognitivo/mcts_planner.py",

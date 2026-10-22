@@ -4,6 +4,7 @@ Extração strangler: o código abaixo foi movido sem alteração de comportamen
 core.constitutional_brain reexporta Episode e RealEpisodicMemory no ponto original.
 """
 
+import re
 import sqlite3
 import threading
 import time
@@ -87,6 +88,25 @@ class RealEpisodicMemory:
                 );
             """)
             self.conn.commit()
+            self._fts_enabled = self._create_fts_index(cursor)
+
+    def _create_fts_index(self, cursor) -> bool:
+        """Índice FTS5 (bm25) sobre title/trigger_query; preenche bancos legados. False sem FTS5."""
+        try:
+            cursor.execute(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS episodic_fts "
+                "USING fts5(episode_id UNINDEXED, title, trigger_query)"
+            )
+            cursor.execute("""
+                INSERT INTO episodic_fts (episode_id, title, trigger_query)
+                SELECT episode_id, title, COALESCE(trigger_query, '') FROM episodic_memories
+                WHERE episode_id NOT IN (SELECT episode_id FROM episodic_fts)
+            """)
+            self.conn.commit()
+            return True
+        except sqlite3.OperationalError:
+            self.conn.rollback()
+            return False
 
     def start_episode(self, title: str, trigger_query: Optional[str] = None,
                      importance: float = 0.6, auto_log: bool = True) -> str:
@@ -100,6 +120,11 @@ class RealEpisodicMemory:
                 INSERT INTO episodic_memories (episode_id, title, start_timestamp, trigger_query, importance)
                 VALUES (?, ?, ?, ?, ?)
             """, (episode_id, title[:200], ts, trigger_query, importance))
+            if self._fts_enabled:
+                cursor.execute(
+                    "INSERT INTO episodic_fts (episode_id, title, trigger_query) VALUES (?, ?, ?)",
+                    (episode_id, title[:200], trigger_query or ""),
+                )
             self.conn.commit()
 
             self.episodes_created += 1
@@ -169,23 +194,43 @@ class RealEpisodicMemory:
             cursor = self.conn.cursor()
 
             if query:
-                cursor.execute("""
-                    SELECT episode_id, title, start_timestamp, end_timestamp,
-                           trigger_query, importance, status
-                    FROM episodic_memories
-                    WHERE (title LIKE ? OR trigger_query LIKE ?) AND status = ?
-                    ORDER BY start_timestamp DESC LIMIT ?
-                """, (f"%{query}%", f"%{query}%", status, limit))
-            else:
-                cursor.execute("""
-                    SELECT episode_id, title, start_timestamp, end_timestamp,
-                           trigger_query, importance, status
-                    FROM episodic_memories
-                    WHERE status = ?
-                    ORDER BY start_timestamp DESC LIMIT ?
-                """, (status, limit))
-
+                return self._ranked_search(cursor, query, status, limit)
+            cursor.execute("""
+                SELECT episode_id, title, start_timestamp, end_timestamp,
+                       trigger_query, importance, status
+                FROM episodic_memories
+                WHERE status = ?
+                ORDER BY start_timestamp DESC LIMIT ?
+            """, (status, limit))
             rows = cursor.fetchall()
+        return [Episode(*row) for row in rows]
+
+    def _ranked_search(self, cursor, query: str, status: str, limit: int) -> List[Episode]:
+        """Termos em OR ranqueados por bm25 (FTS5), depois substring LIKE por recência."""
+        rows = []
+        terms = re.findall(r"\w+", query)
+        if self._fts_enabled and terms:
+            match = " OR ".join('"' + t + '"' for t in terms)
+            try:
+                cursor.execute("""
+                    SELECT m.episode_id, m.title, m.start_timestamp, m.end_timestamp,
+                           m.trigger_query, m.importance, m.status FROM episodic_fts f
+                    JOIN episodic_memories m ON m.episode_id = f.episode_id
+                    WHERE episodic_fts MATCH ? AND m.status = ?
+                    ORDER BY bm25(episodic_fts), m.start_timestamp DESC LIMIT ?
+                """, (match, status, limit))
+                rows = cursor.fetchall()
+            except sqlite3.OperationalError:
+                rows = []
+        if len(rows) < limit:
+            seen = {row[0] for row in rows}
+            cursor.execute("""
+                SELECT m.episode_id, m.title, m.start_timestamp, m.end_timestamp,
+                       m.trigger_query, m.importance, m.status FROM episodic_memories m
+                WHERE (m.title LIKE ? OR m.trigger_query LIKE ?) AND m.status = ?
+                ORDER BY m.start_timestamp DESC LIMIT ?
+            """, (f"%{query}%", f"%{query}%", status, limit))
+            rows += [row for row in cursor.fetchall() if row[0] not in seen][:limit - len(rows)]
         return [Episode(*row) for row in rows]
 
     def get_episode_memories(self, episode_id: str) -> List[Dict]:
