@@ -527,6 +527,32 @@ CAUSAL_L = [
     ("The cause is unknown", None),
     ("Causal models are hard", None),
 ]
+CAUSAL_H = [  # held-out pré-registrado em 396164e (R3), nunca usado para ajustar padrões
+    ("Poor sanitation causes cholera", ("poor sanitation", "cholera")),
+    ("Frequent deploys cause regressions", ("frequent deploys", "regressions")),
+    ("The outage happened because the router failed", ("the router failed", "the outage happened")),
+    ("Prices rose because of the drought", ("the drought", "prices rose")),
+    ("Overfishing leads to population collapse", ("overfishing", "population collapse")),
+    ("Misuse of antibiotics leads to resistance", ("misuse of antibiotics", "resistance")),
+    ("The leak results in pressure loss", ("the leak", "pressure loss")),
+    ("Cancellations were due to the strike", ("the strike", "cancellations were")),
+    ("The fire was caused by faulty wiring", ("faulty wiring", "the fire")),
+    ("Heavy load triggers throttling", ("heavy load", "throttling")),
+    ("The disk filled up, so the job failed", ("the disk filled up", "the job failed")),
+    ("Inflation was driven by energy costs", ("energy costs", "inflation")),
+    ("As a result of the patch, crashes stopped", ("the patch", "crashes stopped")),
+    ("Stress contributes to heart disease", ("stress", "heart disease")),
+    ("Video games do not cause violence", None),
+    ("It is false that vaccines cause autism", None),
+    ("Coffee is not known to cause ulcers", None),
+    ("Nothing suggests that 5G causes illness", None),
+    ("Shark attacks rise with ice cream sales", None),
+    ("Height is correlated with income", None),
+    ("Umbrellas and rain appear together", None),
+    ("Because is a conjunction", None),
+    ("He gave no cause for alarm", None),
+    ("Causality is a philosophical topic", None),
+]
 CAUSAL_ACTION_VOCAB = ("APPLY_PATCH", "IGNORE_ALERT", "ROLLBACK", "ESCALATE", "MONITOR", "ISOLATE_SYSTEM",
                        "RESTORE_BACKUP", "DEPLOY_UPDATE", "INCREASE_LOGGING", "SHUTDOWN_SERVICE")
 CAUSAL_C3_SETS = [
@@ -543,13 +569,12 @@ def _norm(text):
     return text.strip().lower().rstrip(".!?;,")
 
 
-def eval_causal(criteria="v1"):
-    from core.cognitivo.causal_world_model import RealCausalReasoning, RealWorldModelSimulator
+def _score_extraction(cls, dataset):
     tp = fp = fn = 0
     neg_fp = 0
     per_form = {}
-    for idx, (text, label) in enumerate(CAUSAL_L):
-        pairs = {(_norm(r.cause), _norm(r.effect)) for r in RealCausalReasoning().extract_causal_relations(text)}
+    for idx, (text, label) in enumerate(dataset):
+        pairs = {(_norm(r.cause), _norm(r.effect)) for r in cls().extract_causal_relations(text)}
         if label is None:
             fp += len(pairs)
             neg_fp += bool(pairs)
@@ -562,8 +587,15 @@ def eval_causal(criteria="v1"):
     precision = tp / (tp + fp) if tp + fp else 0.0
     recall = tp / (tp + fn) if tp + fn else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    negatives = sum(label is None for _, label in dataset)
+    return f1, precision, recall, neg_fp / negatives, per_form
+
+
+def eval_causal(criteria="v1"):
+    from core.cognitivo.causal_world_model import RealCausalReasoning, RealWorldModelSimulator
+    f1, precision, recall, fp_rate, per_form = _score_extraction(RealCausalReasoning, CAUSAL_L)
     negatives = sum(label is None for _, label in CAUSAL_L)
-    fp_rate = neg_fp / negatives
+    f1_h, precision_h, recall_h, fp_h, _ = _score_extraction(RealCausalReasoning, CAUSAL_H)
     wm = RealWorldModelSimulator()
     initial = wm.current_state.state
     covered = []
@@ -592,6 +624,10 @@ def eval_causal(criteria="v1"):
         _check("C3", f"{correct}/{len(CAUSAL_C3_SETS)}", correct >= 5, ">= 5/6 top-1", criteria="v1",
                baseline_first_index=f"{baseline_first}/{len(CAUSAL_C3_SETS)}"),
         _check("C4", integrated, integrated, "relação extraída altera simulação", criteria="v1"),
+        _check("H-F1", round(f1_h, 4), f1_h >= 0.60 and f1 - f1_h <= 0.20,
+               "guarda R3: F1(H) >= 0.60 e F1(L) - F1(H) <= 0.20", criteria="v1",
+               precision=round(precision_h, 4), recall=round(recall_h, 4), gap=round(f1 - f1_h, 4)),
+        _check("H-FP", round(fp_h, 4), fp_h <= 0.20, "guarda R3: FP nas negativas de H <= 0.20", criteria="v1"),
     ]
 
 
