@@ -58,5 +58,38 @@ class CognitivoEvalCliContractTests(unittest.TestCase):
         self.assertEqual(v2["PC1"]["seeds"], list(range(100, 120)))
         self.assertIn("per_seed_pass_rate", v2["PC3"])
 
+    def test_v3_rejects_missing_or_empty_input(self):
+        with self.assertRaises(ValueError):
+            cognitivo_eval._mcts_m3_v3(instances=())
+        with self.assertRaises(ValueError):
+            cognitivo_eval._mcts_m3_v3(seeds=())
+        with self.assertRaises(ValueError):
+            cognitivo_eval._m3_precheck([])
+        for bad in (None, -1, True, "0"):
+            with self.assertRaises(ValueError):
+                cognitivo_eval.SyntheticTree(bad)
+
+    def test_invalid_scenario_has_own_exit_code(self):
+        fake = [{"id": "M3P", "value": 0.0, "limit": "", "passed": False, "scenario_invalid": True}]
+        original = cognitivo_eval.EVALUATORS["mcts"]
+        cognitivo_eval.EVALUATORS["mcts"] = lambda criteria="v3": fake
+        try:
+            code, _ = self._run(["--capability", "mcts", "--criteria", "v3"])
+        finally:
+            cognitivo_eval.EVALUATORS["mcts"] = original
+        self.assertEqual(code, cognitivo_eval.EXIT_INVALID_SCENARIO)
+        self.assertNotIn(cognitivo_eval.EXIT_INVALID_SCENARIO,
+                         (cognitivo_eval.EXIT_OK, cognitivo_eval.EXIT_FAIL, cognitivo_eval.EXIT_USAGE))
+
+    def test_synthetic_tree_has_unique_exact_optimum_in_deceptive_branch(self):
+        tree = cognitivo_eval.SyntheticTree(0)
+        self.assertEqual(len(tree.leaves), 6 ** 6)
+        self.assertEqual(tree.optimum, 1.0)
+        self.assertEqual(tree.needle[0], tree.deceptive)
+        self.assertEqual(sum(v == tree.optimum for v in tree.leaves.values()), 1)
+        self.assertEqual(tree.value(tree.needle[:3]), 0.0)
+        check = cognitivo_eval._m3_precheck([tree])
+        self.assertTrue(check["passed"], check)
+
 if __name__ == "__main__":
     unittest.main()

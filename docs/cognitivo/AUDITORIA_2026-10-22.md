@@ -71,3 +71,33 @@ Regra: se um PR falhar a v2, os critérios não serão ajustados de novo; a falh
 - #90 (preditiva): PC1 v2 0,3195 (persistência 0,479; 17/20 seeds), PC2 0,25, PC3 v2 0,0798 (17/20 seeds): passa.
 - #91 (MCTS): M1 1,00, M2 0,8808, M4 e M5 passam. **M3 v2 FALHA**: regret(2000) = regret(50) = 0,0 com max_depth=8
   (o teto persiste). Mesclado com a falha registrada, por aprovação de Pedro em 22/10 16:52; sem nova emenda.
+
+---
+
+## v3: emenda do M3 (22/10/2026 17:38, aprovada por Pedro; escrita ANTES de qualquer avaliação v3)
+As seções v1 e v2 acima permanecem inalteradas. A v3 acrescenta apenas `M3 v3` e o pré-teste `M3P`; os demais critérios seguem a v2.
+O harness passa a aceitar `--criteria v3`. Os padrões anteriores não mudam.
+
+**Motivo:** o M3 v2 falhou em main (`feef2f3`) com regret 0,0 em 50 e em 2000 iterações. O diagnóstico é efeito teto:
+no domínio padrão o ótimo tem uma ação (`APPLY_PATCH`) e a raiz o expande nas primeiras ~10 iterações. Além disso, o
+regret era medido contra o "melhor observado", não contra um ótimo exato.
+Referências: docs `PESQUISA_MCTS_2026-10-22.md`; Schadd et al. 2008 (SP-MCTS); Cazenave 2009 (NMCS); Rosin 2011 (NRPA); testes de valor exato do OpenSpiel.
+
+**Cenário (domínio sintético injetado no planejador; o domínio padrão continua coberto por M1/M2/M4):**
+- 20 instâncias, `i = 0..19`, cada uma uma árvore determinística gerada por `random.Random(1000 + i)`:
+  - ramificação 6 (ações `A0..A5`, todas disponíveis em todo nó), profundidade 6 (46 656 folhas); `max_depth = 6`;
+  - cada aresta recebe um peso U[0,1), sorteado em ordem DFS;
+  - valor de folha = média dos 6 pesos do caminho; nós internos valem 0.
+- **Ramo enganoso:** um primeiro passo `D` sorteado tem todas as folhas multiplicadas por 0,5.
+- **Agulha:** um caminho sorteado dentro de `D` vale 1,0. É o ótimo único, porque todas as outras folhas valem menos que 1.
+- **Ótimo exato:** calculado por força bruta sobre as 46 656 folhas.
+- **Execuções:** seeds de execução 0..9, com `random.seed(s)` antes de cada `plan`, e orçamentos {50, 200, 800, 2000}.
+- **Regret** de uma execução = ótimo exato − valor da sequência devolvida (uma sequência que não termina em folha vale 0).
+
+| Id | Critério | Limite |
+|---|---|---|
+| M3P (pré-teste de validade, independente da qualidade do planejador) | Verifica, por instância: (a) a agulha é o ótimo único e está em `D`; (b) a média das folhas de `D` é menor que a de cada outro primeiro passo; (c) o número de folhas distintas avaliadas com orçamento 50 é ≤ 50, contado por instrumentação. Para qualquer algoritmo com ≤ 50 avaliações de folha, a agulha é uniforme entre as 7 776 folhas de `D` e os demais valores são independentes da sua posição, então P(ótimo em 50) ≤ 50/7 776 ≈ 0,64%. A cota implica orçamento 50 subótimo esperado em ≥ 99% das execuções | (a), (b) e (c) em 20/20 instâncias **e** cota ≥ 50%. Se M3P falhar, o cenário é inválido e M3 v3 não é julgado |
+| M3 v3 | Regret médio nas 200 execuções (20 × 10) por orçamento | média(2000) **<** média(50), estrito, **e** mediana não crescente: med(50) ≥ med(200) ≥ med(800) ≥ med(2000) |
+| M3I (informativo) | Fração de execuções no ótimo com 2000; avaliações de folha até o ótimo, nas execuções que o atingem | — |
+
+Regra: se o M3 v3 falhar, os critérios não serão reajustados; a falha é reportada. Mudanças no planejador ficam fora deste PR.

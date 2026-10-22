@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-EXIT_OK, EXIT_FAIL, EXIT_USAGE = 0, 1, 2
+EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
 CAPABILITIES = ("episodic", "predictive", "mcts")
 
 TOPICS = [
@@ -210,7 +210,7 @@ def eval_predictive(criteria="v2"):
         expected = _closed_form_posterior(prior, transition, likelihood)
         worst = max(worst, max(abs(got[s] - e) for s, e in zip(states, expected)))
     checks.append(_check("PC4", worst, worst <= 1e-9, "erro máx <= 1e-9"))
-    if criteria == "v2":
+    if criteria in ("v2", "v3"):
         checks = [c for c in checks if c["id"] not in ("PC1", "PC3")] + _predictive_v2()
     return checks
 
@@ -310,6 +310,8 @@ def eval_mcts(criteria="v2"):
 
     if criteria == "v2":
         checks = [c for c in checks if c["id"] != "M3"] + [_mcts_m3_v2()]
+    elif criteria == "v3":
+        checks = [c for c in checks if c["id"] != "M3"] + _mcts_m3_v3()
 
     planner = RealMCTSPlanner(max_depth=3)
     effects_before = set(planner._action_effects)
@@ -358,6 +360,139 @@ def _mcts_m3_v2(depth=8):
                   criteria="v2", regret_50=round(regret50, 4))
 
 
+# ── M3 v3: árvores sintéticas com ótimo exato (AUDITORIA, seção v3) ─────────
+
+V3_INSTANCES = tuple(range(20))
+V3_RUN_SEEDS = tuple(range(10))
+V3_BUDGETS = (50, 200, 800, 2000)
+V3_BRANCHING, V3_DEPTH = 6, 6
+V3_ACTIONS = tuple(f"A{k}" for k in range(V3_BRANCHING))
+
+
+class SyntheticTree:
+    """Árvore determinística b=6, d=6 com ramo enganoso e agulha (ótimo único = 1,0)."""
+
+    def __init__(self, instance):
+        if isinstance(instance, bool) or not isinstance(instance, int) or instance < 0:
+            raise ValueError("instance must be a non-negative integer")
+        rng = random.Random(1000 + instance)  # nosec B311 - instância sintética de avaliação
+        self.leaves = {}
+        self._fill(rng, (), 0.0)
+        self.deceptive = V3_ACTIONS[rng.randrange(V3_BRANCHING)]
+        self.needle = (self.deceptive,) + tuple(V3_ACTIONS[rng.randrange(V3_BRANCHING)]
+                                                for _ in range(V3_DEPTH - 1))
+        for path in self.leaves:
+            if path[0] == self.deceptive:
+                self.leaves[path] *= 0.5
+        self.leaves[self.needle] = 1.0
+        self.optimum = max(self.leaves.values())  # força bruta sobre as 46 656 folhas
+
+    def _fill(self, rng, path, acc):
+        if len(path) == V3_DEPTH:
+            self.leaves[path] = acc / V3_DEPTH
+            return
+        for action in V3_ACTIONS:
+            self._fill(rng, path + (action,), acc + rng.random())
+
+    def value(self, sequence):
+        return self.leaves.get(tuple(sequence), 0.0)
+
+
+def _synthetic_planner(tree):
+    """Subclasse do planejador com domínio injetado (efeitos/avaliador) e instrumentação de folhas."""
+    from core.cognitivo.mcts_planner import RealMCTSPlanner
+
+    class SyntheticPlanner(RealMCTSPlanner):
+        def __init__(self):
+            super().__init__(max_depth=V3_DEPTH)
+            self.leaf_evaluations = []
+
+        def _get_initial_state(self, goal):
+            return {"steps_taken": []}
+
+        def _get_available_actions(self, state, depth):
+            return [] if depth >= self.max_depth else list(V3_ACTIONS)
+
+        def _apply_action(self, state, action):
+            return {"steps_taken": list(state.get("steps_taken", [])) + [action]}
+
+        def _evaluate_state(self, state, goal):
+            steps = tuple(state.get("steps_taken", []))
+            if len(steps) == V3_DEPTH:
+                self.leaf_evaluations.append(steps)
+            return tree.value(steps)
+
+    return SyntheticPlanner()
+
+
+def _median(values):
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    return ordered[mid] if len(ordered) % 2 else (ordered[mid - 1] + ordered[mid]) / 2
+
+
+def _m3_precheck(trees):
+    """M3P: validade do cenário, independente da qualidade do planejador."""
+    if not trees:
+        raise ValueError("M3 v3 requires at least one instance")
+    ok_unique = ok_deceptive = ok_budget = 0
+    for tree in trees:
+        others = [v for p, v in tree.leaves.items() if p != tree.needle]
+        ok_unique += tree.leaves[tree.needle] == tree.optimum and max(others) < tree.optimum
+        means = {}
+        for path, v in tree.leaves.items():
+            means.setdefault(path[0], []).append(v)
+        mean_d = sum(means[tree.deceptive]) / len(means[tree.deceptive])
+        ok_deceptive += all(mean_d < sum(v) / len(v) for a, v in means.items() if a != tree.deceptive)
+        random.seed(0)
+        planner = _synthetic_planner(tree)
+        planner.plan("synthetic", max_iterations=V3_BUDGETS[0])
+        ok_budget += len(set(planner.leaf_evaluations)) <= V3_BUDGETS[0]
+    subtree = V3_BRANCHING ** (V3_DEPTH - 1)
+    bound = 1 - V3_BUDGETS[0] / subtree
+    n = len(trees)
+    passed = ok_unique == ok_deceptive == ok_budget == n and bound >= 0.5
+    return _check("M3P", round(bound, 4), passed, "v3: (a)(b)(c) em todas as instâncias e cota subótimo@50 >= 0.5",
+                  criteria="v3", unique_optimum=f"{ok_unique}/{n}", deceptive_branch=f"{ok_deceptive}/{n}",
+                  leaves_at_50_bounded=f"{ok_budget}/{n}", scenario_invalid=not passed)
+
+
+def _mcts_m3_v3(instances=V3_INSTANCES, seeds=V3_RUN_SEEDS, budgets=V3_BUDGETS):
+    if not instances or not seeds or not budgets:
+        raise ValueError("M3 v3 requires non-empty instances, seeds and budgets")
+    trees = [SyntheticTree(i) for i in instances]
+    pre = _m3_precheck(trees)
+    regrets = {b: [] for b in budgets}
+    to_optimum = []
+    for tree in trees:
+        for seed in seeds:
+            for budget in budgets:
+                random.seed(seed)
+                planner = _synthetic_planner(tree)
+                plan = planner.plan("synthetic", max_iterations=budget)
+                regrets[budget].append(tree.optimum - tree.value(plan.best_action_sequence))
+                if budget == budgets[-1] and tree.needle in planner.leaf_evaluations:
+                    to_optimum.append(planner.leaf_evaluations.index(tree.needle) + 1)
+    means = {b: sum(r) / len(r) for b, r in regrets.items()}
+    medians = {b: _median(r) for b, r in regrets.items()}
+    meds = [medians[b] for b in budgets]
+    ok = (pre["passed"] and means[budgets[-1]] < means[budgets[0]]
+          and all(a >= b for a, b in zip(meds, meds[1:])))
+    last = regrets[budgets[-1]]
+    return [
+        pre,
+        _check("M3", round(means[budgets[-1]], 4), ok,
+               "v3: média(2000) < média(50) e mediana não crescente", criteria="v3",
+               regret_50=round(means[budgets[0]], 4),
+               mean_regret={b: round(v, 4) for b, v in means.items()},
+               median_regret={b: round(v, 4) for b, v in medians.items()},
+               scenario_invalid=not pre["passed"]),
+        _check("M3I", round(sum(r == 0 for r in last) / len(last), 4), True,
+               "informativo: fração no ótimo @2000", criteria="v3", informative=True,
+               evaluations_to_optimum=sorted(to_optimum)),
+    ]
+
+
 EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts}
 
 
@@ -374,7 +509,7 @@ def main(argv=None) -> int:
     if cap != "all" and cap not in CAPABILITIES:
         print(f"erro: capacidade desconhecida: {cap}", file=sys.stderr)
         return EXIT_USAGE
-    if args.criteria not in ("v1", "v2"):
+    if args.criteria not in ("v1", "v2", "v3"):
         print(f"erro: versão de critérios desconhecida: {args.criteria}", file=sys.stderr)
         return EXIT_USAGE
     selected = CAPABILITIES if cap == "all" else (cap,)
@@ -387,6 +522,9 @@ def main(argv=None) -> int:
     if args.json_path:
         Path(args.json_path).write_text(text + "\n", encoding="utf-8")
     print(text)
+    invalid = any(c.get("scenario_invalid") for name in selected for c in report[name])
+    if invalid:
+        return EXIT_INVALID_SCENARIO
     return EXIT_FAIL if failed else EXIT_OK
 
 
