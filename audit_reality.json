@@ -11,6 +11,12 @@
         "functions": 0
       },
       {
+        "path": "core/cognitivo/causal_world_model.py",
+        "lines": 124,
+        "classes": 5,
+        "functions": 7
+      },
+      {
         "path": "core/cognitivo/episodic_memory.py",
         "lines": 280,
         "classes": 2,
@@ -29,9 +35,9 @@
         "functions": 17
       }
     ],
-    "core_lines": 26526,
-    "classes": 261,
-    "functions": 834,
+    "core_lines": 26418,
+    "classes": 256,
+    "functions": 827,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -51,7 +57,6 @@
       "RealAnalogicalReasoningSystem.get_statistics",
       "RealAttentionRoutingSystem.get_statistics",
       "RealAttentionSystem.get_statistics",
-      "RealCausalReasoning.get_statistics",
       "RealCognitiveBudgetEnforcer.get_status",
       "RealCollaborativeIntelligenceEngine.get_statistics",
       "RealConsciousnessSystem.get_self_knowledge",
