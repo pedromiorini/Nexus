@@ -45,3 +45,23 @@ respeitando `available_actions`; docstring diz "200 = ~50ms".
 ## Regra de adoção
 Melhoria só é promovida se: critério pré-registrado passa, sem regressão (suíte, demo, replay 11/11,
 pisos de cobertura, os dois gates de mutação, bandit/triage), API pública compatível, sem dependência nova pesada.
+
+---
+
+## v2 — emenda de critérios (22/10/2026 15:29, aprovada por Pedro; escrita ANTES de qualquer avaliação v2)
+A v1 acima permanece inalterada e visível. A v2 substitui apenas PC1, PC3 e M3; os demais critérios seguem a v1.
+O harness passa a aceitar `--criteria {v1,v2}` (padrão v2); v1 continua reproduzível.
+
+**Motivos da emenda**
+- **PC1/PC3, variância amostral:** com uma única seed (11) e janela de 200 passos, o desvio-padrão da taxa de erro
+  (~0,03) é da ordem da folga até o limite; o resultado de uma seed não distingue método de sorte.
+- **M3, efeito teto:** com max_depth ∈ {2,3}, um planejador correto atinge o ótimo já com 50 iterações; os dois regrets
+  valem 0 e o `<` estrito fica inatingível, embora o critério pretenda medir melhora com iterações.
+
+| Id | Critério v2 | Limite |
+|---|---|---|
+| PC1 v2 | Mesmo protocolo da v1 (fonte p=(0,7;0,2;0,1), 500 passos, últimos 200), repetido nas **20 seeds fixas 100,101,…,119**. Métrica = média das 20 taxas de erro | média ≤ 0,35 **e** média ≤ média da persistência − 0,05. Taxa de aprovação por seed reportada (informativa) |
+| PC3 v2 | ECE (10 bins) da v1 em cada uma das mesmas 20 seeds. Métrica = média dos 20 ECE | média ≤ 0,10. Taxa de aprovação por seed reportada (informativa) |
+| M3 v2 | Cenário endurecido: domínio padrão, os 4 goals da v1, **max_depth = 8**, seeds 0–9 (`random.seed(s)` antes de cada `plan`). Valor = `_evaluate_state` após a sequência. Regret = (melhor valor observado no cenário, entre todos os planos avaliados) − valor; equivalente a comparar médias | regret médio(2000) **<** regret médio(50), `<` estrito mantido |
+
+Regra: se um PR falhar a v2, os critérios não serão ajustados de novo; a falha é reportada.
