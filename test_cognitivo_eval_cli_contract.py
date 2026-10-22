@@ -16,6 +16,18 @@ class CognitivoEvalCliContractTests(unittest.TestCase):
             code = cognitivo_eval.main(argv)
         return code, err.getvalue()
 
+    def test_m6_only_for_mcts(self):
+        code, err = self._run(["--capability", "episodic", "--criteria", "m6"])
+        self.assertEqual(code, cognitivo_eval.EXIT_USAGE)
+        self.assertIn("m6", err)
+
+    def test_m6_search_rejects_empty_input_and_restores_strategy(self):
+        with self.assertRaises(ValueError):
+            cognitivo_eval._m6_search("nmcs", instances=())
+        frac, regret = cognitivo_eval._m6_search("nmcs", instances=(0,), seeds=(0,), budget=50)
+        self.assertTrue(0.0 <= frac <= 1.0 and regret >= 0.0)
+        self.assertEqual(cognitivo_eval._STRATEGY_KW, {})
+
     def test_missing_capability_exits_2(self):
         code, err = self._run([])
         self.assertEqual(code, cognitivo_eval.EXIT_USAGE)

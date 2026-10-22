@@ -3,13 +3,17 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "M3 v3 pré-registrado: árvores sintéticas com ótimo exato no harness cognitivo (draft)"
+    tarefa: "M6 qualidade de busca: estratégia opt-in NMCS no RealMCTSPlanner (draft)"
     arquivos:
-      - docs/cognitivo/AUDITORIA_2026-10-22.md
+      - core/cognitivo/mcts_planner.py
+      - test_mcts_strategy_contract.py
+      - tools/cognitivo_mutation.py
       - tools/cognitivo_eval.py
       - test_cognitivo_eval_cli_contract.py
+      - docs/cognitivo/AUDITORIA_2026-10-22.md
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
+      - SECURITY_TRIAGE.md
       - docs/agentes/CLAIMS.yaml
-    pr: 92
+    pr: 93
     expira_em: "2026-10-25T18:00:00+00:00"

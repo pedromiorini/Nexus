@@ -275,7 +275,7 @@ def eval_mcts(criteria="v2"):
     sums = {"mcts": 0.0, "mcts50": 0.0, "greedy": 0.0, "random": 0.0, "opt": 0.0}
     rng = random.Random(21)  # nosec B311 - dados sintéticos de avaliação
     for goal, depth in itertools.product(GOALS, (2, 3)):
-        ref = RealMCTSPlanner(max_depth=depth)
+        ref = RealMCTSPlanner(**_STRATEGY_KW, max_depth=depth)
         sequences = _all_sequences(ref, goal, depth)
         opt = max(_value(ref, goal, s) for s in sequences)
         greedy, state = [], ref._get_initial_state(goal)
@@ -288,9 +288,9 @@ def eval_mcts(criteria="v2"):
         rand_mean = sum(_value(ref, goal, rng.choice(full)) for _ in range(200)) / 200
         for seed in range(10):
             random.seed(seed)
-            v = _value(ref, goal, RealMCTSPlanner(max_depth=depth).plan(goal, max_iterations=2000).best_action_sequence)
+            v = _value(ref, goal, RealMCTSPlanner(**_STRATEGY_KW, max_depth=depth).plan(goal, max_iterations=2000).best_action_sequence)
             random.seed(seed)
-            v50 = _value(ref, goal, RealMCTSPlanner(max_depth=depth).plan(goal, max_iterations=50).best_action_sequence)
+            v50 = _value(ref, goal, RealMCTSPlanner(**_STRATEGY_KW, max_depth=depth).plan(goal, max_iterations=50).best_action_sequence)
             near_opt += v >= 0.98 * opt
             total += 1
             sums["mcts"] += v
@@ -313,7 +313,7 @@ def eval_mcts(criteria="v2"):
     elif criteria == "v3":
         checks = [c for c in checks if c["id"] != "M3"] + _mcts_m3_v3()
 
-    planner = RealMCTSPlanner(max_depth=3)
+    planner = RealMCTSPlanner(**_STRATEGY_KW, max_depth=3)
     effects_before = set(planner._action_effects)
     ok = True
     for seed in range(10):
@@ -331,7 +331,7 @@ def eval_mcts(criteria="v2"):
     for seed in range(20):
         random.seed(seed)
         start = time.perf_counter()
-        RealMCTSPlanner().plan("secure the system", max_iterations=200)
+        RealMCTSPlanner(**_STRATEGY_KW).plan("secure the system", max_iterations=200)
         times.append(time.perf_counter() - start)
     p95 = sorted(times)[18]
     checks.append(_check("M5", round(p95, 4), p95 <= 0.10, "p95 <= 0.10 s"))
@@ -342,7 +342,7 @@ def _mcts_m3_v2(depth=8):
     """M3 v2: horizonte 8; regret contra o melhor valor observado no cenário (AUDITORIA v2)."""
     from core.cognitivo.mcts_planner import RealMCTSPlanner
 
-    ref = RealMCTSPlanner(max_depth=depth)
+    ref = RealMCTSPlanner(**_STRATEGY_KW, max_depth=depth)
     values = {2000: [], 50: []}
     best = 0.0
     for goal in GOALS:
@@ -350,7 +350,7 @@ def _mcts_m3_v2(depth=8):
         for seed in range(10):
             for iterations in (2000, 50):
                 random.seed(seed)
-                plan = RealMCTSPlanner(max_depth=depth).plan(goal, max_iterations=iterations)
+                plan = RealMCTSPlanner(**_STRATEGY_KW, max_depth=depth).plan(goal, max_iterations=iterations)
                 per_goal[iterations].append(_value(ref, goal, plan.best_action_sequence))
         best = max(per_goal[2000] + per_goal[50])
         for iterations in (2000, 50):
@@ -358,6 +358,9 @@ def _mcts_m3_v2(depth=8):
     regret, regret50 = (sum(values[k]) / len(values[k]) for k in (2000, 50))
     return _check("M3", round(regret, 4), regret < regret50, "v2: max_depth=8, regret(2000) < regret(50)",
                   criteria="v2", regret_50=round(regret50, 4))
+
+
+_STRATEGY_KW: dict = {}  # estratégia do planejador sob avaliação (M6); vazio = padrão
 
 
 # ── M3 v3: árvores sintéticas com ótimo exato (AUDITORIA, seção v3) ─────────
@@ -404,7 +407,7 @@ def _synthetic_planner(tree):
 
     class SyntheticPlanner(RealMCTSPlanner):
         def __init__(self):
-            super().__init__(max_depth=V3_DEPTH)
+            super().__init__(max_depth=V3_DEPTH, **_STRATEGY_KW)
             self.leaf_evaluations = []
 
         def _get_initial_state(self, goal):
@@ -493,6 +496,68 @@ def _mcts_m3_v3(instances=V3_INSTANCES, seeds=V3_RUN_SEEDS, budgets=V3_BUDGETS):
     ]
 
 
+# ── M6: qualidade de busca (AUDITORIA, seção M6) ─────────────────────────────
+
+M6_BASELINE = {"optimal_fraction": 0.015, "mean_regret": 0.1377}
+
+
+def _with_strategy(strategy, fn, *args):
+    global _STRATEGY_KW
+    saved = _STRATEGY_KW
+    _STRATEGY_KW = {"strategy": strategy} if strategy else {}
+    try:
+        return fn(*args)
+    finally:
+        _STRATEGY_KW = saved
+
+
+def _m6_search(strategy, instances=V3_INSTANCES, seeds=V3_RUN_SEEDS, budget=V3_BUDGETS[-1]):
+    if not instances or not seeds:
+        raise ValueError("M6 requires non-empty instances and seeds")
+    regrets = []
+    for i in instances:
+        tree = SyntheticTree(i)
+        for seed in seeds:
+            random.seed(seed)
+            plan = _with_strategy(strategy, lambda t=tree: _synthetic_planner(t).plan("synthetic", max_iterations=budget))
+            regrets.append(tree.optimum - tree.value(plan.best_action_sequence))
+    return sum(r == 0 for r in regrets) / len(regrets), sum(regrets) / len(regrets)
+
+
+def eval_m6(candidate="nmcs"):
+    from core.cognitivo.mcts_planner import RealMCTSPlanner
+
+    frac, regret = _m6_search(candidate)
+    checks = [
+        _check("M6a", round(frac, 4), frac >= 0.10 and frac > M6_BASELINE["optimal_fraction"],
+               ">= 0.10 e > 0.015", strategy=candidate),
+        _check("M6b", round(regret, 4), regret <= 0.10 and regret < M6_BASELINE["mean_regret"],
+               "<= 0.10 e < 0.1377", strategy=candidate),
+    ]
+    cand = _with_strategy(candidate, eval_mcts, "v3")
+    wanted = ("M1", "M2", "M3", "M4", "M5")
+    failed_c = [c["id"] for c in cand if c["id"] in wanted and not c["passed"]]
+    checks.append(_check("M6c", failed_c or "ok", not failed_c, "M1/M2/M4/M5 v2 e M3 v3 com o candidato",
+                         strategy=candidate, details={c["id"]: c["value"] for c in cand}))
+    default = eval_mcts("v3")
+    failed_d = [c["id"] for c in default if c["id"] in wanted and not c["passed"]]
+    random.seed(0)
+    plan_default = RealMCTSPlanner(max_depth=3).plan("secure the system", max_iterations=200).best_action_sequence
+    random.seed(0)
+    plan_uct = RealMCTSPlanner(max_depth=3, strategy="uct").plan("secure the system",
+                                                                 max_iterations=200).best_action_sequence
+    checks.append(_check("M6d", failed_d or "ok", not failed_d and plan_default == plan_uct,
+                         "padrão inalterado (M1–M5, M3 v3, plano com seed fixa)", default_plan=plan_default))
+    try:
+        RealMCTSPlanner(strategy="bogus")
+        api_ok = False
+    except ValueError:
+        api_ok = True
+    checks.append(_check("M6e", api_ok, api_ok and RealMCTSPlanner().strategy == "uct",
+                         "strategy opcional (padrão uct); desconhecida -> ValueError"))
+    return checks
+
+
 EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts}
 
 
@@ -509,12 +574,19 @@ def main(argv=None) -> int:
     if cap != "all" and cap not in CAPABILITIES:
         print(f"erro: capacidade desconhecida: {cap}", file=sys.stderr)
         return EXIT_USAGE
-    if args.criteria not in ("v1", "v2", "v3"):
+    if args.criteria not in ("v1", "v2", "v3", "m6"):
         print(f"erro: versão de critérios desconhecida: {args.criteria}", file=sys.stderr)
         return EXIT_USAGE
     selected = CAPABILITIES if cap == "all" else (cap,)
-    report = {name: (EVALUATORS[name](args.criteria) if name != "episodic" else EVALUATORS[name]())
-              for name in selected}
+    if args.criteria == "m6":
+        if cap not in ("mcts", "all"):
+            print("erro: --criteria m6 só se aplica a mcts", file=sys.stderr)
+            return EXIT_USAGE
+        selected = ("mcts",)
+        report = {"mcts": eval_m6()}
+    else:
+        report = {name: (EVALUATORS[name](args.criteria) if name != "episodic" else EVALUATORS[name]())
+                  for name in selected}
     report["criteria"] = args.criteria
     failed = [c["id"] for name in selected for c in report[name] if not c["passed"] and not c.get("informative")]
     report["failed"] = failed

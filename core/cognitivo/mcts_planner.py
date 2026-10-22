@@ -80,6 +80,12 @@ class PlanResult:
     success_probability: float           # Probabilidade estimada de sucesso
 
 
+# "uct": comportamento padrão. "nmcs": Nested Monte-Carlo Search nível 2 (Cazenave, IJCAI 2009),
+# opt-in; max_iterations = máximo de rollouts (avaliações de folha).
+STRATEGIES = ("uct", "nmcs")
+NMCS_LEVEL = 2
+
+
 class RealMCTSPlanner:
     """
     POST3: Monte Carlo Tree Search Planner — REAL e FUNCIONAL
@@ -101,7 +107,9 @@ class RealMCTSPlanner:
         causal_reasoning: Optional[Any] = None,
         episodic_memory: Optional[Any] = None,
         exploration_constant: float = 1.414,
-        max_depth: int = 5
+        max_depth: int = 5,
+        *,
+        strategy: str = "uct"
     ):
         if isinstance(exploration_constant, bool) or not isinstance(exploration_constant, Real):
             raise TypeError("exploration_constant must be a real number")
@@ -113,6 +121,13 @@ class RealMCTSPlanner:
             raise TypeError("max_depth must be an integer")
         if max_depth <= 0:
             raise ValueError("max_depth must be positive")
+        if not isinstance(strategy, str):
+            raise TypeError("strategy must be a string")
+        if strategy not in STRATEGIES:
+            raise ValueError(f"unknown strategy: {strategy!r} (expected one of {STRATEGIES})")
+        self.strategy = strategy
+        self._nmcs_budget = 0
+        self._nmcs_prefix = 0
         self.world_model = world_model
         self.causal_reasoning = causal_reasoning
         self.episodic_memory = episodic_memory
@@ -392,8 +407,76 @@ class RealMCTSPlanner:
             self._plan_effects = {}
             self._best_found = None
 
+    # ─── Estratégia opt-in: Nested Monte-Carlo Search ───────────────────────
+
+    def _nmcs_depth(self, state: Dict) -> int:
+        return len(state.get("steps_taken", [])) - self._nmcs_prefix
+
+    def _nmcs_rollout(self, state: Dict, goal: str) -> Optional[tuple]:
+        """Nível 0: um rollout aleatório (consome 1 do orçamento)."""
+        if self._nmcs_budget <= 0:
+            return None
+        self._nmcs_budget -= 1
+        actions = self._get_available_actions(state, self._nmcs_depth(state))
+        if actions and self._nmcs_depth(state) > 0:  # prefixo também é plano candidato
+            self._record_found(self._evaluate_state(state, goal), state)
+        while actions:
+            state = self._apply_action(state, random.choice(actions))
+            actions = self._get_available_actions(state, self._nmcs_depth(state))
+        reward = self._evaluate_state(state, goal)
+        self._record_found(reward, state)
+        return reward, state
+
+    def _nmcs(self, state: Dict, goal: str, level: int) -> Optional[tuple]:
+        """Nível n: em cada passo, testa cada ação com busca de nível n-1 e segue a melhor sequência."""
+        if level == 0:
+            return self._nmcs_rollout(state, goal)
+        best = None
+        while self._nmcs_budget > 0:
+            actions = self._get_available_actions(state, self._nmcs_depth(state))
+            if not actions:
+                break
+            for action in actions:
+                result = self._nmcs(self._apply_action(state, action), goal, level - 1)
+                if result is not None and (best is None or result[0] > best[0]):
+                    best = result
+            if best is None:
+                break
+            done = len(state.get("steps_taken", []))
+            best_steps = best[1].get("steps_taken", [])
+            if len(best_steps) <= done:
+                break
+            state = self._apply_action(state, best_steps[done])
+        return best
+
+    def _run_nmcs(self, goal: str, initial_state: Dict[str, Any], max_iterations: int,
+                  start_time: float) -> PlanResult:
+        self._nmcs_budget = max_iterations
+        self._nmcs_prefix = len(initial_state.get("steps_taken", []))
+        while self._nmcs_budget > 0:
+            before = self._nmcs_budget
+            self._nmcs(initial_state, goal, NMCS_LEVEL)
+            if self._nmcs_budget == before:
+                break
+        self.total_iterations += max_iterations - self._nmcs_budget
+        best = self._best_found
+        sequence = best[1][self._nmcs_prefix:] if best is not None else []
+        reward = best[0] if best is not None else 0.0
+        return PlanResult(
+            goal=goal,
+            best_action_sequence=sequence,
+            expected_reward=round(reward, 4),
+            iterations_run=max_iterations,
+            tree_nodes_created=self.total_nodes_created,
+            alternative_plans=[],
+            planning_time=round(time.time() - start_time, 4),
+            success_probability=round(min(1.0, reward * 1.1), 4)
+        )
+
     def _run_plan(self, goal: str, initial_state: Dict[str, Any], allowed: Optional[List[str]],
                   max_iterations: int, start_time: float) -> PlanResult:
+        if self.strategy == "nmcs":
+            return self._run_nmcs(goal, initial_state, max_iterations, start_time)
         # Criar raiz da árvore
         prefix = len(initial_state.get("steps_taken", []))
         root = MCTSNode(

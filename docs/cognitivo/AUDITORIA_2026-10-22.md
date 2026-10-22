@@ -133,3 +133,18 @@ nível 2, com reinícios até esgotar o orçamento.
 
 **Sucesso** exige M6a e M6b e M6c e M6d e M6e. Se o candidato falhar, os limites não serão ajustados e a falha é reportada.
 Se o candidato passar, tornar `nmcs` o padrão fica como proposta ao Pedro, não neste PR.
+
+### Registro de resultados M6
+Medido em 22/10/2026 com `python tools/cognitivo_eval.py --capability mcts --criteria m6`. Os limites pré-registrados no commit `5b9ad36` não foram alterados.
+
+| Id | Valor (`nmcs`) | Baseline (`uct`) | Resultado |
+|---|---|---|---|
+| M6a | fração no ótimo @2000 = 0,010 | 0,015 | **FALHA** |
+| M6b | regret médio @2000 = 0,1283 | 0,1377 | **FALHA** (melhora, mas acima de 0,10) |
+| M6c | M1 = 0,75 (FALHA); M2 = 0,8708; M3 v3 passa; M4 passa; M5 p95 = 0,005 s | — | **FALHA** |
+| M6d | padrão inalterado: M1–M5 e M3 v3 passam, plano com seed fixa idêntico | — | passa |
+| M6e | API compatível | — | passa |
+
+**Conclusão:** o candidato NMCS nível 2 **não passa**. Ele fica como opção opt-in (`strategy="nmcs"`), e o padrão continua `uct`, sem proposta de troca.
+Leitura: a agulha do ramo enganoso não tem sinal nos irmãos, e nenhum método supera a cota de ≈ 0,257. O NMCS também concentra orçamento no ramo que parece melhor.
+Próximas hipóteses, cada uma exigindo pré-registro novo: NRPA (Rosin 2011) e o termo de variância do SP-MCTS.

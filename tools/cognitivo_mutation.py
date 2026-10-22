@@ -38,6 +38,8 @@ PC_LEARNING = ("test_predictive_learning_contract.py",)
 
 RETRIEVAL = ("test_episodic_retrieval_contract.py",)
 
+STRATEGY = ("test_mcts_strategy_contract.py",)
+
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
              "ORDER BY m.start_timestamp DESC", tests=RETRIEVAL),
@@ -165,6 +167,11 @@ MUTATIONS = [
              'if exploration_constant < 0:', 'if exploration_constant < -1:', tests=MCTS_INPUT),
     Mutation("mcts_guard_exploration_zero_allowed", MCTS,
              'if exploration_constant < 0:', 'if exploration_constant <= 0:', tests=MCTS_INPUT),
+    Mutation("mcts_nmcs_consumes_budget", MCTS, "        self._nmcs_budget -= 1\n", "", tests=STRATEGY),
+    Mutation("mcts_nmcs_follows_best_sequence", MCTS, "result[0] > best[0]", "result[0] < best[0]", tests=STRATEGY),
+    Mutation("mcts_nmcs_dispatch", MCTS, 'if self.strategy == "nmcs":', 'if False:', tests=STRATEGY),
+    Mutation("mcts_rejects_unknown_strategy", MCTS, "if strategy not in STRATEGIES:", "if False:", tests=STRATEGY),
+    Mutation("mcts_default_strategy_uct", MCTS, 'strategy: str = "uct"', 'strategy: str = "nmcs"', tests=STRATEGY),
 ]
 
 
