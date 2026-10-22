@@ -32,6 +32,8 @@ MCTS_INPUT = ("test_mcts_planner_input_contract.py", "test_mcts_planner_extracti
 MCTS_TESTS = ("test_mcts_planner_extraction_contract.py", "test_mcts_action_contract.py")
 _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")'
 
+MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
+
 PC_LEARNING = ("test_predictive_learning_contract.py",)
 
 RETRIEVAL = ("test_episodic_retrieval_contract.py",)
@@ -55,6 +57,20 @@ MUTATIONS = [
              "alpha = self.learning_rates[0]", tests=PC_LEARNING),
     Mutation("predictive_decays_previous_mass", PREDICTIVE,
              "self._sensory_distribution[symbol] *= 1.0 - alpha", "pass", tests=PC_LEARNING),
+    Mutation("mcts_copies_caller_action_list", MCTS,
+             "untried_actions=list(allowed) if allowed is not None else (",
+             "untried_actions=allowed if allowed is not None else (", tests=MCTS_QUALITY),
+    Mutation("mcts_available_actions_every_depth", MCTS,
+             "all_actions = (list(self._plan_actions) if self._plan_actions is not None",
+             "all_actions = (list(self._plan_actions) if False", tests=MCTS_QUALITY),
+    Mutation("mcts_prefix_competes_for_best_plan", MCTS,
+             "        if depth > 0:  # prefixo", "        if False:  # prefixo", tests=MCTS_QUALITY),
+    Mutation("mcts_returns_best_found_sequence", MCTS,
+             "best_sequence = (self._best_found[1][prefix:] if self._best_found is not None",
+             "best_sequence = (self._best_found[1][prefix:] if False", tests=MCTS_QUALITY),
+    Mutation("mcts_keeps_strictly_better_found", MCTS,
+             "reward > 0 and (self._best_found is None or reward > self._best_found[0])",
+             "reward > 0", tests=MCTS_QUALITY),
     Mutation("episodic_search_rejects_boolean_and_non_integer_limit", EPISODIC, _GUARD,
              '"""Buscar episódios"""\n        if False:\n            raise TypeError("limit must be an integer")', tests=LIMITS),
     Mutation("episodic_search_rejects_negative_limit", EPISODIC,
@@ -101,7 +117,8 @@ MUTATIONS = [
     Mutation("mcts_backprop_skips_reward", MCTS,
              "current.total_reward += reward", "current.total_reward += 0.0", tests=MCTS_TESTS),
     Mutation("mcts_depth_limit_off_by_one", MCTS,
-             "if depth >= self.max_depth:", "if depth > self.max_depth:", tests=MCTS_TESTS),
+             "if depth >= self.max_depth:", "if depth > self.max_depth:",
+             tests=MCTS_TESTS + MCTS_QUALITY),
     Mutation("mcts_best_child_by_min_reward", MCTS,
              "best_child = max(root.children, key=lambda c: c.avg_reward)",
              "best_child = min(root.children, key=lambda c: c.avg_reward)", tests=MCTS_TESTS),

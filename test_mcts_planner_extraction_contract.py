@@ -3,8 +3,9 @@
 Teste dos três casos (critérios escritos antes da extração):
 (a) caso de origem: o planejador passa a existir num módulo próprio, importável sem numpy,
     vita ou o monólito, e o monólito reexporta as MESMAS classes;
-(b) não regressão: com random.seed(20261016), o PlanResult (sem planning_time) tem o mesmo
-    SHA-256 medido na main 4d54183;
+(b) não regressão: com random.seed(20261016), o PlanResult (sem planning_time) tem o
+    SHA-256 fixado; re-fixado na auditoria funcional 2026-10-22 (melhor sequência encontrada,
+    prefixos incluídos — antes ['ESCALATE', 'IGNORE_ALERT'], valor 0.367; agora ['APPLY_PATCH'], 0.867);
 (c) caso incompatível: entrada ausente (goal=None) levanta ValueError; max_depth<=0,
     exploration_constant=NaN e max_iterations<0 foram endurecidos (ValueError) em PR
     próprio; max_iterations=0 e goal vazio seguem aceitos.
@@ -21,7 +22,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-GOLDEN_SHA256 = "47c6fda003aeeaa15c649a416eea7920d8d4bb6f6b23237cf64bc4524054ea12"
+GOLDEN_SHA256 = "36d0f00a1ce3d451be52c3ea61b05706cced9b37b35b04b145514ffe4d873a80"
 SEED = 20261016
 GOAL = "secure the system"
 
@@ -74,7 +75,7 @@ class MCTSPlannerExtractionContractTests(unittest.TestCase):
 
     def test_fixed_seed_plan_matches_main(self):
         data = _plan()
-        self.assertEqual(data["best_action_sequence"], ["ESCALATE", "IGNORE_ALERT"])
+        self.assertEqual(data["best_action_sequence"], ["APPLY_PATCH"])
         text = json.dumps(data, sort_keys=True)
         self.assertEqual(hashlib.sha256(text.encode("utf-8")).hexdigest(), GOLDEN_SHA256)
 
@@ -94,12 +95,12 @@ class MCTSPlannerExtractionContractTests(unittest.TestCase):
         for depth in (1, 2):
             with self.subTest(max_depth=depth):
                 data = _plan(max_depth=depth, iterations=200)
-                self.assertEqual(len(data["best_action_sequence"]), depth)
+                self.assertTrue(1 <= len(data["best_action_sequence"]) <= depth)
 
     def test_zero_iterations_and_empty_goal_still_accepted(self):
         self.assertEqual(_plan(iterations=0)["iterations_run"], 0)
         self.assertEqual(_plan(iterations=0)["best_action_sequence"], [])
-        self.assertEqual(_plan(goal="")["best_action_sequence"], ["ESCALATE", "IGNORE_ALERT"])
+        self.assertEqual(_plan(goal="")["best_action_sequence"], ["APPLY_PATCH"])
 
 
 if __name__ == "__main__":
