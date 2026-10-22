@@ -16,14 +16,15 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Regra/checagem derivada: regra para as instruções ou checagem automática proposta.
 - Evidência: PR, SHA e/ou ID de execução do CI verificáveis (obrigatório; "evidência: ver texto" só para entradas anteriores à v3.4).
 - Derivada de: lições em uso quando esta foi escrita (ex.: L-003) ou "nenhuma".
-- Status: candidata | ativa | promovida (onde: instrução §/arquivo, ou teste/gate) | aposentada (data, motivo)
+- Status: pendente | ativa | promovida (onde: instrução §/arquivo, ou teste/gate) | aposentada (data, motivo)
 ```
 
-## Regra de evidência e ativação (v3.4)
-- **Evidência bruta obrigatória:** toda lição cita PR, SHA e/ou ID de execução do CI que outro agente consiga conferir. Lição tirada só de resumo, handoff ou memória é **rejeitada** (registro incompleto ensina regra errada — arXiv 2610.19910, preprint).
-- **Candidata → ativa:** lição nova entra com `Status: candidata`; vira `ativa` só após replay/teste dos 3 casos (caso de origem, caso anterior bem-sucedido, caso semelhante incompatível), com o resultado registrado no PR.
-- **Limite:** no máximo **15** lições ativas/promovidas em uso. Para ativar outra, aposente uma explicitamente (`Status: aposentada`, data e motivo), sem apagar o texto (15 é teto operacional escolhido para o Nexus, não resultado de paper; arXiv 2608.05810, preprint, só sustenta cautela com acúmulo sem filtro).
-- Entradas L-001..L-007 são anteriores à v3.4: mantêm o status original; o campo `Evidência` foi acrescentado só quando ela já constava no texto.
+## Regra de evidência e ativação (v3.4.1)
+- **Evidência bruta obrigatória:** toda lição cita PR, SHA e/ou ID de execução do CI que outro agente consiga conferir. Lição tirada só de resumo, handoff ou memória é **rejeitada** (política local; arXiv 2610.19910, preprint, só por analogia: mede ruído na evidência de evolução, não rejeição de handoff).
+- **Status:** `pendente` (nova, não testada) → `ativa` (passou no teste dos três casos) → `promovida` ou `aposentada`. "Promoção sugerida" é nota, não status.
+- **Teste dos três casos** (política local, sem verificação automática; não é o replay de guardas): critérios escritos no PR antes de rodar; passa só se o caso de origem fica corrigido, um caso anterior bem-sucedido não regride e um caso semelhante incompatível é rejeitado ou sinalizado.
+- **Teto de 15:** contam só `ativa` e as legadas `registrada` (equivalem a `ativa`); `pendente`, `promovida` e `aposentada` não contam. Para ativar além de 15, aposente uma explicitamente (`Status: aposentada`, data e motivo), sem apagar o texto. 15 é teto operacional escolhido para o Nexus, não resultado de paper (arXiv 2608.05810, preprint, só sustenta cautela com acúmulo sem filtro).
+- **Registros legados:** L-001..L-007 são anteriores à v3.4: mantêm o status original sem refazer o teste; o campo `Evidência` foi acrescentado só quando ela já constava no texto. Evidência que não é PR/SHA/run verificável externamente fica marcada como legada (L-006).
 
 ## Regra de promoção
 - Uma lição **repetida 2 vezes** ou de **alto risco** (estado compartilhado do GitHub, segurança, perda de dado, gate enfraquecido) deve ser promovida a regra nas instruções dos agentes **ou** a checagem automática (teste/gate).
@@ -51,7 +52,7 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Correção: #63; script de resolução endurecido (mantém só o fim do bloco vindo de `main`, une a narrativa e recusa qualquer `tests:`/`bandit_low:` fora do bloco).
 - Regra/checagem derivada: após resolver conflito em documento com bloco de estado, verificar `grep -c '^tests: ' == 1` e ausência de marcadores `<<<<<<<`/`>>>>>>>` antes do push. Candidata a checagem automática: o gate falhar se `tests:`/`bandit_low:` aparecer fora do bloco (Inferência: teria barrado o #54).
 - Evidência: #54 (merge `d074c15`), #63.
-- Status: registrada (alto risco → candidata a promoção como gate).
+- Status: registrada (legada; promoção sugerida: gate, por alto risco).
 
 ### L-003 — Pipe engoliu código de saída e marcou o #58 como pronto
 - Data: 2026-10-21
@@ -61,7 +62,7 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Correção: comandos que alteram estado do GitHub passaram a rodar com `set -euo pipefail` e sem pipes no caminho de decisão; "pronto" e merge só depois de CI 2/2 verde confirmado no head enviado.
 - Regra/checagem derivada: toda automação que faz push, marca pronto, mescla ou fecha PR roda com `set -euo pipefail`; nunca filtrar com `| grep` a saída de um passo cujo código de saída decide o próximo.
 - Evidência: #58 (conflito em `tools/targeted_mutation.py`; merge recusado pelo GitHub).
-- Status: registrada (alto risco → candidata a promoção nas instruções).
+- Status: registrada (legada; promoção sugerida: instruções, por alto risco).
 
 ### L-004 — PR do registro misturou workflow com docs (#67)
 - Data: 2026-10-21
@@ -89,8 +90,8 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Causa (Fato): invocar `bash script` não exige o bit executável do script e não exercita a forma direta documentada.
 - Correção local: restaurado somente o modo `100755` do runner, sem alterar seu conteúdo; acrescentado `test_documented_runner_is_directly_executable`, sem `bash` nem chmod no teste, sobre os 11 casos padrão.
 - Regra/checagem derivada: testar a forma de invocação documentada e incluir modos Git na identidade do diff congelado.
-- Evidência: patch `a175daa4d98704bd0c4a608d18c0517ffffdf62ace488e598b1fd481276df9fd` (reprovado).
-- Status: registrada, sem promoção permanente; patch reprovado preservado como histórico, novo diff sujeito à nova revisão final independente de Segurança.
+- Evidência: patch `a175daa4d98704bd0c4a608d18c0517ffffdf62ace488e598b1fd481276df9fd` (reprovado). Evidência legada anterior à v3.4: hash de patch local, não commit/PR/run verificável externamente.
+- Status: registrada (legada), sem promoção permanente; patch reprovado preservado como histórico, novo diff sujeito à nova revisão final independente de Segurança.
 
 ### L-007 — Formato date no schema não era aplicado pelo validador
 - Data: 2026-10-21
