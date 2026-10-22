@@ -19,6 +19,22 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = Path("docs/agentes/schema/registro_agentes.schema.json")
+_GLOB_WORK_LIMIT = 100_000
+_REGISTRY_GLOB_WORK_LIMIT = 1_000_000
+
+
+class _GlobBudgetExceeded(ValueError):
+    """An unresolved intersection must never be reported as disjoint."""
+
+
+class _GlobBudget:
+    def __init__(self, limit: int = _GLOB_WORK_LIMIT):
+        self.remaining = limit
+
+    def charge(self, amount: int) -> None:
+        if amount > self.remaining:
+            raise _GlobBudgetExceeded("orçamento de trabalho de globs excedido; reduza/divida os claims")
+        self.remaining -= amount
 
 
 def _load(path: Path) -> dict:
@@ -38,17 +54,81 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _prefix(pattern: str) -> str:
-    return pattern[:-3] if pattern.endswith("/**") else pattern
+def _glob_masks(pattern: str, alphabet: list[str], budget: _GlobBudget) -> list[int | None]:
+    """One character mask per fnmatch atom; None is a star (epsilon/loop)."""
+    masks: list[int | None] = []
+    i = 0
+    while i < len(pattern):
+        start = i
+        char = pattern[i]
+        i += 1
+        if char == "*":
+            if not masks or masks[-1] is not None:
+                masks.append(None)
+            continue
+        if char == "[":
+            # Match fnmatch's closing-bracket rules, including [!]] and [[];
+            # an unclosed '[' is literal. Translation handles ranges/negation.
+            end = i
+            if end < len(pattern) and pattern[end] == "!":
+                end += 1
+            if end < len(pattern) and pattern[end] == "]":
+                end += 1
+            while end < len(pattern) and pattern[end] != "]":
+                budget.charge(1)  # Unclosed '[' atoms can repeatedly scan a suffix.
+                end += 1
+            if end < len(pattern):
+                i = end + 1
+        matcher = re.compile(fnmatch.translate(pattern[start:i]))
+        masks.append(sum(1 << n for n, value in enumerate(alphabet) if matcher.fullmatch(value)))
+    return masks
 
 
-def overlaps(a: str, b: str) -> bool:
-    if a == b or fnmatch.fnmatch(a, b) or fnmatch.fnmatch(b, a):
-        return True
-    pa, pb = _prefix(a), _prefix(b)
-    if a.endswith("/**") and (b == pa or b.startswith(pa + "/")):
-        return True
-    return b.endswith("/**") and (a == pb or a.startswith(pb + "/"))
+def _glob_intersects(a: str, b: str, budget: _GlobBudget | None = None) -> bool:
+    # fnmatch atoms distinguish only literals and codepoint ranges. A boundary
+    # and its successor represent every induced interval, including complements
+    # and Unicode; this is a symbolic alphabet, not a sampled filename search.
+    budget = budget if budget is not None else _GlobBudget()
+    budget.charge(len(a) + len(b))
+    points = {0}
+    for char in a + b:
+        points.add(ord(char))
+        if ord(char) < sys.maxunicode:
+            points.add(ord(char) + 1)
+    alphabet = [chr(point) for point in sorted(points)]
+    budget.charge((len(a) + len(b)) * len(alphabet))
+    left, right = _glob_masks(a, alphabet, budget), _glob_masks(b, alphabet, budget)
+    any_char = (1 << len(alphabet)) - 1
+    pending = [(0, 0)]
+    seen = set()
+    while pending:
+        budget.charge(1)
+        i, j = pending.pop()
+        if (i, j) in seen:
+            continue
+        seen.add((i, j))
+        if i == len(left) and j == len(right):
+            return True
+        if i < len(left) and left[i] is None:
+            pending.append((i + 1, j))
+        if j < len(right) and right[j] is None:
+            pending.append((i, j + 1))
+        if i == len(left) or j == len(right):
+            continue
+        lm = any_char if left[i] is None else left[i]
+        rm = any_char if right[j] is None else right[j]
+        if lm & rm:
+            pending.append((i if left[i] is None else i + 1,
+                            j if right[j] is None else j + 1))
+    return False
+
+
+def overlaps(a: str, b: str, *, _budget: _GlobBudget | None = None) -> bool:
+    """Intersect fnmatch globs (/** includes parent); raise ValueError on budget exhaustion."""
+    budget = _budget if _budget is not None else _GlobBudget()
+    left = (a, a[:-3]) if a.endswith("/**") else (a,)
+    right = (b, b[:-3]) if b.endswith("/**") else (b,)
+    return any(_glob_intersects(x, y, budget) for x in left for y in right)
 
 
 def _parse_time(value: object) -> datetime:
@@ -110,11 +190,17 @@ def validate(root: Path, registro: Path, claims_path: Path, now: datetime,
             (warnings if expired_as_warning else errors).append(f"{label}: claim expirado em {cl['expira_em']}")
             continue
         active.append((label, cl))
+    budget = _GlobBudget(_REGISTRY_GLOB_WORK_LIMIT)
     for x in range(len(active)):
         for y in range(x + 1, len(active)):
             for a in active[x][1]["arquivos"]:
                 for b in active[y][1]["arquivos"]:
-                    if overlaps(a, b):
+                    try:
+                        conflict = overlaps(a, b, _budget=budget)
+                    except _GlobBudgetExceeded as exc:
+                        errors.append(str(exc))
+                        return errors, warnings
+                    if conflict:
                         errors.append(f"{active[x][0]} e {active[y][0]}: claims sobrepostos em {a} / {b}")
     return errors, warnings
 

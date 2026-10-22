@@ -15,6 +15,31 @@ O runner exige arquivo regular legível e conclui sua leitura antes de executar 
 
 O runner deve manter modo Git `100755`: `tools/agente/replay/run_replay.sh` funciona diretamente, sem prefixo `bash`. A regressão de execução direta usa a tabela padrão de 11 casos e não altera permissões para mascarar falhas.
 
+## Sobreposição de claims
+
+`python tools/agente/validar_registro.py` rejeita dois claims ativos quando seus
+globs têm uma string em comum, mesmo que o arquivo ainda não exista. Por exemplo,
+`src/a?.py` e `src/?b.py` conflitam por cobrirem `src/ab.py`. Comparar o texto de
+um padrão com o outro não basta; o validador percorre o produto dos autômatos dos
+dois padrões, com alfabeto simbólico de fronteiras de caracteres Unicode.
+
+A semântica é `fnmatchcase`: sensível a maiúsculas, `*`, `?`, classes, intervalos
+e classes negadas; `/` e ponto inicial não recebem tratamento especial, `**`
+equivale a `*`. Preserva-se a convenção adicional de `p/**` cobrir também `p`.
+Classes inválidas seguem `fnmatch`, inclusive linguagem vazia de `[z-a]`.
+Não se trata de `pathlib.glob`, expansão de shell ou inspeção do filesystem.
+Por par de padrões, a busca visita no máximo o produto dos números de posições;
+as máscaras de caracteres são construídas a partir de fronteiras dos padrões.
+O helper dispõe de 100.000 unidades de trabalho; `validate()` compartilha
+1.000.000 de unidades entre todos os pares/alternativas de claims ativos.
+Cobram-se comprimento de entrada, comprimento × tamanho do alfabeto antes das
+máscaras, passos de busca do fechamento de classes e cada retirada da pilha.
+Exaustão não significa ausência de
+conflito: o helper lança `ValueError`, a API retorna erro explícito e a CLI
+falha com código 1, pedindo reduzir/dividir os claims. É um orçamento algorítmico,
+não um prazo de tempo real nem limite do parser YAML/validação genérica do schema.
+Regressões de helper, API e CLI: `python -m unittest -v test_agent_registry_contract`.
+
 ## Dependências e limitações
 - Rodar de dentro de um clone do repositório (o padrão é `git rev-parse --show-toplevel`; pode-se definir `R=`/`REPO=`). Requer `git` ≥ 2.38 (`merge-tree --write-tree`), `rg` e `awk`.
 - `replay/casos.tsv` referencia SHAs reais do histórico (`d074c15`, merges do #57/#58/#61). Todos são ancestrais de `main`; basta um clone com histórico completo (não `--depth`). Verificado em clone novo em 21/10/2026: 11/11 casos.

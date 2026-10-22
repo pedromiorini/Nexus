@@ -4,7 +4,7 @@
 
 ## Evidência estrutural
 
-O núcleo analisado possui **27591 linhas**, **269 classes** e **878 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **2** funções com retorno constante simples e **31** marcadores de testes embutidos.
+O núcleo analisado possui **27847 linhas**, **269 classes** e **887 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **2** funções com retorno constante simples e **31** marcadores de testes embutidos.
 
 | Área | Resultado | Interpretação |
 |---|---:|---|
@@ -26,6 +26,9 @@ O núcleo analisado possui **27591 linhas**, **269 classes** e **878 funções**
 
 ## Referências quebradas ou verificadas
 
+- `test_deferred_task_queue.py`: existe.
+- `test_deferred_task_snapshot.py`: existe.
+- `test_consolidated_pr_contract.py`: existe.
 - `core/constitutional_brain.py`: existe.
 - `core/deferred_task_queue.py`: existe.
 - `core/vram_defense_guard.py`: existe.
@@ -42,6 +45,8 @@ O núcleo analisado possui **27591 linhas**, **269 classes** e **878 funções**
 - `test_mcts_action_contract.py`: existe.
 - `core/constitutional_brain.py`: existe.
 - `tools/reality_audit.py`: existe.
+- `test_dependency_profiles_contract.py`: existe.
+- `test_knowledge_graph_contract.py`: existe.
 - `test_deferred_task_snapshot.py`: existe.
 - `test_memory_sql_contract.py`: existe.
 - `test_jailbreak_detector_contract.py`: existe.

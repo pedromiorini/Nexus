@@ -4,21 +4,22 @@
 commit: HEAD
 ci_run: CURRENT_RUN
 tests: CURRENT_TESTS
-bandit_low: 131
+bandit_low: 135
 -->
 
 > This is a conservative inventory, not a clearance report. Findings remain open until reviewed and fixed or explicitly justified.
 
-- Total findings: **131**
-- Severity counts: LOW=131
+- Total findings: **135**
+- Severity counts: LOW=135
 
 ## Dispositions
 
 | Disposition | Count | Meaning |
 |---|---:|---|
-| `controlled_subprocess_review` | 4 | Mutation harness subprocess; keep inputs fixed and review execution boundaries. |
+| `controlled_subprocess_review` | 6 | Mutation harness subprocess; keep inputs fixed and review execution boundaries. |
 | `embedded_demo_assert_review` | 111 | Assertions inside the legacy __main__ demonstration block; keep them out of production contracts and migrate incrementally. |
-| `simulation_only_random_review` | 16 | Randomness reviewed as simulation/heuristic behavior; keep it out of secrets and security decisions. |
+| `manual_review` | 1 | No project-specific disposition; manual review required. |
+| `simulation_only_random_review` | 17 | Randomness reviewed as simulation/heuristic behavior; keep it out of secrets and security decisions. |
 
 ## Findings
 
@@ -41,7 +42,11 @@ Agrupados por escopo (sem números de linha, que mudam a cada edição).
 | `B311` | LOW | `core/constitutional_brain.py` | `RealMCTSPlanner._simulate` | 1 | `simulation_only_random_review` |
 | `B311` | LOW | `core/constitutional_brain.py` | `RealMentalSimulationSystem.rollout_planning` | 1 | `simulation_only_random_review` |
 | `B311` | LOW | `core/constitutional_brain.py` | `RealRSI.optimize_step` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `tools/math_verifier_holdout.py` | `freeze` | 1 | `simulation_only_random_review` |
+| `B404` | LOW | `tools/math_verifier_holdout.py` | `<module>` | 1 | `controlled_subprocess_review` |
 | `B404` | LOW | `tools/state_manifest.py` | `<module>` | 1 | `controlled_subprocess_review` |
 | `B404` | LOW | `tools/targeted_mutation.py` | `<module>` | 1 | `controlled_subprocess_review` |
+| `B603` | LOW | `tools/math_verifier_holdout.py` | `_git_revision` | 1 | `controlled_subprocess_review` |
 | `B603` | LOW | `tools/state_manifest.py` | `_git` | 1 | `controlled_subprocess_review` |
 | `B603` | LOW | `tools/targeted_mutation.py` | `run_tests` | 1 | `controlled_subprocess_review` |
+| `B607` | LOW | `tools/math_verifier_holdout.py` | `_git_revision` | 1 | `manual_review` |

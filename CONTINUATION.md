@@ -4,10 +4,385 @@
 commit: HEAD
 ci_run: CURRENT_RUN
 tests: CURRENT_TESTS
-bandit_low: 131
+bandit_low: 135
 -->
 
+## Revalidação local da composição sobre a3f929f — 2026-10-22
+
+**Identidade:** clone independente `/workspace/Nexus-pr46-revalidation-a3f929f-20261022`,
+branch `local/pr46-revalidation-a3f929f-20261022`, HEAD âncora da #46
+`f3044badb1f16eb4936dde6db17087f6bc96d049`, main/MERGE_HEAD
+`a3f929f046d73461eb1e6b5169dce428c523f6f6`. Merge local pendente,
+sem commit. HEAD não identifica os bytes compostos: tree, patches completos contra
+ambos os pais, modos e hashes constam em
+`/workspace/pr46-revalidation-a3f929f-evidence-20261022/provenance.json` e
+`candidate-files.json`. O manifesto local distingue o HEAD âncora da candidate_tree.
+
+**Contrato e resolução:** o merge fresco teve dez conflitos, registrados em
+`merge-tree.txt` e `conflicted-paths.txt`. Comparados os nove commits novos de main:
+sete paths alterados, nenhum delta novo no núcleo, dependências ou catálogo de
+mutação contra `a663a55`. Resoluções anteriores foram reconciliadas com essa
+comparação explícita, preservando D-029 temporal e D-034/D-035 da main, união de
+mutações/aliases e perfil compartilhado alinhado ao lock. Core, preflight atômico
+(incluindo `self`, `u_of_edge`, `v_of_edge`), guardas fail-closed, interseção real
+de globs/orçamento e regressões permanecem byte a byte os da tree `697923975efbee368dece179b9139e840919d785`.
+A v3.4.1, registro e replay #74 permanecem os da main exata; L-001–L-007 usam o
+texto atualizado de main, L-008–L-010 foram preservadas uma única vez como histórico
+local, sem promoção. Não houve conflito novo de código exigindo adoção de semântica
+sem evidência. O caso `pre deadbeef` continua sendo rejeição exercitada pelo guard;
+SHA ausente/falha de worktree em `res`/`merge` é entrada inválida rc 4.
+
+**Evidência nova:** comandos e resultados medidos nesta rodada estão em
+`/workspace/pr46-revalidation-a3f929f-evidence-20261022/run-gates.sh`,
+`gates.tsv`, arquivos `.command`/`.log`, `STATE_MANIFEST.local.json` e
+`state-consistency.json`. As sentinelas são resolvidas desse manifesto local;
+`ci_run=not_ci`, nunca CI hospedado. A situação remota e os resultados de CI #74
+foram fornecidos pelo owner como contexto; não se atribuem a esta nova tree.
+A única revisão independente final é solicitada sobre a tree congelada e seus
+dois diffs exatos; seu resultado externo não é antecipado nesta documentação.
+
+**Limites e autorização:** composição/revalidação local somente. Sem commit, push,
+PR ou merge remoto; nenhum ref do repositório compartilhado é movido. Os dois
+checkouts protegidos, inclusive índice/merge e arquivos não rastreados, são
+atestados por inventários completos antes/depois. A main ausente localmente foi
+obtida por fetch somente-leitura no clone independente, sem remote persistente.
+Gates são contratos de software e sondas sintéticas, não capacidade geral ou
+clearance de segurança. O ambiente opcional e os skips são registrados no manifesto;
+não há validação GPU/FAISS real, matriz Python ou cancelamento/transação geral.
+`preflight_rotina.sh` continua sem examinar untracked; orçamento de globs é limite
+operacional aproximado, não garantia formal. O alias histórico do catálogo de
+mutação não representa defeito independente adicional.
+
+**Delimitação histórica:** todos os checkpoints e pareceres abaixo, inclusive
+548/113 da tree 6979 e BLOCKs anteriores, são preservados como história de suas
+próprias árvores. Não validam a composição sobre a3f929f e não se somam às medições
+atuais. Não abortar nem concluir automaticamente qualquer merge preservado.
+
+
+## Correção local da colisão self — 2026-10-21
+
+**Identidade/escopo:** somente `/workspace/Nexus-pr46-compose-main-20261021`,
+branch `local/pr46-compose-main-a663a55-20261021`, HEAD âncora
+`f3044badb1f16eb4936dde6db17087f6bc96d049`, MERGE_HEAD
+`a663a55a560e00ae818e9c8f60aacd4cf9bd93f7`. Partida: tree
+`972747bebe1b9a16d79b158ab11caf9365cd618a`, BLOQUEADA pela revisão integral
+anterior apesar dos 545 testes/112 mutantes. HEAD não identifica o composto;
+árvore final, patches binários contra partida e ambos os pais, modos e hashes
+ficam em `/workspace/pr46-composition-evidence-20261021/self-collision-fix/`.
+Merge permanece pendente, staged e sem commit. Nenhum push, PR, fetch real,
+merge remoto, outra worktree ou `/workspace/Nexus` foi operado nesta rodada.
+
+**Contrato e discriminação:** `properties={'self': 'opaque'}` deve provocar
+TypeError de preflight no backend NetworkX antes de qualquer mutação, não o
+TypeError tardio de `DiGraph.add_edge`. Hipóteses discriminadas por snapshots:
+mera rejeição do backend não preservava o estado; tratar `self` como valor opaco
+NetworkX também não era válido. A causa reproduzida foi omitir o receptor bound
+da lista de parâmetros reservados. Acrescentado somente `self` à guarda
+existente; preservados o snapshot/validação de chaves, demais parâmetros,
+valores opacos válidos e contrato legado do fallback. Três métodos novos cobrem
+vazio/populado × com/sem store, predicado funcional com endpoints existentes
+(inclusive ausência de chamadas a `assert_fact`/`add_edge`) e fallback positivo.
+Os arquivos de shell, interseção glob com orçamento fail-closed e seus contratos
+permanecem idênticos à partida. O catálogo mantém os 112 nomes anteriores,
+ajusta a âncora existente e acrescenta remoção específica da guarda de `self`.
+
+**RED/GREEN e gates:** `red.command`/`red.log`: 7 métodos executados, 5 falhas
+de subcasos (quatro combinações de estado/store e um fechamento funcional),
+antes da mudança do núcleo. `green.log`: 53/53 contratos do grafo/temporal.
+`run-gates.sh`, comandos `*.command`, saídas `*.log` e `gates.tsv`: ambiente
+externo Python 3.11.16 com pins do lock, grupo focado **117/117**, suíte sob
+cobertura e resumo **548/548**, 0 falhas/skips/XPASS. Integração separada:
+**30 aprovações + 1 skip FAISS**, sem IDs ausentes/inesperados/conflitantes/duplicados.
+Cobertura CLI: fila 91%, VRAM 94%, temporal 94%, Vita 76%, núcleo 70%, acima
+dos pisos 90/90/90/70/62. Mutação: **113 declaradas/aplicadas/mortas**, zero
+sobreviventes/timeouts/não aplicadas; aliases históricos não representam defeitos
+independentes. Bandit: **135 LOW, 0 MEDIUM/HIGH, 0 erros**, exit bruto 1
+separado da política aprovada. Ruff, compileall, actionlint, zizmor offline,
+requirements dry-run, realidade, registro, replay 11/11 e controle adulterado,
+triagem, B101 e gaps passaram. CLIs sintéticas de benchmarks v1/v2 com seed
+20261016 executadas como gates de software; não são validação externa/cognitiva.
+
+**Documentação e revisão:** 517/96 foi identificado explicitamente como
+checkpoint histórico em NEXUS_EVIDENCE e NEXUS_KNOWLEDGE, preservando a origem;
+545/112 também permanece histórico e bloqueado. Pareceres independentes e
+conferência da tree final ficam em `review-integral/`, com o estado exato no
+handoff externo. A revisão BLOCK de `972747` não foi convertida em aprovação;
+aprovação integral não decorre dos gates nem de parecer limitado a um patch.
+`final-checks.sh` sela paths explícitos, confere refs/identidade/correções
+preservadas e gera atestação local com `run_id=not_ci`, sem fabricar CI hospedado.
+
+**Limites:** preflight de entradas conhecidas não é transação contra falhas
+arbitrárias de backend, objetos customizados ou esgotamento de recursos.
+O descompasso writer/reader de suíte vazia permanece fail-closed, sem mudança:
+writer emite falha válida de zero testes, leitor a classifica `invalid_summary`;
+não há evidência de necessidade de ampliar este patch para isso. Orçamento de
+globs permanece aproximado, não prazo real/validação genérica YAML/schema.
+Whitespace EOF herdado das instruções main permanece ressalva separada, sem
+limpeza lateral ou alteração de seu hash. Sem matriz Python, GPU/FAISS real,
+clearance de segurança, CI hospedado ou evidência de capacidade geral.
+
+## Correção local da interseção de claims — 2026-10-21
+
+**Identidade:** candidata exclusiva `/workspace/Nexus-pr46-compose-main-20261021`,
+branch `local/pr46-compose-main-a663a55-20261021`, HEAD âncora
+`f3044badb1f16eb4936dde6db17087f6bc96d049`, MERGE_HEAD
+`a663a55a560e00ae818e9c8f60aacd4cf9bd93f7`. Partida: tree bloqueada
+`d60f157162d6d79a9543b73d1047a05b4f44bef2`. HEAD não identifica o composto;
+nova tree, patches, hashes, modos, comandos e logs ficam externamente em
+`/workspace/pr46-composition-evidence-20261021/glob-overlap-fix/`.
+Nenhum commit, push, PR, fetch real, alteração remota ou operação de outra worktree.
+
+**Contrato/correção:** bug herdado de main: `src/a?.py` e `src/?b.py` têm a
+testemunha `src/ab.py`, mas o helper, API e CLI aprovavam os claims ativos.
+Comparação textual substituída por interseção de autômatos fnmatchcase, com
+alfabeto simbólico Unicode; não enumera arquivos existentes. Preserva `/**`
+incluindo o pai, expiração e controles disjuntos. As três correções anteriores
+e seus contratos permanecem byte a byte idênticos à tree de partida. Claim
+temporário Axis encerrado, sem alteração final de CLAIMS.yaml ou das instruções.
+
+**RED/GREEN:** regressões de helper, API, CLI e oracle limitado; 26 métodos finais
+da primeira etapa falharam na implementação antiga em cópia temporária
+(1.250 falhas de subcasos). A revisão independente da primeira implementação
+não encontrou divergência semântica nos casos exercitados, mas apontou risco P2
+de custo quadrático sem limite. Acrescentado orçamento de 100.000 unidades por
+helper e 1.000.000 compartilhadas por validação, incluindo scanner de classes;
+exaustão é erro explícito, nunca ausência de conflito. Cinco métodos de recursos
+também têm RED/GREEN. A rodada intermediária interrompida com exit 130, incluindo
+mutation baseline RED do scanner durante a inclusão do teste, está preservada
+em `pre-scanner-gates/`; não serve de atestação da versão final.
+
+**Evidência atual:** Python 3.11.16 e ambiente externo com pins do lock;
+`run-gates.sh`, `*.command`, `*.log` e `gates.tsv`: contratos do registro **31/31**,
+grupo focado **114/114**, suíte **545/545**, 0 falhas/skips/XPASS. Integração
+separada: **30 aprovados + 1 skip FAISS**, sem IDs ausentes/inesperados/conflitantes.
+Cobertura CLI: fila 91%, VRAM 94%, temporal 94%, Vita 76%, núcleo 69%; pisos
+90/90/90/70/62 satisfeitos. Mutação: **112 declaradas/aplicadas/mortas**, zero
+sobreviventes/timeouts/não aplicadas; preservados os 103 nomes anteriores e seu
+alias histórico, com 9 novos (contagem não representa defeitos independentes).
+Bandit **135 LOW, 0 MEDIUM/HIGH, 0 erros**, exit bruto 1 separado da política.
+Ruff, compileall, actionlint, zizmor offline, requirements dry-run, realidade,
+registro, replay 11/11 e controle adulterado, triagem, B101 e gaps passaram.
+
+**Revisão e limites:** parecer adicional em `review-budget/report.md`, somente
+sobre os hashes finais de implementação/testes: 31 contratos aprovados, sondagens
+quadráticas falharam fechadas, sem bypass relevante encontrado. Não é aprovação
+independente da nova tree inteira; o BLOCK de `d60f157` não foi transferido nem
+convertido em aprovação. `final-checks.sh` faz atestação/selagem local, sem CI
+hospedado. Whitespace EOF herdado das instruções permanece ressalva separada.
+Orçamento é custo algorítmico aproximado, não prazo real, limite do parser YAML,
+validação genérica do schema ou garantia de recursos/segurança geral. Sem matriz
+Python, GPU/FAISS real ou evidência de capacidade. Merge continua pendente e
+composto staged, sem autorização para commit/publicação.
+
+## Correção local dos três bloqueios da composição #46 + main — 2026-10-21
+
+**Identidade:** mesma worktree `/workspace/Nexus-pr46-compose-main-20261021` e branch
+`local/pr46-compose-main-a663a55-20261021`, HEAD âncora
+`f3044badb1f16eb4936dde6db17087f6bc96d049`, MERGE_HEAD
+`a663a55a560e00ae818e9c8f60aacd4cf9bd93f7`. Revisão independente anterior BLOCK
+sobre tree `5d766cfa057861f4533d4d333c5bd35ffd5f3b1f`: os três achados herdados
+foram reproduzidos e corrigidos somente na candidata local, sem abortar o merge,
+commit, push, fetch real, alteração remota ou operação de outras worktrees.
+HEAD não identifica este composto; tree final, patches, modos e hashes ficam em
+`/workspace/pr46-composition-evidence-20261021/fixes-review-block/`.
+
+**Contrato e correção:** `RealKnowledgeGraph.add_relation` faz snapshot e valida
+as chaves usadas como kwargs NetworkX antes do ledger/projeção; rejeita chaves
+não-string e colisões com `u_of_edge`/`v_of_edge`, mantendo propriedades opacas
+válidas e comportamento do fallback. Testa estado vazio e populado, com/sem store,
+e preservação do fechamento temporal funcional. `predeleg.sh` distingue sucesso,
+conflito (exit 1 com tree e lista demonstrados) e falha operacional: erro/saída
+ambígua aborta com 3, conflito de código mantém 2. `preflight_rotina.sh` exige
+sucesso de `git status` e aceita apenas `ok|blocked` (default `ok` preservado),
+abortando sem fetch nos casos inválidos. Scripts continuam executáveis.
+
+**Fato/evidência local:** RED do grafo: 4 métodos/18 falhas de subcasos;
+RED shell: 12 métodos/4 falhas; GREEN focado do grafo com contratos existentes:
+26/26, shell 12/12. Novos contratos somam 16 métodos. Revalidação ampla em Python
+3.11.16 com o venv externo e pins do lock da composição: **533 executados/aprovados,
+0 falhas/skips/XPASS**; integração separada **30 aprovações + 1 skip FAISS**, sem
+IDs ausentes/inesperados/conflitantes. Cobertura CLI: fila 91%, VRAM 94%, temporal
+94%, Vita 76%, núcleo 70%, acima dos pisos. Mutação: **103 declaradas/aplicadas/mortas,
+0 sobreviventes/timeouts/não aplicadas**; 7 mutantes novos, preservando os 96 nomes
+anteriores (incluem um par de aliases históricos da mesma alteração semântica).
+Bandit **135 LOW, 0 MEDIUM/HIGH, 0 erros**; código bruto 1 mantido separado da
+política aprovada. Ruff, compileall, actionlint, zizmor offline, requirements dry-run,
+registro, replay 11/11 e rejeição de expectativas adulteradas, B101, gaps e triagem
+passaram. Relatórios de realidade regenerados. Comandos e saídas: `run-gates.sh`,
+`*.command`, `*.log`, `gates.tsv`; finalização em `final-checks.sh` e respectivos logs.
+
+**Limites e handoff:** a revisão BLOCK anterior permanece histórica, não equivale
+a aprovação independente desta nova árvore. Atestação final identifica explicitamente
+composição não commitada e gates locais, sem fabricar CI hospedado. Diagnóstico
+integral de whitespace mantém a linha vazia EOF das instruções herdadas de main;
+nenhuma limpeza lateral das instruções/hashes. Preflight não oferece transação
+contra falhas arbitrárias de backend, recursos ou objetos customizados. Sem matriz
+Python, GPU/FAISS/SentenceTransformers real, clearance de segurança ou alegação de
+capacidade geral. Preservar o merge pendente; não publicar/commitar automaticamente.
+
+
+## Composição local candidata da #46 com main — 2026-10-21
+
+**Identidade e contrato:** worktree `/workspace/Nexus-pr46-compose-main-20261021`, branch
+`local/pr46-compose-main-a663a55-20261021`; HEAD/base da candidata
+`f3044badb1f16eb4936dde6db17087f6bc96d049`, incorporando por merge local sem commit
+`a663a55a560e00ae818e9c8f60aacd4cf9bd93f7`; merge-base
+`d435083bb4c893a58128cee6cfa00f65bba7fe02`. O código testado inclui modificações não
+commitadas: HEAD sozinho NÃO identifica a composição. Diff, modos e hashes da árvore
+ficam em `/workspace/pr46-composition-evidence-20261021/`. Não há push, alteração de
+main ou de PR, rebase das fontes, novo commit ou CI remoto desta composição.
+
+**Resoluções:** decisões preservadas dos dois lados; somente D-029 main do contador
+passa a D-034 e D-029 main B101 a D-035, com busca de todas as referências. D-029
+temporal da PR e D-030–D-033 permanecem. Perfil CI/dev compartilhado da #46 mantido,
+pins alinhados ao lock main: numpy 2.4.6, coverage 7.16.2, hypothesis 6.170.5,
+bandit 1.9.4, ruff 0.17.1, networkx 3.6.1. Sem re-resolução do lock: hashes e pins
+dos pacotes main preservados; o comentário numpy mantém a proveniência dos dois
+arquivos de entrada. Catálogo de mutações é a união de nomes dos dois lados;
+`queue_capacity_guard` e `queue_max_attempts_positive` são aliases históricos da
+MESMA alteração semântica, com âncora restrita ao construtor para evitar o restore.
+Timeout permanece inconclusivo e bloqueia o gate. Os 96 nomes não são 96 defeitos
+independentes. Demais mudanças de main auto-mescladas foram testadas em conjunto.
+
+**Evidência real desta tentativa:** ambiente novo externo Python 3.11.16, lock
+instalado com hashes; executor `run-gates.sh`, comandos `*.command`, logs `*.log`
+e códigos em `gates.tsv` no diretório externo acima. Suíte completa sob cobertura e
+resumo final: **517 executados/aprovados, 0 falhas, 0 skips, 0 XPASS**. Integração
+separada: **30 aprovações + 1 skip FAISS**, sem IDs ausentes/inesperados/conflitantes.
+Cobertura (arredondada CLI): fila 91%, VRAM 94%, temporal 94%, Vita 76%, núcleo 69%,
+todos acima dos pisos 90/90/90/70/62. Mutation: **96 declaradas/aplicadas/mortas,
+0 sobreviventes, 0 timeouts, 0 não aplicadas**, com o alias semântico já explicado.
+Bandit novo: **135 LOW, 0 MEDIUM/HIGH, 0 erros**; exit 1 bruto por LOW registrado,
+política de severidade separada aprovada. B101 e gaps aprovados (0 pass-only,
+0 NotImplementedError). Ruff, compileall, actionlint 1.7.12, zizmor 1.31.1 offline,
+contratos focados, requirements dry-run, registro e replay de 11 casos aprovados;
+expectativas adulteradas foram rejeitadas. Relatórios de realidade regenerados
+pela árvore composta e estabilidade conferida na finalização.
+
+**Falha observada e correção documental:** a primeira execução completa terminou
+com código 1 SOMENTE em `security-check`, porque o documento provisório continha
+história fora do formato canônico. O relatório foi regenerado pelo scanner atual;
+os snapshots dos dois commits foram preservados abaixo e externamente, sem somar
+contagens. O check canônico e os contratos documentais são reexecutados na
+finalização; os códigos originais não são apagados. `git diff --check HEAD` também
+identifica uma linha vazia no EOF de `docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md`,
+herdada byte a byte de main. Não alteramos as instruções/hashes do registro por
+limpeza alheia à composição; a checagem contra main nesse path é limpa. O gate de
+whitespace do primeiro executor inspecionou apenas unstaged: não prova o diff total.
+
+A primeira atestação também rejeitou `SECURITY_TRIAGE.md: bandit_low: 131`:
+o gerador canônico preserva o bloco existente, mesmo ao regenerar os findings.
+Corrigido somente esse marcador para 135, a medição atual. O manifesto e o log
+rejeitados foram preservados como `STATE_MANIFEST.first-rejected.json` e
+`state-consistency.first-rejected.json` na evidência externa. Nova finalização,
+atestação e congelamento substituem aquela identidade provisória; nenhuma mudança
+de código, teste ou resultado do scanner foi necessária.
+
+**Benchmarks e limites:** v1/v2 sintéticos herdados, seed 20261016, sem novo holdout.
+v1 mantém `unsupported_interface` para POMDP. v2 128/128 dentro da tolerância
+1e-12, erro máximo 2.7755575615628914e-16; controles inválidos rejeitados 4/4,
+taskset SHA-256 `232371d0e8e948f4b0a004261e3d271b1003aed8d0de8c931d3439f9d370d025`.
+Os JSONs dizem `source_revision=unrecorded-local`; a identidade real é o patch e a
+atestação externa, não um benchmark independente nem prova de capacidade geral.
+Sem GPU real, FAISS, SentenceTransformers, matriz Python ou auditoria externa.
+Checks antigos da PR NÃO validam esta composição. O manifesto nativo usa o HEAD
+âncora; o manifesto local anotado e a proveniência externa explicitam árvore suja,
+patch e ausência de CI. `clean_required` do gerador não é comprovação de limpeza.
+A revisão independente única de QA ainda será solicitada pela coordenação sobre
+o diff final congelado; nenhuma revisão independente foi realizada nesta tentativa.
+
+
+
+## Registro histórico (não estado atual): revalidação local da #46 após a #51 — 2026-10-19
+
+**Separação de estados:** a base desta rodada é o commit de `main` integrado pela #51,
+`d435083bb4c893a58128cee6cfa00f65bba7fe02`, confirmado no objeto local `origin/main`.
+O `main` local permanece em `7c8a187c1465c6db39777f5e9dc16efb112e1121` e não foi movido.
+O head draft da #46 é `f025204339b3dc5ae1f345e98be7f6f7fbcb2498`, branch
+`audit/consolidated-38-45-20261018`, worktree original limpa confirmada; merge-base
+`812ebd02b0c82ecc3169d620e36d25592b1d6727`. O candidato vive somente em
+`audit/reconcile-pr46-after-ci-20261019`, worktree `/workspace/Nexus-pr46-revalidated-20261019`.
+Não representa `main`, atualização da PR ou CI remoto. A árvore original suja
+`/workspace/Nexus` e todas as worktrees/refs preexistentes devem permanecer intactas.
+
+**Contrato e resolução:** merge local `--no-commit --no-ff` do head exato da #46 sobre
+`d435083`; único conflito em `CONTINUATION.md`, resolvido preservando ambos os
+históricos (#51 e composição/VRAM), sem escolher contagens antigas de `main`.
+O workflow auto-mesclou: retém `push.branches: [main]`, `pull_request` sem filtro
+de destino, ausência de `pull_request_target`, permissões, pins e steps herdados.
+Comparado ao head #46, apenas o workflow (remoção do filtro da #51) e este documento
+mudam; código, testes, lock e demais arquivos são idênticos. #47–#50 não foram incorporadas.
+
+**Validação atual:** Python 3.11.16 em venv novo externo, lock instalado com
+`uv pip install --require-hashes -r requirements-ci.lock`, NetworkX 3.6.1 presente.
+Executor e comandos exatos em `/workspace/pr46-validation-20261019/validate.sh`;
+logs, comandos por etapa, relatórios e `gates.tsv` no mesmo diretório.
+- Contratos focados, `coverage run --branch -m unittest discover -p 'test_*.py'`
+  e `python tools/test_summary.py --output test-summary.json`: **416/416**, zero falhas,
+  skips e XPASS na suíte completa. Integração separada via
+  `NEXUS_INTEGRATED_SUMMARY=integrated-summary.json coverage run --append --branch core/constitutional_brain.py`:
+  **30 aprovadas + 1 skip FAISS**, zero IDs faltantes/inesperados/conflitantes.
+- Cobertura branch: fila **91%**, VRAM **94%**, temporal **94%**, Vita **76%**, núcleo
+  **69%**, acima dos pisos 90/90/90/70/62. `tools/targeted_mutation.py`: **84/84 mortas**;
+  suplemento externo VRAM: **10/10 mortas**, zero sobreviventes/timeouts/não aplicadas.
+- Ruff 0.16.10, actionlint 1.7.12, Zizmor 1.31.1 offline, compileall, dry-run dos
+  requisitos constitucionais, realidade sem diff, triagem canônica, auditor B101 e
+  auditor de lacunas aprovados. Bandit 1.9.4: **135 LOW, zero MEDIUM/HIGH e erros**;
+  saída 1 esperada por LOW, política de severidade conferida separadamente.
+- Benchmarks sintéticos herdados, seed `20261016`: v1 mantém `unsupported_interface`
+  na trilha POMDP e limitações dos controles negativos; v2 **128/128** dentro de
+  `1e-12`, erro máximo `2.7755575615628914e-16`, controles rejeitados **4/4**,
+  taskset SHA-256 `232371d0e8e948f4b0a004261e3d271b1003aed8d0de8c931d3439f9d370d025`.
+  Os JSONs iniciais usam `unrecorded-local`; árvore congelada e atestação externa
+  fornecem a proveniência desta execução. Não houve novo holdout independente.
+- O primeiro comando externo de inventário de versões teve erro de sintaxe de
+  f-string; corrigido apenas no executor externo e reexecutado com êxito em
+  `environment-retry.log`. Nenhum gate de código falhou ou foi ignorado.
+
+**Checks remotos e limites:** a consulta GitHub desta sessão foi bloqueada por acesso
+não habilitado; não há reconfirmação remota nova. Conforme o handoff recebido (não
+nova evidência): push de `main` após #51 aprovado; #46 OPEN/draft, CONFLICTING,
+checks antigos 2/2 success; #47–#50 OPEN/draft, bases empilhadas e sem checks reportados.
+Checks antigos não validam este candidato. A revisão independente única incide
+sobre a árvore/diff congelados; parecer, hashes e SHA do commit local ficam fora
+da árvore, em `/workspace/pr46-validation-20261019/`, para evitar autorreferência.
+O manifesto final será gerado pós-commit, com `ci.run_id=not_ci`; `gates_status=success`
+refere-se somente aos gates locais concluídos, não a um job GitHub.
+Não há validação de GPU real, FAISS, matriz de outras versões Python ou segurança
+externa; métricas sintéticas não demonstram capacidade geral ou prontidão para produção.
+
+**Próximo passo exige autorização:** no máximo commit local desta composição; sem
+push, publicação, rebase remoto, atualização de PR, merge remoto ou alteração de `main`.
+Antes de qualquer ação futura, mostrar payload, novo head/base, diferenças e checks
+atuais ao Nexus e obter autorização individual. A #46 e toda a cadeia permanecem drafts
+remotos inalterados; os registros abaixo são históricos, não estado de `main`.
+
+
+## Histórico da composição local anterior — 2026-10-18
+
+Candidato isolado em `audit/consolidated-38-45-20261018`, baseado exatamente em
+`812ebd02b0c82ecc3169d620e36d25592b1d6727` (`origin/main` local inventariado).
+Inclui os heads exatos das PRs #38–#45 por merges locais; não é um merge em
+`main`, publicação ou execução de CI remoto. #12–#14 ficam fora: #41 já alinha
+os perfis e o lock, e nenhum dos três bumps é dependência funcional obrigatória.
+Inventário, contratos, comandos, resultados e plano seguro: [AUDIT_COMPOSITION.md](AUDIT_COMPOSITION.md).
+
+Os registros abaixo de outras branches/rodadas são **históricos**, não resultados
+da composição. Os marcadores atuais refletem somente a suíte combinada; `HEAD`
+é resolvido pelo manifesto pós-commit, com `ci_run=not_ci`. Não somar contagens
+isoladas nem atribuir evidência sintética a capacidade geral.
+
+### Follow-up documental da revisão independente — 2026-10-18
+
+Sobre o candidato congelado `3ddc68d06853ba211bb6c04a02743565c28bd19c`, corrigidas duas questões documentais concretas: a tabela do README agora aponta para a composição local e seus resultados, não para o manifesto histórico `5b8bed8`; a docstring de `RealKnowledgeGraph` preserva os números legados `>93%`, `>95%` em 32k e `<45ms`, mas os classifica explicitamente como não verificados, sem task set, comando, ambiente ou proveniência. Não houve mudança de lógica, assinaturas, testes ou catálogo de mutações. A AST é idêntica à de `3ddc68d` ao excluir somente essa docstring.
+
+Verificação do follow-up: `bash /workspace/nexus-consolidation-evidence/doc-followup/verify.sh`, no mesmo ambiente Python 3.11.16 com lock. Suíte completa **416/416**, sem falhas/skips/XPASS; integração **30 aprovadas + 1 skip FAISS**, sem IDs faltantes/inesperados/conflitantes; Ruff, compileall, realidade regenerada, triagem e `git diff --check` aprovados. Os relatórios de realidade versionados apenas acrescentam as três referências de testes do README. Comandos, logs e resumos separados em `/workspace/nexus-consolidation-evidence/doc-followup/`, sem sobrescrever a evidência anterior.
+
+Cobertura, Bandit, 84 mutantes canônicos e suplemento VRAM de 10 mutantes **não foram medidos novamente** neste follow-up documental; os resultados continuam atribuídos a `3ddc68d` em `AUDIT_COMPOSITION.md`. A revisão independente deve ser reaberta somente sobre este novo diff congelado; seu parecer e o SHA final ficam no diretório externo do follow-up. Permanecem proibidos publicação, alteração de `main`, ações sobre PRs e merge remoto; preservar `/workspace/Nexus` sujo e todas as refs de origem.
+
 > Handoff operacional versionado para continuidade entre agentes Manus.
+
+
 
 ## Rodada local — Axis e last_seen canônico — 2026-10-21
 
@@ -44,7 +419,7 @@ bandit_low: 131
 ## Rodada local — contador de testes derivado (D1) — 2026-10-21
 
 - **Base:** `d435083` (`main`), branch `fix/handoff-counter-decoupling`, sem push.
-- **Mudança:** `tests: CURRENT_TESTS` nos quatro blocos `NEXUS-CURRENT-STATE`; sentinelas restritas ao próprio campo (ver D-029). PRs futuros **não** precisam editar o contador.
+- **Mudança:** `tests: CURRENT_TESTS` nos quatro blocos `NEXUS-CURRENT-STATE`; sentinelas restritas ao próprio campo (ver D-034). PRs futuros **não** precisam editar o contador.
 - **Comandos:** ruff 0.16.10 (lock) ok; compileall ok; reality audit sem diff; `unittest discover` 309 OK; suíte integrada 30 aprovadas/1 ignorada; mutação 58/58; Bandit 131 LOW; `state_manifest.py` + `state_consistency_audit.py` → `pass`; com literal `tests: 303` injetado → `fail` (conflito detectado).
 - **Limitações:** Python 3.13.5 local (CI usa 3.11); CI hospedado, actionlint e zizmor não executados nesta rodada.
 ## Rodada local — descoberta unittest vazia falha fechada — 2026-10-20
@@ -286,14 +661,89 @@ Validação local no commit de código `4e971f38854dedecac68a55f08125cde01d27992
 - **Limites:** validação local em ambiente já disponível, sem reinstalação do lock; não equivale ao ambiente hospedado. Cobertura, mutation e benchmarks não foram reexecutados para esta exclusão de filtro; código Python e steps não mudaram. O filtro removido permite o disparo, mas não garante execução diante de conflitos, políticas, aprovação de forks ou outros bloqueios do provedor. PRs draft não ganham novos tipos de evento com esta mudança. Não há execução retroativa garantida para PRs abertas, nem alteração das PRs #47–#50. Um run remoto só poderá ocorrer após push/PR autorizado e evento elegível; nenhum push, PR, merge ou auto-merge foi feito.
 - **Revisão:** congelar este diff de dois arquivos para uma única revisão independente de CI/security; reabrir somente por achado concreto. Se gates e revisão passarem, produzir somente commit local. O hash final do commit e o resultado da revisão ficam no handoff externo, evitando autorreferência no próprio commit.
 
-## Estado herdado (histórico; não é a validação desta rodada)
+## Histórico: integração local das duas correções VRAM — 2026-10-18
 
-- **Base auditada nesta rodada:** `main` estava no merge documental da PR #35, commit `047c4ba6bb4fb22e3dbe3251c8aee9bf986e0583`; a base funcional permanece no merge da PR #34 (`51373dc77179e4edd094df14290f91aa9c8d8060`), que contém as PRs #32, #33 e #34.
-- **Política de integração:** mudanças futuras devem permanecer em branches isoladas e ser mescladas somente mediante autorização específica.
-- **D-026 implementada:** `RealEpisodicMemory.search_episodes` rejeita `bool`/tipos não inteiros e limites negativos antes de lock/SQL; `limit=0` retorna vazio sem consulta e valores positivos preservam o fluxo anterior, sem novo teto.
-- **Hardening herdado:** D-024 (fallback de cache hit) e D-025 (snapshot JSON anti-TOCTOU) estão em `main` após os merges #32 e #33.
-- **Validação da PR #34:** unittest 275/275; 11/11 contratos episódicos focados; integração 30 aprovados + 1 skip FAISS opcional; cobertura 95/94/76/68%; mutation 58/58 mortas e 0 não aplicadas/sobreviventes; Bandit 131 LOW, sem MEDIUM/HIGH. Checks oficiais da PR: 2/2 aprovados. POMDP v2: 128/128 dentro de `1e-12`, erro máximo `2.7755575615628914e-16`, 4/4 controles inválidos rejeitados.
-- **Limites:** nenhum teto novo para limites positivos altos; o snapshot de parâmetros permanece por valor, sem preservar identidade/aliasing ou sincronizar escrita concorrente. Fallback de cache não limita custo do executor ou memória global; timeout segue diagnóstico, não cancelamento.
+### Proveniência e contrato
+
+- Base remota confirmada por `git ls-remote --heads origin` e `git fetch origin main`: `812ebd02b0c82ecc3169d620e36d25592b1d6727`. Worktree nova, inicialmente limpa: `/workspace/Nexus-vram-integrated`; branch `fix/vram-integrated-2026-10-18`, derivada diretamente de `origin/main`.
+- Origens limpas verificadas antes da composição: `fix/vram-limit-bool-2026-10-18` em `4073eb298cb5fe0b3ca1db58a1b38d91c330afbb`; `fix/vram-snapshot-counters-2026-10-18` em `985917446f25c79d526c9ba2aca7f5d33187dd5d`, após implementação `41bb57143152486588c1b15431b879849ab2ecb0`. Ambas têm merge-base `812ebd02` e os mesmos seis paths alterados. Foram compostos somente seus patches de código/testes; os documentos desta seção foram reconciliados a partir da base, sem transportar os gates isolados como atuais.
+- SHA do commit de implementação integrado (código/testes): `9b657011d0b0b0eec61fad53b3d353717c109e4d`. Este SHA identifica a implementação revisada, não o checkpoint documental. O follow-up destes registros é um commit posterior; seu hash é o `HEAD` documental (`git rev-parse HEAD`) e fica identificado separadamente no manifesto de estado pós-commit em `/workspace/nexus-vram-integrated-evidence/STATE_MANIFEST.json`.
+- Contrato: limites booleanos geram `TypeError` antes de comparações; defaults, tipos numéricos antes aceitos, `0 < soft < hard <= 1` e ações inclusivas permanecem. Os três counters exigem `type(value) is int` e valor não negativo na construção (`TypeError` para tipo, `ValueError` para negativo), antes de qualquer decisão ou alteração do histórico/telemetria.
+- Red/green combinado: com os sete testes novos e sem os patches de produção, 19 testes executados, 145 falhas de subteste e 7 erros; após ambos os patches, 19/19 aprovados. Logs `red-combined.log` e `green-focused.log` no diretório de evidências.
+
+### Resultados medidos no conteúdo combinado
+
+- Suíte completa sob cobertura e resumo final: **310 executados, 310 aprovados, 0 falhas, 0 skips, 0 XPASS**. Integração separada: **30 aprovações, 1 skip FAISS, 0 missing/unexpected/conflicting**.
+- Cobertura branch (arredondamento da CLI; piso entre parênteses): fila **95% (90)**, VRAM **94% (90)**, fatos temporais **93% (90)**, Vita **76% (70)**, núcleo **68% (62)**.
+- Mutation canônico: **58 declaradas/aplicáveis/mortas**, 0 sobreviventes/não aplicadas. Ensaio suplementar externo `vram_mutation.py`: **10 declaradas/aplicáveis/mortas**, 0 sobreviventes/não aplicadas; sete mutantes de counters e três de limites booleanos, em cópias temporárias. Não foi alterado o catálogo versionado.
+- Bandit: **131 LOW, 0 MEDIUM/HIGH**. Triagem/check, auditor B101 (nenhum assert fora do main), gaps (0 pass-only e 0 NotImplementedError), Ruff, compileall, actionlint **1.7.12**, zizmor **1.31.1** offline e dry-run dos requisitos passaram. Bandit gera exit não zero por LOW; o comando aceita relatório não vazio e a política de severidade é conferida separadamente.
+- Realidade regenerada sem diff em `AUDIT_REALITY_REPORT.md`/`audit_reality.json`; não há nova alegação cognitiva. Benchmarks CLI herdados executados com seed `20261016`: v1 mantém observação parcial `unsupported_interface`; v2 **128/128** dentro de `1e-12`, erro máximo **2.7755575615628914e-16**, controles inválidos **4/4** rejeitados. Taskset v2 SHA-256 `232371d0e8e948f4b0a004261e3d271b1003aed8d0de8c931d3439f9d370d025`. São checks sintéticos internos, não avaliação independente ou capacidade geral. Os JSONs usam `source_revision=unrecorded-local`; a proveniência real é esta base, o patch congelado e a atestação pós-commit externa, não o `base_commit` histórico do v1.
+
+### Comandos reproduzíveis desta rodada
+
+Diretório: `/workspace/Nexus-vram-integrated`. Script e logs completos: `/workspace/nexus-vram-integrated-evidence/run-gates.sh`. Ambiente reutilizado, sem modificar as origens: `/tmp/nexus-snapshot-venv`, Python **3.12.3**, dependências instaladas previamente com `requirements-ci.lock`, NetworkX **3.6.1** e Ruff **0.16.10**; versões efetivas registradas em `environment.log`.
+
+```bash
+export PATH=/tmp/nexus-snapshot-venv/bin:/tmp/nexus-ci-tools:$PATH PYTHONPATH=.
+export NEXUS_AUDIT_DB=/workspace/nexus-vram-integrated-evidence/audit.sqlite3
+export NEXUS_INTEGRATED_SUMMARY=integrated-summary.json
+python -m unittest -v test_vram_defense_guard
+bash /workspace/nexus-vram-integrated-evidence/run-gates.sh
+# O script executou, com logs separados:
+python -m pip freeze
+python -m pip install --dry-run --no-deps -r requirements_constitutional.txt
+actionlint .github/workflows/nexus-contract-gate.yml
+zizmor --offline --no-progress .github/workflows
+python -m ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py
+python -m compileall -q core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py
+python tools/reality_audit.py
+git diff --exit-code -- AUDIT_REALITY_REPORT.md audit_reality.json
+python -m coverage run --branch -m unittest discover -p 'test_*.py'
+python -m coverage run --append --branch core/constitutional_brain.py
+for spec in core/deferred_task_queue.py:90 core/vram_defense_guard.py:90 core/temporal_facts.py:90 vita/nexus_constitutional_bridge_v3.py:70 core/constitutional_brain.py:62; do
+  python -m coverage report --include="${spec%:*}" --fail-under="${spec##*:}"
+done
+python -m coverage xml -o /workspace/nexus-vram-integrated-evidence/coverage.xml
+python tools/targeted_mutation.py
+python /workspace/nexus-vram-integrated-evidence/vram_mutation.py
+python -m bandit -r core vita tools -f json -o bandit-report.json || test -s bandit-report.json
+python tools/security_triage.py bandit-report.json security-triage-generated.md
+python tools/security_triage.py bandit-report.json SECURITY_TRIAGE.md --check
+python tools/embedded_assert_audit.py bandit-report.json core/constitutional_brain.py
+python tools/implementation_gap_audit.py core/constitutional_brain.py --output implementation-gaps.json
+# A política de severidade no script bloqueia qualquer MEDIUM/HIGH.
+python -m benchmarks.nexus_capability_benchmark --seed 20261016 --output capability-benchmark.json
+python -m benchmarks.nexus_pomdp_benchmark_v2 --seed 20261016 --output /workspace/nexus-vram-integrated-evidence/pomdp-belief-benchmark-v2.json
+python tools/test_summary.py --output test-summary.json
+python tools/state_manifest.py --output STATE_MANIFEST.json --test-result passed --test-command "python -m unittest discover -p 'test_*.py'" --gates-status success
+python tools/state_consistency_audit.py --manifest STATE_MANIFEST.json --output state-consistency.json
+```
+
+Os quatro claims canônicos foram sincronizados para **310 testes / 131 LOW**. A consistência é medida antes e depois do commit, com `ci_run=not_ci`; os artefatos pós-commit identificam o SHA final. Os gates adicionais que o workflow repete por módulos já estão incluídos no discover; não foram repetidos todos como invocações independentes. Nenhuma execução de CI remoto foi atribuída a esta branch.
+
+### Diferenças em relação às execuções isoladas e limites
+
+- Limites isolados reportavam 14 testes VRAM e 305 executados/303 aprovados/2 skips NetworkX. Counters isolados reportavam 17 VRAM e 308/308, após corrigir o ambiente. Combinado: **19 VRAM e 310/310**; a ausência dos dois skips vem de NetworkX presente, não de correção adicional.
+- Coberturas arredondadas, integração 30+1, mutation canônico 58/58 e Bandit 131 LOW permaneceram iguais aos registros isolados. O ensaio suplementar passa de sete counters para dez mutantes incluindo limites; a comparação é histórica, não nova reexecução das branches de origem.
+- Validação somente na construção: não congela snapshots, não valida atribuição posterior, relações físicas entre counters, objetos forjados ou código Python hostil. `available`, timestamp, coleta CUDA e mitigação não mudaram; as conversões CUDA `int(...)` preexistentes permanecem. Sem ensaio GPU real; psutil/FAISS/SentenceTransformers ausentes. Python local 3.12.3 difere do 3.11 de CI. Testes/scan/revisão não provam segurança geral ou prontidão de produção.
+- As duas origens e `/workspace/Nexus` sujo devem permanecer idênticos; SQLite, relatórios e logs são externos ou ignorados, nunca parte do commit. Somente revisão final única de Segurança sobre o diff integrado; reabrir apenas por achado concreto. Nenhum push, PR ou merge nesta rodada, nem processamento da autorização privada #38–#44.
+
+## Estado histórico anterior à integração VRAM
+
+- **Branch e base:** `fix/queue-snapshot-hardening-2026-10-17`, baseada em `origin/main` `812ebd02b0c82ecc3169d620e36d25592b1d6727`; alterações locais, sem push, merge ou rebase.
+- **D-030:** fronteiras de snapshot endurecidas sem mudar schema `nexus.deferred_task_queue.v1` nem assinaturas públicas; contextos exigem JSON nativo estrito. Extensões string-key em raiz/tarefas são ignoradas sem cópia profunda ou propagação interna; `statistics` exige exatamente quatro chaves. Chaves root/tarefa/estatísticas devem ser `str` exatas antes de qualquer lookup/membership, e JSON textual rejeita duplicatas em todos os níveis. Containers externos `dict`/`list` aceitam subclasses; escalares usam tipos built-in exatos e rejeitam `bool`/subclasses antes de operações ou construção de tarefas. A restauração publica heap, índice e contadores somente após staging completo.
+- **Baseline confirmado:** referências aninhadas já eram isoladas; timestamps NaN/±Infinity e bool nos campos inteiros já eram rejeitados. Lacunas reproduzidas: chave extra em estatísticas, tentativa exaurida ainda pendente, hooks de deepcopy/`__eq__`, duplicatas JSON e falha parcial durante staging; revisões independentes encontraram TOCTOU de `task_id` e subclass `int` de `priority` executando `__neg__`, todos agora cobertos e corrigidos.
+- **Testes locais:** `unittest` 318 executados, 316 aprovados e 2 skips pelo NetworkX opcional ausente; contratos focados snapshot/fila 51/51 em Python 3.11.16 e 51/51 em Python 3.12.3; cobertura de branch da fila 91%. Suite integrada: 30 aprovados, 1 skip opcional de FAISS, 0 faltantes.
+- **Gates:** mutation 80/80 mortos, 0 sobreviventes/não aplicadas; Ruff 0.16.10, actionlint 1.7.12 e zizmor 1.31.1 passaram; Bandit 131 LOW e 0 MEDIUM/HIGH, triagem coerente; compileall passou no Python 3.12.3 e nos três arquivos alterados no Python 3.11.16. Auditoria de realidade regenerada (27.549 linhas, 269 classes, 875 funções), sem diff nos relatórios versionados.
+- **Limites:** nenhum teto novo de bytes/profundidade; o parser/encoder JSON padrão pode rejeitar aninhamentos extremos. `enqueue` ainda usa `deepcopy` para contexto e os métodos da fila ainda expõem objetos mutáveis; isso ficou fora do escopo. Não há callsite de produção de `restore_snapshot` no checkout. CI oficial não foi executada porque não houve publicação.
+- **Próxima ação:** manter a branch isolada até autorização explícita para publicação/merge; não enviar para `main`. Considerar `enqueue` como uma decisão separada se futuramente for desejada validação JSON estrita também na entrada da fila.
+
+- **Base desta rodada:** `main` está no merge da PR #37, commit `812ebd02b0c82ecc3169d620e36d25592b1d6727`; essa PR incorporou o núcleo do ledger temporal (D-027) e o acúmulo de tipos de relação no grafo (D-028). A branch `feat/temporal-ledger-integration-2026-10-17` parte desse commit.
+- **Política de integração:** mudanças permanecem em branches/PRs pequenas e só são mescladas com autorização explícita para a PR específica.
+- **D-027/D-028 em `main`:** o `TemporalFactStore` oferece fatos bi-temporais, replay e snapshots encadeados em memória; `RealKnowledgeGraph` preserva tipos de relação múltiplos em uma mesma aresta NetworkX.
+- **D-029 nesta branch:** integração opt-in por `RealKnowledgeGraph(..., temporal_store=...)`; o chamador declara explicitamente predicados funcionais e pode fornecer `source` e `valid_from`. Propriedades da relação não são encaminhadas implicitamente como metadata temporal.
+- **Validação desta branch:** suíte unittest local 309/309; integração 30 aprovados + 1 skip opcional; contratos focados 11/11; cobertura dos métodos alterados 100% em linhas e branches; mutation testing 62/62 mortos; Ruff passou. Os dois checks oficiais do run `39015023676` passaram no commit de implementação `865063d21de9e986f9a502a790bfac2b68f7f801`; consulte a PR #38 para o estado do HEAD mais recente.
+- **Limites atuais:** não há persistência SQLite para o ledger nem ingestão automatizada das alegações de `NEXUS_EVIDENCE.md`; o grafo e o ledger são projeções distintas, sem transação distribuída se uma falha inesperada ocorrer após a escrita temporal. Predicados funcionais continuam configuração explícita do chamador.
 - **POMDP herdado:** o filtro v2 usa modelo explícito e não reivindica aprendizagem ou planejamento; o protocolo v1 mantém `unsupported_interface` para observação parcial.
 - **Escopo real:** protótipo experimental Python de roteamento, filas, telemetria e contratos de diagnóstico. Não reivindicar AGI, ASI, consciência ou autonomia geral.
 
@@ -316,11 +766,11 @@ Validação local no commit de código `4e971f38854dedecac68a55f08125cde01d27992
 - `tools/diagnostics_dashboard.py`: dashboard CLI determinístico que valida snapshots antes de renderizar métricas observáveis.
 - `tools/security_triage.py` e `SECURITY_TRIAGE.md`: inventário conservador dos achados Bandit, sem supressão automática.
 - `test_memory_sql_contract.py`: protege SQL parametrizado, limite positivo/zero, rejeição de negativos e tipos inválidos e falha antes do backend semântico.
-- `tools/targeted_mutation.py`: mutation testing direcionado para fila, Vita e schema.
-- `core/deferred_task_queue.py`: transições de estado protegidas por `RLock`; conclusão/descarte removem tarefas pendentes do heap, retry é único e limitado, callbacks defeituosos são reportados sem interromper o lote; snapshots versionados continuam atômicos.
+- `tools/targeted_mutation.py`: mutation testing direcionado para fila, snapshots, Vita e schema.
+- `core/deferred_task_queue.py`: transições de estado protegidas por `RLock`; conclusão/descarte removem tarefas pendentes do heap, retry é único e limitado, callbacks defeituosos são reportados sem interromper o lote; snapshots usam JSON estrito, estatísticas exatas e restore transacional.
 - `RealImmutableLog`: triggers bloqueiam UPDATE/DELETE, o SHA-chain é verificado na inicialização e detecta adulteração/remoção; writes de conexões concorrentes são serializados. Truncamento final ou rehash por quem controla o arquivo ainda exige âncora externa.
 - `RealJailbreakDetector`: normalização Unicode, sinais por frases e fronteiras de palavra reduzem falsos positivos e detectam ofuscações testadas em inglês/português; continua heurístico, não é uma fronteira de segurança.
-- `test_deferred_task_snapshot.py`: contrato de round-trip, ordem, atomicidade, limites, tipos inválidos e ausência de execução durante restauração.
+- `test_deferred_task_snapshot.py`: round-trip, ordem, atomicidade nos dois modos, limites, JSON estrito, rejeição de bool/NaN/ciclos/hooks de cópia, estatísticas e mutação concorrente de dicts de entrada; restore não executa tarefas.
 - Auditoria de realidade em `tools/reality_audit.py`.
 - Hardening do fallback SQL em `RealHierarchicalMemory`: consultas estáticas parametrizadas por termo, sem montagem dinâmica de placeholders.
 - Hardening de `_generate_correction`: captura explícita de `ValueError`/`IndexError`, com preservação do conteúdo original em descrições inválidas.
@@ -468,9 +918,10 @@ O workflow endurecido gera o manifesto após Bandit, mutation e auditoria AST; a
 - **2026-10-05 — 105 testes:** run `37258732531`, marco anterior preservado para proveniência.
 - **Bootstrap — 86 testes:** run `37097334156`, snapshot histórico; não representa o estado atual.
 
-## Próxima ação
+## Próxima ação histórica (superada pelo plano da composição)
 
 Após revisão e commit local desta correção, aguardar autorização específica antes de qualquer publicação ou integração. Não alterar a cadeia de PRs existente. As referências anteriores à PR #36 são históricas, não uma instrução operacional atual. A auditoria de outras fronteiras fica fora desta rodada; `ToolDefinition.requires_permission`/`permission_level` e validação recursiva dos membros de contêiner não foram examinados aqui.
+Entregar a integração VRAM local para aprovação posterior. Não há autorização de push, PR ou merge. A decisão privada sobre PRs #38–#44 não pertence a esta rodada. A instrução histórica sobre PR #36 aberta está superada: #36 e #37 já integram a base `812ebd02`. Não incorporar outras branches nem sobrescrever seus documentos; regenerar evidências se a base mudar. `ToolDefinition.requires_permission`/`permission_level` continuam sem enforcement, fora deste escopo.
 
 ## Rodada local — inventário de classe em `raise` — 2026-10-21
 
@@ -482,3 +933,105 @@ Após revisão e commit local desta correção, aguardar autorização específi
 - **Reprodução:** evidência em `/workspace/nexus-gap-audit-class-evidence-20261021/`: contrato prévio, inventário, RED/GREEN, logs, `run_gates.py` e `validation.json` com comandos/saídas/durações. `PY=/workspace/nexus-window-exact-evidence/venv311/bin/python`; `PYTHONPATH=.`; audit DB e cobertura externos. Focado: `$PY -m unittest -v test_implementation_gap_raise_class_contract.py test_implementation_gap_audit.py test_reality_audit.py`; amplo: `$PY /workspace/nexus-gap-audit-class-evidence-20261021/run_gates.py`.
 - **Limites e decisão:** o falso negativo foi concretamente demonstrado; nenhuma decisão anterior foi refutada. Sem revisão independente final adicional: correção AST de duas linhas, sem execução do fonte, dependência ou mudança operacional. Hash final, diff congelado e verificação pós-commit ficam no handoff externo para evitar autorreferência. CI hospedado não foi executado; publicação exige autorização do owner para o diff/hash exatos.
 - **Atestação local:** `tools/state_manifest.py --output /workspace/nexus-gap-audit-class-evidence-20261021/STATE_MANIFEST-local.json --test-result passed --test-command 'python tools/test_summary.py --output test-summary.json'` retornou 0; `tools/state_consistency_audit.py --manifest .../STATE_MANIFEST-local.json --output .../state-consistency.json` retornou 1, com zero conflitos documentais e exatamente `manifesto: ci.gates_status deve ser 'success'`. O valor real é `not_ci`; não se fabricou run nem status de gates hospedados. Checagem separada dos quatro marcadores confirmou `tests=308` e `bandit_low=131`. O manifesto pré-commit identifica a base, não um commit contendo a WIP.
+
+
+## Proveniência histórica dos inventários de segurança reconciliados
+
+### Snapshot histórico de segurança — PR #46 `f3044badb1f16eb4936dde6db17087f6bc96d049`
+
+Não é medição da composição, não somar ao inventário atual.
+
+# Bandit Security Triage
+
+
+
+> This is a conservative inventory, not a clearance report. Findings remain open until reviewed and fixed or explicitly justified.
+
+- Total findings: **135**
+- Severity counts: LOW=135
+
+## Dispositions
+
+| Disposition | Count | Meaning |
+|---|---:|---|
+| `controlled_subprocess_review` | 6 | Mutation harness subprocess; keep inputs fixed and review execution boundaries. |
+| `embedded_demo_assert_review` | 111 | Assertions inside the legacy __main__ demonstration block; keep them out of production contracts and migrate incrementally. |
+| `manual_review` | 1 | No project-specific disposition; manual review required. |
+| `simulation_only_random_review` | 17 | Randomness reviewed as simulation/heuristic behavior; keep it out of secrets and security decisions. |
+
+## Findings
+
+Agrupados por escopo (sem números de linha, que mudam a cada edição).
+
+| ID | Severity | File | Scope | Count | Disposition |
+|---|---|---|---|---:|---|
+| `B101` | LOW | `core/constitutional_brain.py` | `<__main__ block>` | 111 | `embedded_demo_assert_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `AudioProcessor.detect_emotion_from_voice` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `CognitiveFlexibility.adapt_to_context` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `ConceptualBlender.generate_multiple_blends` | 2 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `DivergentThinker.generate_alternatives` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `HyperparameterOptimizer.suggest_next_value` | 2 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `ImitationLearner.imitate` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `InhibitoryControl.inhibit_response` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `QuestionGenerator.generate_followup` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `QuestionGenerator.generate_question` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `RealCreativitySystem.generate_creative_idea` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `RealMCTSPlanner._expand` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `RealMCTSPlanner._simulate` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `RealMentalSimulationSystem.rollout_planning` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `RealRSI.optimize_step` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `tools/math_verifier_holdout.py` | `freeze` | 1 | `simulation_only_random_review` |
+| `B404` | LOW | `tools/math_verifier_holdout.py` | `<module>` | 1 | `controlled_subprocess_review` |
+| `B404` | LOW | `tools/state_manifest.py` | `<module>` | 1 | `controlled_subprocess_review` |
+| `B404` | LOW | `tools/targeted_mutation.py` | `<module>` | 1 | `controlled_subprocess_review` |
+| `B603` | LOW | `tools/math_verifier_holdout.py` | `_git_revision` | 1 | `controlled_subprocess_review` |
+| `B603` | LOW | `tools/state_manifest.py` | `_git` | 1 | `controlled_subprocess_review` |
+| `B603` | LOW | `tools/targeted_mutation.py` | `run_tests` | 1 | `controlled_subprocess_review` |
+| `B607` | LOW | `tools/math_verifier_holdout.py` | `_git_revision` | 1 | `manual_review` |
+
+### Snapshot histórico de segurança — main incorporada `a663a55a560e00ae818e9c8f60aacd4cf9bd93f7`
+
+Não é medição da composição, não somar ao inventário atual.
+
+# Bandit Security Triage
+
+
+
+> This is a conservative inventory, not a clearance report. Findings remain open until reviewed and fixed or explicitly justified.
+
+- Total findings: **131**
+- Severity counts: LOW=131
+
+## Dispositions
+
+| Disposition | Count | Meaning |
+|---|---:|---|
+| `controlled_subprocess_review` | 4 | Mutation harness subprocess; keep inputs fixed and review execution boundaries. |
+| `embedded_demo_assert_review` | 111 | Assertions inside the legacy __main__ demonstration block; keep them out of production contracts and migrate incrementally. |
+| `simulation_only_random_review` | 16 | Randomness reviewed as simulation/heuristic behavior; keep it out of secrets and security decisions. |
+
+## Findings
+
+Agrupados por escopo (sem números de linha, que mudam a cada edição).
+
+| ID | Severity | File | Scope | Count | Disposition |
+|---|---|---|---|---:|---|
+| `B101` | LOW | `core/constitutional_brain.py` | `<__main__ block>` | 111 | `embedded_demo_assert_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `AudioProcessor.detect_emotion_from_voice` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `CognitiveFlexibility.adapt_to_context` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `ConceptualBlender.generate_multiple_blends` | 2 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `DivergentThinker.generate_alternatives` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `HyperparameterOptimizer.suggest_next_value` | 2 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `ImitationLearner.imitate` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `InhibitoryControl.inhibit_response` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `QuestionGenerator.generate_followup` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `QuestionGenerator.generate_question` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `RealCreativitySystem.generate_creative_idea` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `RealMCTSPlanner._expand` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `RealMCTSPlanner._simulate` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `RealMentalSimulationSystem.rollout_planning` | 1 | `simulation_only_random_review` |
+| `B311` | LOW | `core/constitutional_brain.py` | `RealRSI.optimize_step` | 1 | `simulation_only_random_review` |
+| `B404` | LOW | `tools/state_manifest.py` | `<module>` | 1 | `controlled_subprocess_review` |
+| `B404` | LOW | `tools/targeted_mutation.py` | `<module>` | 1 | `controlled_subprocess_review` |
+| `B603` | LOW | `tools/state_manifest.py` | `_git` | 1 | `controlled_subprocess_review` |
+| `B603` | LOW | `tools/targeted_mutation.py` | `run_tests` | 1 | `controlled_subprocess_review` |

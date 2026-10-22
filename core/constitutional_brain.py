@@ -144,7 +144,7 @@ import random
 import numpy as np
 from collections.abc import Sequence
 from numbers import Real
-from typing import Dict, List, Set, Optional, Tuple, Any
+from typing import Dict, List, Set, Optional, Tuple, Any, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from collections import defaultdict, deque
@@ -158,6 +158,7 @@ import weakref
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
 from core.vram_defense_guard import VramDefenseGuard
 from core.deferred_task_queue import DeferredTaskQueue
+from core.temporal_facts import TemporalFactStore
 
 
 _NEXUS_DEBUG = os.environ.get("NEXUS_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
@@ -544,14 +545,15 @@ class RealKnowledgeGraph:
     • × POST11 (Causal): Grafo explicita relações causais
     • × POST9 (Learning): Padrões aprendidos viram nós/arestas
     
-    Métricas de validação:
-    - Multihop reasoning: > 93%
-    - Needle-in-haystack (32k): > 95%
-    - Latência: < 45ms
+    Alegações legadas não verificadas; não são resultados deste candidato:
+    - Multihop reasoning: > 93% (sem task set, comando, ambiente ou proveniência)
+    - Needle-in-haystack (32k): > 95% (sem task set, comando, ambiente ou proveniência)
+    - Latência: < 45ms (sem task set, comando, ambiente ou proveniência)
     """
 
-    def __init__(self, hierarchical_memory: Optional[Any] = None):
-        """NetworkX não precisa de instalação — já está na stdlib Python 3"""
+    def __init__(self, hierarchical_memory: Optional[Any] = None, *,
+                 temporal_store: Optional[TemporalFactStore] = None):
+        """Usa NetworkX se instalado; caso contrário, mantém o fallback interno."""
         try:
             import networkx as nx
             self.nx = nx
@@ -560,6 +562,7 @@ class RealKnowledgeGraph:
             self.nx = None
 
         self.memory = hierarchical_memory
+        self.temporal_store = temporal_store
 
         # Grafo principal
         if self.nx:
@@ -616,8 +619,29 @@ class RealKnowledgeGraph:
         return entity
 
     def add_relation(self, source_id: str, relation_type: str, target_id: str,
-                     properties: Optional[Dict] = None, confidence: float = 0.9) -> Relation:
+                     properties: Optional[Dict] = None, confidence: float = 0.9,
+                     *, source: str = "observation",
+                     valid_from: Optional[float] = None) -> Relation:
         """Adicionar relação direcionada entre entidades."""
+        # Valide os kwargs do backend antes de gravar o ledger ou a projeção.
+        # O fallback não usa kwargs e preserva seu contrato legado de propriedades.
+        if self.nx:
+            properties = dict(properties or {})
+            if any(not isinstance(key, str) for key in properties):
+                raise TypeError("NetworkX relation property keys must be strings")
+            if any(key in properties for key in ("self", "u_of_edge", "v_of_edge")):
+                raise TypeError("NetworkX relation properties collide with edge parameters")
+        # A integração é opt-in. Registre antes de criar entidades ou alterar índices,
+        # para que entradas temporais inválidas não deixem uma projeção parcial.
+        if self.temporal_store is not None:
+            self.temporal_store.assert_fact(
+                source_id,
+                relation_type,
+                target_id,
+                valid_from=valid_from,
+                confidence=confidence,
+                source=source,
+            )
         # Verificar que entidades existem
         if source_id not in self.entity_index or target_id not in self.entity_index:
             # Criar entidades automaticamente se não existirem
@@ -698,9 +722,13 @@ class RealKnowledgeGraph:
         """
         Raciocínio multi-salto: encontrar caminho de start → end.
         Usa BFS para encontrar caminho mais curto.
+        IDs inexistentes retornam resultado vazio em ambos os backends.
         """
         self.total_queries += 1
         self.total_multihop_queries += 1
+
+        if start_id not in self.entity_index or end_id not in self.entity_index:
+            return QueryResult([], [], "", 0.0, 0)
 
         if self.nx:
             # NetworkX: usar shortest_path
@@ -724,9 +752,13 @@ class RealKnowledgeGraph:
                 return QueryResult([], [], "", 0.0, 0)
         else:
             # Fallback: BFS manual
-            path = self._bfs_path(start_id, end_id, max_hops)
+            # Encontrar a distância real antes de aplicar o limite, como NetworkX.
+            path = self._bfs_path(start_id, end_id, len(self.entity_index))
             if not path:
                 return QueryResult([], [], "", 0.0, 0)
+            hops = len(path) - 1
+            if hops > max_hops:
+                return QueryResult([], [], "", 0.0, hops)
 
             entities = [self.entity_index[nid] for nid in path if nid in self.entity_index]
             context = self._build_path_context(path)
@@ -5148,6 +5180,29 @@ class RealLanguageUnderstandingSystem:
 # MÓDULO 11A2: METACOGNITION SYSTEM (POST 24)
 # ═══════════════════════════════════════════════════════════════════════════
 
+METACOGNITIVE_SCORE_HEURISTIC = "heuristic_fallback"
+METACOGNITIVE_SCORE_EVALUATOR = "explicit_evaluator"
+METACOGNITIVE_SCORE_UNAVAILABLE = "unavailable"
+
+
+def _is_valid_metacognitive_score(score: Any) -> bool:
+    """Return whether an exact built-in int/float score is finite and in [0, 1]."""
+    if type(score) not in (int, float):
+        return False
+    try:
+        return math.isfinite(score) and 0.0 <= score <= 1.0
+    except (OverflowError, TypeError, ValueError):
+        return False
+
+
+def _require_valid_metacognitive_score(score: Any, name: str) -> None:
+    """Reject values outside the exact built-in finite [0, 1] score contract."""
+    if not _is_valid_metacognitive_score(score):
+        raise ValueError(
+            f"{name} must be an exact built-in int or float, finite, and in [0, 1]"
+        )
+
+
 @dataclass
 class CognitiveProcess:
     """Processo cognitivo sendo monitorado"""
@@ -5158,9 +5213,20 @@ class CognitiveProcess:
     performance: Optional[float]  # 0-1
     strategy_used: str
     outcome: Optional[str]
+    _score_source: str = field(
+        default=METACOGNITIVE_SCORE_HEURISTIC,
+        init=False,
+        repr=False,
+        compare=False,
+    )
+
+    @property
+    def score_source(self) -> str:
+        """Read-only provenance assigned by the monitor."""
+        return self._score_source
 
 
-@dataclass
+@dataclass(frozen=True)
 class MetacognitiveAssessment:
     """Avaliação metacognitiva"""
     assessment_id: str
@@ -5170,6 +5236,17 @@ class MetacognitiveAssessment:
     difficulty_estimate: float   # Quão difícil é a tarefa
     strategy_effectiveness: float  # Quão eficaz foi a estratégia
     timestamp: float
+    _score_source: str = field(
+        default=METACOGNITIVE_SCORE_HEURISTIC,
+        init=False,
+        repr=False,
+        compare=False,
+    )
+
+    @property
+    def score_source(self) -> str:
+        """Read-only provenance assigned by the evaluator."""
+        return self._score_source
 
 
 @dataclass
@@ -5181,6 +5258,7 @@ class CognitiveStrategy:
     success_rate: float
     usage_count: int
     avg_performance: float
+    success_count: int = 0
 
 
 class MetacognitiveMonitor:
@@ -5198,10 +5276,22 @@ class MetacognitiveMonitor:
 
         # Métricas de monitoramento
         self.process_metrics = {
-            "reasoning": {"count": 0, "avg_duration": 0.0, "avg_performance": 0.0},
-            "memory": {"count": 0, "avg_duration": 0.0, "avg_performance": 0.0},
-            "planning": {"count": 0, "avg_duration": 0.0, "avg_performance": 0.0},
-            "learning": {"count": 0, "avg_duration": 0.0, "avg_performance": 0.0}
+            "reasoning": {
+                "count": 0, "avg_duration": 0.0, "avg_performance": 0.0,
+                "verified_performance_count": 0
+            },
+            "memory": {
+                "count": 0, "avg_duration": 0.0, "avg_performance": 0.0,
+                "verified_performance_count": 0
+            },
+            "planning": {
+                "count": 0, "avg_duration": 0.0, "avg_performance": 0.0,
+                "verified_performance_count": 0
+            },
+            "learning": {
+                "count": 0, "avg_duration": 0.0, "avg_performance": 0.0,
+                "verified_performance_count": 0
+            }
         }
 
     def start_monitoring(self, process_type: str, strategy: str) -> str:
@@ -5231,27 +5321,60 @@ class MetacognitiveMonitor:
 
         return process_id
 
-    def end_monitoring(self, process_id: str, performance: float, outcome: str):
+    def end_monitoring(
+        self,
+        process_id: str,
+        performance: Optional[float],
+        outcome: str,
+    ):
+        """Close a process without treating a caller-supplied score as verified.
+
+        Only exact built-in ``int`` and ``float`` values are accepted as scores;
+        invalid values are retained as unavailable rather than aggregated.
         """
-        Terminar monitoramento de processo.
-        
-        Args:
-            process_id: ID do processo
-            performance: Performance alcançada (0-1)
-            outcome: Resultado do processo
-        """
+        score_source = (
+            METACOGNITIVE_SCORE_HEURISTIC
+            if _is_valid_metacognitive_score(performance)
+            else METACOGNITIVE_SCORE_UNAVAILABLE
+        )
+        self._finish_monitoring(process_id, performance, outcome, score_source)
+
+    def _end_monitoring_verified(
+        self,
+        process_id: str,
+        performance: float,
+        outcome: str,
+    ):
+        """Trusted internal boundary, used only after a valid evaluator result."""
+        if not _is_valid_metacognitive_score(performance):
+            raise ValueError("verified performance must be a valid score")
+        self._finish_monitoring(
+            process_id,
+            performance,
+            outcome,
+            METACOGNITIVE_SCORE_EVALUATOR,
+        )
+
+    def _finish_monitoring(
+        self,
+        process_id: str,
+        performance: Optional[float],
+        outcome: str,
+        score_source: str,
+    ):
+        """Internal process closure; callers must establish score provenance."""
         if process_id not in self.active_processes:
             return
-
         process = self.active_processes[process_id]
         process.end_time = time.time()
-        process.performance = performance
+        process.performance = (
+            float(performance) if _is_valid_metacognitive_score(performance) else None
+        )
+        process._score_source = score_source
         process.outcome = outcome
-
         # Mover para completed
         self.completed_processes.append(process)
         del self.active_processes[process_id]
-
         # Atualizar métricas
         self._update_metrics(process)
 
@@ -5274,11 +5397,18 @@ class MetacognitiveMonitor:
             count = metrics["count"]
             metrics["avg_duration"] = (old_avg * (count - 1) + duration) / count
 
-        # Atualizar avg_performance
-        if process.performance is not None:
+        # Only explicit, validated evaluator scores feed this adaptive aggregate.
+        if (
+            process.score_source == METACOGNITIVE_SCORE_EVALUATOR
+            and process.performance is not None
+        ):
+            previous_count = metrics["verified_performance_count"]
+            count = previous_count + 1
             old_avg = metrics["avg_performance"]
-            count = metrics["count"]
-            metrics["avg_performance"] = (old_avg * (count - 1) + process.performance) / count
+            metrics["avg_performance"] = (
+                old_avg * previous_count + process.performance
+            ) / count
+            metrics["verified_performance_count"] = count
 
     def get_current_performance(self, process_type: str) -> float:
         """Obter performance atual de tipo de processo"""
@@ -5319,7 +5449,8 @@ class StrategySelector:
                 applicable_to=applicable,
                 success_rate=initial_success,
                 usage_count=0,
-                avg_performance=initial_success
+                avg_performance=initial_success,
+                success_count=0
             )
             self.strategies[name] = strategy
 
@@ -5351,22 +5482,37 @@ class StrategySelector:
 
         return best_strategy[0]
 
-    def update_strategy_performance(self, strategy_name: str, performance: float):
-        """Atualizar performance de estratégia"""
-        if strategy_name not in self.strategies:
-            return
+    def update_strategy_performance(
+        self,
+        strategy_name: str,
+        performance: float,
+        *,
+        task_type: Optional[str] = None,
+    ) -> bool:
+        """Update a strategy only for a valid score and, if supplied, task type.
 
+        Context-free calls retain legacy behavior. Monitored execution supplies
+        its task type so an incompatible task cannot train this strategy.
+        This method validates attribution, not evaluator provenance.
+        """
+        if (
+            strategy_name not in self.strategies
+            or not _is_valid_metacognitive_score(performance)
+        ):
+            return False
         strategy = self.strategies[strategy_name]
-        strategy.usage_count += 1
-
-        # Running average
-        old_avg = strategy.avg_performance
-        count = strategy.usage_count
-        strategy.avg_performance = (old_avg * (count - 1) + performance) / count
-
-        # Update success rate (threshold 0.6)
-        successes = old_avg * (count - 1) + (1 if performance > 0.6 else 0)
-        strategy.success_rate = successes / count
+        if task_type is not None and task_type not in strategy.applicable_to:
+            return False
+        score = float(performance)
+        previous_count = strategy.usage_count
+        strategy.usage_count = previous_count + 1
+        strategy.avg_performance = (
+            strategy.avg_performance * previous_count + score
+        ) / strategy.usage_count
+        if score > 0.6:
+            strategy.success_count += 1
+        strategy.success_rate = strategy.success_count / strategy.usage_count
+        return True
 
 
 class PerformanceEvaluator:
@@ -5380,28 +5526,74 @@ class PerformanceEvaluator:
     def __init__(self):
         # Histórico de assessments
         self.assessments: List[MetacognitiveAssessment] = []
+        # Immutable numeric snapshots keep public assessment/list mutation from
+        # changing aggregates that represent validated evaluator callbacks.
+        self._verified_assessment_scores: List[Tuple[float, float]] = []
+        self._assessment_count = 0
 
-    def evaluate_performance(self, 
-                           process_type: str,
-                           actual_performance: float,
-                           expected_performance: float,
-                           difficulty: float) -> MetacognitiveAssessment:
+    def evaluate_performance(
+        self,
+        process_type: str,
+        actual_performance: float,
+        expected_performance: float,
+        difficulty: float,
+    ) -> MetacognitiveAssessment:
+        """Create a public, heuristic assessment from validated score inputs.
+
+        Direct calls always remain heuristic; only the internal execution path
+        can record a score as coming from an explicit evaluator callback.
+
+        Raises:
+            ValueError: If any score is not an exact built-in int/float, finite,
+                and in [0, 1].
         """
-        Avaliar performance em processo.
-        
-        Args:
-            process_type: Tipo de processo
-            actual_performance: Performance real (0-1)
-            expected_performance: Performance esperada (0-1)
-            difficulty: Dificuldade estimada (0-1)
-        
-        Returns:
-            MetacognitiveAssessment
-        """
+        return self._evaluate_performance(
+            process_type,
+            actual_performance,
+            expected_performance,
+            difficulty,
+        )
+
+    def _evaluate_verified_performance(
+        self,
+        process_type: str,
+        actual_performance: float,
+        expected_performance: float,
+        difficulty: float,
+    ) -> MetacognitiveAssessment:
+        """Internal path for a score validated from the evaluator callback."""
+        assessment = self._evaluate_performance(
+            process_type,
+            actual_performance,
+            expected_performance,
+            difficulty,
+        )
+        object.__setattr__(
+            assessment, "_score_source", METACOGNITIVE_SCORE_EVALUATOR
+        )
+        self._verified_assessment_scores.append(
+            (assessment.confidence_in_result, assessment.understanding_level)
+        )
+        return assessment
+
+    def _evaluate_performance(
+        self,
+        process_type: str,
+        actual_performance: float,
+        expected_performance: float,
+        difficulty: float,
+    ) -> MetacognitiveAssessment:
+        """Validate scores, create an assessment, and append it to history."""
+        _require_valid_metacognitive_score(
+            actual_performance, "actual_performance"
+        )
+        _require_valid_metacognitive_score(
+            expected_performance, "expected_performance"
+        )
+        _require_valid_metacognitive_score(difficulty, "difficulty")
         # Confiança no resultado
         # Alta se performance próxima do esperado
         confidence = 1.0 - abs(actual_performance - expected_performance)
-
         # Nível de compreensão
         # Alto se performance > expected dado difficulty
         understanding = self._assess_understanding(
@@ -5409,11 +5601,9 @@ class PerformanceEvaluator:
             expected_performance,
             difficulty
         )
-
         # Eficácia da estratégia
         # Alta se performance boa
         strategy_effectiveness = actual_performance
-
         assessment = MetacognitiveAssessment(
             assessment_id=str(uuid.uuid4()),
             process_evaluated=process_type,
@@ -5421,11 +5611,10 @@ class PerformanceEvaluator:
             understanding_level=understanding,
             difficulty_estimate=difficulty,
             strategy_effectiveness=strategy_effectiveness,
-            timestamp=time.time()
+            timestamp=time.time(),
         )
-
         self.assessments.append(assessment)
-
+        self._assessment_count += 1
         return assessment
 
     def _assess_understanding(self, actual: float, expected: float, difficulty: float) -> float:
@@ -5441,20 +5630,23 @@ class PerformanceEvaluator:
         # Se performou pior = compreensão limitada
         return 0.4
 
-    def get_avg_confidence(self) -> float:
-        """Obter confiança média"""
-        if not self.assessments:
-            return 0.5
+    def get_assessment_count(self) -> int:
+        """Return the number of assessments created through evaluator methods."""
+        return self._assessment_count
 
-        return sum(a.confidence_in_result for a in self.assessments) / len(self.assessments)
+    def get_avg_confidence(self) -> float:
+        """Return average confidence from private verified-score snapshots."""
+        verified = self._verified_assessment_scores
+        if not verified:
+            return 0.5
+        return sum(confidence for confidence, _ in verified) / len(verified)
 
     def get_avg_understanding(self) -> float:
-        """Obter compreensão média"""
-        if not self.assessments:
+        """Return average understanding from private verified-score snapshots."""
+        verified = self._verified_assessment_scores
+        if not verified:
             return 0.5
-
-        return sum(a.understanding_level for a in self.assessments) / len(self.assessments)
-
+        return sum(understanding for _, understanding in verified) / len(verified)
 
 class RealMetacognitionSystem:
     """
@@ -5520,47 +5712,99 @@ class RealMetacognitionSystem:
                                strategy: str,
                                execution_func: callable,
                                expected_performance: float = 0.7,
-                               difficulty: float = 0.5) -> Tuple[Any, MetacognitiveAssessment]:
+                               difficulty: float = 0.5,
+                               *,
+                               evaluator: Optional[Callable[[Any], Any]] = None
+                               ) -> Tuple[Any, MetacognitiveAssessment]:
         """
         Executar processo com monitoramento metacognitivo.
-        
         Args:
             process_type: Tipo de processo
             strategy: Estratégia a usar
             execution_func: Função a executar
             expected_performance: Performance esperada
             difficulty: Dificuldade da tarefa
-        
         Returns:
             (resultado, assessment)
+
+        ``evaluator`` is a trusted callback in this process, not a sandboxed
+        evaluator. Its exceptions and invalid scores propagate without falling
+        back to a heuristic. Heuristic scores remain visible in records but are
+        excluded from verified aggregates.
+        A valid evaluator score updates strategy statistics only when the
+        strategy declares applicability to ``process_type``. Incompatible or
+        unknown strategies remain monitorable without receiving strategy credit.
+        ``expected_performance`` and ``difficulty`` must be exact built-in
+        ``int`` or ``float`` scores, finite and in [0, 1]. They are validated
+        before a monitored process starts.
         """
+        _require_valid_metacognitive_score(
+            expected_performance, "expected_performance"
+        )
+        _require_valid_metacognitive_score(difficulty, "difficulty")
         # Iniciar monitoramento
         process_id = self.monitor.start_monitoring(process_type, strategy)
+        try:
+            result = execution_func()
+        except BaseException:
+            self.monitor.end_monitoring(process_id, None, "error")
+            raise
 
-        # Executar
-        result = execution_func()
+        if evaluator is not None:
+            try:
+                evaluated_score = evaluator(result)
+            except BaseException:
+                self.monitor.end_monitoring(
+                    process_id, None, "evaluation_error"
+                )
+                raise
+            if not _is_valid_metacognitive_score(evaluated_score):
+                self.monitor.end_monitoring(
+                    process_id, None, "invalid_evaluator_score"
+                )
+                raise ValueError(
+                    "evaluator must return a finite, non-boolean number in [0, 1]"
+                )
+            actual_performance = float(evaluated_score)
+            outcome = "success" if actual_performance > 0.6 else "failure"
+            self.monitor._end_monitoring_verified(
+                process_id, actual_performance, outcome
+            )
+            score_source = METACOGNITIVE_SCORE_EVALUATOR
+        else:
+            try:
+                result_succeeded = bool(result)
+            except BaseException:
+                self.monitor.end_monitoring(
+                    process_id, None, "truthiness_error"
+                )
+                raise
+            actual_performance = 0.8 if result_succeeded else 0.3
+            outcome = "success" if result_succeeded else "failure"
+            self.monitor.end_monitoring(
+                process_id, actual_performance, outcome
+            )
+            score_source = METACOGNITIVE_SCORE_HEURISTIC
 
-        # Avaliar resultado (simplificado: assume sucesso = 0.8)
-        actual_performance = 0.8 if result else 0.3
-
-        # Terminar monitoramento
-        self.monitor.end_monitoring(
-            process_id,
-            actual_performance,
-            "success" if result else "failure"
-        )
-
-        # Avaliar performance
-        assessment = self.performance_evaluator.evaluate_performance(
-            process_type,
-            actual_performance,
-            expected_performance,
-            difficulty
-        )
-
-        # Atualizar estratégia
-        self.strategy_selector.update_strategy_performance(strategy, actual_performance)
-
+        # Keep returning an assessment for compatibility; aggregate only verified scores.
+        if score_source == METACOGNITIVE_SCORE_EVALUATOR:
+            assessment = self.performance_evaluator._evaluate_verified_performance(
+                process_type,
+                actual_performance,
+                expected_performance,
+                difficulty,
+            )
+        else:
+            assessment = self.performance_evaluator.evaluate_performance(
+                process_type,
+                actual_performance,
+                expected_performance,
+                difficulty,
+            )
+        if score_source == METACOGNITIVE_SCORE_EVALUATOR:
+            self.strategy_selector.update_strategy_performance(
+                strategy, actual_performance, task_type=process_type
+            )
         # Consciência metacognitiva
         if self.consciousness:
             self.consciousness.attend_to(
@@ -5569,7 +5813,6 @@ class RealMetacognitionSystem:
                 "metacognitive",
                 salience=0.6
             )
-
         return result, assessment
 
     def should_switch_strategy(self, current_strategy: str, task_type: str) -> bool:
@@ -5600,27 +5843,39 @@ class RealMetacognitionSystem:
 
         return False
 
-    def reflect_on_learning(self) -> Dict[str, float]:
+    def reflect_on_learning(self) -> Dict[str, Any]:
         """
         Refletir sobre próprio aprendizado.
-        
+
+        Performance is based only on verified evaluator scores. If none exist,
+        the corresponding performance is ``None`` and its count is zero.
+
         Returns:
             Reflexão metacognitiva
         """
+        reasoning_metrics = self.monitor.process_metrics["reasoning"]
+        learning_metrics = self.monitor.process_metrics["learning"]
+        reasoning_count = reasoning_metrics["verified_performance_count"]
+        learning_count = learning_metrics["verified_performance_count"]
         reflection = {
             "avg_confidence": self.performance_evaluator.get_avg_confidence(),
             "avg_understanding": self.performance_evaluator.get_avg_understanding(),
-            "reasoning_performance": self.monitor.get_current_performance("reasoning"),
-            "learning_performance": self.monitor.get_current_performance("learning"),
+            "reasoning_performance": (
+                reasoning_metrics["avg_performance"] if reasoning_count else None
+            ),
+            "reasoning_verified_performance_count": reasoning_count,
+            "learning_performance": (
+                learning_metrics["avg_performance"] if learning_count else None
+            ),
+            "learning_verified_performance_count": learning_count,
             "metacognitive_awareness": self._compute_metacognitive_awareness()
         }
-
         return reflection
 
     def _compute_metacognitive_awareness(self) -> float:
         """Computar nível de consciência metacognitiva"""
         # Baseado em quantos assessments foram feitos
-        num_assessments = len(self.performance_evaluator.assessments)
+        num_assessments = self.performance_evaluator.get_assessment_count()
 
         # Awareness aumenta com prática
         awareness = min(1.0, num_assessments / 20.0)
@@ -5634,7 +5889,7 @@ class RealMetacognitionSystem:
             "strategy_switches": self.strategy_switches,
             "active_processes": len(self.monitor.active_processes),
             "completed_processes": len(self.monitor.completed_processes),
-            "assessments_made": len(self.performance_evaluator.assessments),
+            "assessments_made": self.performance_evaluator.get_assessment_count(),
             "avg_confidence": self.performance_evaluator.get_avg_confidence(),
             "metacognitive_awareness": self._compute_metacognitive_awareness()
         }
@@ -13735,11 +13990,12 @@ class CentralRouter:
             try:
                 result = self._route(task.prompt, context, _deferred_reprocess=True)
             except Exception as exc:
-                task.last_reason = f"{type(exc).__name__}: {exc}"
+                task.last_reason = f"{type(exc).__name__}: deferred reprocessing failed"
                 return False
             if result.get("success"):
                 return True
-            task.last_reason = result.get("reason", result.get("error", "reprocessamento não concluído"))
+            # A resposta pode carregar detalhes privados; não persistir payloads de erro.
+            task.last_reason = "reprocessamento não concluído"
             return False
 
         def success(task):

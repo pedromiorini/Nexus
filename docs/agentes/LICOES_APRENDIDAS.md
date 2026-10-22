@@ -102,3 +102,34 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Regra/checagem derivada: declaração de formato em schema não substitui teste negativo do caminho efetivamente executado; parser ISO sozinho também aceita formatos compactos/semanais.
 - Evidência: base `b2b01f2c6b044f0f7f1b60ec1e9c0d615fa4d296`; correção no PR #70 (head `10a48e81316b3f13c1cff414bbaa6dc91cf791a1`, merge `a663a55a560e00ae818e9c8f60aacd4cf9bd93f7`).
 - Status: registrada; sem promoção das instruções, publicação ou alegação de validação genérica de todo o schema.
+
+## Histórico local anterior à recomposição de 22/10/2026
+
+As entradas L-008–L-010 abaixo provêm da tree local `697923975efbee368dece179b9139e840919d785`, anterior à adoção local da v3.4.1. Preservadas sem duplicação e sem promoção; os resultados citados são históricos, não evidência desta nova composição. Não são lições novas ativadas pelo teste dos três casos da v3.4.1.
+
+### L-008 — Composição verde ainda aceitava mutação parcial e falhas operacionais
+- Data: 2026-10-21
+- Verificador: revisão independente BLOCK da árvore local `5d766cfa057861f4533d4d333c5bd35ffd5f3b1f`; gates anteriores não cobriam os três casos.
+- Fato observado: chave não-string em `add_relation` deixava ledger/entidades/índice alterados antes do TypeError NetworkX; merge-tree 128 vazio era aprovado como docs; status Git 128 vazio ou nuvem inesperada era aprovado como modo nuvem.
+- Causa (Fato): cópia de dict não valida kwargs; saída vazia era tratada como evidência de ausência de conflito/sujeira sem validar o status do processo; estado da nuvem não tinha domínio fechado.
+- Correção local: preflight de kwargs antes das gravações, classificação explícita de exit/saída de merge-tree e validação do status Git/domínio da nuvem. Contratos `test_graph_relation_preflight_contract.py` e `test_agent_guards_contract.py`; 7 mutantes adicionais. RED, GREEN e gates na nova seção de CONTINUATION e no diretório externo `fixes-review-block`.
+- Regra/checagem derivada: snapshot de entrada não substitui validação da chamada efetiva; sucesso exige status explícito, não apenas stdout vazio. Testar falha operacional também com saída aparentemente válida.
+- Status: registrada; correções apenas na candidata local em merge, sem commit/publicação nem promoção das instruções permanentes.
+
+### L-009 — Comparar textos de globs não detecta sua interseção
+- Data: 2026-10-21
+- Verificador que deveria ter falhado: `tools/agente/validar_registro.py` e contratos do registro na árvore composta `d60f157162d6d79a9543b73d1047a05b4f44bef2` (bug herdado de main).
+- Fato observado: `src/a?.py` e `src/?b.py` cobrem `src/ab.py`, mas helper, `validate()` e CLI aprovavam os dois claims ativos. RED reproduzível guardado em `glob-overlap-fix/red.log` no diretório externo da composição.
+- Causa (Fato): `fnmatch` aplicava um padrão ao texto do outro; nenhuma das duas direções decide interseção de linguagens.
+- Correção local: produto de autômatos com transições de estrela e alfabeto simbólico Unicode; regressões de duas linguagens, controles disjuntos, API/CLI sem arquivo materializado e expiração, além de nove mutantes específicos. A revisão independente encontrou custo quadrático sem limite no primeiro incremento: acrescentado orçamento compartilhado com exaustão explícita fail-closed e cinco regressões de recursos RED/GREEN, incluindo scanner de classes sem fechamento. Comandos e resultados na nova seção de CONTINUATION.
+- Regra/checagem derivada: testar sobreposição de padrões entre si, não somente glob contra caminho literal; não enumerar apenas arquivos já existentes para decidir leases sobre arquivos futuros.
+- Status: registrada; somente candidata local, sem commit/publicação nem promoção das instruções. BLOCK da árvore anterior não equivale a aprovação independente da próxima.
+
+### L-010 — Preflight de método bound omitiu o parâmetro self
+- Data: 2026-10-21
+- Verificador: revisão independente integral BLOCK da tree `972747bebe1b9a16d79b158ab11caf9365cd618a`; 545 testes/112 mutantes anteriores não cobriam a chave `self`.
+- Fato observado: novas regressões falharam em quatro combinações vazio/populado × com/sem store e no predicado funcional. A chamada NetworkX rejeitava `self` tarde demais, após mutações de índices/entidades/ledger, inclusive fechamento do fato anterior.
+- Causa (Fato): o preflight cobria `u_of_edge`/`v_of_edge`, mas não o parâmetro implícito `self` de `DiGraph.add_edge`.
+- Correção local: incluir `self` na guarda anterior a qualquer backend mutante; regressões por snapshot completo, ausência de chamadas mutantes e fallback positivo; mutante específico remove somente essa nova guarda. Evidências em `/workspace/pr46-composition-evidence-20261021/self-collision-fix/` e nova seção de CONTINUATION.
+- Regra/checagem derivada: colisões de kwargs de métodos bound incluem o receptor implícito; uma exceção esperada não demonstra atomicidade — comparar todo o estado e, quando pertinente, comprovar que o backend não foi chamado.
+- Status: registrada; sem promoção das instruções, commit ou publicação. Revisão BLOCK anterior não aprova a próxima tree; limite de atomicidade restrito a entradas conhecidas, não falhas arbitrárias do backend.
