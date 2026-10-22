@@ -1,15 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "Gates de core/cognitivo: escopo do auditor de realidade (este PR) e workflow (PR de workflow separado, L-004). Substitui o claim do #82, já mesclado."
-    arquivos:
-      - tools/reality_audit.py
-      - test_reality_audit_cognitivo_contract.py
-      - AUDIT_REALITY_REPORT.md
-      - audit_reality.json
-      - .github/workflows/nexus-contract-gate.yml
-      - docs/agentes/CLAIMS.yaml
-    pr: 83
-    expira_em: "2026-10-25T16:00:00+00:00"
+claims: []
