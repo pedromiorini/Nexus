@@ -9,6 +9,7 @@ claims:
       - core/cognitivo/mcts_planner.py
       - test_mcts_planner_extraction_contract.py
       - tools/cognitivo_mutation.py
+      - SECURITY_TRIAGE.md  # só as 2 linhas B311 de RealMCTSPlanner (caminho)
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
       - docs/agentes/CLAIMS.yaml

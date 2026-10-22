@@ -17,15 +17,21 @@
         "functions": 12
       },
       {
+        "path": "core/cognitivo/mcts_planner.py",
+        "lines": 414,
+        "classes": 3,
+        "functions": 17
+      },
+      {
         "path": "core/cognitivo/predictive_coding.py",
         "lines": 470,
         "classes": 3,
         "functions": 15
       }
     ],
-    "core_lines": 26922,
-    "classes": 264,
-    "functions": 851,
+    "core_lines": 26526,
+    "classes": 261,
+    "functions": 834,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -70,7 +76,6 @@
       "RealKnowledgeGraph.get_statistics",
       "RealLanguageUnderstandingSystem.get_statistics",
       "RealLifelongLearningEngine.get_statistics",
-      "RealMCTSPlanner.get_statistics",
       "RealMentalSimulationSystem.get_statistics",
       "RealMetaLearningStrategies.get_meta_learning_report",
       "RealMetaLearningStrategies.get_statistics",
@@ -139,8 +144,8 @@
         "occurrences": 3,
         "examples": [
           "POST4: Knowledge Graph Híbrido — REAL e FUNCIONAL",
-          "POST3: Monte Carlo Tree Search Planner — REAL e FUNCIONAL",
-          "POST12: Incremental Learner — REAL e FUNCIONAL"
+          "POST12: Incremental Learner — REAL e FUNCIONAL",
+          "POST3: Monte Carlo Tree Search Planner — REAL e FUNCIONAL"
         ]
       },
       {
