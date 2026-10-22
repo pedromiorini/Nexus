@@ -11,6 +11,12 @@
         "functions": 0
       },
       {
+        "path": "core/cognitivo/action_effects.py",
+        "lines": 39,
+        "classes": 0,
+        "functions": 1
+      },
+      {
         "path": "core/cognitivo/causal_world_model.py",
         "lines": 124,
         "classes": 5,
@@ -24,7 +30,7 @@
       },
       {
         "path": "core/cognitivo/mcts_planner.py",
-        "lines": 458,
+        "lines": 449,
         "classes": 3,
         "functions": 19
       },

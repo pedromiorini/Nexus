@@ -200,3 +200,19 @@ Regra: nenhum ajuste de código nesta rodada (apenas medir); lacunas e opções 
 5. **Integração causal (C4)** — compilar arestas extraídas em um modelo causal estrutural e simular intervenções `do(X)` (Pearl, 2009); a longo prazo, modelos de transição aprendidos (Ha & Schmidhuber, 2018; Dreamer, Hafner et al., 2020) — pesado.
 
 Ordem sugerida (custo/benefício): 3 → 4 → 2 → 1 (padrões) → 5 (SCM mínimo em stdlib).
+
+---
+
+## Correção R1 — tabela única de efeitos de ação + aviso de ação desconhecida (pré-registro)
+
+Registrado antes de implementar/executar. Critérios C1–C4 inalterados (v1, `--capability causal --criteria v1`).
+
+| id | critério de sucesso R1 | antes (main b1f8fdc) |
+|---|---|---|
+| C2a | ≥ 0.80 | 0.20 |
+| C2b | verdadeiro | falso |
+| não regressão MCTS v2 | M1 = 1.0, M2 ≥ 0.8808, M4 verdadeiro, M5 ≤ 0.10 s | 1.0 / 0.8808 / verdadeiro / 0.0066 |
+| não regressão MCTS v3 | M3P, M3, M3I passam (M3 ≥ valor de main 0.1377 não exigido; só passar) | 0.9936 / 0.1377 / 0.015, todos passam |
+| golden de extração | `feb0815a…` inalterado (se mudar, re-pin só com justificativa no PR) | — |
+
+Escopo: tabela declarativa única em `core/cognitivo/action_effects.py`, consumida pelo `RealMCTSPlanner` (deltas numéricos) e pelo `RealWorldModelSimulator` (efeitos simbólicos); ação fora da tabela → `warnings` e estado inalterado. C1, C3 e C4 não são alvo (resultado relatado mesmo assim).

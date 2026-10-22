@@ -33,6 +33,8 @@ MCTS_TESTS = ("test_mcts_planner_extraction_contract.py", "test_mcts_action_cont
 _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")'
 
 CAUSAL = "core/cognitivo/causal_world_model.py"
+EFFECTS = "core/cognitivo/action_effects.py"
+R1_TESTS = ("test_action_effects_contract.py",)
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
@@ -176,10 +178,21 @@ MUTATIONS = [
              tests=CAUSAL_TESTS),
     Mutation("causal_graph_not_updated", CAUSAL, 'self.causal_graph["adjacency"][cause].add(effect)', "pass",
              tests=CAUSAL_TESTS),
-    Mutation("world_patch_not_secure", CAUSAL, 'state.state["system_status"] = "secure"',
-             'state.state["system_status"] = "stable_"', tests=CAUSAL_TESTS),
-    Mutation("world_ignore_alert_noop", CAUSAL, 'state.state["system_status"] = "compromised"', "pass",
-             tests=CAUSAL_TESTS),
+    Mutation("world_patch_not_secure", EFFECTS, '"low", "system_status": "secure"}},\n    "IGNORE',
+             '"low", "system_status": "stable_"}},\n    "IGNORE', tests=CAUSAL_TESTS),
+    Mutation("world_ignore_alert_noop", EFFECTS, '"world": {"alert_level": "critical", "system_status": "compromised"}',
+             '"world": {}', tests=CAUSAL_TESTS),
+    Mutation("r1_unknown_action_silent", CAUSAL, 'warnings.append(f"unknown action: {action!r}")', "pass",
+             tests=R1_TESTS),
+    Mutation("r1_unknown_action_applies_nothing_but_breaks", CAUSAL, "                continue\n", "                break\n",
+             tests=R1_TESTS),
+    Mutation("r1_planner_shares_mutable_table", EFFECTS, "dict(entry[\"metrics\"])", "entry[\"metrics\"]",
+             tests=R1_TESTS),
+    Mutation("r1_rollback_noop", EFFECTS,
+             '"world": {"security_patch_applied": False, "alert_level": "medium", "system_status": "stable"}',
+             '"world": {}', tests=R1_TESTS),
+    Mutation("r1_delta_changed", EFFECTS, '"SHUTDOWN_SERVICE": {"metrics": {"security": +0.8',
+             '"SHUTDOWN_SERVICE": {"metrics": {"security": +0.7', tests=R1_TESTS),
     Mutation("world_shallow_copy_mutates_state", CAUSAL, "copy.deepcopy(self.current_state)",
              "self.current_state", tests=CAUSAL_TESTS),
     Mutation("world_compare_picks_min", CAUSAL, "best_idx = max(", "best_idx = min(", tests=CAUSAL_TESTS),

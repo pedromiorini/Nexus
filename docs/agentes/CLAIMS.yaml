@@ -3,10 +3,14 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "Extração move-only de causal+world model para core/cognitivo e auditoria funcional (C1-C3)"
+    tarefa: "Correções R1-R3 do causal + world model (tabela de efeitos, ranking ordinal, negação/marcadores)"
     arquivos:
+      - core/cognitivo/action_effects.py
       - core/cognitivo/causal_world_model.py
-      - core/constitutional_brain.py
+      - core/cognitivo/mcts_planner.py
+      - test_action_effects_contract.py
+      - test_futures_ranking_contract.py
+      - test_causal_extraction_contract.py
       - test_causal_world_model_extraction_contract.py
       - tools/cognitivo_mutation.py
       - tools/cognitivo_eval.py
@@ -14,5 +18,5 @@ claims:
       - audit_reality.json
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - docs/agentes/CLAIMS.yaml
-    pr: 96
-    expira_em: "2026-10-26T18:00:00+00:00"
+    pr: 97
+    expira_em: "2026-10-27T18:00:00+00:00"

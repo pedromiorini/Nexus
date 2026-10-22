@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from numbers import Real
 from typing import Any, Dict, List, Optional
 
+from core.cognitivo.action_effects import planner_deltas
+
 __all__ = ["MCTSNode", "PlanResult", "RealMCTSPlanner"]
 
 
@@ -125,18 +127,7 @@ class RealMCTSPlanner:
         self.total_nodes_created = 0
 
         # Biblioteca de domínios de ação predefinidos
-        self._action_effects: Dict[str, Dict] = {
-            "APPLY_PATCH":        {"security": +0.9, "stability": +0.3, "cost": -0.2},
-            "IGNORE_ALERT":       {"security": -0.8, "stability": -0.5, "cost": 0.0},
-            "ROLLBACK":           {"security": +0.4, "stability": +0.6, "cost": -0.4},
-            "ESCALATE":           {"security": +0.6, "stability": +0.2, "cost": -0.3},
-            "MONITOR":            {"security": +0.2, "stability": +0.1, "cost": -0.1},
-            "ISOLATE_SYSTEM":     {"security": +0.7, "stability": -0.2, "cost": -0.3},
-            "RESTORE_BACKUP":     {"security": +0.5, "stability": +0.8, "cost": -0.5},
-            "DEPLOY_UPDATE":      {"security": +0.4, "stability": +0.5, "cost": -0.4},
-            "INCREASE_LOGGING":   {"security": +0.3, "stability": +0.0, "cost": -0.1},
-            "SHUTDOWN_SERVICE":   {"security": +0.8, "stability": -0.7, "cost": -0.2},
-        }
+        self._action_effects: Dict[str, Dict] = planner_deltas()  # tabela única (core.cognitivo.action_effects)
         # Escopo de um plan(): ações permitidas, efeitos de ações customizadas e
         # melhor sequência completa encontrada nos rollouts (estratégia "top score").
         self._plan_actions: Optional[List[str]] = None
