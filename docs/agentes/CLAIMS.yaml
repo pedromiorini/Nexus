@@ -1,4 +1,12 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "Rejeitar linha de estado fora do bloco NEXUS-CURRENT-STATE no auditor"
+    arquivos:
+      - tools/state_consistency_audit.py
+      - test_state_stray_marker_contract.py
+      - docs/agentes/CLAIMS.yaml
+      - docs/agentes/LICOES_APRENDIDAS.md
+    expira_em: "2026-10-25T06:33:00+00:00"
