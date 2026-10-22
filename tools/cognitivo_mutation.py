@@ -35,6 +35,7 @@ _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isi
 CAUSAL = "core/cognitivo/causal_world_model.py"
 EFFECTS = "core/cognitivo/action_effects.py"
 R1_TESTS = ("test_action_effects_contract.py",)
+R2_TESTS = ("test_futures_ranking_contract.py",)
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
@@ -196,6 +197,11 @@ MUTATIONS = [
     Mutation("world_shallow_copy_mutates_state", CAUSAL, "copy.deepcopy(self.current_state)",
              "self.current_state", tests=CAUSAL_TESTS),
     Mutation("world_compare_picks_min", CAUSAL, "best_idx = max(", "best_idx = min(", tests=CAUSAL_TESTS),
+    Mutation("r2_secure_equals_stable", CAUSAL, '{"secure": 3, "stable": 2,', '{"secure": 2, "stable": 2,',
+             tests=R2_TESTS),
+    Mutation("r2_vulnerable_equals_compromised", CAUSAL, '"vulnerable": 1,\n', '"vulnerable": 0,\n', tests=R2_TESTS),
+    Mutation("r2_unknown_status_ranks_high", CAUSAL, '"system_status"), -1)', '"system_status"), 9)',
+             tests=R2_TESTS),
 ]
 
 

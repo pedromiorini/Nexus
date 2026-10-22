@@ -10,6 +10,10 @@ from typing import Any, Dict, List, Optional
 
 from core.cognitivo.action_effects import ACTION_EFFECTS
 
+# R2: utilidade ordinal do estado final (status desconhecido fica abaixo de todos)
+STATUS_UTILITY: Dict[str, int] = {"secure": 3, "stable": 2, "isolated": 1, "offline": 1, "vulnerable": 1,
+                                  "compromised": 0}
+
 
 @dataclass
 class CausalRelation:
@@ -115,7 +119,9 @@ class RealWorldModelSimulator:
     def compare_futures(self, action_sequences: List[List[str]]) -> Dict:
         """Comparar múltiplos futuros"""
         results = [self.simulate(seq) for seq in action_sequences]
-        best_idx = max(range(len(results)), key=lambda i: results[i].success)
+        best_idx = max(range(len(results)),
+                       key=lambda i: (results[i].success,
+                                      STATUS_UTILITY.get(results[i].final_state.state.get("system_status"), -1)))
 
         return {
             "results": results,
