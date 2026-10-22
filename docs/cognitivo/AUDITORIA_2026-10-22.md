@@ -65,3 +65,9 @@ O harness passa a aceitar `--criteria {v1,v2}` (padrão v2); v1 continua reprodu
 | M3 v2 | Cenário endurecido: domínio padrão, os 4 goals da v1, **max_depth = 8**, seeds 0–9 (`random.seed(s)` antes de cada `plan`). Valor = `_evaluate_state` após a sequência. Regret = (melhor valor observado no cenário, entre todos os planos avaliados) − valor; equivalente a comparar médias | regret médio(2000) **<** regret médio(50), `<` estrito mantido |
 
 Regra: se um PR falhar a v2, os critérios não serão ajustados de novo; a falha é reportada.
+
+### Registro de resultados v2 (22/10/2026); critérios acima não alterados
+- #89 (episódica): EM1 1,00, passa.
+- #90 (preditiva): PC1 v2 0,3195 (persistência 0,479; 17/20 seeds), PC2 0,25, PC3 v2 0,0798 (17/20 seeds): passa.
+- #91 (MCTS): M1 1,00, M2 0,8808, M4 e M5 passam. **M3 v2 FALHA**: regret(2000) = regret(50) = 0,0 com max_depth=8
+  (o teto persiste). Mesclado com a falha registrada, por aprovação de Pedro em 22/10 16:52; sem nova emenda.
