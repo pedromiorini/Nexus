@@ -2881,6 +2881,8 @@ class RealToolUse:
         self.successful_executions = 0
         self.failed_executions = 0
         self.cached_executions = 0
+        # Grants explícitos por nome de ferramenta. Vazio = fail-closed.
+        self._permission_grants: Set[str] = set()
 
         print("🔧 POST 16 - RealToolUse initialized (Safe external action capability)")
 
@@ -3291,6 +3293,22 @@ class RealToolUse:
 
         return operations[operation](items)
 
+    def grant_permission(self, tool_name: str) -> None:
+        """Concede execução a uma ferramenta já registrada. Não cria a ferramenta."""
+        if (
+            not isinstance(tool_name, str)
+            or tool_name == ""
+            or self.registry.get_tool(tool_name) is None
+        ):
+            raise ValueError("permission grant rejected")
+        self._permission_grants.add(tool_name)
+
+    def revoke_permission(self, tool_name: str) -> None:
+        """Remove o grant. Nome nunca concedido não é erro."""
+        if not isinstance(tool_name, str) or tool_name == "":
+            raise ValueError("permission revoke rejected")
+        self._permission_grants.discard(tool_name)
+
     def execute_tool(self, tool_name: str, params: Dict[str, Any]) -> ToolExecutionResult:
         """
         Executar ferramenta com validação completa.
@@ -3314,6 +3332,22 @@ class RealToolUse:
                 success=False,
                 result=None,
                 error=f"Tool '{tool_name}' not found"
+            )
+
+        # Fail-closed: flag verdadeira sem grant não chega ao cache nem ao executor.
+        if tool.requires_permission and tool_name not in self._permission_grants:
+            self.failed_executions += 1
+            error = "permission denied: no active grant"
+            self.log.log_event("TOOL_PERMISSION_DENIED", {
+                "tool": tool_name,
+                "reason": "no_active_grant",
+            })
+            return ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=error,
+                execution_time=time.time() - start_time,
             )
 
         # A definição é mutável; revalidar o orçamento antes de cada chamada.
