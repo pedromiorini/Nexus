@@ -486,3 +486,119 @@ PR draft: https://github.com/pedromiorini/Nexus/pull/105
 ### Varredura §7.2 (2026-10-23, `gh pr list --state open`)
 
 Nenhum PR aberto altera `core/cognitivo/counterfactual.py`, `tools/cognitivo_mutation.py` ou este arquivo. O #79 (não editado) mexe no comentário de `docs/agentes/CLAIMS.yaml` e esvazia `claims` na branch dele. O claim obsoleto do #104, já mesclado, é substituído pelo claim desta tarefa a partir da `main` `fe57c82`, sem usar o #79 como base. State docs, Axis, #38–#50 e #60 ficam de fora.
+
+## CF gap do(X) — critérios pré-registrados (CF9)
+
+**Objetivo:** quando `world_model` ou o grafo causal expõem intervenção, `generate_counterfactual_scenario` deixa de responder só com o prefixo `outcome_with_` e com o template lexical `"{situation} causes {intervention}"`. A intervenção mapeada consulta `simulate` / `do` / `_do` (Pearl, *Causality*, 2009; o mesmo recorte simbólico já usado em C4). Sem esse protocolo, a heurística de CF1/CF2/CF4–CF8 e o planner de CF3 permanecem.
+**Não escopo:** calibração de plausibilidade (a fórmula `0.7 - 0.05*|chain|` não muda), Axis, state docs congelados (`CONTINUATION.md`, `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md`, `SECURITY_TRIAGE.md`), `core/constitutional_brain.py`, `tools/targeted_mutation.py`, PRs #38–#50 / #60 / #79, abdução, ruído exógeno e twin network completo. O factual (`intervention is None`) continua `outcome_without_intervention` quando não há `predict_outcome` chamável — limitação desta rodada, não um Y e um Y_x ambos lidos do SCM.
+**Eval:** `tools/cognitivo_eval.py` não ganha id novo. O contrato `test_counterfactual_eval_contract.py` fixa CF1–CF8. CF9 é medido pelo contrato novo. Regressão exigida: `python tools/cognitivo_eval.py --capability counterfactual --criteria v1` com CF1–CF8 passando, inclusive CF3.
+
+### Observação (base `629541f`, antes de código e antes de reexecutar o eval)
+
+Comando (só leitura), `PYTHONPATH=.` e Python 3.12.3:
+
+`RealCausalReasoning.extract_causal_relations("DEPLOY_FIX causes system_status secure")` grava a aresta `DEPLOY_FIX → {system_status secure}`. `RealWorldModelSimulator._do("DEPLOY_FIX")` devolve `{system_status: secure}` e `simulate(["DEPLOY_FIX"]).final_state.state["system_status"]` fica `secure`, sem warning. O mesmo par, passado a `RealCounterfactualReasoningEngine(world_model=..., causal_reasoning=...)`, produz `counterfactual_outcome == "outcome_with_DEPLOY_FIX"`, `actual_outcome == "outcome_without_intervention"` e `causal_chain == ["host exposed causes DEPLOY_FIX"]`. Um spy com `simulate` e sem `predict_outcome`, intervenção `APPLY_PATCH`, registra `calls == []` e outcome `outcome_with_APPLY_PATCH`. `apply patch` no motor com extrator cai em `outcome_with_apply_patch` e na cadeia lexical `system vulnerable causes apply patch`. Nenhum dos dois caminhos chama `_do`.
+
+### Protocolo duck-typed (o que CF9 chama de capaz de do(X))
+
+Precedência em `_predict_outcome`: se `world_model.predict_outcome` é chamável, ele ganha (CF1) e `simulate` / `do` / `_do` não são chamados.
+
+Senão, uma intervenção `str` não vazia depois de `strip` mapeia para no máximo uma ação, nesta ordem, ou para nenhuma:
+
+1. Normalizar: `strip`, trocar espaços e hífens por `_`, colapsar `_` repetido, `upper`, tirar `_` das pontas. Se o resultado é chave de `ACTION_EFFECTS`, a ação é essa chave.
+2. Senão, se a string crua (`strip`) é chave de adjacência, a ação é essa chave.
+3. Senão, se o normalizado é chave de adjacência, a ação é essa chave.
+4. Senão, se exatamente uma chave de adjacência, em forma `upper` depois do mesmo normalizador, iguala o normalizado, a ação é a chave original (não a forma `upper`). Duas chaves ou mais: não mapeia.
+5. Senão, tokens `[a-z0-9]+` em `intervention.lower()`. Se exatamente uma chave de `ACTION_EFFECTS` tem o mesmo conjunto de tokens, a ação é essa chave (`apply patch` e `patch apply` → `APPLY_PATCH`). Zero ou duas ou mais: não mapeia.
+
+`patch` sozinho não mapeia (`{patch}` ≠ `{apply, patch}`). `isolate the system` não mapeia. Não-`str` (`True`, `False`, `int`, `float` inclusive NaN e ±inf) não mapeia e não é coerção. `False` e `""` continuam no ramo falsy já existente (`outcome_without_intervention`). `True`, `-1`, NaN e ±inf continuam a levantar `AttributeError` no `.replace` da heurística, sem chamada a `simulate`/`do`/`_do`.
+
+Adjacência lida, sem copiar aresta nova: `causal.causal_graph["adjacency"]` e, se for outro objeto, `world_model.causal_reasoning.causal_graph["adjacency"]`. A leitura dos efeitos da cadeia ocorre **antes** de `extract_causal_relations("{situation} causes {intervention}")`, para a aresta criada pelo template não contar como SCM prévio. O template continua a ser chamado quando o extrator existe (CF2).
+
+Efeito de aresta: o mesmo corte de C4 (`str(effect).strip().split(None, 1)` com dois pedaços). Pares `(chave, valor)` ordenados. Passo `do({ação}): {chave}={valor}`.
+
+Outcome contrafactual, só se houve ação mapeada e não houve `predict_outcome` chamável:
+
+1. Se `simulate` é chamável: uma chamada `simulate([ação])`. Se `final_state.state` é `dict`, o outcome é `state:` + pares `k=v` com chaves ordenadas, unidos por vírgula sem espaço. Ex.: estado C4 pós-`DEPLOY_FIX` → `state:alert_level=high,security_patch_applied=False,system_status=secure`.
+2. Senão, se `do` é chamável: uma chamada `do(ação)`.
+3. Senão, se `_do` é chamável: uma chamada `_do(ação)`.
+4. Nos ganchos `do`/`_do`, dict de efeitos vazio ou não-dict → heurística `outcome_with_`. Dict não vazio é mesclado por cima de `current_state.state` quando esse estado é dict (cópia; o estado do modelo não é obrigatoriamente mutado aqui).
+5. `simulate` e `do`/`_do` não são chamados juntos. Exceção de `simulate`/`do`/`_do` propaga; o cenário não é gravado.
+6. Sem ação, sem gancho chamável, ou `simulate` sem `dict`: heurística atual. Gancho igual a `True` ou outro não-chamável não é chamado.
+
+Cadeia (`_build_causal_chain`):
+
+- `M_do`: um passo por par de efeito da ação mapeada, no formato acima, antes dos passos lexicais.
+- Se o extrator devolve relações, elas continuam `{cause} causes {effect}` **depois** dos passos `do(`.
+- Se não há efeitos e não há relações: os 5 passos heurísticos, e nenhum passo começa com `do(`.
+- Métrica falsificável: se `|E| > 0` efeitos prévios da ação, a cadeia contém cada `do({ação}): {chave}={valor}` e **não** é igual a `["{situation} causes {intervention}"]`. Se `|E| == 0`, nenhum passo começa com `do(`.
+
+`explore_what_if` entra no mesmo caminho porque delega a `generate_counterfactual_scenario`. A string `intervention` do chamador não é trocada pela ação mapeada (CF7). Passos `planner: …` (CF3), quando existem, continuam no fim da cadeia. `model_causal_intervention`, `compare_outcomes` e `_predict_outcome(situation, None)` não chamam `simulate`/`do`/`_do`.
+
+### Hipóteses concorrentes (Strong Inference)
+
+| id | hipótese | o que a falsifica | teste barato |
+|---|---|---|---|
+| H1 | o template lexical já reflete a aresta SCM; só o prefixo `outcome_with_` está desligado de `_do` | na base `629541f`, com a aresta `DEPLOY_FIX → system_status secure` já gravada, a cadeia é só `host exposed causes DEPLOY_FIX` | sonda desta seção (já observada) e CF9-chain |
+| H2 | toda string, inclusive vazia e não mapeada, deve chamar `simulate` | `""`, `patch`, `hello` ou `isolate the system` disparam `simulate` | CF9-fallback |
+| H3 | `predict_outcome` pode ser substituído por `do(X)` quando os dois existem | CF1 deixa de valer, ou um spy vê `simulate` chamado | CF9-precedence |
+| H4 | substring basta (`patch` → `APPLY_PATCH`) | `patch` com world model capaz chama `simulate(["APPLY_PATCH"])` | CF9-fallback |
+| H5 | ligar `do(X)` altera a heurística sem modelo e derruba CF1–CF8 ou CF3 | `cognitivo_eval --criteria v1` falha, ou sem modelo o outcome deixa de ser `outcome_with_*` / a cadeia deixa de ter 5 passos | CF9-regression |
+
+Hipótese de trabalho (não vinculante; só depois deste pré-registro): implementar o protocolo acima em `core/cognitivo/counterfactual.py`, sem editar `causal_world_model.py`. O factual permanece heurístico. Isto não é abdução nem identifiability.
+
+### Critérios CF9 (v1)
+
+| id | afirmação | protocolo falsificável | alvo |
+|---|---|---|---|
+| CF9-outcome | intervenção mapeada muda o outcome contrafactual via o modelo | spy com `simulate` e sem `predict_outcome`: `generate_counterfactual_scenario("system vulnerable", "APPLY_PATCH")` chama `simulate` uma vez com `["APPLY_PATCH"]`; `counterfactual_outcome == "state:marker=from-model,system_status=secure"`; não começa com `outcome_with_`; `actual_outcome == "outcome_without_intervention"`; `intervention` permanece `APPLY_PATCH`. `apply patch` e `patch apply` chamam `simulate(["APPLY_PATCH"])` no `RealWorldModelSimulator` e o outcome é `state:alert_level=low,security_patch_applied=True,system_status=secure`. `DEPLOY_FIX` com a aresta C4 já extraída: uma `simulate(["DEPLOY_FIX"])` no simulador real e outcome `state:alert_level=high,security_patch_applied=False,system_status=secure` (o valor `secure` não está em `ACTION_EFFECTS` para essa chave; some se `_do` for ignorado). Gancho só `do` ou só `_do` (sem `simulate`) é chamado uma vez e o dict de efeitos entra na serialização | 1 chamada e serialização |
+| CF9-chain | a cadeia deixa de ser só o template quando há efeitos prévios | com a aresta C4, `_build_causal_chain("host exposed", "DEPLOY_FIX")` e a cadeia do cenário são `["do(DEPLOY_FIX): system_status=secure", "host exposed causes DEPLOY_FIX"]`, com ou sem `world_model`. `|E|==0` (grafo vazio, intervenção `APPLY_PATCH`) não produz passo `do(`. Chave original `deploy_fix` com intervenção `DEPLOY_FIX` usa `do(deploy_fix): …` e `simulate(["deploy_fix"])` | igualdade da lista |
+| CF9-fallback | sem protocolo útil, a heurística fica | sem `world_model` e sem aresta: `outcome_with_patch`, cadeia de 5 passos, CF2 `["alarm causes patch"]`. Com spy capaz: `patch`, `hello`, `isolate the system`, `"   "` e `""` não chamam `simulate`; `""` e `False` → `outcome_without_intervention`; string não vazia não mapeada → `outcome_with_` + espaços virados `_` | 0 chamadas |
+| CF9-precedence | `predict_outcome` ganha de `simulate` | objeto com os dois: `_predict_outcome("sit","act") == "wm:sit:act"` e `generate` não chama `simulate` | 0 chamadas a simulate |
+| CF9-invalid | não-str e gancho inválido não são normalizados | `True`, `-1`, `nan`, `inf`, `-inf` levantam `AttributeError` e não chamam `simulate`. Atributo `simulate=True` não é chamado; outcome heurístico. `simulate` que levanta `ValueError` propaga e não incrementa `total_scenarios_generated`. `model_causal_intervention` e `compare_outcomes` não chamam `simulate` | exceção ou 0 chamadas |
+| CF9-keep | planner e plausibilidade não são redefinidos | com planner e spy, uma chamada `plan` (CF3b) e uma `simulate`; o passo `planner:` fica depois de `do(` / lexical. `plausibility_score == max(0.1, 0.7 - 0.05*len(chain))` | fórmula intacta |
+| CF9-regression | CF1–CF8 não regridem | `python tools/cognitivo_eval.py --capability counterfactual --criteria v1` → rc 0 e `failed: []` | 8/8 |
+
+Conjunto D (mapeia): `APPLY_PATCH`, `apply patch`, `patch apply`, `apply_patch`, `DEPLOY_FIX` com aresta. Conjunto N (não mapeia): `patch`, `isolate the system`, `hello`, `""`, `"   "`.
+
+### Regressão exigida
+
+`python tools/cognitivo_eval.py --capability counterfactual --criteria v1` — CF1, CF2, CF3, CF4, CF5, CF6, CF7 e CF8 continuam passando. Golden de extração com `planner is None` e sem world model permanece o da rodada CF3 enquanto a heurística sem modelo não mudar (H5).
+
+Pré-registro escrito **antes** da implementação e **antes** de rodar o eval nesta rodada. O SHA deste commit entra no PR. Resultados, se houver, só numa seção posterior.
+
+### Resultados CF9 (após o pré-registro `c187c12`)
+
+Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, hypothesis 6.170.5, coverage 7.16.2, bandit 1.9.4). O CI usa Python 3.11; esta máquina não o executou. Números abaixo são desta execução, não um carimbo de CI hospedado.
+
+| id | valor | alvo | passou | nota |
+|---|---|---|---|---|
+| CF9-outcome | serialização do spy e do simulador real | 1 chamada e `state:` | **sim** | `APPLY_PATCH` / `apply patch` / `patch apply`; `DEPLOY_FIX` fica `system_status=secure` via `simulate` (C4 `_do` por dentro) |
+| CF9-chain | lista com `do(DEPLOY_FIX): system_status=secure` antes do template | igualdade | **sim** | também sem `world_model`, se a aresta já existe; `|E|==0` não inventa `do(` |
+| CF9-fallback | 0 chamadas em N; heurística sem modelo | 0 chamadas | **sim** | `patch` não vira `APPLY_PATCH` |
+| CF9-precedence | `wm:sit:act` e `simulate` parado | 0 chamadas | **sim** | CF1 intacto |
+| CF9-invalid | `AttributeError` em não-str; `ValueError` de `simulate` propaga | exceção | **sim** | cenário não é gravado |
+| CF9-keep | `plan` com a string original; fórmula `max(0.1, 0.7-0.05*len)` | fórmula | **sim** | não recalibrada |
+| CF9-regression | CF1–CF8 | `failed: []` | **sim** | comando abaixo |
+
+**RED** (commit `312c751`, código ainda o de `629541f`): `python -m unittest test_counterfactual_dox_contract.py` → 15 falhas, rc 1. Sete métodos de controle passaram.
+
+**GREEN:** `0184a72` (código, mutantes e o caso extra de `simulate` sem `dict`, cláusula já escrita no pré-registro). `python -m unittest test_counterfactual_dox_contract.py` → 20 testes, rc 0. O RED tinha 19 métodos; o vigésimo não entra nas 15 falhas.
+
+**Eval:** `python tools/cognitivo_eval.py --capability counterfactual --criteria v1` → rc 0, `failed: []`. O contrato de extração que fixa o golden `fbfb32e9466bf161155a7546e2db07e2f73434230d581217a44fd4b324eb646e` passou na suíte (não reexecutei o hash à parte).
+
+**Implementação:** `_predict_outcome` continua a honrar `predict_outcome` chamável. Senão, se a intervenção mapeia, chama `simulate([ação])` ou, na falta dele, `do` e só então `_do`. A cadeia lê efeitos da adjacência antes do extrator. `causal_world_model.py` não foi editado. O factual sem `predict_outcome` continua `outcome_without_intervention`.
+
+**Hipóteses:** H1 ficou excluída pela sonda anterior ao código (cadeia só lexical com a aresta já gravada). H2, H3 e H4 não se sustentam nos controles que passaram. H5 (regressão de CF1–CF8) não se sustentou neste eval. Nenhuma delas vira alegação de capacidade causal geral.
+
+**Mutação:** `python tools/cognitivo_mutation.py` → `{"declared": 97, "killed": 97, "survived": 0, "not_applied": 0}`, rc 0. Inclui `cf_do_never_consulted`, `cf_scm_edges_ignored`, `cf_do_swallows_simulate_error`, `cf_token_set_match_dropped` e `cf_do_hook_prefers_private`. `python tools/targeted_mutation.py` → 69/69 mortos, rc 0. O catálogo do Axis não foi editado.
+
+**Suíte:** `python -m unittest discover -p 'test_*.py'` → 550 testes, rc 0. Cobertura `core/cognitivo/*` 94% (piso 90); `counterfactual.py` 94% (8 statements sem execução). `core/constitutional_brain.py` 68% (piso 62), com `NEXUS_INTEGRATED_SUMMARY=/tmp/integrated.json`. `ruff check` nos alvos do workflow, rc 0. `reality_audit.py`: counterfactual.py 524 linhas, 21 funções; soma `core/cognitivo` 1976 linhas; núcleo permanece 26071 / 252 / 813. Bandit: 131 LOW, 0 MEDIUM/HIGH; `security_triage.py --check` rc 0. `validar_registro.py --expirados aviso` rc 0. `predeleg.sh HEAD origin/main` → `OK: sem conflito`.
+
+**Fora do que estes comandos medem:** o factual não é lido do SCM; não há abdução nem twin network; a fórmula de plausibilidade não foi calibrada; uma cadeia mais longa só muda o número pela fórmula antiga. CI hospedado e Python 3.11 não rodaram. Conflito de merge com os PRs que também versionam o relatório de realidade não foi resolvido.
+
+PR draft: https://github.com/pedromiorini/Nexus/pull/106
+
+### Varredura §7.2 desta rodada (2026-10-23, `gh pr list --state open`, 16 PRs)
+
+Nenhum PR aberto altera `core/cognitivo/counterfactual.py`, `core/cognitivo/causal_world_model.py`, `core/cognitivo/action_effects.py`, `tools/cognitivo_mutation.py`, `tools/cognitivo_eval.py` ou este arquivo. O #79 (draft, não usado como base) altera `docs/agentes/CLAIMS.yaml`. `AUDIT_REALITY_REPORT.md` / `audit_reality.json` aparecem em #38, #39, #40, #41, #42, #44, #46, #48 e #49; se o gate de realidade exigir recontagem depois da edição de `counterfactual.py`, o diff fica só nessa recontagem, sem o código desses PRs. State docs, Axis, `constitutional_brain` e #60 ficam de fora. O claim do #105 (já mesclado) é substituído pelo claim grok-bot desta tarefa, prazo `2026-10-26T03:00:00Z`.

@@ -42,7 +42,8 @@ R4_TESTS = ("test_scm_intervention_contract.py",)
 CF_TESTS = ("test_counterfactual_extraction_contract.py", "test_counterfactual_contract.py",
             "test_counterfactual_gap3_contract.py",
             "test_counterfactual_gap4_contract.py",
-            "test_counterfactual_planner_contract.py")
+            "test_counterfactual_planner_contract.py",
+            "test_counterfactual_dox_contract.py")
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
@@ -307,6 +308,35 @@ MUTATIONS = [
              "        return [f\"planner: {action}\" for action in sequence if isinstance(action, str)]",
              "        return []  # mutant: sequência do planner descartada",
              tests=("test_counterfactual_planner_contract.py",)),
+    Mutation("cf_do_never_consulted", COUNTERFACTUAL,
+             "        simulate = getattr(world, \"simulate\", None)\n"
+             "        if callable(simulate):\n"
+             "            result = simulate([action])\n",
+             "        simulate = None  # mutant: do(X) nunca consultado\n"
+             "        if False:\n"
+             "            result = simulate([action])\n",
+             tests=("test_counterfactual_dox_contract.py",)),
+    Mutation("cf_scm_edges_ignored", COUNTERFACTUAL,
+             "        do_steps = self._scm_do_steps(intervention)\n",
+             "        do_steps = []  # mutant: arestas SCM ignoradas\n",
+             tests=("test_counterfactual_dox_contract.py",)),
+    Mutation("cf_do_swallows_simulate_error", COUNTERFACTUAL,
+             "            result = simulate([action])\n",
+             "            try:\n"
+             "                result = simulate([action])\n"
+             "            except Exception:\n"
+             "                return None\n",
+             tests=("test_counterfactual_dox_contract.py",)),
+    Mutation("cf_token_set_match_dropped", COUNTERFACTUAL,
+             "        if len(matches) == 1:\n"
+             "            return matches[0]\n",
+             "        if False and len(matches) == 1:\n"
+             "            return matches[0]\n",
+             tests=("test_counterfactual_dox_contract.py",)),
+    Mutation("cf_do_hook_prefers_private", COUNTERFACTUAL,
+             "        for hook_name in (\"do\", \"_do\"):\n",
+             "        for hook_name in (\"_do\", \"do\"):\n",
+             tests=("test_counterfactual_dox_contract.py",)),
 ]
 
 

@@ -3,14 +3,14 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "CF3: usar planner.plan no raciocínio contrafactual"
+    tarefa: "CF9: intervenção do(X) Pearl no contrafactual (outcome via simulate/_do; cadeia com arestas SCM)"
     arquivos:
       - core/cognitivo/counterfactual.py
-      - test_counterfactual_planner_contract.py
+      - test_counterfactual_dox_contract.py
       - tools/cognitivo_mutation.py
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - docs/agentes/CLAIMS.yaml
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
-    pr: 105
+    pr: 106
     expira_em: "2026-10-26T03:00:00Z"

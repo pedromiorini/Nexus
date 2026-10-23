@@ -6,9 +6,22 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from core.cognitivo.action_effects import ACTION_EFFECTS
+
 # Sonda ao planner injetado. Não é o default 200 de RealMCTSPlanner.plan
 # e não calibra plausibilidade.
 PLANNER_PROBE_ITERATIONS = 8
+
+
+def _normalize_action_key(text: str) -> str:
+    """Mesmo normalizador do pré-registro CF9 (espaços/hífens, upper)."""
+    collapsed = re.sub(r"[\s\-]+", "_", text.strip())
+    return re.sub(r"_+", "_", collapsed).strip("_").upper()
+
+
+def _serialize_state(state: Dict[str, object]) -> str:
+    """Serialização estável do pré-registro: state:k=v com chaves ordenadas."""
+    return "state:" + ",".join(f"{key}={state[key]}" for key in sorted(state))
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MÓDULO 37: COUNTERFACTUAL REASONING ENGINE (POST 37)
@@ -167,28 +180,130 @@ class RealCounterfactualReasoningEngine:
             return []  # str solta não vira lista de caracteres
         return [f"planner: {action}" for action in sequence if isinstance(action, str)]
 
+    def _adjacency(self) -> Dict[str, object]:
+        """Arestas já gravadas. O template lexical desta chamada não entra."""
+        found: Dict[str, object] = {}
+        graphs = []
+        causal = self.causal
+        if causal is not None:
+            graphs.append(getattr(causal, "causal_graph", None))
+        world = self.world_model
+        nested = getattr(world, "causal_reasoning", None) if world is not None else None
+        if nested is not None and nested is not causal:
+            graphs.append(getattr(nested, "causal_graph", None))
+        for graph in graphs:
+            if not isinstance(graph, dict):
+                continue
+            adjacency = graph.get("adjacency")
+            if not isinstance(adjacency, dict):
+                continue
+            for key, value in adjacency.items():
+                found.setdefault(str(key), value)
+        return found
+
+    def _map_intervention(self, intervention: object) -> Optional[str]:
+        """Uma ação do vocabulário ou da adjacência, ou None. Não coage não-str."""
+        if not isinstance(intervention, str):
+            return None
+        raw = intervention.strip()
+        if not raw:
+            return None
+        normalized = _normalize_action_key(intervention)
+        adjacency = self._adjacency()
+        if normalized in ACTION_EFFECTS:
+            return normalized
+        if raw in adjacency:
+            return raw
+        if normalized in adjacency:
+            return normalized
+        folded = [key for key in adjacency if _normalize_action_key(key) == normalized]
+        if len(folded) == 1:
+            return folded[0]
+        if len(folded) > 1:
+            return None
+        tokens = set(re.findall(r"[a-z0-9]+", intervention.lower()))
+        if not tokens:
+            return None
+        matches = [
+            name
+            for name in ACTION_EFFECTS
+            if tokens == set(re.findall(r"[a-z0-9]+", name.lower()))
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        return None
+
+    def _scm_do_steps(self, intervention: object) -> List[str]:
+        """Passos do(ação) lidos da adjacência prévia, com o corte de C4."""
+        action = self._map_intervention(intervention)
+        if action is None:
+            return []
+        effects = self._adjacency().get(action)
+        if not effects:
+            return []
+        pairs = []
+        for effect in effects:
+            parts = str(effect).strip().split(None, 1)
+            if len(parts) == 2:
+                pairs.append((parts[0], parts[1]))
+        pairs.sort()
+        return [f"do({action}): {key}={value}" for key, value in pairs]
+
+    def _outcome_via_do(self, intervention: object) -> Optional[str]:
+        """Outcome contrafactual via simulate, senão do, senão _do. None = heurística."""
+        action = self._map_intervention(intervention)
+        if action is None or self.world_model is None:
+            return None
+        world = self.world_model
+        simulate = getattr(world, "simulate", None)
+        if callable(simulate):
+            result = simulate([action])
+            state = getattr(getattr(result, "final_state", None), "state", None)
+            if isinstance(state, dict):
+                return _serialize_state(state)
+            return None
+        for hook_name in ("do", "_do"):
+            hook = getattr(world, hook_name, None)
+            if not callable(hook):
+                continue
+            effects = hook(action)
+            if not isinstance(effects, dict) or not effects:
+                return None
+            current = getattr(world, "current_state", None)
+            base = getattr(current, "state", None)
+            merged = dict(base) if isinstance(base, dict) else {}
+            merged.update(effects)
+            return _serialize_state(merged)
+        return None
+
     def _predict_outcome(self, situation: str, intervention: Optional[str]) -> str:
         """Predizer outcome (com ou sem intervenção)"""
         predictor = getattr(self.world_model, "predict_outcome", None)
         if callable(predictor):
             return str(predictor(situation, intervention))
-        
-        # Heurística simples
+        modeled = self._outcome_via_do(intervention)
+        if modeled is not None:
+            return modeled
+
+        # Heurística simples. Não-str truthy continua sem coerção (AttributeError).
         if intervention:
             return f"outcome_with_{intervention.replace(' ', '_')}"
         else:
             return "outcome_without_intervention"
     
     def _build_causal_chain(self, situation: str, intervention: str) -> List[str]:
-        """Construir cadeia causal"""
+        """Construir cadeia causal. Efeitos SCM prévios vêm antes do template."""
+        do_steps = self._scm_do_steps(intervention)
         extractor = getattr(self.causal, "extract_causal_relations", None)
         if callable(extractor):
             relations = extractor(f"{situation} causes {intervention}")
             if relations:
-                return [
+                return do_steps + [
                     f"{relation.cause} causes {relation.effect}"
                     for relation in relations
                 ]
+        if do_steps:
+            return do_steps
         
         # Heurística: steps básicos
         chain = [
