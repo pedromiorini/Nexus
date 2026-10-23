@@ -3,20 +3,17 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "C4: SCM mínimo do(X) — relações extraídas alteram simulação"
+    tarefa: "Extração move-only RealCounterfactualReasoningEngine + auditoria funcional"
     arquivos:
-      - core/cognitivo/action_effects.py
-      - core/cognitivo/causal_world_model.py
-      - core/cognitivo/mcts_planner.py
-      - test_action_effects_contract.py
-      - test_futures_ranking_contract.py
-      - test_causal_extraction_contract.py
-      - test_causal_world_model_extraction_contract.py
+      - core/cognitivo/counterfactual.py
+      - core/constitutional_brain.py
+      - test_counterfactual_extraction_contract.py
+      - test_counterfactual_contract.py
       - tools/cognitivo_mutation.py
       - tools/cognitivo_eval.py
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - docs/agentes/CLAIMS.yaml
-    pr: 100
-    expira_em: "2026-10-27T18:00:00+00:00"
+    pr: 0
+    expira_em: "2026-10-26T00:49:52Z"
