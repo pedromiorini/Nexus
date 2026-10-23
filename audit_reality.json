@@ -6,7 +6,7 @@
     "extracted_modules": [
       {
         "path": "core/cognitivo/__init__.py",
-        "lines": 43,
+        "lines": 51,
         "classes": 0,
         "functions": 0
       },
@@ -33,6 +33,12 @@
         "lines": 581,
         "classes": 4,
         "functions": 26
+      },
+      {
+        "path": "core/cognitivo/episodic_future_thinking.py",
+        "lines": 366,
+        "classes": 3,
+        "functions": 16
       },
       {
         "path": "core/cognitivo/episodic_memory.py",
@@ -65,15 +71,11 @@
         "functions": 25
       }
     ],
-    "core_lines": 24886,
-    "classes": 236,
-    "functions": 757,
+    "core_lines": 24549,
+    "classes": 233,
+    "functions": 741,
     "pass_only_functions": [],
     "constant_return_functions": [
-      {
-        "qualname": "RealEpisodicFutureThinkingSystem._anticipate_growth",
-        "value": "{'knowledge': 0.8, 'skills': 0.7, 'wisdom': 0.6}"
-      },
       {
         "qualname": "test_task",
         "value": "True"
@@ -98,7 +100,6 @@
       "RealEmotionSystem.get_statistics",
       "RealEmotionalMemoryWeighting.get_statistics",
       "RealEmpathySystem.get_statistics",
-      "RealEpisodicFutureThinkingSystem.compare_future_scenarios",
       "RealEthicalReasoningEngine.get_statistics",
       "RealExplainabilityEngine.get_statistics",
       "RealGoalConditionedRetrieval.get_statistics",

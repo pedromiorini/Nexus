@@ -3,16 +3,16 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "Extrair IncrementalLearner POST12 (move-only) e auditar IL1–IL6 com critérios pré-registrados"
+    tarefa: "Extrair Episodic Future Thinking POST31 (move-only) e auditar EF1–EF6 com critérios pré-registrados"
     arquivos:
-      - core/cognitivo/incremental_learner.py
+      - core/cognitivo/episodic_future_thinking.py
       - core/cognitivo/__init__.py
       - core/constitutional_brain.py
-      - test_incremental_learner_contract.py
+      - test_episodic_future_thinking_contract.py
       - tools/cognitivo_eval.py
       - tools/cognitivo_mutation.py
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - docs/agentes/CLAIMS.yaml
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
-    expira_em: "2026-10-26T05:00:00Z"
+    expira_em: "2026-10-26T06:00:00Z"

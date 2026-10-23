@@ -3,7 +3,7 @@
 Critérios: /workspace/nexus/cognitivo/AUDITORIA_2026-10-22.md (sha256 3d24a63d…), escritos
 antes da execução. Mede propósito, não só ausência de crash.
 
-Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,attention,incremental,all} [--json PATH]
+Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,attention,incremental,episodic_future,all} [--json PATH]
 Saída: exit 0 se todo critério passa, 1 se algum falha, 2 para entrada ausente/vazia/desconhecida.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
-CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental")
+CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future")
 
 TOPICS = [
     ("database", "migration", "rollback"), ("network", "latency", "spike"), ("disk", "quota", "exceeded"),
@@ -2190,11 +2190,690 @@ def eval_incremental(criteria="v1"):
     ]
 
 
+def _ef_err(fn):
+    try:
+        fn()
+    except Exception as exc:
+        return type(exc).__name__
+    return "no-error"
+
+
+class _EfBoom:
+    def __getattr__(self, name):
+        raise AssertionError("called " + name)
+
+
+def _ef_copy_seq(value):
+    if isinstance(value, (list, tuple)):
+        return type(value)(value)
+    return value
+
+
+def _ef_event(event):
+    return {
+        "description": event.description,
+        "time_point": event.time_point,
+        "time_point_type": type(event.time_point).__name__,
+        "location": event.location,
+        "participants": _ef_copy_seq(event.participants),
+        "participants_type": type(event.participants).__name__,
+        "expected_emotions": _ef_copy_seq(event.expected_emotions),
+        "vividness": event.vividness,
+        "plausibility": event.plausibility,
+        "personal_significance": event.personal_significance,
+        "significance_type": type(event.personal_significance).__name__,
+        "event_id_is_uuid": isinstance(event.event_id, str) and len(event.event_id) == 36,
+        "created_at_is_float": isinstance(event.created_at, float),
+    }
+
+
+def _ef_intention(item):
+    return {
+        "what": item.what,
+        "what_type": type(item.what).__name__,
+        "when": item.when,
+        "where": item.where,
+        "trigger": item.trigger,
+        "trigger_type": type(item.trigger).__name__,
+        "importance": item.importance,
+        "importance_type": type(item.importance).__name__,
+        "fulfilled": item.fulfilled,
+        "id_is_uuid": isinstance(item.intention_id, str) and len(item.intention_id) == 36,
+    }
+
+
+def _ef_pre(result):
+    sensory = result["sensory_details"]
+    return {
+        "event_id_is_uuid": isinstance(result["event_id"], str) and len(result["event_id"]) == 36,
+        "sensory_details": {
+            "visual": sensory["visual"],
+            "emotional": _ef_copy_seq(sensory["emotional"]),
+            "social": _ef_copy_seq(sensory["social"]),
+        },
+        "vividness": result["vividness"],
+        "simulation_success": result["simulation_success"],
+        "keys": sorted(result),
+    }
+
+
+def episodic_future_fingerprint(ns):
+    import inspect
+    if isinstance(ns, dict):
+        cls = ns["RealEpisodicFutureThinkingSystem"]
+        future_event = ns["FutureEvent"]
+    else:
+        cls = ns.RealEpisodicFutureThinkingSystem
+        future_event = ns.FutureEvent
+    params = list(inspect.signature(cls.__init__).parameters)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        fresh = cls()
+    banner = buf.getvalue()
+
+    def quiet(memory=None, emotion=None, simulation=None, consciousness=None):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return cls(memory, simulation, consciousness, emotion)
+
+    def open_system():
+        system = quiet()
+        system.set_prospective_memory("keep", "later", where="room", trigger="bell")
+        return system
+
+    mem = _EfBoom()
+    emo = _EfBoom()
+    sim = _EfBoom()
+    cons = _EfBoom()
+    both = quiet(mem, emo, sim, cons)
+    quiet_day = both.imagine_future_event("Quiet day", "tomorrow")
+    override = both.imagine_future_event(
+        "SUCCESS parade", "tomorrow",
+        {"location": "hall", "participants": ["a"], "significance": 0.9},
+    )
+    challenge = both.imagine_future_event("challenge ahead", "next week")
+    quiet_view = _ef_event(quiet_day)
+    override_view = _ef_event(override)
+    challenge_view = _ef_event(challenge)
+    quiet_day.participants.append("x")
+    again = both.imagine_future_event("Quiet day", "tomorrow")
+    none_sim = quiet(mem, emo, None, None)
+    none_view = _ef_event(none_sim.imagine_future_event("Quiet day", "tomorrow"))
+
+    memory_only = quiet(_EfBoom(), None)
+    memory_success = _ef_event(memory_only.imagine_future_event("success today", "tomorrow"))
+    emotion_only = quiet(None, _EfBoom())
+    emotion_cases = {
+        name: _ef_event(emotion_only.imagine_future_event(text, "t"))
+        for name, text in (
+            ("success", "success"),
+            ("achievement", "big achievement"),
+            ("challenge", "The Challenge"),
+            ("meeting", "team meeting"),
+            ("empty", ""),
+            ("homework", "homework"),
+            ("network", "network"),
+            ("lunch", "lunch"),
+            ("travel", "travel"),
+            ("presentation", "presentation"),
+            ("workshop", "workshop"),
+            ("working", "Working late"),
+        )
+    }
+    neither = quiet(None, None)
+    neither_success = _ef_event(neither.imagine_future_event("success today", "tomorrow"))
+    falsy = {}
+    for label, value in (("empty_str", ""), ("zero", 0), ("list", []), ("false", False), ("none", None)):
+        falsy[label] = _ef_event(quiet(value, None).imagine_future_event("success", "t"))
+    truthy = {
+        "one": _ef_event(quiet(1, None).imagine_future_event("plain", "t")),
+        "object": _ef_event(quiet(object(), None).imagine_future_event("plain", "t")),
+    }
+    plain = quiet(None, None)
+    omitted = _ef_event(plain.imagine_future_event("plain", "later"))
+    explicit_none = _ef_event(plain.imagine_future_event("plain", "later", None))
+    empty_details = _ef_event(plain.imagine_future_event("plain", "later", {}))
+    detail_system = quiet(None, None)
+    sig0 = _ef_event(detail_system.imagine_future_event("plain", "t", {"significance": 0}))
+    sig_false = _ef_event(detail_system.imagine_future_event("plain", "t", {"significance": False}))
+    loc_empty = _ef_event(detail_system.imagine_future_event("plain", "t", {"location": ""}))
+    parts_none = _ef_event(detail_system.imagine_future_event("plain", "t", {"participants": None}))
+    parts_tuple = _ef_event(detail_system.imagine_future_event("plain", "t", {"participants": ("a", "b")}))
+    sig_nan = _ef_event(detail_system.imagine_future_event("plain", "t", {"significance": float("nan")}))
+    sig_inf = _ef_event(detail_system.imagine_future_event("plain", "t", {"significance": float("inf")}))
+    sig_neg = _ef_event(detail_system.imagine_future_event("plain", "t", {"significance": -1}))
+    details_zero = _ef_event(detail_system.imagine_future_event("plain", "t", 0))
+    details_false = _ef_event(detail_system.imagine_future_event("plain", "t", False))
+    details_blank = _ef_event(detail_system.imagine_future_event("plain", "t", ""))
+    time_int = _ef_event(detail_system.imagine_future_event("plain", 7))
+    stored_same = both.imagined_events[0] is quiet_day
+
+    pre = quiet(_EfBoom(), _EfBoom())
+    event = pre.imagine_future_event("Quiet day", "tomorrow")
+    before = _ef_event(event)
+    first = pre.preexperience_event(event)
+    second = pre.preexperience_event(event)
+    after = _ef_event(event)
+
+    empty_stats = quiet().get_statistics()
+    stats_system = quiet(_EfBoom(), None)
+    stats_system.imagine_future_event("a", "t")
+    stats_system.imagine_future_event("b", "t")
+    stats_system.imagined_events[1].vividness = 0.25
+    stats_system.preexperience_event(stats_system.imagined_events[0])
+    two_stats = stats_system.get_statistics()
+
+    prospective = quiet()
+    default_item = prospective.set_prospective_memory("call", "tomorrow")
+    blank_trigger = prospective.set_prospective_memory("x", "tonight", trigger="")
+    explicit = prospective.set_prospective_memory(
+        "review", "monday", where="lab", trigger="bell", importance=0.8,
+    )
+    none_trigger = prospective.set_prospective_memory("n", "soon", trigger=None)
+    zero_trigger = prospective.set_prospective_memory("z", "soon", trigger=0)
+    none_what = prospective.set_prospective_memory(None, "soon")
+    importance_cases = {
+        "high": _ef_intention(prospective.set_prospective_memory("h", "t", importance=1.5)),
+        "negative": _ef_intention(prospective.set_prospective_memory("n", "t", importance=-1)),
+        "true": _ef_intention(prospective.set_prospective_memory("b", "t", importance=True)),
+        "nan": _ef_intention(prospective.set_prospective_memory("q", "t", importance=float("nan"))),
+    }
+    same_intention = prospective.prospective_memories[0] is default_item
+
+    triggers = quiet()
+    first_intention = triggers.set_prospective_memory(
+        "call Ana", "tomorrow", where="office", trigger="phone", importance=0.9,
+    )
+    second_intention = triggers.set_prospective_memory(
+        "send notes", "today", where="", trigger="email", importance=0.2,
+    )
+    done = triggers.set_prospective_memory(
+        "already", "tomorrow", where="lab", trigger="bell", importance=0.4,
+    )
+    day_item = triggers.set_prospective_memory("day-match", "day", where="nowhere", trigger="nope")
+    triggers.fulfill_intention(done.intention_id)
+    contexts = {
+        "empty": {},
+        "time_tomorrow": {"time": "tomorrow"},
+        "time_today": {"time": "today"},
+        "location_office": {"location": "office"},
+        "location_home_office": {"location": "home office"},
+        "event_phone": {"event": "phone call"},
+        "event_email": {"event": "email"},
+        "blank_strings": {"time": "", "location": "", "event": ""},
+        "zeros": {"time": 0, "location": 0, "event": 0},
+        "all_ana": {"time": "tomorrow", "location": "office", "event": "phone"},
+    }
+    triggered = {}
+    same_object = {}
+    for name, context in contexts.items():
+        found = triggers.check_prospective_triggers(context)
+        triggered[name] = [item.what for item in found]
+        same_object[name] = all(item in triggers.prospective_memories for item in found)
+
+    fulfill = quiet()
+    missing_return = fulfill.fulfill_intention("missing")
+    missing_counter = fulfill.fulfilled_intentions
+    kept = fulfill.set_prospective_memory("keep", "later", where="room", trigger="bell")
+    other = fulfill.set_prospective_memory("other", "later", where="room", trigger="bell")
+    once_return = fulfill.fulfill_intention(kept.intention_id)
+    once = {
+        "return": once_return is None,
+        "fulfilled": kept.fulfilled,
+        "other_open": other.fulfilled is False,
+        "stats": fulfill.get_statistics(),
+    }
+    twice_return = fulfill.fulfill_intention(kept.intention_id)
+    twice = {"return": twice_return is None, "stats": fulfill.get_statistics(), "flag": kept.fulfilled}
+    lone = quiet()
+    lone_item = lone.set_prospective_memory("only", "later")
+    lone.fulfill_intention(lone_item.intention_id)
+    lone.fulfill_intention(lone_item.intention_id)
+    lone_stats = lone.get_statistics()
+
+    horizons = {}
+    growth = {}
+    for horizon in (
+        "1 year", "YEAR", "yearly", "next month", "Month", "1 year and 1 month",
+        "tomorrow", "", "week", "monthly",
+    ):
+        projected = quiet().project_future_self(horizon)
+        horizons[horizon] = projected["projected_changes"]
+        growth[horizon] = {
+            "growth": projected["anticipated_growth"],
+            "continuity": projected["continuity_with_current_self"],
+            "horizon": projected["time_horizon"],
+        }
+
+    left = future_event("a", "d", "t", "loc", [], [], 0.9, 0.4, 0.2, 1.0)
+    right = future_event("b", "d", "t", "loc", [], [], 0.3, 0.8, 0.5, 1.0)
+    tied = future_event("c", "d", "t", "loc", [], [], 0.5, 0.4, 0.4, 1.0)
+    tied_other = future_event("d", "d", "t", "loc", [], [], 0.5, 0.4, 0.5, 1.0)
+    product_tie = future_event("e", "d", "t", "loc", [], [], 0.4, 0.1, 0.5, 1.0)
+    nan_left = future_event("n", "d", "t", "loc", [], [], float("nan"), 0.2, 0.9, 1.0)
+    bool_left = future_event("t", "d", "t", "loc", [], [], 0.4, 0.2, True, 1.0)
+    bool_right = future_event("u", "d", "t", "loc", [], [], 0.4, 0.2, False, 1.0)
+    cmp_system = quiet()
+
+    def cmp(one_event, other_event):
+        return cmp_system.compare_future_scenarios(one_event, other_event)
+
+    int_with_both = quiet(_EfBoom(), _EfBoom())
+    int_event = _ef_event(int_with_both.imagine_future_event(1, "t"))
+
+    return {
+        "clock": "wall" if "clock" not in params else "injected",
+        "init_params": params,
+        "banner": banner,
+        "fields": {
+            "future": [field for field in future_event.__dataclass_fields__],
+            "prospective": [field for field in (
+                ns["ProspectiveMemory"] if isinstance(ns, dict) else ns.ProspectiveMemory
+            ).__dataclass_fields__],
+        },
+        "wired": {
+            "memory": quiet(mem, emo, sim, cons).memory is mem,
+            "mental_simulation": quiet(mem, emo, sim, cons).mental_simulation is sim,
+            "consciousness": quiet(mem, emo, sim, cons).consciousness is cons,
+            "emotion": quiet(mem, emo, sim, cons).emotion is emo,
+            "counters": [fresh.total_events_imagined, fresh.total_preexperiences, fresh.fulfilled_intentions],
+            "empty_lists": fresh.imagined_events == [] and fresh.prospective_memories == [],
+        },
+        "both": {
+            "quiet": quiet_view,
+            "override": override_view,
+            "challenge": challenge_view,
+            "again_participants": again.participants,
+            "ids_differ": len({quiet_day.event_id, override.event_id, challenge.event_id, again.event_id}) == 4,
+            "count": both.total_events_imagined,
+            "stored_same": stored_same,
+            "simulation_ignored": none_view == _ef_event(quiet(mem, emo).imagine_future_event("Quiet day", "tomorrow")),
+        },
+        "memory_only": memory_success,
+        "emotion_only": emotion_cases,
+        "neither": neither_success,
+        "falsy_memory": falsy,
+        "truthy_memory": truthy,
+        "details": {
+            "omitted": omitted,
+            "none": explicit_none,
+            "empty": empty_details,
+            "views_equal": omitted == explicit_none == empty_details,
+            "significance_zero": sig0["personal_significance"],
+            "significance_false": sig_false["personal_significance"],
+            "significance_false_type": sig_false["significance_type"],
+            "location_empty": loc_empty["location"],
+            "participants_none": parts_none["participants"],
+            "participants_tuple": parts_tuple["participants"],
+            "participants_tuple_type": parts_tuple["participants_type"],
+            "nan": sig_nan["personal_significance"],
+            "inf": sig_inf["personal_significance"],
+            "negative": sig_neg["personal_significance"],
+            "details_zero": details_zero,
+            "details_false": details_false,
+            "details_blank": details_blank,
+            "time_int": time_int["time_point"],
+            "time_int_type": time_int["time_point_type"],
+        },
+        "preexperience": {
+            "first": _ef_pre(first),
+            "second": _ef_pre(second),
+            "same_event_id": first["event_id"] == second["event_id"] == event.event_id,
+            "count": pre.total_preexperiences,
+            "imagined": pre.total_events_imagined,
+            "unchanged": before == after,
+        },
+        "stats": {"empty": empty_stats, "two": two_stats},
+        "prospective": {
+            "default": _ef_intention(default_item),
+            "blank_trigger": _ef_intention(blank_trigger),
+            "explicit": _ef_intention(explicit),
+            "none_trigger": _ef_intention(none_trigger),
+            "zero_trigger": _ef_intention(zero_trigger),
+            "none_what": _ef_intention(none_what),
+            "importance": importance_cases,
+            "same_object": same_intention,
+            "default_trigger_is_when": default_item.trigger == default_item.when,
+        },
+        "triggers": {
+            "found": triggered,
+            "same_object": same_object,
+            "fulfilled_skipped": done.what not in triggered["time_tomorrow"],
+            "open": [first_intention.fulfilled, second_intention.fulfilled, day_item.fulfilled],
+        },
+        "fulfill": {
+            "missing_return_none": missing_return is None,
+            "missing_counter": missing_counter,
+            "once": once,
+            "twice": twice,
+            "lone_double": lone_stats,
+        },
+        "project": {"changes": horizons, "growth": growth},
+        "compare": {
+            "differ": cmp(left, right),
+            "vivid_tie": cmp(tied, tied_other),
+            "product_tie": cmp(tied, product_tie),
+            "nan": cmp(nan_left, right),
+            "bool": cmp(bool_left, bool_right),
+        },
+        "gaps": {
+            "int_description_with_memory_and_emotion": int_event,
+            "memory_not_called": both.imagined_events[0].location == "familiar_place",
+        },
+        "errors": {
+            "desc_int": _ef_err(lambda: quiet(None, None).imagine_future_event(1, "t")),
+            "details_list": _ef_err(lambda: quiet().imagine_future_event("plain", "t", [1])),
+            "details_true": _ef_err(lambda: quiet().imagine_future_event("plain", "t", True)),
+            "horizon_int": _ef_err(lambda: quiet().project_future_self(1)),
+            "horizon_none": _ef_err(lambda: quiet().project_future_self(None)),
+            "context_none_empty": _ef_err(lambda: quiet().check_prospective_triggers(None)),
+            "context_str_empty": _ef_err(lambda: quiet().check_prospective_triggers("time")),
+            "context_list_empty": _ef_err(lambda: quiet().check_prospective_triggers([])),
+            "context_none": _ef_err(lambda: open_system().check_prospective_triggers(None)),
+            "context_str": _ef_err(lambda: open_system().check_prospective_triggers("time")),
+            "context_list": _ef_err(lambda: open_system().check_prospective_triggers([])),
+            "context_omitted": _ef_err(lambda: open_system().check_prospective_triggers()),
+            "preexperience_none": _ef_err(lambda: quiet().preexperience_event(None)),
+            "compare_missing": _ef_err(lambda: quiet().compare_future_scenarios(
+                type("E", (), {"event_id": "a", "vividness": 0.1, "plausibility": 0.1})(),
+                right,
+            )),
+            "compare_str_significance": _ef_err(lambda: quiet().compare_future_scenarios(
+                future_event("s", "d", "t", "loc", [], [], 0.2, 0.2, "high", 1.0),
+                right,
+            )),
+        },
+    }
+
+
+EF_SOURCE_SHA = "a72a34bcc303f98b37cd5e33e030ab69bea8579d4f111c95981b2cf9785cb3e7"
+EF_BEHAVIOR_SHA = "062870d6a044174d49150fc6008521105c05557c40c2f46a4e83cd116b761f27"
+_EF_MARKER = "# MÓDULO 31: EPISODIC FUTURE THINKING SYSTEM (POST 31)\n"
+_EF_END = (
+    '            "avg_event_vividness": sum(e.vividness for e in self.imagined_events) '
+    "/ max(1, len(self.imagined_events))\n        }\n"
+)
+_EF_NAMES = ("FutureEvent", "ProspectiveMemory", "RealEpisodicFutureThinkingSystem")
+_EF_YEAR = ["increased_experience", "new_skills", "evolved_goals"]
+_EF_MONTH = ["incremental_progress", "learning"]
+_EF_MINOR = ["minor_changes"]
+
+
+def episodic_future_source_text(src: str) -> str:
+    idx = src.index(_EF_MARKER)
+    line_start = src.rfind("\n", 0, idx - 1) + 1
+    end = src.index(_EF_END, idx) + len(_EF_END)
+    return src[line_start:end]
+
+
+def _ef_sha(payload) -> str:
+    import hashlib
+    text = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def _episodic_future_source_sha() -> str:
+    import hashlib
+    text = (ROOT / "core/cognitivo/episodic_future_thinking.py").read_text(encoding="utf-8")
+    return hashlib.sha256(episodic_future_source_text(text).encode()).hexdigest()
+
+
+def _episodic_future_standalone() -> bool:
+    """Árvore de imports: constitutional_brain, numpy ou vita no módulo extraído falha EF6.
+
+    Menção no docstring não conta. O bloqueio em runtime fica no contrato, fora de tools/.
+    """
+    import ast
+
+    tree = ast.parse((ROOT / "core/cognitivo/episodic_future_thinking.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names = [node.module]
+        for name in names:
+            root = name.split(".")[0]
+            if root in {"numpy", "vita"} or name == "core.constitutional_brain" or name.startswith("core.constitutional_brain."):
+                return False
+    return True
+
+
+def eval_episodic_future(criteria="v1"):
+    """EF1–EF6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    import math
+
+    import core.cognitivo.episodic_future_thinking as episodic_future
+    import core.constitutional_brain as brain
+    import core.cognitivo as package
+
+    payload = episodic_future_fingerprint(episodic_future)
+    sha_module = _ef_sha(payload)
+    sha_brain = _ef_sha(episodic_future_fingerprint(brain))
+    source_sha = _episodic_future_source_sha()
+    standalone = _episodic_future_standalone()
+    identity = all(
+        getattr(brain, name) is getattr(episodic_future, name) is getattr(package, name)
+        and getattr(episodic_future, name).__module__ == "core.cognitivo.episodic_future_thinking"
+        for name in _EF_NAMES
+    )
+    both = payload["both"]
+    quiet = both["quiet"]
+    emotions = payload["emotion_only"]
+    details = payload["details"]
+    common = ("homework", "network", "workshop", "working", "lunch", "travel", "presentation")
+    ef1 = (
+        quiet["location"] == "familiar_place"
+        and quiet["participants"] == ["friend", "colleague"]
+        and quiet["expected_emotions"] == ["happy", "excited"]
+        and quiet["vividness"] == min(1.0, 0.3 + 3 * 0.15)
+        and quiet["plausibility"] == 0.8
+        and quiet["personal_significance"] == 0.5
+        and both["override"]["location"] == "hall"
+        and both["override"]["participants"] == ["a"]
+        and both["override"]["personal_significance"] == 0.9
+        and both["override"]["expected_emotions"] == ["happy", "excited"]
+        and both["challenge"]["expected_emotions"] == ["happy", "excited"]
+        and both["again_participants"] == ["friend", "colleague"]
+        and both["ids_differ"] is True
+        and both["count"] == 4
+        and both["stored_same"] is True
+        and both["simulation_ignored"] is True
+        and payload["memory_only"]["expected_emotions"] == ["pride", "joy"]
+        and payload["memory_only"]["location"] == "familiar_place"
+        and payload["memory_only"]["vividness"] == 0.75
+        and payload["memory_only"]["plausibility"] == 0.8
+        and payload["neither"]["location"] == "unknown"
+        and payload["neither"]["vividness"] == 0.3
+        and payload["neither"]["plausibility"] == 0.5
+        and payload["neither"]["expected_emotions"] == ["pride", "joy"]
+        and emotions["challenge"]["expected_emotions"] == ["anxiety", "excitement"]
+        and emotions["challenge"]["plausibility"] == 0.5
+        and emotions["meeting"]["expected_emotions"] == ["curiosity", "neutral"]
+        and emotions["meeting"]["plausibility"] == 0.7
+        and emotions["empty"]["expected_emotions"] == ["neutral"]
+        and emotions["empty"]["plausibility"] == 0.5
+        and emotions["empty"]["vividness"] == 0.3
+        and emotions["success"]["expected_emotions"] == ["pride", "joy"]
+        and emotions["achievement"]["expected_emotions"] == ["pride", "joy"]
+        and all(emotions[name]["plausibility"] == 0.7 for name in common)
+        and all(payload["falsy_memory"][name]["location"] == "unknown" for name in payload["falsy_memory"])
+        and payload["truthy_memory"]["one"]["location"] == "familiar_place"
+        and payload["truthy_memory"]["object"]["location"] == "familiar_place"
+        and details["views_equal"] is True
+        and details["significance_zero"] == 0
+        and details["significance_false"] is False
+        and details["significance_false_type"] == "bool"
+        and details["location_empty"] == ""
+        and details["participants_none"] is None
+        and details["participants_tuple_type"] == "tuple"
+        and details["time_int"] == 7
+        and details["time_int_type"] == "int"
+        and details["details_false"]["location"] == "unknown"
+        and details["details_zero"]["expected_emotions"] == ["neutral"]
+        and details["details_blank"]["plausibility"] == 0.5
+        and payload["gaps"]["int_description_with_memory_and_emotion"]["expected_emotions"] == ["happy", "excited"]
+        and payload["gaps"]["memory_not_called"] is True
+        and payload["wired"]["memory"] is True
+        and payload["wired"]["mental_simulation"] is True
+        and payload["wired"]["consciousness"] is True
+        and payload["wired"]["emotion"] is True
+    )
+    pre = payload["preexperience"]
+    empty_stats = payload["stats"]["empty"]
+    two = payload["stats"]["two"]
+    ef2 = (
+        pre["first"]["simulation_success"] is True
+        and pre["second"]["simulation_success"] is True
+        and pre["first"]["sensory_details"]["visual"] == "Imagining familiar_place"
+        and pre["first"]["sensory_details"]["emotional"] == ["happy", "excited"]
+        and pre["first"]["sensory_details"]["social"] == ["friend", "colleague"]
+        and pre["first"]["vividness"] == 0.75
+        and pre["count"] == 2
+        and pre["imagined"] == 1
+        and pre["unchanged"] is True
+        and pre["same_event_id"] is True
+        and empty_stats["total_events_imagined"] == 0
+        and empty_stats["total_preexperiences"] == 0
+        and empty_stats["intention_fulfillment_rate"] == 0.0
+        and empty_stats["avg_event_vividness"] == 0.0
+        and two["avg_event_vividness"] == 0.5
+        and two["total_preexperiences"] == 1
+        and two["total_events_imagined"] == 2
+    )
+    prospective = payload["prospective"]
+    found = payload["triggers"]["found"]
+    ef3 = (
+        prospective["default"]["trigger"] == "tomorrow"
+        and prospective["default"]["importance"] == 0.5
+        and prospective["default"]["where"] == ""
+        and prospective["default_trigger_is_when"] is True
+        and prospective["blank_trigger"]["trigger"] == "tonight"
+        and prospective["none_trigger"]["trigger"] == "soon"
+        and prospective["zero_trigger"]["trigger"] == "soon"
+        and prospective["explicit"]["trigger"] == "bell"
+        and prospective["explicit"]["importance"] == 0.8
+        and prospective["none_what"]["what"] is None
+        and prospective["importance"]["high"]["importance"] == 1.5
+        and prospective["importance"]["negative"]["importance"] == -1
+        and prospective["importance"]["true"]["importance"] is True
+        and math.isnan(prospective["importance"]["nan"]["importance"])
+        and prospective["same_object"] is True
+        and found["empty"] == []
+        and found["time_tomorrow"] == ["call Ana"]
+        and found["time_today"] == ["send notes", "day-match"]
+        and found["location_office"] == ["call Ana", "send notes"]
+        and found["location_home_office"] == ["call Ana", "send notes"]
+        and found["event_phone"] == ["call Ana"]
+        and found["event_email"] == ["send notes"]
+        and found["blank_strings"] == []
+        and found["zeros"] == []
+        and found["all_ana"] == ["call Ana", "send notes"]
+        and payload["triggers"]["fulfilled_skipped"] is True
+        and payload["triggers"]["open"] == [False, False, False]
+        and all(payload["triggers"]["same_object"].values())
+    )
+    changes = payload["project"]["changes"]
+    growth_ok = all(
+        row["growth"] == {"knowledge": 0.8, "skills": 0.7, "wisdom": 0.6} and row["continuity"] == 0.7
+        for row in payload["project"]["growth"].values()
+    )
+    ef4 = (
+        payload["fulfill"]["missing_return_none"] is True
+        and payload["fulfill"]["missing_counter"] == 0
+        and payload["fulfill"]["once"]["return"] is True
+        and payload["fulfill"]["once"]["stats"]["intention_fulfillment_rate"] == 0.5
+        and payload["fulfill"]["once"]["stats"]["prospective_memories_active"] == 1
+        and payload["fulfill"]["once"]["stats"]["fulfilled_intentions"] == 1
+        and payload["fulfill"]["twice"]["stats"]["fulfilled_intentions"] == 2
+        and payload["fulfill"]["twice"]["stats"]["intention_fulfillment_rate"] == 1.0
+        and payload["fulfill"]["twice"]["stats"]["prospective_memories_active"] == 1
+        and payload["fulfill"]["lone_double"]["intention_fulfillment_rate"] == 2.0
+        and payload["fulfill"]["lone_double"]["fulfilled_intentions"] == 2
+        and payload["fulfill"]["lone_double"]["prospective_memories_active"] == 0
+        and changes["1 year"] == _EF_YEAR
+        and changes["YEAR"] == _EF_YEAR
+        and changes["yearly"] == _EF_YEAR
+        and changes["1 year and 1 month"] == _EF_YEAR
+        and changes["next month"] == _EF_MONTH
+        and changes["Month"] == _EF_MONTH
+        and changes["monthly"] == _EF_MONTH
+        and changes["tomorrow"] == _EF_MINOR
+        and changes[""] == _EF_MINOR
+        and changes["week"] == _EF_MINOR
+        and growth_ok
+        and len(payload["project"]["growth"]) == 10
+        and payload["compare"]["differ"] == {
+            "more_vivid": "a", "more_plausible": "b", "more_significant": "b", "preferred": "a",
+        }
+        and payload["compare"]["vivid_tie"] == {
+            "more_vivid": "d", "more_plausible": "d", "more_significant": "d", "preferred": "d",
+        }
+        and payload["compare"]["product_tie"] == {
+            "more_vivid": "c", "more_plausible": "c", "more_significant": "e", "preferred": "e",
+        }
+        and payload["compare"]["nan"]["more_vivid"] == "b"
+        and payload["compare"]["nan"]["preferred"] == "b"
+        and payload["compare"]["nan"]["more_significant"] == "n"
+        and payload["compare"]["bool"]["preferred"] == "t"
+        and payload["compare"]["bool"]["more_vivid"] == "u"
+        and payload["compare"]["bool"]["more_significant"] == "t"
+    )
+    errors = payload["errors"]
+    ef5 = (
+        errors["desc_int"] == "AttributeError"
+        and errors["details_list"] == "AttributeError"
+        and errors["details_true"] == "AttributeError"
+        and errors["horizon_int"] == "AttributeError"
+        and errors["horizon_none"] == "AttributeError"
+        and errors["preexperience_none"] == "AttributeError"
+        and errors["compare_missing"] == "AttributeError"
+        and errors["compare_str_significance"] == "TypeError"
+        and errors["context_none_empty"] == "no-error"
+        and errors["context_str_empty"] == "no-error"
+        and errors["context_list_empty"] == "no-error"
+        and errors["context_none"] == "AttributeError"
+        and errors["context_str"] == "AttributeError"
+        and errors["context_list"] == "AttributeError"
+        and errors["context_omitted"] == "TypeError"
+    )
+    ef6 = (
+        identity
+        and standalone
+        and source_sha == EF_SOURCE_SHA
+        and sha_module == sha_brain == EF_BEHAVIOR_SHA
+        and payload["clock"] == "wall"
+        and payload["init_params"] == ["self", "memory", "mental_simulation", "consciousness", "emotion"]
+        and payload["banner"].endswith("Future imagination active)\n")
+    )
+    return [
+        _check("EF1", {"vivid": quiet["vividness"], "plausible": quiet["plausibility"],
+                       "homework": emotions["homework"]["plausibility"],
+                       "network": emotions["network"]["plausibility"]},
+               ef1, "passado fixo 0.75/0.8; substring work vale 0.7; emoção não é consultada"),
+        _check("EF2", {"preexperiences": pre["count"], "avg": two["avg_event_vividness"],
+                       "empty_avg": empty_stats["avg_event_vividness"]},
+               ef2, "pré-vivência soma 2; média vazia é 0.0 e a do par é 0.5"),
+        _check("EF3", {"today": found["time_today"], "office": found["location_office"],
+                       "importance": prospective["importance"]["high"]["importance"]},
+               ef3, "substring no gatilho; where vazio casa; importância 1.5 não é cortada"),
+        _check("EF4", {"rate": payload["fulfill"]["lone_double"]["intention_fulfillment_rate"],
+                       "year_and_month": changes["1 year and 1 month"],
+                       "preferred_tie": payload["compare"]["product_tie"]["preferred"]},
+               ef4, "taxa 2.0 na segunda conclusão; year antes de month; empate fica com o segundo"),
+        _check("EF5", errors, ef5, "tipo errado quebra no uso; contexto sem intenção não lê o contexto"),
+        _check("EF6", {"source_sha": source_sha, "sha_module": sha_module, "sha_brain": sha_brain,
+                       "identity": identity, "standalone": standalone, "clock": payload["clock"],
+                       "source_golden": EF_SOURCE_SHA, "behavior_golden": EF_BEHAVIOR_SHA},
+               ef6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+    ]
+
+
 EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts,
               "causal": eval_causal, "counterfactual": eval_counterfactual,
               "working_memory": eval_working_memory,
               "attention": eval_attention,
-              "incremental": eval_incremental}
+              "incremental": eval_incremental,
+              "episodic_future": eval_episodic_future}
 
 
 def main(argv=None) -> int:
