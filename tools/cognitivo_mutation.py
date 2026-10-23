@@ -55,6 +55,8 @@ WM = "core/cognitivo/working_memory.py"
 WM_TESTS = ("test_working_memory_contract.py",)
 ATT = "core/cognitivo/attention.py"
 AT_TESTS = ("test_attention_contract.py",)
+IL = "core/cognitivo/incremental_learner.py"
+IL_TESTS = ("test_incremental_learner_contract.py",)
 
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
@@ -602,6 +604,111 @@ MUTATIONS = [
              ")\n"
              "BottomUpAttention = type(\"BottomUpAttention\", (_BottomUpAttention,), {})\n",
              tests=AT_TESTS),
+    Mutation("il_promotion_threshold_raised", IL,
+             "PROMOTION_RELEVANCE_THRESHOLD: float = 0.75   # relevância mínima para promoção",
+             "PROMOTION_RELEVANCE_THRESHOLD: float = 0.90   # relevância mínima para promoção",
+             tests=IL_TESTS),
+    Mutation("il_promotion_drops_multiplier", IL,
+             "old_imp * 1.15", "old_imp * 1.0", tests=IL_TESTS),
+    Mutation("il_promotion_drops_cap", IL,
+             "new_imp = min(self.IMPORTANCE_CAP, old_imp * 1.15)",
+             "new_imp = old_imp * 1.15", tests=IL_TESTS),
+    Mutation("il_promoted_ids_ignored", IL,
+             "and mem_id not in self.promoted_ids", "and True", tests=IL_TESTS),
+    Mutation("il_none_id_not_skipped", IL,
+             "if mem_id is None:", "if False and mem_id is None:", tests=IL_TESTS),
+    Mutation("il_promotion_stores_short_term", IL,
+             "new_imp = min(self.IMPORTANCE_CAP, old_imp * 1.15)\n"
+             "                self.memory.store(content, \"long_term\", new_imp)",
+             "new_imp = min(self.IMPORTANCE_CAP, old_imp * 1.15)\n"
+             "                self.memory.store(content, \"short_term\", new_imp)",
+             tests=IL_TESTS),
+    Mutation("il_reinforcement_boost_zero", IL,
+             "REINFORCEMENT_IMPORTANCE_BOOST: float = 0.08  # boost por acesso extra",
+             "REINFORCEMENT_IMPORTANCE_BOOST: float = 0.0  # boost por acesso extra",
+             tests=IL_TESTS),
+    Mutation("il_reinforcement_ignores_relevance", IL,
+             "elif relevance >= 0.5 and old_imp >= 0.7:",
+             "elif old_imp >= 0.7:", tests=IL_TESTS),
+    Mutation("il_reinforcement_ignores_importance", IL,
+             "elif relevance >= 0.5 and old_imp >= 0.7:",
+             "elif relevance >= 0.5:", tests=IL_TESTS),
+    Mutation("il_promotion_also_reinforces", IL,
+             "elif relevance >= 0.5 and old_imp >= 0.7:",
+             "if relevance >= 0.5 and old_imp >= 0.7:", tests=IL_TESTS),
+    Mutation("il_pattern_freq_three", IL,
+             "PATTERN_MIN_FREQ: int = 2                      # freq. mínima para virar padrão",
+             "PATTERN_MIN_FREQ: int = 3                      # freq. mínima para virar padrão",
+             tests=IL_TESTS),
+    Mutation("il_pattern_importance_half", IL,
+             "PATTERN_IMPORTANCE: float = 0.92               # importância de memórias sintéticas",
+             "PATTERN_IMPORTANCE: float = 0.50               # importância de memórias sintéticas",
+             tests=IL_TESTS),
+    Mutation("il_pattern_key_keeps_case", IL,
+             "key = content[:60].lower().strip()", "key = content[:60]", tests=IL_TESTS),
+    Mutation("il_pattern_guard_removed", IL,
+             "if not already_stored:", "if True:", tests=IL_TESTS),
+    Mutation("il_pattern_synthetic_is_raw_key", IL,
+             'synthetic = f"[PATTERN freq={freq}] {content_key}"',
+             "synthetic = content_key", tests=IL_TESTS),
+    Mutation("il_decay_ignores_log", IL,
+             "if self.log and memory_ids_accessed:",
+             "if memory_ids_accessed:", tests=IL_TESTS),
+    Mutation("il_decay_runs_on_empty", IL,
+             "if self.log and memory_ids_accessed:",
+             "if self.log:", tests=IL_TESTS),
+    Mutation("il_decay_count_is_zero", IL,
+             "decayed = max(0, 5 - len(memory_ids_accessed))  # heurística",
+             "decayed = 0  # heurística", tests=IL_TESTS),
+    Mutation("il_consolidate_ignores_pattern_flag", IL,
+             "new_patterns = self.detect_and_store_patterns() if run_pattern_detection else 0",
+             "new_patterns = self.detect_and_store_patterns()", tests=IL_TESTS),
+    Mutation("il_consolidate_ignores_decay_flag", IL,
+             "if run_decay:\n            self.apply_decay(accessed_ids)",
+             "if True:\n            self.apply_decay(accessed_ids)", tests=IL_TESTS),
+    Mutation("il_consolidate_promoted_counts_all", IL,
+             "memories_promoted=sum(1 for e in all_events if e.promotion),",
+             "memories_promoted=sum(1 for e in all_events if True),", tests=IL_TESTS),
+    Mutation("il_consolidate_reinforced_counts_promotions", IL,
+             "memories_reinforced=sum(1 for e in all_events if not e.promotion),",
+             "memories_reinforced=sum(1 for e in all_events if e.promotion),", tests=IL_TESTS),
+    Mutation("il_plan_threshold_dropped", IL,
+             "if reward < 0.7:", "if reward < 0.0:", tests=IL_TESTS),
+    Mutation("il_plan_missing_reward_defaults_high", IL,
+             'reward = getattr(plan_result, "expected_reward", 0.0)',
+             'reward = getattr(plan_result, "expected_reward", 0.9)', tests=IL_TESTS),
+    Mutation("il_plan_importance_ignores_reward", IL,
+             "importance = min(self.IMPORTANCE_CAP, 0.6 + reward * 0.35)",
+             "importance = min(self.IMPORTANCE_CAP, 0.6)", tests=IL_TESTS),
+    Mutation("il_module_pulls_monolith", IL,
+             "import time\n",
+             "import time\nimport core.constitutional_brain  # noqa: F401\n", tests=IL_TESTS),
+    Mutation("il_monolith_stops_reexporting", "core/constitutional_brain.py",
+             "from core.cognitivo.incremental_learner import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    LearningEvent,\n"
+             "    ConsolidationReport,\n"
+             "    RealIncrementalLearner,\n"
+             ")\n",
+             "from core.cognitivo.incremental_learner import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    LearningEvent as _LearningEvent,\n"
+             "    ConsolidationReport,\n"
+             "    RealIncrementalLearner,\n"
+             ")\n"
+             "LearningEvent = type(\"LearningEvent\", (_LearningEvent,), {})\n",
+             tests=IL_TESTS),
+    Mutation("il_package_stops_reexporting", "core/cognitivo/__init__.py",
+             "from core.cognitivo.incremental_learner import (\n"
+             "    ConsolidationReport,\n"
+             "    LearningEvent,\n"
+             "    RealIncrementalLearner,\n"
+             ")\n",
+             "from core.cognitivo.incremental_learner import (\n"
+             "    ConsolidationReport,\n"
+             "    LearningEvent,\n"
+             "    RealIncrementalLearner as _RealIncrementalLearner,\n"
+             ")\n"
+             "RealIncrementalLearner = type(\"RealIncrementalLearner\", (_RealIncrementalLearner,), {})\n",
+             tests=IL_TESTS),
 ]
 
 

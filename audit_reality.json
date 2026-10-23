@@ -6,7 +6,7 @@
     "extracted_modules": [
       {
         "path": "core/cognitivo/__init__.py",
-        "lines": 35,
+        "lines": 43,
         "classes": 0,
         "functions": 0
       },
@@ -41,6 +41,12 @@
         "functions": 14
       },
       {
+        "path": "core/cognitivo/incremental_learner.py",
+        "lines": 334,
+        "classes": 3,
+        "functions": 7
+      },
+      {
         "path": "core/cognitivo/mcts_planner.py",
         "lines": 449,
         "classes": 3,
@@ -59,9 +65,9 @@
         "functions": 25
       }
     ],
-    "core_lines": 25192,
-    "classes": 239,
-    "functions": 764,
+    "core_lines": 24886,
+    "classes": 236,
+    "functions": 757,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -97,7 +103,6 @@
       "RealExplainabilityEngine.get_statistics",
       "RealGoalConditionedRetrieval.get_statistics",
       "RealHardwareAwareSelfOptimization.get_statistics",
-      "RealIncrementalLearner.get_statistics",
       "RealIntegrationOrchestrationEngine.get_statistics",
       "RealIntrospectionEngine.get_statistics",
       "RealKnowledgeGraph.get_statistics",

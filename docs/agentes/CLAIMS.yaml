@@ -3,12 +3,12 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "Extrair Attention POST25 (move-only) e auditar AT1–AT6 com critérios pré-registrados"
+    tarefa: "Extrair IncrementalLearner POST12 (move-only) e auditar IL1–IL6 com critérios pré-registrados"
     arquivos:
-      - core/cognitivo/attention.py
+      - core/cognitivo/incremental_learner.py
       - core/cognitivo/__init__.py
       - core/constitutional_brain.py
-      - test_attention_contract.py
+      - test_incremental_learner_contract.py
       - tools/cognitivo_eval.py
       - tools/cognitivo_mutation.py
       - docs/cognitivo/AUDITORIA_2026-10-22.md

@@ -3,7 +3,7 @@
 Critérios: /workspace/nexus/cognitivo/AUDITORIA_2026-10-22.md (sha256 3d24a63d…), escritos
 antes da execução. Mede propósito, não só ausência de crash.
 
-Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,attention,all} [--json PATH]
+Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,attention,incremental,all} [--json PATH]
 Saída: exit 0 se todo critério passa, 1 se algum falha, 2 para entrada ausente/vazia/desconhecida.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
-CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention")
+CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental")
 
 TOPICS = [
     ("database", "migration", "rollback"), ("network", "latency", "spike"), ("disk", "quota", "exceeded"),
@@ -1538,10 +1538,663 @@ def eval_attention(criteria="v1"):
 
 
 
+class _Mem:
+    def __init__(self, mode="echo"):
+        self.stores = []
+        self.retrieves = []
+        self.mode = mode
+
+    def store(self, content, tier, importance):
+        self.stores.append([content, tier, importance])
+        return 1000 + len(self.stores)
+
+    def retrieve(self, query, limit=1):
+        self.retrieves.append([query, limit])
+        if self.mode == "echo":
+            return [{"content": item[0]} for item in self.stores]
+        if self.mode == "empty":
+            return []
+        if self.mode == "tag":
+            return [{"content": query}]
+        return []
+
+
+class _Log:
+    def __init__(self):
+        self.events = []
+
+    def log_event(self, kind, payload):
+        self.events.append([kind, payload])
+
+
+class _Epi:
+    def __init__(self, memories):
+        self.memories = memories
+        self.calls = []
+
+    def get_episode_memories(self, episode_id):
+        self.calls.append(episode_id)
+        return self.memories
+
+
+class _Book:
+    def __init__(self, episodes):
+        self.episodes = episodes
+        self.searches = []
+
+    def search_episodes(self, status="closed", limit=10):
+        self.searches.append({"status": status, "limit": limit})
+        return list(self.episodes)[:limit]
+
+    def get_episode_memories(self, episode_id):
+        for episode in self.episodes:
+            if episode.episode_id == episode_id:
+                return episode.memories
+        return []
+
+
+def _view(event):
+    return {
+        "episode_id": event.episode_id,
+        "memory_id": event.memory_id,
+        "content": event.content,
+        "old_importance": event.old_importance,
+        "new_importance": event.new_importance,
+        "promotion": event.promotion,
+        "reason": event.reason,
+        "timestamp_is_float": isinstance(event.timestamp, float),
+    }
+
+
+def _run(mod, memories, log=None, mode="echo"):
+    memory = _Mem(mode=mode)
+    learner = mod.RealIncrementalLearner(_Epi(memories), memory, log)
+    events = learner.learn_from_episode("ep")
+    return learner, memory, [_view(event) for event in events]
+
+
+def _typed(fn):
+    try:
+        fn()
+    except Exception as exc:
+        return type(exc).__name__
+    return None
+
+
+def incremental_fingerprint(mod):
+    """Protocolo IL6. O dict, não o texto-fonte, entra no SHA comportamental.
+
+    Timestamps e duration numérica ficam de fora: vêm de time.time().
+    """
+    import inspect
+    from types import SimpleNamespace
+
+    learner_cls = mod.RealIncrementalLearner
+    hyper = {
+        "promotion": learner_cls.PROMOTION_RELEVANCE_THRESHOLD,
+        "boost": learner_cls.REINFORCEMENT_IMPORTANCE_BOOST,
+        "cap": learner_cls.IMPORTANCE_CAP,
+        "decay": learner_cls.DECAY_RATE,
+        "pattern_freq": learner_cls.PATTERN_MIN_FREQ,
+        "pattern_importance": learner_cls.PATTERN_IMPORTANCE,
+    }
+    init_params = list(inspect.signature(learner_cls.__init__).parameters)
+    clock = "wall" if "clock" not in init_params and "now" not in init_params else "injected"
+
+    promo_learner, promo_mem, promo_events = _run(mod, [{
+        "id": 7, "content": "alpha fact", "relevance_to_episode": 0.75, "importance": 0.8,
+    }])
+    promo_stores = [list(row) for row in promo_mem.stores]
+    promo_stats = promo_learner.get_statistics()
+    promo_ids = sorted(promo_learner.promoted_ids)
+    again = promo_learner.learn_from_episode("ep")
+    below_learner, below_mem, below_events = _run(mod, [{
+        "id": 7, "content": "alpha fact", "relevance_to_episode": 0.749, "importance": 0.4,
+    }])
+    _cap_learner, cap_mem, cap_events = _run(mod, [{
+        "id": 7, "content": "alpha fact", "relevance_to_episode": 0.9, "importance": 0.9,
+    }])
+    none_learner, none_mem, none_events = _run(mod, [
+        {"id": None, "content": "ghost", "relevance_to_episode": 0.9, "importance": 0.9},
+        {"content": "also", "relevance_to_episode": 1.0, "importance": 0.9},
+    ])
+    long_content = "L" * 100
+    long_learner, long_mem, long_events = _run(mod, [{
+        "id": 3, "content": long_content, "relevance_to_episode": 0.8, "importance": 0.5,
+    }])
+    _zero_learner, zero_mem, zero_events = _run(mod, [{
+        "id": 0, "content": "zero", "relevance_to_episode": 0.8, "importance": 0.5,
+    }])
+    _missing_imp_learner, missing_imp_mem, missing_imp_events = _run(mod, [{
+        "id": 4, "content": "no-imp", "relevance_to_episode": 0.8,
+    }])
+    missing_rel_learner, missing_rel_mem, missing_rel_events = _run(mod, [{
+        "id": 5, "content": "no-rel", "importance": 0.9,
+    }])
+    _missing_content_learner, missing_content_mem, missing_content_events = _run(mod, [{
+        "id": 6, "relevance_to_episode": 0.8, "importance": 0.5,
+    }])
+
+    def boundary(relevance, importance):
+        _learner, memory, events = _run(mod, [{
+            "id": 1, "content": "r", "relevance_to_episode": relevance, "importance": importance,
+        }])
+        return {"events": events, "stores": memory.stores, "promoted": sorted(_learner.promoted_ids)}
+
+    preset_mem = _Mem()
+    preset = learner_cls(_Epi([{
+        "id": 9, "content": "z", "relevance_to_episode": 0.9, "importance": 0.8,
+    }]), preset_mem, None)
+    preset.promoted_ids.add(9)
+    preset_events = [_view(event) for event in preset.learn_from_episode("ep")]
+
+    freq1_learner, freq1_mem, _freq1_events = _run(mod, [{
+        "id": 1, "content": "Repeat Me", "relevance_to_episode": 0.1, "importance": 0.1,
+    }])
+    freq1_new = freq1_learner.detect_and_store_patterns()
+    freq1_stores = [list(row) for row in freq1_mem.stores]
+    freq1_retrieves = [list(row) for row in freq1_mem.retrieves]
+    freq1_learner.episodic.memories = [{
+        "id": 2, "content": "  REPEAT ME  ", "relevance_to_episode": 0.1, "importance": 0.1,
+    }]
+    freq1_learner.learn_from_episode("ep2")
+    own_new = freq1_learner.detect_and_store_patterns()
+    own_again = freq1_learner.detect_and_store_patterns()
+
+    pattern_log = _Log()
+    pattern_mem = _Mem(mode="empty")
+    pattern_learner = learner_cls(_Epi([{
+        "id": 1, "content": "Repeat Me", "relevance_to_episode": 0.1, "importance": 0.1,
+    }]), pattern_mem, pattern_log)
+    pattern_learner.learn_from_episode("a")
+    pattern_learner.episodic.memories = [{
+        "id": 2, "content": "repeat me", "relevance_to_episode": 0.1, "importance": 0.1,
+    }]
+    pattern_learner.learn_from_episode("b")
+    logged_new = pattern_learner.detect_and_store_patterns()
+    tag_mem = _Mem(mode="tag")
+    tag_learner = learner_cls(_Epi([{
+        "id": 1, "content": "repeat me", "relevance_to_episode": 0.1, "importance": 0.1,
+    }]), tag_mem, _Log())
+    tag_learner.learn_from_episode("a")
+    tag_learner.learn_from_episode("b")
+    tag_new = tag_learner.detect_and_store_patterns()
+
+    plan_learner, plan_mem, _ = _run(mod, [])
+    plan_none = plan_learner.learn_from_plan(None)
+    plan_low = plan_learner.learn_from_plan(SimpleNamespace(
+        expected_reward=0.699, goal="g", best_action_sequence=["a"],
+    ))
+    plan_missing = plan_learner.learn_from_plan(SimpleNamespace(goal="g", best_action_sequence=["a"]))
+    plan_log = _Log()
+    plan_ok_mem = _Mem()
+    plan_ok = learner_cls(_Epi([]), plan_ok_mem, plan_log)
+    plan_event = plan_ok.learn_from_plan(SimpleNamespace(
+        expected_reward=0.7, goal="G" * 80, best_action_sequence=["look", "go"],
+    ))
+    plan_plain_mem = _Mem()
+    plan_plain = learner_cls(_Epi([]), plan_plain_mem, None)
+    plan_high = plan_plain.learn_from_plan(SimpleNamespace(
+        expected_reward=1.2, goal="g", best_action_sequence=[],
+    ))
+    plan_bool = plan_plain.learn_from_plan(SimpleNamespace(
+        expected_reward=True, goal="g", best_action_sequence=["a"],
+    ))
+    plan_false = plan_plain.learn_from_plan(SimpleNamespace(
+        expected_reward=False, goal="g", best_action_sequence=["a"],
+    ))
+    plan_nan = plan_plain.learn_from_plan(SimpleNamespace(
+        expected_reward=float("nan"), goal="g", best_action_sequence=["a"],
+    ))
+
+    decay_plain = learner_cls(_Epi([]), _Mem(), None)
+    decay_no_log = {"returned": decay_plain.apply_decay({1}), "stores": decay_plain.memory.stores}
+    decay_empty_log = _Log()
+    decay_empty_learner = learner_cls(_Epi([]), _Mem(), decay_empty_log)
+    decay_empty = {
+        "returned": decay_empty_learner.apply_decay(set()),
+        "log": decay_empty_log.events,
+        "stores": decay_empty_learner.memory.stores,
+    }
+    decay_counts = {}
+    for count in (1, 4, 5, 6):
+        log = _Log()
+        holder = learner_cls(_Epi([]), _Mem(), log)
+        decay_counts[str(count)] = {
+            "returned": holder.apply_decay(set(range(count))),
+            "log": log.events,
+            "stores": holder.memory.stores,
+        }
+
+    episodes = [
+        SimpleNamespace(episode_id="ep-a", memories=[{
+            "id": 1, "content": "solo", "relevance_to_episode": 0.8, "importance": 0.5,
+        }]),
+        SimpleNamespace(episode_id="ep-b", memories=[{
+            "id": 2, "content": "solo", "relevance_to_episode": 0.6, "importance": 0.8,
+        }]),
+        SimpleNamespace(episode_id="ep-c", memories=[{
+            "id": 3, "content": "quiet", "relevance_to_episode": 0.1, "importance": 0.1,
+        }]),
+    ]
+
+    def consolidate(episodes_in, last_n=10, patterns=True, decay=True, log=True):
+        book = _Book(episodes_in)
+        memory = _Mem()
+        logger = _Log() if log else None
+        holder = learner_cls(book, memory, logger)
+        report = holder.consolidate_learning(
+            last_n_episodes=last_n, run_pattern_detection=patterns, run_decay=decay,
+        ) if last_n is not None else holder.consolidate_learning()
+        return {
+            "episodes_processed": report.episodes_processed,
+            "memories_promoted": report.memories_promoted,
+            "memories_reinforced": report.memories_reinforced,
+            "patterns_detected": report.patterns_detected,
+            "total_learning_events": report.total_learning_events,
+            "duration_ok": (
+                isinstance(report.duration, float)
+                and report.duration >= 0
+                and report.duration == round(report.duration, 4)
+            ),
+            "stores": memory.stores,
+            "retrieves": memory.retrieves,
+            "searches": book.searches,
+            "log": [] if logger is None else logger.events,
+            "stats": holder.get_statistics(),
+        }
+
+    full = consolidate(episodes, last_n=10, patterns=True, decay=True, log=True)
+    flags_off = consolidate(episodes, last_n=2, patterns=False, decay=False, log=True)
+    no_log = consolidate(episodes, last_n=10, patterns=True, decay=True, log=False)
+    empty = consolidate([], last_n=None, patterns=True, decay=True, log=True)
+
+    def gap(item):
+        try:
+            _learner, memory, events = _run(mod, [item])
+        except Exception as exc:
+            return {"err": type(exc).__name__}
+        return {"events": events, "stores": memory.stores, "patterns": dict(_learner.pattern_registry)}
+
+    errors = {
+        "str_relevance": _typed(lambda: _run(mod, [{
+            "id": 1, "content": "b", "relevance_to_episode": "0.9", "importance": 0.5,
+        }])),
+        "str_importance_promotion": _typed(lambda: _run(mod, [{
+            "id": 1, "content": "b", "relevance_to_episode": 0.9, "importance": "0.5",
+        }])),
+        "str_importance_reinforcement": _typed(lambda: _run(mod, [{
+            "id": 1, "content": "b", "relevance_to_episode": 0.6, "importance": "0.8",
+        }])),
+        "plan_str_reward": _typed(lambda: learner_cls(_Epi([]), _Mem(), None).learn_from_plan(
+            SimpleNamespace(expected_reward="0.9", goal="g", best_action_sequence=["a"])
+        )),
+        "plan_missing_sequence": _typed(lambda: learner_cls(_Epi([]), _Mem(), None).learn_from_plan(
+            SimpleNamespace(expected_reward=0.9, goal="g")
+        )),
+        "plan_goal_none": _typed(lambda: learner_cls(_Epi([]), _Mem(), None).learn_from_plan(
+            SimpleNamespace(expected_reward=0.9, goal=None, best_action_sequence=["a"])
+        )),
+        "memory_item_str": _typed(lambda: _run(mod, ["nope"])),
+    }
+
+    return {
+        "hyper": hyper,
+        "clock": clock,
+        "init_params": init_params,
+        "promotion": {
+            "events": promo_events,
+            "stores": promo_stores,
+            "promoted": promo_ids,
+            "stats": promo_stats,
+            "again": [_view(event) for event in again],
+            "again_stores": [list(row) for row in promo_mem.stores],
+            "again_promoted": sorted(promo_learner.promoted_ids),
+            "again_stats": promo_learner.get_statistics(),
+        },
+        "below": {"events": below_events, "stores": below_mem.stores, "patterns": dict(below_learner.pattern_registry)},
+        "cap": {"events": cap_events, "stores": cap_mem.stores},
+        "skip_none": {
+            "events": none_events,
+            "stores": none_mem.stores,
+            "patterns": dict(none_learner.pattern_registry),
+        },
+        "long": {
+            "event_content": long_events[0]["content"],
+            "stored": long_mem.stores,
+            "key": next(iter(long_learner.pattern_registry)),
+        },
+        "zero_id": {"events": zero_events, "stores": zero_mem.stores},
+        "defaults": {
+            "missing_importance": {"events": missing_imp_events, "stores": missing_imp_mem.stores},
+            "missing_relevance": {
+                "events": missing_rel_events,
+                "stores": missing_rel_mem.stores,
+                "patterns": dict(missing_rel_learner.pattern_registry),
+            },
+            "missing_content": {"events": missing_content_events, "stores": missing_content_mem.stores},
+        },
+        "boundaries": {
+            "rel_0_5_imp_0_7": boundary(0.5, 0.7),
+            "rel_0_5_imp_under": boundary(0.5, 0.699999999999),
+            "rel_under": boundary(0.499, 0.9),
+            "reinforce_cap": boundary(0.6, 0.95),
+            "just_under_promotes_not": boundary(0.749, 0.8),
+            "both_would_match": boundary(0.8, 0.8),
+        },
+        "preset_promoted": {"events": preset_events, "stores": preset_mem.stores, "promoted": sorted(preset.promoted_ids)},
+        "patterns": {
+            "freq1_new": freq1_new,
+            "freq1_stores": freq1_stores,
+            "freq1_retrieves": freq1_retrieves,
+            "registry": dict(freq1_learner.pattern_registry),
+            "own_synthetic_first": own_new,
+            "own_synthetic_second": own_again,
+            "own_stores": freq1_mem.stores,
+            "logged_new": logged_new,
+            "logged_stores": pattern_mem.stores,
+            "logged_events": pattern_log.events,
+            "tag_suppresses": tag_new,
+            "tag_stores": tag_mem.stores,
+            "tag_patterns": tag_learner.total_patterns,
+        },
+        "plans": {
+            "none": plan_none is None and plan_mem.stores == [] and plan_learner.total_promotions == 0,
+            "low": plan_low is None and plan_mem.stores == [],
+            "missing_reward": plan_missing is None and plan_mem.stores == [],
+            "ok": None if plan_event is None else _view(plan_event),
+            "ok_store": plan_ok_mem.stores,
+            "ok_promoted": sorted(plan_ok.promoted_ids),
+            "ok_stats": plan_ok.get_statistics(),
+            "ok_log": plan_log.events,
+            "high": None if plan_high is None else _view(plan_high),
+            "high_store": plan_plain_mem.stores[0],
+            "bool_true": None if plan_bool is None else _view(plan_bool),
+            "bool_false": plan_false is None,
+            "nan": None if plan_nan is None else _view(plan_nan),
+            "plain_stores": plan_plain_mem.stores,
+        },
+        "decay": {"no_log": decay_no_log, "empty": decay_empty, "counts": decay_counts},
+        "consolidate": {"full": full, "flags_off": flags_off, "no_log": no_log, "empty": empty},
+        "gaps": {
+            "bool_true": gap({"id": 1, "content": "b", "relevance_to_episode": True, "importance": 0.5}),
+            "bool_false": gap({"id": 1, "content": "b", "relevance_to_episode": False, "importance": 0.9}),
+            "bool_importance": gap({"id": 1, "content": "b", "relevance_to_episode": 0.6, "importance": True}),
+            "nan_relevance": gap({"id": 1, "content": "b", "relevance_to_episode": float("nan"), "importance": 0.9}),
+            "nan_importance": gap({"id": 1, "content": "b", "relevance_to_episode": 0.9, "importance": float("nan")}),
+            "inf_relevance": gap({"id": 1, "content": "b", "relevance_to_episode": float("inf"), "importance": 0.5}),
+            "ninf_importance": gap({"id": 1, "content": "b", "relevance_to_episode": 0.9, "importance": float("-inf")}),
+            "negative_relevance": gap({"id": 1, "content": "b", "relevance_to_episode": -1, "importance": 0.9}),
+        },
+        "errors": errors,
+    }
+
+
+IL_SOURCE_SHA = "e09c2d75df964dd52915eaf0c0660dd45a6ac34cbf476804c786423910057542"
+IL_BEHAVIOR_SHA = "636c95bfaebbd60ca55a5e14f12e9f5ff7b6f7868f5a476b31fa479528db7767"
+_IL_MARKER = "# MÓDULO 11: INCREMENTAL LEARNER (POST12)\n"
+_IL_END = '            "pattern_registry_size": len(self.pattern_registry),\n        }\n'
+_IL_NAMES = ("LearningEvent", "ConsolidationReport", "RealIncrementalLearner")
+
+
+def incremental_source_text(src: str) -> str:
+    idx = src.index(_IL_MARKER)
+    line_start = src.rfind("\n", 0, idx - 1) + 1
+    end = src.index(_IL_END, idx) + len(_IL_END)
+    return src[line_start:end]
+
+
+def _il_sha(payload) -> str:
+    import hashlib
+    text = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def _incremental_source_sha() -> str:
+    import hashlib
+    text = (ROOT / "core/cognitivo/incremental_learner.py").read_text(encoding="utf-8")
+    return hashlib.sha256(incremental_source_text(text).encode()).hexdigest()
+
+
+def _incremental_standalone() -> bool:
+    """Árvore de imports: constitutional_brain, numpy ou vita no módulo extraído falha IL6.
+
+    Menção no docstring não conta. O bloqueio em runtime fica no contrato, fora de tools/.
+    """
+    import ast
+
+    tree = ast.parse((ROOT / "core/cognitivo/incremental_learner.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names = [node.module]
+        for name in names:
+            root = name.split(".")[0]
+            if root in {"numpy", "vita"} or name == "core.constitutional_brain" or name.startswith("core.constitutional_brain."):
+                return False
+    return True
+
+
+def eval_incremental(criteria="v1"):
+    """IL1–IL6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    import core.cognitivo.incremental_learner as incremental
+    import core.constitutional_brain as brain
+    import core.cognitivo as package
+
+    payload = incremental_fingerprint(incremental)
+    sha_module = _il_sha(payload)
+    sha_brain = _il_sha(incremental_fingerprint(brain))
+    source_sha = _incremental_source_sha()
+    standalone = _incremental_standalone()
+    identity = all(
+        getattr(brain, name) is getattr(incremental, name) is getattr(package, name)
+        and getattr(incremental, name).__module__ == "core.cognitivo.incremental_learner"
+        for name in _IL_NAMES
+    )
+    promo = payload["promotion"]
+    event = promo["events"][0]
+    again = promo["again"][0]
+    il1 = (
+        payload["hyper"]["promotion"] == 0.75
+        and payload["hyper"]["cap"] == 0.99
+        and event["promotion"] is True
+        and event["memory_id"] == 7
+        and event["content"] == "alpha fact"
+        and event["old_importance"] == 0.8
+        and event["new_importance"] == min(0.99, 0.8 * 1.15)
+        and event["reason"] == "relevance=0.75 >= 0.75"
+        and event["timestamp_is_float"] is True
+        and promo["stores"] == [["alpha fact", "long_term", event["new_importance"]]]
+        and promo["promoted"] == [7]
+        and promo["stats"]["total_promotions"] == 1
+        and promo["stats"]["total_reinforcements"] == 0
+        and promo["stats"]["pattern_registry_size"] == 1
+        and again["promotion"] is False
+        and again["new_importance"] == min(0.99, 0.8 + 0.08)
+        and promo["again_promoted"] == [7]
+        and promo["again_stats"]["total_promotions"] == 1
+        and promo["again_stats"]["total_reinforcements"] == 1
+        and payload["below"]["events"] == []
+        and payload["below"]["stores"] == []
+        and payload["below"]["patterns"] == {"alpha fact": 1}
+        and payload["cap"]["events"][0]["new_importance"] == 0.99
+        and payload["cap"]["events"][0]["promotion"] is True
+        and payload["skip_none"]["events"] == []
+        and payload["skip_none"]["stores"] == []
+        and payload["skip_none"]["patterns"] == {}
+        and payload["zero_id"]["events"][0]["memory_id"] == 0
+        and payload["zero_id"]["events"][0]["promotion"] is True
+        and len(payload["long"]["event_content"]) == 80
+        and len(payload["long"]["stored"][0][0]) == 100
+        and payload["long"]["key"] == "l" * 60
+        and payload["long"]["stored"][0][1] == "long_term"
+        and payload["defaults"]["missing_importance"]["events"][0]["old_importance"] == 0.5
+        and payload["defaults"]["missing_relevance"]["events"] == []
+        and payload["defaults"]["missing_relevance"]["patterns"] == {"no-rel": 1}
+        and payload["defaults"]["missing_content"]["events"][0]["content"] == ""
+    )
+    bounds = payload["boundaries"]
+    il2 = (
+        payload["hyper"]["boost"] == 0.08
+        and bounds["rel_0_5_imp_0_7"]["events"][0]["promotion"] is False
+        and bounds["rel_0_5_imp_0_7"]["events"][0]["new_importance"] == min(0.99, 0.7 + 0.08)
+        and bounds["rel_0_5_imp_0_7"]["stores"] == [[
+            "r", "long_term", bounds["rel_0_5_imp_0_7"]["events"][0]["new_importance"],
+        ]]
+        and bounds["rel_0_5_imp_0_7"]["promoted"] == []
+        and bounds["rel_0_5_imp_under"]["events"] == []
+        and bounds["rel_under"]["events"] == []
+        and bounds["reinforce_cap"]["events"][0]["new_importance"] == 0.99
+        and bounds["reinforce_cap"]["events"][0]["promotion"] is False
+        and bounds["just_under_promotes_not"]["events"][0]["promotion"] is False
+        and bounds["just_under_promotes_not"]["events"][0]["reason"] == "reinforcement (old_imp=0.80, rel=0.75)"
+        and bounds["just_under_promotes_not"]["promoted"] == []
+        and len(bounds["both_would_match"]["events"]) == 1
+        and bounds["both_would_match"]["events"][0]["promotion"] is True
+        and bounds["both_would_match"]["promoted"] == [1]
+        and payload["preset_promoted"]["events"][0]["promotion"] is False
+        and payload["preset_promoted"]["promoted"] == [9]
+        and payload["preset_promoted"]["events"][0]["new_importance"] == min(0.99, 0.8 + 0.08)
+    )
+    patterns = payload["patterns"]
+    il3 = (
+        payload["hyper"]["pattern_freq"] == 2
+        and payload["hyper"]["pattern_importance"] == 0.92
+        and patterns["freq1_new"] == 0
+        and patterns["freq1_stores"] == []
+        and patterns["freq1_retrieves"] == []
+        and patterns["registry"] == {"repeat me": 2}
+        and patterns["own_synthetic_first"] == 1
+        and patterns["own_synthetic_second"] == 1
+        and patterns["own_stores"] == [
+            ["[PATTERN freq=2] repeat me", "long_term", 0.92],
+            ["[PATTERN freq=2] repeat me", "long_term", 0.92],
+        ]
+        and patterns["logged_new"] == 1
+        and patterns["logged_stores"] == [["[PATTERN freq=2] repeat me", "long_term", 0.92]]
+        and patterns["logged_events"] == [["PATTERN_DETECTED", {"content": "repeat me", "frequency": 2}]]
+        and patterns["tag_suppresses"] == 0
+        and patterns["tag_stores"] == []
+        and patterns["tag_patterns"] == 0
+    )
+    plans = payload["plans"]
+    ok = plans["ok"]
+    il4 = (
+        plans["none"] is True
+        and plans["low"] is True
+        and plans["missing_reward"] is True
+        and ok["promotion"] is True
+        and ok["episode_id"] == "mcts_direct"
+        and ok["memory_id"] == 1001
+        and ok["old_importance"] == 0.0
+        and ok["new_importance"] == min(0.99, 0.6 + 0.7 * 0.35)
+        and ok["content"] == plans["ok_store"][0][0][:80]
+        and len(ok["content"]) == 80
+        and plans["ok_store"][0][1] == "long_term"
+        and len(plans["ok_store"][0][0]) == 113
+        and plans["ok_promoted"] == []
+        and plans["ok_stats"]["total_promotions"] == 1
+        and plans["ok_stats"]["pattern_registry_size"] == 0
+        and plans["ok_log"][0][0] == "MCTS_PLAN_LEARNED"
+        and plans["ok_log"][0][1]["reward"] == 0.7
+        and plans["ok_log"][0][1]["sequence"] == ["look", "go"]
+        and len(plans["ok_log"][0][1]["goal"]) == 80
+        and plans["high"]["new_importance"] == 0.99
+        and plans["high_store"][0].endswith("Sequence: ")
+        and payload["errors"]["str_relevance"] == "TypeError"
+        and payload["errors"]["str_importance_promotion"] == "TypeError"
+        and payload["errors"]["str_importance_reinforcement"] == "TypeError"
+        and payload["errors"]["plan_str_reward"] == "TypeError"
+        and payload["errors"]["plan_missing_sequence"] == "AttributeError"
+        and payload["errors"]["plan_goal_none"] == "TypeError"
+        and payload["errors"]["memory_item_str"] == "AttributeError"
+    )
+    full = payload["consolidate"]["full"]
+    flags_off = payload["consolidate"]["flags_off"]
+    no_log = payload["consolidate"]["no_log"]
+    empty = payload["consolidate"]["empty"]
+    decay = payload["decay"]
+    il5 = (
+        full["episodes_processed"] == 3
+        and full["memories_promoted"] == 1
+        and full["memories_reinforced"] == 1
+        and full["patterns_detected"] == 1
+        and full["total_learning_events"] == 2
+        and full["duration_ok"] is True
+        and full["searches"] == [{"status": "closed", "limit": 10}]
+        and full["stores"] == [
+            ["solo", "long_term", 0.575],
+            ["solo", "long_term", 0.88],
+            ["[PATTERN freq=2] solo", "long_term", 0.92],
+        ]
+        and [row[0] for row in full["log"]] == ["PATTERN_DETECTED", "DECAY_APPLIED", "LEARNING_CONSOLIDATION"]
+        and full["log"][1][1] == {"accessed_count": 2, "decay_rate": 0.02}
+        and full["stats"]["total_consolidations"] == 1
+        and full["stats"]["pattern_registry_size"] == 2
+        and flags_off["episodes_processed"] == 2
+        and flags_off["patterns_detected"] == 0
+        and flags_off["retrieves"] == []
+        and flags_off["searches"] == [{"status": "closed", "limit": 2}]
+        and [row[0] for row in flags_off["log"]] == ["LEARNING_CONSOLIDATION"]
+        and flags_off["log"][0][1]["patterns_found"] == 0
+        and no_log["log"] == []
+        and no_log["stores"][-1][0].startswith("[PATTERN freq=2]")
+        and empty["episodes_processed"] == 0
+        and empty["searches"] == [{"status": "closed", "limit": 10}]
+        and empty["stores"] == []
+        and empty["stats"]["total_consolidations"] == 1
+        and [row[0] for row in empty["log"]] == ["LEARNING_CONSOLIDATION"]
+        and decay["no_log"] == {"returned": 0, "stores": []}
+        and decay["empty"]["returned"] == 0
+        and decay["empty"]["log"] == []
+        and decay["empty"]["stores"] == []
+        and decay["counts"]["1"]["returned"] == 4
+        and decay["counts"]["4"]["returned"] == 1
+        and decay["counts"]["5"]["returned"] == 0
+        and decay["counts"]["6"]["returned"] == 0
+        and all(decay["counts"][key]["stores"] == [] for key in ("1", "4", "5", "6"))
+        and payload["hyper"]["decay"] == 0.02
+    )
+    il6 = (
+        identity
+        and standalone
+        and source_sha == IL_SOURCE_SHA
+        and sha_module == sha_brain == IL_BEHAVIOR_SHA
+        and payload["clock"] == "wall"
+    )
+    return [
+        _check("IL1", {"new": event["new_importance"], "again_promotion": again["promotion"],
+                       "cap": payload["cap"]["events"][0]["new_importance"],
+                       "skipped": payload["skip_none"]["events"], "zero_id": payload["zero_id"]["events"][0]["memory_id"]},
+               il1, "promove em 0.75 com teto 0.99; o mesmo id não promove de novo"),
+        _check("IL2", {"boosted": bounds["rel_0_5_imp_0_7"]["events"][0]["new_importance"],
+                       "both": bounds["both_would_match"]["events"][0]["promotion"],
+                       "under": bounds["rel_under"]["events"]},
+               il2, "reforço +0.08 só no elif; 0.8/0.8 promove uma vez"),
+        _check("IL3", {"registry": patterns["registry"], "own_second": patterns["own_synthetic_second"],
+                       "tag": patterns["tag_suppresses"], "logged": patterns["logged_new"]},
+               il3, "freq 2 grava 0.92; a tag achada não duplica; o sintético próprio duplica"),
+        _check("IL4", {"none": plans["none"], "low": plans["low"], "importance": ok["new_importance"],
+                       "errors": payload["errors"]},
+               il4, "None e reward<0.7 devolvem None; 0.7 grava com importância 0.845"),
+        _check("IL5", {"promoted": full["memories_promoted"], "reinforced": full["memories_reinforced"],
+                       "patterns": full["patterns_detected"], "decay_one": decay["counts"]["1"]["returned"],
+                       "flags_patterns": flags_off["patterns_detected"]},
+               il5, "contagens, flags e decay heurístico sem store"),
+        _check("IL6", {"source_sha": source_sha, "sha_module": sha_module, "sha_brain": sha_brain,
+                       "identity": identity, "standalone": standalone, "clock": payload["clock"],
+                       "source_golden": IL_SOURCE_SHA, "behavior_golden": IL_BEHAVIOR_SHA},
+               il6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+    ]
+
+
 EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts,
               "causal": eval_causal, "counterfactual": eval_counterfactual,
               "working_memory": eval_working_memory,
-              "attention": eval_attention}
+              "attention": eval_attention,
+              "incremental": eval_incremental}
 
 
 def main(argv=None) -> int:
