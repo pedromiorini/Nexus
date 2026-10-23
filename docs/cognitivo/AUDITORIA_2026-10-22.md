@@ -1267,3 +1267,99 @@ TS1: 9 testes, `FAILED (failures=1, errors=10)`. `test_ts1a` falhou com `Asserti
 **Hipóteses.** H1 não se sustenta: no caso novo, sem grant, `success` era `True`. H2 descreve o baseline e o GREEN deixa de reproduzir essa passagem (executor não chamado, `failed_executions` soma 1, mensagem com `permission` e `grant`). H3 não se sustenta: o helper não existia e o import falhou. H4 não se sustenta no GREEN: omissão devolve `False` sem exceção; `None` e resultado que não é dict levantam `EvidenceGateRejection` com código próprio. Nada disso é controle de acesso pronto para produção. `permission_level` e `permission_hierarchy` continuam sem leitor. O helper não é chamado por `execute_tool`. O banner do núcleo e a suíte embutida continuam sendo demo, não evidência de capacidade.
 
 **Fora do que estes comandos medem:** CI hospedado; Python 3.11; merge contra as branches dos PRs #38, #39, #40, #41, #42, #44, #46, #48, #49, #50, #60, #77 e #79 (`predeleg` só compara com `origin/main`); state docs não atualizados, de propósito; compilador SCOPE, SMT/SCA, proveniência completa, self-mod e open-endedness; catálogo `tools/targeted_mutation.py` não foi editado, então o gate novo não tem mutante nesse script. Não há interface web nesta mudança.
+
+## Episodic Future Thinking — critérios pré-registrados (EF1–EF6)
+
+**Objetivo desta rodada:** extrair, em move-only, o bloco POST31 (`FutureEvent`, `ProspectiveMemory`, `RealEpisodicFutureThinkingSystem`) de `core/constitutional_brain.py` para `core/cognitivo/episodic_future_thinking.py`, com reexport strangler no ponto original e em `core/cognitivo/__init__.py`. Medir EF1–EF6. Se todos passam, documentar e parar. Se algum falha no monólito atual, registrar o gap. Não corrigir comportamento depois de ver o número.
+**Por que este bloco, e não outro:** a leitura do monólito em `d0aab24` mostra o bloco separável. Ele não chama classe nenhuma do monólito. Os quatro colaboradores (`memory`, `mental_simulation`, `consciousness`, `emotion`) são só atributos. `memory` e `emotion` entram como valor booleano; nenhum método deles é chamado. `mental_simulation` e `consciousness` são guardados e não são lidos. Os nomes de que o bloco depende (`dataclass`, `List`, `Dict`, `Any`, `uuid`, `time`) já estão no escopo do monólito e são stdlib. Blocos de ferramenta (Tool Use / `ToolDefinition` / permissões) ficam de fora: outro agente trabalha segurança de ferramentas.
+**Não escopo:** injetar relógio; passar a consultar memória, emoção, simulação mental ou consciência; trocar substring por palavra inteira; tornar `fulfill_intention` idempotente; rejeitar `bool`/`NaN`/`±inf`/importância fora de [0, 1]; `details or {}`; Mental Simulation (POST30), Analogical Reasoning, Embodied Cognition; o construtor do orquestrador que instancia o sistema (~`enable_episodic_future_thinking`); Axis e `tools/targeted_mutation.py` (mutantes só em `tools/cognitivo_mutation.py`); state docs (`CONTINUATION.md`, `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md`, `SECURITY_TRIAGE.md`); PRs congelados #38–#50, #60, #77, #79 (não rebasear, não editar as branches, não resolver os conflitos deles).
+**Eval:** `python tools/cognitivo_eval.py --capability episodic_future`. O id curto é `episodic_future` (não `future` nem `eft`). O protocolo abaixo é único; `--criteria` v1/v2/v3 não o altera. Seeds não se aplicam. `event_id`, `intention_id` e `created_at` vêm de `uuid.uuid4()` e `time.time()` e não entram no golden. O golden guarda `event_id_is_uuid` (string de 36), `created_at_is_float`, `id_is_uuid` e `ids_differ`.
+**Base da observação:** `d0aab245f6d0453428d1f530c82ddd23fed18c1b` (merge do #110). Sonda só de leitura, Python 3.12.3, antes deste texto, antes de criar `core/cognitivo/episodic_future_thinking.py` e antes de qualquer harness `episodic_future`. O fingerprint foi calculado duas vezes: executando o texto fatiado do monólito e importando `core.constitutional_brain`. Os dois SHA comportamentais coincidiram. Colaboradores são `object`/`_Boom` (qualquer atributo lido levanta `AssertionError`); nenhum SQLite.
+
+### Varredura §7.2 (2026-10-23, `gh pr list --state open`)
+
+PRs abertos: #38, #39, #40, #41, #42, #43, #44, #45, #46, #47, #48, #49, #50, #60, #77, #79. Os que editam `core/constitutional_brain.py`: #38, #39, #40, #41, #42, #44, #46, #48, #49. São os congelados do pedido; não são a base. A extração precisa do reexport no monólito (§16). Isso tensiona a fila única da §11.2: o conflito com esses PRs fica declarado, sem rebase neles. O mesmo padrão foi o do #108, do #109 e do #110, já mesclados.
+Nenhum PR aberto altera `core/cognitivo/episodic_future_thinking.py` (o arquivo ainda não existe), `test_episodic_future_thinking_contract.py`, `tools/cognitivo_eval.py`, `tools/cognitivo_mutation.py`, `core/cognitivo/__init__.py` ou este arquivo. O #79 (draft, não usado como base) altera `docs/agentes/CLAIMS.yaml`. `AUDIT_REALITY_REPORT.md` / `audit_reality.json` aparecem em #38, #39, #40, #41, #42, #44, #46, #48 e #49; se o gate exigir recontagem depois do move, o diff fica só nos números deste módulo. O #46 também altera `docs/agentes/LICOES_APRENDIDAS.md`; esta rodada só escreve lá se um verificador falhar. O claim do IncrementalLearner, já mesclado em `d0aab24` e ainda listado, é substituído pelo claim grok-bot desta tarefa, prazo `2026-10-26T06:00:00Z`.
+
+### Observação (código e sonda, antes do move e antes do eval)
+
+**Fato, lido no bloco ~L5012–L5357:** `__init__(memory=None, mental_simulation=None, consciousness=None, emotion=None)` guarda os quatro por identidade, zera os contadores e as duas listas, e imprime o banner `🧠🔮 POST 31 - RealEpisodicFutureThinkingSystem initialized (Future imagination active)\n`. Não há parâmetro `clock`.
+
+`imagine_future_event`: `details or {}` trata `None`, `0`, `False` e `""` como `{}`. `True` e uma lista são verdadeiros e quebram em `.get` (`AttributeError`). Com `memory` verdadeiro, o passado é o dict fixo `location=familiar_place`, `participants=["friend","colleague"]`, `emotions=["happy","excited"]`, sem chamada de método. Com `memory` falso (`None`, `""`, `0`, `[]`, `False`), o passado é `{}`. Local e participantes usam `details` se a chave existe, inclusive `location=""` e `participants=None` ou uma tupla. `time_point` é guardado como veio: `7` fica `int`.
+
+Emoções: se `emotion` é verdadeiro e o passado tem `emotions`, devolve essa lista e não lê a descrição. Senão, substring em minúsculas: `success` ou `achievement` → `["pride","joy"]`; `challenge` → `["anxiety","excitement"]`; `meeting` → `["curiosity","neutral"]`; caso contrário `["neutral"]`. Descrição `int` sem esse atalho de emoção → `AttributeError`. Descrição `int` com memória e emoção verdadeiras não lê `.lower()` e devolve `["happy","excited"]`.
+
+Vividez: `min(1.0, 0.3 + len(past_elements) * 0.15)`. Passado fixo tem 3 chaves → `0.75`. Passado vazio → `0.3`. O teto `1.0` não é atingido por esse retorno. Plausibilidade: passado não vazio → `0.8`; senão, se a descrição contém `meeting`, `work`, `lunch`, `travel` ou `presentation` → `0.7`; senão `0.5`. `homework`, `network`, `workshop` e `Working late` caem em `0.7` porque contêm `work`. Significância ausente é `0.5`; `0` permanece `0` (`int`); `False` permanece `bool`; `nan`, `inf` e `-1` são guardados.
+
+Cada `imagine` acrescenta o mesmo objeto à lista e soma 1 em `total_events_imagined`. Dois eventos têm ids diferentes. Alterar `participants` de um evento não altera o seguinte. `mental_simulation` e `consciousness` presentes ou `None` não mudam o evento.
+
+`preexperience_event` soma 1 em `total_preexperiences` e devolve `event_id`, `sensory_details` (`visual` = `Imagining {location}`, `emotional` e `social` são as listas do evento), `vividness` e `simulation_success=True`. Não altera o evento. `None` → `AttributeError`.
+
+`get_statistics` com listas vazias: taxa `0.0` e vividez média `0.0` (`max(1, 0)` no denominador da média). Dois eventos de vividez `0.75` e `0.25` dão média `0.5`.
+
+`set_prospective_memory`: `trigger` falso (`""`, `None`, `0`) vira `when`. Importância ausente é `0.5`. `1.5`, `-1`, `True` e `nan` são guardados sem corte. `what=None` é guardado. O objeto devolvido é o que está na lista. `fulfilled` começa `False`.
+
+`check_prospective_triggers`: pula `fulfilled`. Casa por substring, não por igualdade: `when in str(time)`, `where in str(location)`, `trigger in str(event)`, cada um só se o valor do contexto for verdadeiro. `""` está em qualquer string, então `where=""` casa com qualquer local verdadeiro. `"day"` casa com `"today"`. Contexto `{}`, strings vazias ou zeros: lista vazia. Contexto `None`, `str` ou `list` com a lista de intenções vazia não entra no laço e não erro. Com uma intenção em aberto, os três levantam `AttributeError`. Omitir o argumento levanta `TypeError`. A lista devolve os mesmos objetos, na ordem de inserção. No protocolo (Ana `tomorrow`/`office`/`phone`; notes `today`/`""`/`email`; `already` cumprida `tomorrow`/`lab`/`bell`; `day-match` `day`/`nowhere`/`nope`):
+
+| contexto | o que dispara |
+|---|---|
+| `{}`, strings vazias, zeros | ninguém |
+| `time=tomorrow` | call Ana |
+| `time=today` | send notes, day-match |
+| `location=office` e `location=home office` | call Ana, send notes |
+| `event=phone call` | call Ana |
+| `event=email` | send notes |
+| time+location+event da Ana | call Ana, send notes |
+
+`fulfill_intention` de id ausente devolve `None` e não soma. No id achado, marca `fulfilled` e soma de novo mesmo se já estava cumprida. Uma intenção cumprida duas vezes: `fulfilled_intentions=2`, ativos `0`, taxa `2.0`. Uma de duas cumprida uma vez: ativos `1`, taxa `0.5`. A segunda chamada nessa mesma: contador `2`, taxa `1.0`, ativos ainda `1`.
+
+`project_future_self`: `"year"` na minúscula antes de `"month"`. `1 year`, `YEAR`, `yearly` e `1 year and 1 month` → `increased_experience`, `new_skills`, `evolved_goals`. `next month`, `Month`, `monthly` → `incremental_progress`, `learning`. `tomorrow`, `""`, `week` → `minor_changes`. Crescimento é constante em todos: knowledge `0.8`, skills `0.7`, wisdom `0.6`, continuity `0.7`. Horizonte `int` ou `None` → `AttributeError`.
+
+`compare_future_scenarios` usa `>` estrito; empate fica com o segundo. Produto `vividness * personal_significance`. Eventos construídos com ids fixos: a=`(0.9, 0.4, 0.2)`, b=`(0.3, 0.8, 0.5)` → mais vívido `a`, mais plausível `b`, mais significativo `b`, preferido `a` (`0.18 > 0.15`). Empate de vividez e plausibilidade c=`(0.5, 0.4, 0.4)` contra d=`(0.5, 0.4, 0.5)` → as quatro chaves `d`. Produto empatado c contra e=`(0.4, 0.1, 0.5)` (`0.20 == 0.20`) → preferido `e`, mais significativo `e`, vívido e plausível `c`. Vividez `nan` no primeiro contra b → preferido `b` e mais significativo `n` (`0.9 > 0.5`). `True` contra `False` na significância, vividez igual `0.4`: preferido o `True` (`t`), vívido e plausível o segundo (`u`). Significância `str` → `TypeError`. Objeto sem `personal_significance` → `AttributeError`.
+
+**Gaps medidos, fora de correção nesta rodada.** Memória e emoção não são consultadas; simulação e consciência não são lidas. `work` casa dentro de `network` e `homework`. `where=""` casa com qualquer local. `"day"` casa com `"today"`. `fulfill_intention` não é idempotente e a taxa passa de `1`. `bool` `False` em `details` vira `{}`; `True` quebra. `bool` na significância compara como `int`. `nan` perde a comparação `>`. Descrição que não é string passa se memória e emoção estão ambos verdadeiros. Nada disso será editado no bloco.
+
+### Hipóteses concorrentes (Strong Inference)
+
+| id | hipótese | o que a falsifica | teste barato |
+|---|---|---|---|
+| H1 | mover o bloco muda o texto ou o fingerprint de comportamento | SHA de fonte ou SHA comportamental ≠ os valores abaixo, ou as três classes reexportadas não são o mesmo objeto | EF6 |
+| H2 | `memory` verdadeiro é consultado por método | um objeto que levanta em qualquer atributo ainda produz `familiar_place` / `0.75` / `0.8` | EF1 |
+| H3 | `emotion` verdadeiro escolhe a emoção da descrição | com memória e emoção, `"challenge ahead"` continua `["happy","excited"]` | EF1 |
+| H4 | o gatilho compara igualdade, não substring | `time=today` inclui `day-match`; `location=office` inclui a intenção com `where=""` | EF3 |
+| H5 | cumprir a mesma intenção duas vezes não soma de novo | a intenção sozinha fica com contador `2` e taxa `2.0` | EF4 |
+| H6 | `mental_simulation` ou `consciousness` mudam o evento imaginado | o mesmo `imagine("Quiet day")` com os dois objetos e com `None` tem a mesma vista | EF1 |
+
+A sonda já exclui H2, H3, H4, H5 e H6 como descrição do bloco atual. O eval as repete para o move não as reintroduzir. H1 ainda não foi testada: o módulo novo não existe. Hipótese de trabalho, não vinculante para além da tabela: move-only, sem injetar relógio e sem passar a chamar os colaboradores. Os gaps não autorizam editar o bloco.
+
+### Critérios
+
+| id | afirmação | protocolo falsificável | alvo |
+|---|---|---|---|
+| EF1 | memória verdadeira usa o passado fixo; emoção verdadeira não lê a descrição quando esse passado tem emoções; vividez e plausibilidade seguem as fórmulas lidas | Memória+emoção, `"Quiet day"`: local `familiar_place`, participantes `friend`/`colleague`, emoções `happy`/`excited`, vividez `0.75`, plausibilidade `0.8`, significância `0.5`. Override `location=hall`, `participants=["a"]`, `significance=0.9` mantém as emoções do passado. `"challenge ahead"` com os dois também. Sem memória, `"success today"` → `pride`/`joy`, local `unknown`, vividez `0.3`, plausibilidade `0.5`. `"The Challenge"` → `anxiety`/`excitement` e `0.5`. `"team meeting"` → `curiosity`/`neutral` e `0.7`. `""` → `neutral` e `0.5`. `homework`, `network`, `workshop`, `Working late`, `lunch`, `travel`, `presentation` → `0.7`. Memória falsa (`""`, `0`, `[]`, `False`, `None`) igual a ausente. Memória `1` ou `object()` usa o passado fixo. `details` `None`, `{}`, `0`, `False` e `""` coincidem com o argumento omitido. Significância `0` fica `0`; `False` fica bool. Local `""` e participantes `None` são guardados. `time_point=7` fica `int`. Quatro ids diferem. Acrescentar um participante não altera o evento seguinte. Simulação e consciência não mudam a vista. Descrição `1` com memória e emoção produz o passado fixo | `0.75`, `0.8`, `0.7`, `0.3`, `0.5` e o passado fixo |
+| EF2 | pré-vivência devolve o ensaio sensorial e soma o contador; a estatística vazia não divide por zero | Duas pré-vivências do mesmo evento: `simulation_success` verdadeiro, visual `Imagining familiar_place`, contador `2`, eventos imaginados continuam `1`, o evento não muda. Estatística vazia: seis zeros. Dois eventos, o segundo com vividez `0.25` e uma pré-vivência: média `0.5`, pré-vivências `1` | contador `2` e média `0.5` |
+| EF3 | gatilho falso copia `when`; a checagem é substring e pula cumpridas; importância não é cortada | Padrão: trigger `tomorrow`, importância `0.5`, `where=""`. `""`, `None` e `0` no trigger caem em `when`. `what=None` é guardado. Importâncias `1.5`, `-1`, `True` e `nan` saem como entraram. A tabela de contextos acima, com a cumprida de fora e os mesmos objetos | a tabela e a importância `1.5` |
+| EF4 | cumprir soma outra vez; o horizonte é substring com `year` antes de `month`; o crescimento não depende do horizonte; empate na comparação fica com o segundo | Id ausente: `None` e contador `0`. Uma de duas, uma vez: taxa `0.5`, ativos `1`. A segunda vez: contador `2`, taxa `1.0`, ativos `1`. Intenção sozinha, duas vezes: taxa `2.0`, ativos `0`. Horizontes da observação. Crescimento `0.8`/`0.7`/`0.6` e continuity `0.7` nos dez horizontes. Comparação dos cinco pares com ids `a`–`e`, `n`, `t`, `u` como na observação | taxa `2.0`, continuity `0.7` e o preferido do empate |
+| EF5 | tipo errado quebra no uso; contexto vazio de intenções não chega a ler o contexto | Descrição `int` sem emoção, `details` lista, `details` `True`, horizonte `int` e `None`, pré-vivência `None` e comparação sem `personal_significance`: `AttributeError`. Significância `str`: `TypeError`. Contexto `None`/`str`/`list` sem intenções: sem erro. Com uma intenção em aberto: `AttributeError`. Argumento omitido: `TypeError` | essas classes de exceção |
+| EF6 | move-only: o texto do bloco e o fingerprint comportamental são os mesmos; reexport é o mesmo objeto | O texto UTF-8 que começa na linha de `═` imediatamente antes de `# MÓDULO 31: EPISODIC FUTURE THINKING SYSTEM (POST 31)` e termina no `}` de `get_statistics` (a chave `"avg_event_vividness"`) tem SHA-256 `a72a34bcc303f98b37cd5e33e030ab69bea8579d4f111c95981b2cf9785cb3e7` no monólito, antes do splice, e o mesmo SHA no módulo novo. As três classes: `core.constitutional_brain` e `core.cognitivo` são o mesmo objeto que `core.cognitivo.episodic_future_thinking`, e `__module__` é `core.cognitivo.episodic_future_thinking`. O módulo importa sem puxar o monólito, numpy ou vita (árvore de `import` / `import from`; menção no docstring não conta). O dict do protocolo, `json.dumps(..., sort_keys=True, ensure_ascii=False)`, tem SHA-256 `062870d6a044174d49150fc6008521105c05557c40c2f46a4e83cd116b761f27`, igual pela classe do monólito e pela do módulo novo. `clock` é `wall` | os dois SHA e a identidade |
+
+**Protocolo do fingerprint comportamental de EF6** (o que entra no dict; sem SQLite):
+
+- `clock`; `init_params`; `banner` exato; nomes dos campos dos dois dataclasses.
+- `wired`: as quatro identidades e os contadores zerados.
+- `both`: quiet, override, challenge, participantes do evento seguinte, `ids_differ`, `count` 4, o objeto guardado é o devolvido, simulação ignorada.
+- `memory_only`, `emotion_only` (doze descrições), `neither`, `falsy_memory`, `truthy_memory`.
+- `details`: omitido, `None`, `{}`, `0`, `False`, `""`, significância `0`/`False`/`nan`/`inf`/`-1`, local vazio, participantes `None` e tupla, `time_point` `7`.
+- `preexperience` sem o uuid cru; `stats` vazio e o par de vividezes `0.75`/`0.25`.
+- `prospective` padrão, trigger falso, importância fora do intervalo, `what=None`.
+- `triggers` da tabela; `fulfill` ausente, uma de duas, a segunda vez, e a intenção sozinha duas vezes.
+- `project` dos dez horizontes, com crescimento e continuity.
+- `compare` dos cinco pares; `gaps` da descrição `int` com memória e emoção; `errors` com o nome da classe.
+
+`bool`/`NaN`/`Infinity`, a substring `work`, o `where` vazio, a taxa `2.0` e o passado fixo fazem parte do golden de identidade. Não são metas de qualidade e não serão corrigidos nesta rodada.
+
+### Regressão exigida
+
+Não há contrato anterior destes três símbolos. O teste embutido 27 do demo continua chamando `imagine_future_event`, `preexperience_event`, `set_prospective_memory`, `project_future_self` e `get_statistics` pelo reexport. O eval dos outros capabilities não é alvo de mudança de critério.
+
+Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability episodic_future`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
