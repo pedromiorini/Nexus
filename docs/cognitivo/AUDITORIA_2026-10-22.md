@@ -286,3 +286,33 @@ Registrado **antes** de implementar/executar, em commit próprio. Critérios C1�
 | não regressão | C1a/C1b/C2a/C2b/C3/H-F1/H-FP e MCTS M1/M2/M4/M5 + M3 v3 | 1.0 / 0.0 / 0.80 / T / 6/6 / 0.963 / 0.0 |
 
 Escopo: compilar arestas do grafo causal já extraído num SCM mínimo (stdlib) e, em `simulate`, aplicar intervenção `do(ação)` (Pearl, 2009) — efeitos simbólicos das arestas causa→efeito, sem substituir a tabela `ACTION_EFFECTS`. API retrocompatível. Sem dependências pesadas, sem alterar workflows/Axis/congelados.
+
+## Auditoria funcional CF — raciocínio contrafactual (pré-registro)
+
+Registrado **antes** de qualquer execução, em commit próprio, sobre `core/cognitivo/counterfactual.py` (extraído no PR de move-only). Propósito declarado: POST37 "What-if reasoning" (Pearl 2009; Roese & Olson 1995). Avaliador: `tools/cognitivo_eval.py --capability counterfactual --criteria v1`. Conjuntos congelados abaixo; qualquer mudança neles invalida a rodada.
+
+### Conjunto W (parse "what if", 5 itens com marcador + 1 negativo informativo)
+
+| # | questão | intervenção esperada |
+|---|---|---|
+| 1 | What if we apply the patch? | we apply the patch |
+| 2 | what if the server reboots? | the server reboots |
+| 3 | WHAT IF isolation is enabled? | isolation is enabled |
+| 4 | What if? | *(vazio)* |
+| 5 | And what if DNS fails | dns fails |
+| — | Suppose we rollback | *(sem marcador; não conta no denominador de CF4)* |
+
+### Pares S (situação, intervenção) para CF6
+
+`("system vulnerable", "apply patch")`, `("alarm", "patch")`, `("outage", "rollback")`, `("host", "isolate")`.
+
+| id | capacidade | métrica | alvo | baseline documentado (não é alvo) |
+|---|---|---|---|---|
+| CF1 | honrar protocolo `world_model.predict_outcome` | com WM stub que prefixa `wm:`, `_predict_outcome("sit","act") == "wm:sit:act"` | verdadeiro | heurística `outcome_with_*` |
+| CF2 | honrar protocolo `causal.extract_causal_relations` | `_build_causal_chain("alarm","patch") == ["alarm causes patch"]` com `RealCausalReasoning` | verdadeiro | chain heurística de 5 passos |
+| CF3 | usar o `planner` injetado | `self.planner` aparece no corpo de algum método público/privado além de `__init__` (AST) | verdadeiro | — |
+| CF4 | parse de "what if" em inglês | acertos em W (5 com marcador) | ≥ 5/5 | — |
+| CF5 | plausibilidade monótona no comprimento da chain | para comprimentos (1,3,5,10), cada passo é estritamente menor | verdadeiro | — |
+| CF6 | intervenção altera o outcome declarado | nos 4 pares S, `counterfactual_outcome != actual_outcome` | 4/4 | — |
+
+Comando: `python tools/cognitivo_eval.py --capability counterfactual --criteria v1` — determinístico (sem semente; uuid irrelevante aos critérios).
