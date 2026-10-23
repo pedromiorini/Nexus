@@ -53,6 +53,8 @@ PC_LEARNING = ("test_predictive_learning_contract.py",)
 RETRIEVAL = ("test_episodic_retrieval_contract.py",)
 WM = "core/cognitivo/working_memory.py"
 WM_TESTS = ("test_working_memory_contract.py",)
+ATT = "core/cognitivo/attention.py"
+AT_TESTS = ("test_attention_contract.py",)
 
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
@@ -489,6 +491,117 @@ MUTATIONS = [
              ")\n"
              "CentralExecutive = type(\"CentralExecutive\", (_CentralExecutive,), {})\n",
              tests=WM_TESTS),
+    Mutation("at_novelty_always_familiar", ATT,
+             "            return 0.9  # Alta novidade",
+             "            return 0.2  # Alta novidade", tests=AT_TESTS),
+    Mutation("at_novelty_always_new", ATT,
+             "        return 0.2  # Baixa novidade (familiar)",
+             "        return 0.9  # Baixa novidade (familiar)", tests=AT_TESTS),
+    Mutation("at_intensity_visual_is_internal", ATT,
+             "            return 0.7",
+             "            return 0.4", tests=AT_TESTS),
+    Mutation("at_weights_drop_novelty", ATT,
+             '            "novelty": 0.3,      # Novidade',
+             '            "novelty": 0.0,      # Novidade', tests=AT_TESTS),
+    Mutation("at_contrast_fallback_zero", ATT,
+             "        # Fallback heurístico explícito para estímulos sem observação.\n"
+             "        return 0.5",
+             "        # Fallback heurístico explícito para estímulos sem observação.\n"
+             "        return 0.0", tests=AT_TESTS),
+    Mutation("at_motion_fallback_zero", ATT,
+             "        # Fallback heurístico explícito para estímulos sem observação.\n"
+             "        return 0.6",
+             "        # Fallback heurístico explícito para estímulos sem observação.\n"
+             "        return 0.0", tests=AT_TESTS),
+    Mutation("at_contrast_skips_clamp", ATT,
+             "            return min(1.0, max(0.0, stimulus.contrast))",
+             "            return stimulus.contrast", tests=AT_TESTS),
+    Mutation("at_contrast_ignores_context", ATT,
+             '        context_contrast = context.get("contrast")\n',
+             "        context_contrast = None\n", tests=AT_TESTS),
+    Mutation("at_topdown_no_goals_zero", ATT,
+             "            return 0.3  # Sem objetivos = relevância baixa",
+             "            return 0.0  # Sem objetivos = relevância baixa", tests=AT_TESTS),
+    Mutation("at_goal_match_is_equality", ATT,
+             "        matches = sum(1 for word in goal_words if word in stimulus_str)",
+             "        matches = sum(1 for word in goal_words if word == stimulus_str)", tests=AT_TESTS),
+    Mutation("at_goal_relevance_sums", ATT,
+             "        return max(relevances) if relevances else 0.3",
+             "        return sum(relevances) if relevances else 0.3", tests=AT_TESTS),
+    Mutation("at_priority_no_clamp", ATT,
+             "        self.goal_relevance[goal] = min(1.0, max(0.0, priority))",
+             "        self.goal_relevance[goal] = priority", tests=AT_TESTS),
+    Mutation("at_set_goals_resets_priority", ATT,
+             "            if goal not in self.goal_relevance:\n"
+             "                self.goal_relevance[goal] = 0.5",
+             "            if True or goal not in self.goal_relevance:\n"
+             "                self.goal_relevance[goal] = 0.5", tests=AT_TESTS),
+    Mutation("at_spotlight_evicts_highest", ATT,
+             "            least_salient = min(self.spotlight, key=lambda x: x.salience)",
+             "            least_salient = max(self.spotlight, key=lambda x: x.salience)", tests=AT_TESTS),
+    Mutation("at_spotlight_ignores_capacity", ATT,
+             "        if len(self.spotlight) >= self.capacity:",
+             "        if len(self.spotlight) > self.capacity:", tests=AT_TESTS),
+    Mutation("at_refocus_appends_again", ATT,
+             "        if stimulus in self.spotlight:\n"
+             "            # Já focado\n"
+             "            return\n",
+             "        if False and stimulus in self.spotlight:\n"
+             "            # Já focado\n"
+             "            return\n", tests=AT_TESTS),
+    Mutation("at_attend_sorts_ascending", ATT,
+             "            reverse=True",
+             "            reverse=False", tests=AT_TESTS),
+    Mutation("at_attend_score_is_salience", ATT,
+             "            stimulus.attention_score = (stimulus.salience + stimulus.priority) / 2.0",
+             "            stimulus.attention_score = stimulus.salience", tests=AT_TESTS),
+    Mutation("at_shift_missing_returns_true", ATT,
+             "            return False",
+             "            return True", tests=AT_TESTS),
+    Mutation("at_shift_drops_cross_modal_cost", ATT,
+             "                base_cost += 0.3  # Cross-modal shift cost",
+             "                base_cost += 0.0  # Cross-modal shift cost", tests=AT_TESTS),
+    Mutation("at_shift_same_modal_costs_extra", ATT,
+             "            if current_type != target.stimulus_type:",
+             "            if current_type == target.stimulus_type:", tests=AT_TESTS),
+    Mutation("at_clear_keeps_an_hour", ATT,
+             "            if current_time - s.timestamp < 60.0  # Keep last 60s",
+             "            if current_time - s.timestamp < 3600.0  # Keep last 60s", tests=AT_TESTS),
+    Mutation("at_attend_empty_counts_episode", ATT,
+             "        if not self.available_stimuli:\n"
+             "            return []\n",
+             "        if False and not self.available_stimuli:\n"
+             "            return []\n", tests=AT_TESTS),
+    Mutation("at_consciousness_skipped", ATT,
+             "        if self.consciousness:",
+             "        if False and self.consciousness:", tests=AT_TESTS),
+    Mutation("at_release_drops_filter", ATT,
+             "        self.spotlight = [s for s in self.spotlight if s.stimulus_id != stimulus_id]",
+             "        self.spotlight = [s for s in self.spotlight if True]", tests=AT_TESTS),
+    Mutation("at_module_pulls_monolith", ATT,
+             "import time\n",
+             "import time\nimport core.constitutional_brain  # noqa: F401\n", tests=AT_TESTS),
+    Mutation("at_monolith_stops_reexporting", "core/constitutional_brain.py",
+             "from core.cognitivo.attention import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    AttentionShift,\n"
+             "    AttentionalFocus,\n"
+             "    AttentionalSpotlight,\n"
+             "    BottomUpAttention,\n"
+             "    RealAttentionSystem,\n"
+             "    StimulusItem,\n"
+             "    TopDownAttention,\n"
+             ")\n",
+             "from core.cognitivo.attention import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    AttentionShift,\n"
+             "    AttentionalFocus,\n"
+             "    AttentionalSpotlight,\n"
+             "    BottomUpAttention as _BottomUpAttention,\n"
+             "    RealAttentionSystem,\n"
+             "    StimulusItem,\n"
+             "    TopDownAttention,\n"
+             ")\n"
+             "BottomUpAttention = type(\"BottomUpAttention\", (_BottomUpAttention,), {})\n",
+             tests=AT_TESTS),
 ]
 
 
