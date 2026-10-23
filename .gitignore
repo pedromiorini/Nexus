@@ -29,3 +29,4 @@ bandit-report.json
 security-triage-generated.md
 implementation-gaps.json
 targeted_mutation_report.json
+cognitivo_mutation_report.json

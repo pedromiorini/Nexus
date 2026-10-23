@@ -1,17 +1,24 @@
 # Registro de agentes do Nexus (protegido por CODEOWNERS: @pedromiorini).
 # Cada agente se declara ANTES do 1º PR. Validado por tools/agente/validar_registro.py.
 # Autodeclaração é Hipótese: só o hash das instruções e os claims são verificados mecanicamente.
-schema_version: 1
+schema_version: 2
 instrucoes_atuais:
   arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md
   versao: "3.4.2"
+instrucoes_versoes:
+  "3.4.1":
+    arquivo: docs/agentes/versoes/3.4.1/6778552adef5433c85bf9209b494456f4f497ffdf6f8e190b19eab45d54c20a6.md
+    sha256: 6778552adef5433c85bf9209b494456f4f497ffdf6f8e190b19eab45d54c20a6
+  "3.4.2":
+    arquivo: docs/agentes/versoes/3.4.2/8f03762d2a2d128eea955597f1b55210e387c08385bdc5544514ea2f39701b5d.md
+    sha256: 8f03762d2a2d128eea955597f1b55210e387c08385bdc5544514ea2f39701b5d
 agentes:
   - id: grok-bot
     operador: pedromiorini
     ferramenta: Grok Bot (subagentes locais no box; agentes de nuvem quando liberados)
     modelo: não declarado pelo provedor
     instrucoes:
-      arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md
+      arquivo: docs/agentes/versoes/3.4.2/8f03762d2a2d128eea955597f1b55210e387c08385bdc5544514ea2f39701b5d.md
       sha256: 8f03762d2a2d128eea955597f1b55210e387c08385bdc5544514ea2f39701b5d
       versao_aceita: "3.4.2"
     conhecimentos: [CI do Nexus, state_consistency_audit, gate de mutação, triagem de PRs]
@@ -27,9 +34,9 @@ agentes:
     ferramenta: Cue
     modelo: não declarado pelo provedor
     instrucoes:
-      arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md
-      sha256: 8f03762d2a2d128eea955597f1b55210e387c08385bdc5544514ea2f39701b5d
-      versao_aceita: "3.4.2"
+      arquivo: docs/agentes/versoes/3.4.1/6778552adef5433c85bf9209b494456f4f497ffdf6f8e190b19eab45d54c20a6.md
+      sha256: 6778552adef5433c85bf9209b494456f4f497ffdf6f8e190b19eab45d54c20a6
+      versao_aceita: "3.4.1"
     conhecimentos: [contratos de registro de agentes, validação local do Nexus]
     skills: [contract-first-bugfix, repo-evidence-audit]
     escopo_arquivos: [docs/agentes/**, tools/agente/validar_registro.py, test_agent_registry_contract.py, tools/targeted_mutation.py, CONTINUATION.md]
@@ -43,7 +50,7 @@ agentes:
 #    operador: <conta GitHub responsável>
 #    ferramenta: <produto>
 #    modelo: <modelo ou "não declarado">
-#    instrucoes: {arquivo: docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md, sha256: <sha256sum do arquivo>, versao_aceita: "3.4.2"}
+#    instrucoes: {arquivo: <artefato de instrucoes_versoes>, sha256: <SHA desse artefato>, versao_aceita: <versão explicitamente aceita>}
 #    conhecimentos: [...]
 #    skills: [...]
 #    escopo_arquivos: [<globs>]

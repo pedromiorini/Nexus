@@ -51,3 +51,8 @@ Identidade, Constituição (8 regras), vocabulário epistemológico, precedênci
 - §9C.3: o claim vive só no branch do PR aberto; o último commit do mesmo PR o remove antes do merge (elimina PRs só de remoção como #72 e #76). Claims ativos = `main` + `CLAIMS.yaml` de cada PR aberto (comando `gh`/`git` documentado).
 - Motivo: no fluxo anterior o claim só chegava à `main` depois do trabalho mesclado, sem proteger nada. Teste dos três casos com critérios prévios no PR.
 - Pendente: leitura automática de claims de PRs abertos no validador (follow-up; arquivos do Axis não alterados).
+
+### Reconciliação local com schema 2 (pós-#113)
+- A #113 foi integrada na main `cb74cad7cfcd0ab536178ed984989ef2425c8211`. Esta composição local, ainda sem commit/publicação, acrescenta o artefato 3.4.2 exato da #79 (`8f03762d2a2d128eea955597f1b55210e387c08385bdc5544514ea2f39701b5d`) e atualiza o ponto de entrada, sem atribuir aceite automático aos agentes.
+- Axis continua integralmente em 3.4.1. Após declaração explícita do Grok na #78/comentário 6367039207 e autorização do owner apenas para refletir o aceite localmente, só o trio arquivo/SHA/versão aceita do Grok passa para 3.4.2. O catálogo/snapshot 3.4.1 e os demais metadados dos agentes foram preservados. Schema e validador da #113 não precisam de alteração.
+- §9C.4 permanece nos bytes históricos solicitados, mas a promoção sob schema 2 não exige atualizar hashes/aceites dos agentes: só o catálogo e o ponto de entrada mudam; cada aceite depende de declaração própria. Ver [ACEITE_VERSIONADO.md](ACEITE_VERSIONADO.md).

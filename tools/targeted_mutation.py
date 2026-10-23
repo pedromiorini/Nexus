@@ -60,6 +60,61 @@ class Mutation:
 
 MUTATIONS = [
     Mutation(
+        'instruction_numeric_version_order', "tools/agente/validar_registro.py",
+        'return tuple(int(part) for part in value.split("."))', 'return tuple(value.split("."))',
+        tests=("test_agent_instruction_versions_contract.py",),
+    ),
+    Mutation(
+        'instruction_catalog_future', "tools/agente/validar_registro.py",
+        'if parsed > current_version:\n                raise ValueError(f"versão futura', 'if False:\n                raise ValueError(f"versão futura',
+        tests=("test_agent_instruction_versions_contract.py",),
+    ),
+    Mutation(
+        'instruction_acceptance_future', "tools/agente/validar_registro.py",
+        'if parsed > current_version:\n            raise ValueError(f"versão aceita futura', 'if False:\n            raise ValueError(f"versão aceita futura',
+        tests=("test_agent_instruction_versions_contract.py",),
+    ),
+    Mutation(
+        'instruction_artifact_content_hash', "tools/agente/validar_registro.py",
+        'if _sha256(_instruction_file(root, artifact["arquivo"])) != digest:', 'if False:',
+        tests=("test_agent_instruction_versions_contract.py",),
+    ),
+    Mutation(
+        'instruction_catalog_path_binding', "tools/agente/validar_registro.py",
+        'if artifact["arquivo"] != expected:', 'if False:',
+        tests=("test_agent_instruction_versions_contract.py",),
+    ),
+    Mutation(
+        'instruction_entrypoint_content_hash', "tools/agente/validar_registro.py",
+        'if artifact is not None and _sha256(path) != artifact["sha256"]:', 'if False:',
+        tests=("test_agent_instruction_versions_contract.py",),
+    ),
+    Mutation(
+        'instruction_agent_path_binding', "tools/agente/validar_registro.py",
+        'if ins["arquivo"] != artifact["arquivo"]:', 'if False:',
+        tests=("test_agent_instruction_versions_contract.py",),
+    ),
+    Mutation(
+        'instruction_agent_hash_binding', "tools/agente/validar_registro.py",
+        'if ins["sha256"] != artifact["sha256"]:', 'if False:',
+        tests=("test_agent_instruction_versions_contract.py",),
+    ),
+    Mutation(
+        'instruction_verified_stale_warning', "tools/agente/validar_registro.py",
+        'if parsed < current_version:', 'if False:',
+        tests=("test_agent_instruction_versions_contract.py",),
+    ),
+    Mutation(
+        'instruction_symlink_guard', "tools/agente/validar_registro.py",
+        'if path.is_symlink():', 'if False:',
+        tests=("test_agent_instruction_versions_contract.py",),
+    ),
+    Mutation(
+        'instruction_explicit_schema', "tools/agente/validar_registro.py",
+        'if type(schema_version) is not int or schema_version not in (1, 2):', 'if False:',
+        tests=("test_agent_instruction_versions_contract.py",),
+    ),
+    Mutation(
         "registry_last_seen_calendar", "tools/agente/validar_registro.py",
         "date.fromisoformat(last_seen)", "pass",
         tests=("test_agent_registry_contract.py",),
@@ -304,21 +359,21 @@ MUTATIONS = [
     ),
     Mutation(
         "episodic_search_rejects_boolean_and_non_integer_limit",
-        "core/constitutional_brain.py",
+        "core/cognitivo/episodic_memory.py",
         '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")',
         '"""Buscar episódios"""\n        if False:\n            raise TypeError("limit must be an integer")',
         tests=EPISODIC_SEARCH_LIMIT,
     ),
     Mutation(
         "episodic_search_rejects_negative_limit",
-        "core/constitutional_brain.py",
+        "core/cognitivo/episodic_memory.py",
         '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")\n        if limit < 0:\n            raise ValueError("limit must be non-negative")',
         '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")\n        if False:\n            raise ValueError("limit must be non-negative")',
         tests=EPISODIC_SEARCH_LIMIT,
     ),
     Mutation(
         "episodic_search_zero_limit_skips_database",
-        "core/constitutional_brain.py",
+        "core/cognitivo/episodic_memory.py",
         '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")\n        if limit < 0:\n            raise ValueError("limit must be non-negative")\n        if limit == 0:\n            return []',
         '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")\n        if limit < 0:\n            raise ValueError("limit must be non-negative")\n        if False:\n            return []',
         tests=EPISODIC_SEARCH_LIMIT,
