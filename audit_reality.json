@@ -18,9 +18,9 @@
       },
       {
         "path": "core/cognitivo/causal_world_model.py",
-        "lines": 174,
+        "lines": 193,
         "classes": 5,
-        "functions": 8
+        "functions": 9
       },
       {
         "path": "core/cognitivo/episodic_memory.py",

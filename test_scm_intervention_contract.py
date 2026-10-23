@@ -15,6 +15,7 @@ class ScmInterventionContractTests(unittest.TestCase):
         result = world.simulate(["DEPLOY_FIX"])
         self.assertEqual(result.final_state.state.get("system_status"), "secure")
         self.assertTrue(result.success)
+        self.assertFalse(result.warnings)
 
     def test_without_extraction_unknown_stays_and_warns(self):
         world = RealWorldModelSimulator(causal_reasoning=RealCausalReasoning())
