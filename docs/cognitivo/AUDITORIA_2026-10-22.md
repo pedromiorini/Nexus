@@ -1023,3 +1023,105 @@ Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, cov
 **Fora do que estes comandos medem:** CI hospedado; Python 3.11 (o 0.0 do `nan` foi lido em 3.12.3); conflito de merge contra as branches dos PRs #38, #39, #40, #41, #42, #44, #46, #48, #49, #50, #60, #77 e #79 (o `predeleg` só compara com `origin/main`); state docs não atualizados, de propósito; `AttentionalState`, POST49, GlobalWorkspace/Consciousness, IncrementalLearner, HierarchicalMemory/FAISS, Metacognition, Axis e o catálogo `tools/targeted_mutation.py` não foram tocados. Não há interface web nesta extração.
 
 PR draft: https://github.com/pedromiorini/Nexus/pull/109
+
+## Incremental Learner — critérios pré-registrados (IL1–IL6)
+
+**Objetivo desta rodada:** extrair, em move-only, o bloco POST12 (`LearningEvent`, `ConsolidationReport`, `RealIncrementalLearner`) de `core/constitutional_brain.py` para `core/cognitivo/incremental_learner.py`, com reexport strangler no ponto original e em `core/cognitivo/__init__.py`. Medir IL1–IL6. Se todos passam, documentar e parar. Se algum falha no monólito atual, registrar o gap. Não corrigir comportamento depois de ver o número.
+**Não escopo:** injetar relógio; corrigir gaps de comportamento (o guard de padrão não reconhece o próprio sintético; `apply_decay` é heurística e não faz UPDATE; `bool`/`NaN`/`±inf` seguem a aritmética de `int`/`float`; `id` 0 não é ausência); ObservationalLearner, ImitationLearner, VicariousLearner; HierarchicalMemory/FAISS (POST1); Metacognition (#42 e o bloco POST24); Attention e Working Memory já extraídos; Lifelong Learning Engine; o atalho `consolidate_learning` do orquestrador (~L23047), que só delega a `self.learner` e permanece no monólito; Axis e `tools/targeted_mutation.py` (mutantes só em `tools/cognitivo_mutation.py`); state docs (`CONTINUATION.md`, `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md`, `SECURITY_TRIAGE.md`); PRs congelados #38–#50, #60, #77, #79 (não rebasear, não editar as branches, não resolver os conflitos deles).
+**Eval:** `python tools/cognitivo_eval.py --capability incremental`. O id curto é `incremental` (não `incremental_learner`). O protocolo abaixo é único; `--criteria` v1/v2/v3 não o altera. Seeds não se aplicam. Timestamps de `LearningEvent` e o número de `duration` vêm de `time.time()` e não entram no golden. O golden guarda só `timestamp_is_float` e `duration_ok` (float ≥ 0 já arredondado a 4 casas).
+**Base da observação:** `ab3a22bf9697f2a5e45ebbb4d32a423b8150da74` (merge do #109). Sonda só de leitura, Python 3.12.3, antes deste texto, antes de criar `core/cognitivo/incremental_learner.py` e antes de qualquer harness `incremental`. O fingerprint foi calculado duas vezes: executando o texto fatiado do monólito e, com o venv do `requirements-ci.lock`, importando `core.constitutional_brain`. Os dois SHA comportamentais coincidiram. Fakes duck-typed (`get_episode_memories`, `search_episodes`, `store`, `retrieve`, `log_event`); nenhum SQLite.
+
+### Varredura §7.2 (2026-10-23, `gh pr list --state open`)
+
+PRs abertos que editam `core/constitutional_brain.py`: #38, #39, #40, #41, #42, #44, #46, #48, #49. São os congelados do pedido; não são a base. A extração precisa do reexport no monólito (§16). Isso tensiona a fila única da §11.2: o conflito com esses PRs fica declarado, sem rebase neles. O mesmo padrão foi o do #108 e do #109, já mesclados.
+Nenhum PR aberto altera `core/cognitivo/incremental_learner.py` (o arquivo ainda não existe), `test_incremental_learner_contract.py`, `tools/cognitivo_eval.py`, `tools/cognitivo_mutation.py`, `core/cognitivo/__init__.py` ou este arquivo. O #79 (draft, não usado como base) altera `docs/agentes/CLAIMS.yaml`. `AUDIT_REALITY_REPORT.md` / `audit_reality.json` aparecem em #38, #39, #40, #41, #42, #44, #46, #48 e #49; se o gate exigir recontagem depois do move, o diff fica só nos números deste módulo. O claim da Attention, já mesclado em `ab3a22b` e ainda listado, é substituído pelo claim grok-bot desta tarefa, prazo `2026-10-26T05:00:00Z`.
+
+### Observação (código e sonda, antes do move e antes do eval)
+
+**Fato, lido no bloco ~L2008–L2322:** as constantes de classe são `PROMOTION_RELEVANCE_THRESHOLD=0.75`, `REINFORCEMENT_IMPORTANCE_BOOST=0.08`, `IMPORTANCE_CAP=0.99`, `DECAY_RATE=0.02`, `PATTERN_MIN_FREQ=2`, `PATTERN_IMPORTANCE=0.92`. `__init__(episodic_memory, hierarchical_memory, constitutional_log=None)` guarda os três por atributo e não recebe `clock` nem `now`. Episódio e plano são `Any`: o bloco não importa `Episode` nem `PlanResult`.
+
+`learn_from_episode` ignora o item só quando `id is None` (id ausente também). `id` 0 promove. Relevância ausente vale 0.0; importância ausente vale 0.5; conteúdo ausente vale `""`. Promoção (`if`) exige relevância ≥ 0.75 e id fora de `promoted_ids`: `store(conteúdo inteiro, "long_term", min(0.99, old*1.15))`, entra em `promoted_ids`, `total_promotions += 1`, evento com `promotion=True` e `content[:80]`. Reforço é `elif` (não acumula com a promoção): relevância ≥ 0.5 e importância ≥ 0.7 → `store(..., min(0.99, old+0.08))`, `promotion=False`. O padrão é contado mesmo sem evento: chave `content[:60].lower().strip()`.
+
+`detect_and_store_patterns`: frequência < 2 não chama `retrieve`. Frequência ≥ 2 busca `tag="[PATTERN] {chave}"` com `limit=1` e só grava se nenhum `content` devolvido contém `tag[:30]`. O que grava é `"[PATTERN freq={freq}] {chave}"` com importância 0.92. Essa string **não** contém `tag[:30]`. Com log, emite `PATTERN_DETECTED`.
+
+`apply_decay`: sem log, ou com conjunto vazio, devolve 0 e não grava. Com log e conjunto não vazio, emite `DECAY_APPLIED` (`accessed_count`, `decay_rate=0.02`) e devolve `max(0, 5-len(ids))`. Não chama `store`. `consolidate_learning` descarta esse retorno.
+
+`learn_from_plan`: `None` → `None`. `expected_reward` ausente cai em 0.0 via `getattr` e também devolve `None`. `reward < 0.7` → `None`. Senão grava a sequência, `importance=min(0.99, 0.6+reward*0.35)`, `episode_id="mcts_direct"`, `promotion=True`, `old_importance=0.0`, `memory_id` é o retorno de `store`, incrementa `total_promotions` e **não** põe o id em `promoted_ids`. O evento corta `content` em 80; o `store` e o log recebem o texto e o goal inteiros.
+
+`consolidate_learning` soma `total_consolidations`, busca `search_episodes(status="closed", limit=last_n_episodes)` (padrão 10), aprende cada `episode.episode_id`, detecta padrão só se `run_pattern_detection`, chama `apply_decay` só se `run_decay`, e loga `LEARNING_CONSOLIDATION` se há log. `memories_reinforced` conta eventos com `promotion` falso. Os ids acessados são só os dos eventos, não os que só entraram no registro de padrão.
+
+| caso | medido |
+|---|---|
+| relevância 0.75, importância 0.8, id 7 | promoção; `new=min(0.99, 0.8*1.15)` = `0.9199999999999999`; reason `relevance=0.75 >= 0.75`; segunda chamada no mesmo id não promove de novo e reforça para 0.88 |
+| relevância 0.749, importância 0.4 | nenhum evento; a chave do padrão mesmo assim conta 1 |
+| importância 0.9, relevância 0.9 | `new=0.99` |
+| id `None` ou ausente | nenhum evento e registro de padrão vazio |
+| id 0 | promove; `memory_id` 0 |
+| conteúdo de 100 `L` | evento com 80; `store` com 100; chave do padrão com 60 `l` |
+| importância ausente / relevância ausente / conteúdo ausente | old 0.5 e promove; nenhum evento mas chave registrada; evento com `content=""` |
+| relevância 0.5 e importância 0.7 | reforço, `new=min(0.99, 0.7+0.08)` = `0.7799999999999999`; `promoted_ids` vazio |
+| relevância 0.5 e importância 0.699999999999; relevância 0.499 e importância 0.9 | nenhum evento |
+| relevância 0.6 e importância 0.95 | reforço com teto 0.99 |
+| relevância 0.749 e importância 0.8 | reforço, não promoção; o reason formata `rel=0.75` por `:.2f` |
+| relevância 0.8 e importância 0.8 | um único evento, o de promoção (`if`/`elif`) |
+| id já em `promoted_ids`, relevância 0.9, importância 0.8 | reforço, sem segunda promoção |
+| freq 1 | `detect` devolve 0, sem `retrieve` e sem `store` |
+| `"Repeat Me"` e `"  REPEAT ME  "` | a mesma chave `repeat me`, freq 2 |
+| `retrieve` devolve o sintético gravado | a chamada seguinte grava de novo `[PATTERN freq=2] repeat me` com 0.92 |
+| `retrieve` devolve `[]` e há log | uma gravação e `PATTERN_DETECTED` `{content: repeat me, frequency: 2}` |
+| `retrieve` devolve um item cujo content é a própria tag | não grava; `total_patterns` permanece 0 |
+| `learn_from_plan(None)`, reward 0.699, reward ausente | `None`, sem `store` |
+| reward 0.7, goal de 80 `G`, sequência `look`,`go` | importância 0.845; evento com 80 caracteres; `store` com 113; log com o goal inteiro; `promoted_ids` vazio; `total_promotions` 1 |
+| reward 1.2 e sequência vazia | importância 0.99; o texto termina em `Sequence: ` |
+| `apply_decay` sem log / conjunto vazio / 1, 4, 5, 6 ids | 0 / 0 sem log / 4, 1, 0, 0; nenhum `store` |
+| consolidar 3 episódios (`solo` promove, `solo` reforça, `quiet` só no padrão) | processados 3, promovidas 1, reforçadas 1, padrões 1, eventos 2; `DECAY_APPLIED` com `accessed_count` 2 |
+| flags `run_pattern_detection=False` e `run_decay=False`, `last_n=2` | padrões 0, sem `retrieve`, sem `DECAY_APPLIED`; o log de consolidação continua |
+| sem log | o padrão ainda é gravado; a lista de log fica vazia |
+| busca vazia, argumentos padrão | `limit` 10, zero episódios, `total_consolidations` 1, sem `DECAY_APPLIED` |
+| `str` em relevância, importância ou reward | `TypeError` |
+| plano sem `best_action_sequence` | `AttributeError` |
+| `goal is None`; item de memória que não é dict | `TypeError`; `AttributeError` |
+
+**Gaps medidos, fora de correção nesta rodada.** `bool` é `int`: relevância `True` promove com reason `relevance=1.00`; importância `True` no reforço vai ao teto 0.99; reward `True` vale 1.0 (importância 0.95) e reward `False` devolve `None`. Relevância `nan` não promove e ainda conta padrão. Importância `nan` promove e `new_importance` fica 0.99, porque `min(0.99, nan)` neste CPython 3.12.3 fica com o 0.99. Importância `-inf` é gravada como `-inf`. Reward `nan` não é `< 0.7`, então o plano é gravado com `reward=nan` e importância 0.99. O JSON do golden contém os tokens `NaN` e `-Infinity`. Python 3.11 não foi executado.
+
+### Hipóteses concorrentes (Strong Inference)
+
+| id | hipótese | o que a falsifica | teste barato |
+|---|---|---|---|
+| H1 | mover o bloco muda o texto ou o fingerprint de comportamento | SHA de fonte ou SHA comportamental ≠ os valores abaixo, ou as três classes reexportadas não são o mesmo objeto | IL6 |
+| H2 | promoção e reforço disparam juntos quando relevância ≥ 0.75 e importância ≥ 0.7 | o protocolo mostra um único evento, o de promoção | IL2 |
+| H3 | a segunda detecção é idempotente contra o sintético que a própria função grava | a chamada seguinte grava de novo quando `retrieve` devolve esse sintético | IL3 |
+| H4 | `apply_decay` atualiza a importância na memória com `DECAY_RATE` | não há `store` no decay; o retorno é `max(0, 5-len)` e só existe log com conjunto não vazio | IL5 |
+| H5 | `learn_from_plan` exige a classe `PlanResult` | um objeto com `expected_reward`, `goal` e `best_action_sequence` basta; `None` e reward < 0.7 devolvem `None` | IL4 |
+
+A sonda já exclui H2, H3, H4 e H5 como descrição do bloco atual. O eval as repete para o move não as reintroduzir. H1 ainda não foi testada: o módulo novo não existe. Hipótese de trabalho, não vinculante para além da tabela: move-only, sem injetar relógio e sem alterar fórmulas. O gap do padrão e o decay heurístico não autorizam editar o bloco.
+
+### Critérios
+
+| id | afirmação | protocolo falsificável | alvo |
+|---|---|---|---|
+| IL1 | relevância ≥ 0.75 e id novo promovem com `min(0.99, old*1.15)`; o mesmo id não promove de novo; id `None` é ignorado | Id 7, `"alpha fact"`, 0.75, 0.8 → um `store` long_term com `0.9199999999999999`, `promotion=True`, reason `relevance=0.75 >= 0.75`. A segunda chamada reforça (0.88) e `total_promotions` continua 1. 0.749 com importância 0.4 não gera evento, mas a chave conta. Importância 0.9 → 0.99. Id `None` ou ausente: zero eventos e registro vazio. Id 0 promove. Conteúdo de 100 caracteres: evento 80, `store` 100, chave 60 já em minúsculas. Importância ausente usa 0.5 | esses stores, o teto e a não-repromoção |
+| IL2 | reforço é o `elif`: +0.08 com teto 0.99, só sem promoção, relevância ≥ 0.5 e importância ≥ 0.7 | 0.5/0.7 → `0.7799999999999999` e `promotion=False`. 0.5 com importância logo abaixo de 0.7, e 0.499 com 0.9, não geram evento. 0.95 vai a 0.99. 0.749/0.8 reforça e o reason mostra `rel=0.75`. 0.8/0.8 gera um único evento de promoção. Id já promovido com 0.9/0.8 reforça e não entra de novo | um evento, o boost e o teto |
+| IL3 | freq ≥ 2 grava `[PATTERN freq=…]` com importância 0.92 se `retrieve` não acha `tag[:30]`; a tag achada não duplica; o sintético da própria função não conta como achado | Freq 1: devolve 0, sem `retrieve`. `"Repeat Me"` e `"  REPEAT ME  "` viram `repeat me`. `retrieve` que ecoa o sintético: a chamada seguinte grava outra vez. `retrieve` vazio com log: uma gravação e `PATTERN_DETECTED`. `retrieve` que devolve a tag: zero gravações e `total_patterns` 0 | 0.92, a tag e a segunda gravação do sintético |
+| IL4 | `learn_from_plan` devolve `None` se o plano é `None` ou reward < 0.7; reward ≥ 0.7 grava a sequência e marca promoção | `None`, 0.699 e reward ausente → `None`. Reward 0.7 → importância 0.845, `episode_id="mcts_direct"`, `memory_id` igual ao retorno de `store`, evento cortado em 80, `store` com o texto inteiro, log com goal de 80 e a sequência, `promoted_ids` vazio, `total_promotions` 1. Reward 1.2 → 0.99. `str` → `TypeError`. Sem sequência → `AttributeError`. `goal=None` → `TypeError`. Item de memória `str` → `AttributeError` | `None`, 0.845 e as exceções |
+| IL5 | `consolidate_learning` conta episódios, promoções, reforços e padrões; as flags mandam no padrão e no decay; o decay não atualiza memória | Três episódios fechados: 3/1/1/1 e 2 eventos; busca `status=closed`, `limit=10`; log `PATTERN_DETECTED`, `DECAY_APPLIED` com `accessed_count` 2, `LEARNING_CONSOLIDATION`. Flags falsas e `last_n=2`: padrões 0, sem `DECAY_APPLIED`, consolidação ainda logada. Sem log: padrão gravado, log vazio. Busca vazia no padrão: `limit` 10 e `total_consolidations` 1. `apply_decay` devolve 0/0/4/1/0/0 nos casos sem log, vazio, 1, 4, 5 e 6 ids, e não chama `store`. `duration_ok` é verdadeiro sem fixar o número | as contagens, as flags e a heurística |
+| IL6 | move-only: o texto do bloco e o fingerprint comportamental são os mesmos; reexport é o mesmo objeto | O texto UTF-8 que começa na linha de `═` imediatamente antes de `# MÓDULO 11: INCREMENTAL LEARNER (POST12)` e termina no `}` de `get_statistics` (a chave `"pattern_registry_size"`) tem SHA-256 `e09c2d75df964dd52915eaf0c0660dd45a6ac34cbf476804c786423910057542` no monólito, antes do splice, e o mesmo SHA no módulo novo. As três classes: `core.constitutional_brain` e `core.cognitivo` são o mesmo objeto que `core.cognitivo.incremental_learner`, e `__module__` é `core.cognitivo.incremental_learner`. O módulo importa sem puxar o monólito, numpy ou vita (árvore de `import` / `import from`; menção no docstring não conta). O dict do protocolo, `json.dumps(..., sort_keys=True, ensure_ascii=False)`, tem SHA-256 `636c95bfaebbd60ca55a5e14f12e9f5ff7b6f7868f5a476b31fa479528db7767`, igual pela classe do monólito e pela do módulo novo. `clock` é `wall` | os dois SHA e a identidade |
+
+**Protocolo do fingerprint comportamental de IL6** (o que entra no dict; fakes em memória, sem SQLite):
+
+- `hyper` com as seis constantes; `clock`; `init_params` = `self`, `episodic_memory`, `hierarchical_memory`, `constitutional_log`.
+- `promotion`: o caso 0.75/0.8 antes da segunda chamada (`stores`, `promoted`, `stats`) e `again` / `again_stores` / `again_stats` depois.
+- `below` 0.749/0.4; `cap` 0.9/0.9; `skip_none`; `long`; `zero_id`; `defaults` (importância, relevância ou conteúdo ausentes).
+- `boundaries`: 0.5/0.7, 0.5/0.699999999999, 0.499/0.9, 0.6/0.95, 0.749/0.8, 0.8/0.8. `preset_promoted` com o id 9 já inserido em `promoted_ids`.
+- `patterns`: freq 1; registro `repeat me`; duas gravações quando o `retrieve` ecoa o sintético; uma gravação com log e `retrieve` vazio; zero quando o `retrieve` devolve a tag.
+- `plans`: `none`, `low` e `missing_reward` verdadeiros; evento e `store` do reward 0.7; reward 1.2; reward `True`, `False` e `nan` no golden, sem virar rejeição de tipo.
+- `decay`: sem log, conjunto vazio, e contagens 1/4/5/6. `consolidate`: cheio, flags desligadas, sem log, e busca vazia no padrão. `duration` numérica de fora.
+- `gaps`: relevância `True`/`False`, importância `True`, relevância `nan`, importância `nan`, relevância `inf`, importância `-inf`, relevância −1. `errors`: os `TypeError` e `AttributeError` da tabela.
+
+`bool`/`NaN`/`-inf`, o reason que arredonda 0.749 para `0.75`, a segunda gravação do sintético e o decay que não atualiza memória fazem parte do golden de identidade. Não são metas de qualidade e não serão corrigidos nesta rodada.
+
+### Regressão exigida
+
+Não há contrato anterior destes três símbolos. O eval dos outros capabilities não é alvo de mudança de critério. O atalho do orquestrador continua chamando `self.learner.consolidate_learning`.
+
+Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability incremental`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
