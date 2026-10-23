@@ -15,6 +15,10 @@ O runner exige arquivo regular legível e conclui sua leitura antes de executar 
 
 O runner deve manter modo Git `100755`: `tools/agente/replay/run_replay.sh` funciona diretamente, sem prefixo `bash`. A regressão de execução direta usa a tabela padrão de 11 casos e não altera permissões para mascarar falhas.
 
+## Registro e aceite das instruções
+
+`python tools/agente/validar_registro.py --expirados aviso` valida registro e claims sem escrever nos arquivos. No schema 2, aceite anterior só gera aviso se versão, artefato e SHA forem verificáveis; versão desconhecida/futura, arquivo ausente ou SHA divergente continuam falhando. O schema 1 permanece estrito. Contrato, caminhos de migração e limites de confiança em [ACEITE_VERSIONADO.md](../../docs/agentes/ACEITE_VERSIONADO.md). Essa migração local mantém ambos os agentes em 3.4.1 e não aprova a v3.4.2.
+
 ## Dependências e limitações
 - Rodar de dentro de um clone do repositório (o padrão é `git rev-parse --show-toplevel`; pode-se definir `R=`/`REPO=`). Requer `git` ≥ 2.38 (`merge-tree --write-tree`), `rg` e `awk`.
 - `replay/casos.tsv` referencia SHAs reais do histórico (`d074c15`, merges do #57/#58/#61). Todos são ancestrais de `main`; basta um clone com histórico completo (não `--depth`). Verificado em clone novo em 21/10/2026: 11/11 casos.

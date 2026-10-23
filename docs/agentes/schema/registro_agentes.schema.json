@@ -3,6 +3,14 @@
   "$id": "https://github.com/pedromiorini/Nexus/docs/agentes/schema/registro_agentes.schema.json",
   "title": "Registro e claims de agentes do Nexus",
   "$defs": {
+    "versao": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "artefato": {
+      "type": "object", "required": ["arquivo", "sha256"],
+      "properties": {
+        "arquivo": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
     "agente": {
       "type": "object",
       "required": ["id", "operador", "ferramenta", "modelo", "instrucoes", "skills", "escopo_arquivos", "limites", "contato", "last_seen"],
@@ -27,8 +35,27 @@
   "type": "object",
   "required": ["schema_version", "instrucoes_atuais", "agentes"],
   "properties": {
+    "schema_version": {"type": "integer", "enum": [1, 2]},
     "instrucoes_atuais": {"type": "object", "required": ["arquivo", "versao"]},
+    "instrucoes_versoes": {
+      "type": "object", "minProperties": 1,
+      "propertyNames": {"$ref": "#/$defs/versao"},
+      "additionalProperties": {"$ref": "#/$defs/artefato"}
+    },
     "agentes": {"type": "array", "items": {"$ref": "#/$defs/agente"}},
     "claims": {"type": "array", "items": {"$ref": "#/$defs/claim"}}
-  }
+  },
+  "allOf": [{
+    "if": {"properties": {"schema_version": {"const": 2}}},
+    "then": {
+      "required": ["instrucoes_versoes"],
+      "properties": {
+        "instrucoes_atuais": {"properties": {"versao": {"$ref": "#/$defs/versao"}, "arquivo": {"type": "string", "minLength": 1}}},
+        "agentes": {"items": {"properties": {"instrucoes": {
+          "allOf": [{"$ref": "#/$defs/artefato"}],
+          "properties": {"versao_aceita": {"$ref": "#/$defs/versao"}}
+        }}}}
+      }
+    }
+  }]
 }
