@@ -37,6 +37,7 @@ EFFECTS = "core/cognitivo/action_effects.py"
 R1_TESTS = ("test_action_effects_contract.py",)
 R2_TESTS = ("test_futures_ranking_contract.py",)
 R3_TESTS = ("test_causal_extraction_contract.py",)
+R4_TESTS = ("test_scm_intervention_contract.py",)
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
@@ -186,8 +187,9 @@ MUTATIONS = [
              '"world": {}', tests=CAUSAL_TESTS),
     Mutation("r1_unknown_action_silent", CAUSAL, 'warnings.append(f"unknown action: {action!r}")', "pass",
              tests=R1_TESTS),
-    Mutation("r1_unknown_action_applies_nothing_but_breaks", CAUSAL, "unknown action: {action!r}\")\n                continue\n",
-             "unknown action: {action!r}\")\n                break\n",
+    Mutation("r1_unknown_action_applies_nothing_but_breaks", CAUSAL,
+             "            if not applied:\n                warnings.append(f\"unknown action: {action!r}\")\n",
+             "            if not applied:\n                warnings.append(f\"unknown action: {action!r}\")\n                break\n",
              tests=R1_TESTS),
     Mutation("r1_planner_shares_mutable_table", EFFECTS, "dict(entry[\"metrics\"])", "entry[\"metrics\"]",
              tests=R1_TESTS),
@@ -220,6 +222,18 @@ MUTATIONS = [
              "            self.causal_graph[\"adjacency\"][cause].add(effect)\n", tests=R3_TESTS + CAUSAL_TESTS),
     Mutation("r3_negation_continues_search", CAUSAL, "_negated(text[:match.start(2)], first, kind):\n                break\n",
              "_negated(text[:match.start(2)], first, kind):\n                continue\n", tests=R3_TESTS),
+    Mutation("c4_do_ignored", CAUSAL, "            intervened = self._do(action)\n            if intervened:\n                state.state.update(intervened)\n                applied = True\n",
+             "", tests=R4_TESTS),
+    Mutation("c4_do_skips_split", CAUSAL, "            if len(parts) == 2:\n                effects[parts[0]] = parts[1]",
+             "            if False:\n                effects[parts[0]] = parts[1]", tests=R4_TESTS),
+    Mutation("c4_table_skipped_when_do", CAUSAL, "            if entry is not None:\n                state.state.update(entry[\"world\"])\n                applied = True\n",
+             "            if entry is not None and not self._do(action):\n                state.state.update(entry[\"world\"])\n                applied = True\n",
+             tests=R4_TESTS + R1_TESTS),
+    Mutation("c4_warns_even_when_do", CAUSAL, "            if not applied:\n                warnings.append(f\"unknown action: {action!r}\")",
+             "            if entry is None:\n                warnings.append(f\"unknown action: {action!r}\")",
+             tests=R4_TESTS),
+    Mutation("c4_adjacency_wrong_key", CAUSAL, "        for effect in adjacency.get(action, ()):",
+             "        for effect in adjacency.get(action.lower(), ()):", tests=R4_TESTS),
 ]
 
 

@@ -104,17 +104,36 @@ class RealWorldModelSimulator:
             timestamp=time.time()
         )
 
+    def _do(self, action: str) -> Dict[str, object]:
+        """Intervenção do(ação): efeitos simbólicos das arestas causa→efeito (Pearl)."""
+        cr = self.causal_reasoning
+        if cr is None:
+            return {}
+        adjacency = getattr(cr, "causal_graph", {}).get("adjacency") or {}
+        effects: Dict[str, object] = {}
+        for effect in adjacency.get(action, ()):
+            parts = str(effect).strip().split(None, 1)
+            if len(parts) == 2:
+                effects[parts[0]] = parts[1]
+        return effects
+
     def simulate(self, actions: List[str]) -> SimulationResult:
-        """Simular sequência de ações"""
+        """Simular sequência de ações; aplica ACTION_EFFECTS e do(ação)."""
         state = copy.deepcopy(self.current_state)
         warnings = []
 
         for action in actions:
+            applied = False
             entry = ACTION_EFFECTS.get(action)
-            if entry is None:
+            if entry is not None:
+                state.state.update(entry["world"])
+                applied = True
+            intervened = self._do(action)
+            if intervened:
+                state.state.update(intervened)
+                applied = True
+            if not applied:
                 warnings.append(f"unknown action: {action!r}")
-                continue
-            state.state.update(entry["world"])
 
         # Evaluate success
         success = state.state.get("system_status") in ["secure", "stable"]
