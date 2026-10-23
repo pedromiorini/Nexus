@@ -1166,3 +1166,104 @@ Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, cov
 **Fora do que estes comandos medem:** CI hospedado; Python 3.11 (o 0.99 de `min(0.99, nan)` e o token `-Infinity` foram lidos em 3.12.3); conflito de merge contra as branches dos PRs #38, #39, #40, #41, #42, #44, #46, #48, #49, #50, #60, #77 e #79 (o `predeleg` só compara com `origin/main`); state docs não atualizados, de propósito; ObservationalLearner, ImitationLearner, VicariousLearner, HierarchicalMemory/FAISS, Metacognition, Attention, Working Memory, Lifelong Learning Engine, o atalho `consolidate_learning` do orquestrador e o catálogo `tools/targeted_mutation.py` não foram alterados no comportamento. Não há interface web nesta extração.
 
 PR draft: https://github.com/pedromiorini/Nexus/pull/110
+
+## Tool safety — A/B permission + evidence omission
+
+**Objetivo desta rodada:** fechar dois gaps com critérios congelados antes do código novo. (1) `RealToolUse.execute_tool` honra `ToolDefinition.requires_permission`. (2) Um helper mínimo, fail-closed, recusa resultado de ferramenta quando uma evidência exigida foi omitida. Adoção só se o critério B passar e o critério A falhar no caso novo, com zero falhas novas nos `test_tool_*_contract.py` que já existem.
+**Não-escopo:** SMT/SCA; compilador SCOPE; proveniência completa no estilo ClawMMU; self-mod; open-endedness; hierarquia `permission_level` (`read`/`write`/`admin`); UI; Axis e o catálogo `tools/targeted_mutation.py`; IncrementalLearner e qualquer extrato cognitivo; state docs (`CONTINUATION.md`, `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md`, `SECURITY_TRIAGE.md`). O pedido cita como contexto AgentPolicyForge (arXiv:2610.28989), EpiSEM-Bench (arXiv:2610.31650) e Behavior Beyond Text (arXiv:2610.28982). SCOPE (arXiv:2610.31062) fica esticado para documentação: estes identificadores não são evidência do buraco. A evidência do buraco é o código lido abaixo. Ligar o helper de evidência dentro de `execute_tool` também fica fora: os built-ins não declaram evidência exigida, e esta rodada não acrescenta esse campo.
+**Base da observação:** `d0aab245f6d0453428d1f530c82ddd23fed18c1b` (merge do #110). Leitura só do bloco Tool Use, Python ainda sem o contrato novo e sem `core/tool_evidence_gate.py`.
+
+### Varredura §7.2 (2026-10-23, `gh pr list --state open`)
+
+PRs abertos que editam `core/constitutional_brain.py`: #38, #39, #40, #41, #42, #44, #46, #48, #49. São os congelados do pedido; não são a base e as branches deles não serão editadas. O mesmo arquivo entra nesta rodada porque o gap está em `execute_tool`. Isso tensiona a fila única da §11.2. O texto do patch que a API devolveu para esses nove PRs não contém `execute_tool`, `requires_permission`, `class ToolDefinition`, `class RealToolUse` nem `permission_level`. Inferência: o hunk desta rodada pode não coincidir com o deles. Merge-tree contra cada branch congelada segue não verificado; `predeleg.sh` só compara com `origin/main`.
+#50, #60 e #77 não tocam o monólito, os testes `test_tool_*`, este arquivo nem `CLAIMS.yaml`. #79 (draft, não usado como base) altera `docs/agentes/CLAIMS.yaml`. O claim do IncrementalLearner, já mesclado no #110 e ainda listado, é substituído pelo claim grok-bot desta tarefa, prazo `2026-10-26T06:00:00Z`. `AUDIT_REALITY_REPORT.md` / `audit_reality.json` aparecem em #38, #39, #40, #41, #42, #44, #46, #48 e #49; se o gate exigir recontagem depois do método novo, o diff fica só nos números deste núcleo.
+
+### Observação (código, antes do contrato e antes do fix)
+
+**Fato, lido em `d0aab245`.** `ToolDefinition` (por volta da linha 2508) tem `requires_permission: bool = False` e `permission_level: str = "read"`. As quatro ferramentas built-in (`math_calculate`, `string_transform`, `format_json`, `list_operations`) passam `requires_permission=False`. `list_tools` só ecoa o booleano. `ToolValidator.permission_hierarchy` é atribuído no `__init__` e nenhuma outra linha do arquivo lê esse atributo. `rg` de `requires_permission` no monólito não encontra ocorrência dentro de `execute_tool`.
+
+`execute_tool` (por volta da linha 3294) soma `total_executions`, busca a ferramenta e, se falta, devolve `success=False` com `error` `Tool '<nome>' not found` e soma `failed_executions`. Se existe, revalida `timeout_seconds`, prepara snapshot/cache, valida parâmetros e só então consulta o dict de executores (`_execute_math_calculate`, `_execute_string_transform`, `_execute_format_json`, `_execute_list_operations`). Não há leitura de `requires_permission` nem de um conjunto de grants. Não existe `grant_permission` nem `revoke_permission`. Não existe `core/tool_evidence_gate.py`. `rg` de `required_evidence` e `system_isolated` em `core/` não encontra ocorrências.
+
+### Hipóteses concorrentes (Strong Inference)
+
+| id | hipótese | o que a falsifica | teste barato |
+|---|---|---|---|
+| H1 | `execute_tool` já nega quando `requires_permission` é verdadeiro | sem grant, o executor mock é chamado, ou `success` não é falha que mencione permission/grant | TS1 no código atual (critério A) |
+| H2 | a flag só é armazenada e ecoada; um built-in mutado para `True` ainda chega ao executor | depois do critério B, sem grant o executor não é chamado e `failed_executions` aumenta | TS1 sem grant, depois do fix |
+| H3 | algum helper já rejeita omissão de evidência | o import de `core.tool_evidence_gate` falha, e o caso `{status: ok}` sem a chave exigida não tem função que o negue | TS2 no código atual (critério A) |
+| H4 | entrada inválida (`required` `None`, resultado que não é dict) seria o mesmo booleano da omissão, ou seria aceita | omissão devolve `allowed=False` sem exceção; `None` e resultado não-dict levantam `EvidenceGateRejection` com código próprio | TS2 negativo, critério B |
+
+Hipótese de trabalho, não vinculante para além da tabela: H1 e H3 descrevem o que o campo e o nome sugerem; o código lido aponta para H2 e para a ausência do helper. H4 ainda não tem implementação para distinguir. Nenhuma hipótese vira alegação de controle de acesso pronto para produção. `permission_level` e `permission_hierarchy` continuam fora do caminho de execução.
+
+### Critérios congelados
+
+**Adoção:** B passa e A falha no caso novo. Regressão dos `test_tool_*_contract.py` já existentes = 0 falhas novas. Proibido relaxar assert para ficar verde.
+
+**Critério A (baseline atual, deve falhar no caso novo).** TS1: `list_operations` com `requires_permission=True`, sem grant, `execute_tool` com parâmetros válidos chama `_execute_list_operations` (o mock observa a chamada) e não devolve falha cuja mensagem mencione permission e grant. TS2: `import core.tool_evidence_gate` levanta `ModuleNotFoundError` (o módulo não existe neste commit). Os casos de nome vazio e de ferramenta sem registro já devolvem `Tool '' not found` e `Tool 'missing_tool' not found`; eles distinguem o caminho e podem passar em A. O arquivo de TS1, no conjunto, sai com código 1 por causa do caso novo.
+
+**Critério B (comportamento desejado).**
+
+| id | afirmação | protocolo falsificável |
+|---|---|---|
+| TS1a | sem grant ativo, flag verdadeira, o executor não roda | Mutar `list_operations`: `requires_permission=True` e `cacheable=False`. `execute_tool("list_operations", {"items": [2, 1], "operation": "sort"})` com `_execute_list_operations` patchado. `success is False`, `result is None`, `error` em minúsculas contém `permission` e contém `grant`, o mock não foi chamado, `failed_executions == 1`. O log recebe `TOOL_PERMISSION_DENIED` com `tool == "list_operations"`. |
+| TS1b | grant explícito deixa o executor rodar | O mesmo tool e os mesmos parâmetros. `grant_permission("list_operations")` e em seguida `execute_tool`. `success is True`, `result == [1, 2]`, o mock foi chamado uma vez. |
+| TS1c | revogar o grant fecha de novo, inclusive se a chamada anterior podia cachear | Flag verdadeira e `cacheable=True`. Grant, uma execução que sucede e chama o executor uma vez, `revoke_permission("list_operations")`, a mesma chamada de novo. A segunda tem `success is False`, a mensagem contém `permission` e `grant`, `cached is False`, e o mock continua com uma chamada só. |
+| TS1d | nome vazio e nome sem registro não são erro de permissão | `execute_tool("", ...)` → `success is False`, `error == "Tool '' not found"`, mock não chamado. `execute_tool("missing_tool", {})` → `success is False`, `error == "Tool 'missing_tool' not found"`, sem `permission` na mensagem. |
+| TS1e | built-in no default segue sem grant | `list_operations` com a flag ainda `False` executa `sort` e `success is True`, sem chamar `grant_permission`. |
+| TS2a | omissão da chave exigida nega | `required_evidence=["system_isolated"]`, `tool_result={"status": "ok"}` → `allowed is False`. Sem exceção. |
+| TS2b | valor exatamente `True` permite | `tool_result={"status": "ok", "system_isolated": True}` → `allowed is True`. |
+| TS2c | lista exigida vazia é válida | `required_evidence=[]` e `tool_result` dict (inclusive `{}`) → `allowed is True`. |
+| TS2d | valor presente que não é `True` não autoriza e não é exceção | `False`, `1`, `"true"` e `None` na chave `system_isolated` → `allowed is False`, sem exceção. Sem coerção. |
+| TS2e | todas as chaves precisam valer `True` | `["system_isolated", "sandbox"]` com só `system_isolated=True` → `False`. As duas `True` → `True`. |
+| TS2f | entrada inválida tem código próprio, distinto da omissão | `required_evidence is None`, ou não é `list` (`True`, uma `str`), ou algum item não é `str` → `EvidenceGateRejection` com `code == "required_evidence_invalid"`. `tool_result` que não é `dict` (`None`, `list`, `str`) → `code == "tool_result_not_dict"`. Se os dois são inválidos, vale o código de `required_evidence` (checado primeiro). |
+
+**API mínima de B, congelada com os testes.** Em `RealToolUse.__init__`, `self._permission_grants: set[str] = set()`. `grant_permission(tool_name)` acrescenta o nome só se for `str` não vazia e a ferramenta estiver registrada; caso contrário `ValueError` com mensagem `permission grant rejected`. `revoke_permission(tool_name)` exige `str` não vazia (`ValueError` `permission revoke rejected` se não) e faz `discard` (revogar nome que não estava concedido não é erro). A checagem em `execute_tool` fica depois de `get_tool` e antes de timeout, parâmetros, leitura de cache e dispatch do executor: se `tool.requires_permission` é verdadeiro e `tool_name` não está em `_permission_grants`, devolver `ToolExecutionResult(success=False, error=...)` cuja mensagem contém `permission` e `grant`, somar `failed_executions`, não chamar executor. `permission_level` não entra na decisão.
+
+**Helper de B, congelado com os testes.** Módulo novo `core/tool_evidence_gate.py`. Função `evaluate_evidence_omission(required_evidence, tool_result) -> bool`. Exceção `EvidenceGateRejection(ValueError)` com atributo `code`. Uma chave exigida só conta se `tool_result[key] is True`. Subclasse de `dict` conta como dict (`isinstance`). O helper não é chamado por `execute_tool` nesta rodada.
+
+Pré-registro escrito **antes** dos contratos novos e **antes** de alterar `execute_tool`. O SHA deste commit entra no PR. Resultados de A e de B só numa seção posterior.
+
+### Resultados TS (após o pré-registro `fc48293`)
+
+Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, bandit 1.9.4, hypothesis 6.170.5, numpy 2.4.6). O lock deste commit instala ruff 0.17.1; o snapshot antigo da §10 citava 0.16.10. O CI usa Python 3.11; esta máquina não o executou. Os códigos de saída abaixo são desta execução, não um carimbo de CI hospedado.
+
+**Commits.** Base `d0aab245f6d0453428d1f530c82ddd23fed18c1b`. Pré-registro `fc48293bbee0e6af26846b4bd64a96097891d135`. RED `73b43a14f59664a1f20e5a6418e89e45ec131be2` (só os dois contratos; `execute_tool` ainda é o da base). GREEN `6c91a12f17d1e54ee37591343a90b0b4076b65d8`.
+
+**Critério A, na árvore do RED** (`PYTHONPATH=.`, `NEXUS_AUDIT_DB=/tmp/nexus_audit.sqlite3`):
+
+| id | A falhou no caso novo? | comando | rc |
+|---|---|---|---|
+| TS1 | sim | `python -m unittest test_tool_permission_failclosed_contract.py` | 1 |
+| TS2 | sim | `python -m unittest test_evidence_omission_contract.py` | 1 |
+
+TS1: 9 testes, `FAILED (failures=1, errors=10)`. `test_ts1a` falhou com `AssertionError: True is not false`: sem grant, `execute_tool` devolveu sucesso e portanto chamou o executor. `test_ts1b`, `test_ts1c` e os testes de `grant_permission`/`revoke_permission` deram `AttributeError: 'RealToolUse' object has no attribute 'grant_permission'` (os subtestes entram na conta de errors). Os três testes que já distinguiam o baseline passaram: nome vazio, nome `missing_tool` e built-in com a flag ainda falsa. TS2: coleta do módulo, `ModuleNotFoundError: No module named 'core.tool_evidence_gate'`.
+
+**Critério B, reexecutado no commit GREEN** `6c91a12`:
+
+| id | B passou? | comando | rc |
+|---|---|---|---|
+| TS1 | sim | `python -m unittest test_tool_permission_failclosed_contract.py test_evidence_omission_contract.py` | 0 |
+| TS2 | sim | o mesmo comando (19 testes, `OK`) | 0 |
+
+`python -m unittest discover -p 'test_tool_*.py'`: 33 testes, `OK`, rc 0. Nenhum assert foi relaxado entre o RED e o GREEN. Os `test_tool_*_contract.py` que já existiam estão dentro desses 33 e não acrescentaram falha.
+
+**Outros comandos na árvore do GREEN** (a suíte completa e o bandit rodaram no working tree idêntico ao que foi commitado em `6c91a12`; os contratos e o `predeleg` foram repetidos depois do commit):
+
+| comando | rc | resultado |
+|---|---|---|
+| `ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py` | 0 | All checks passed |
+| `python -m unittest discover -p 'test_*.py'` | 0 | 602 testes, `OK`, 18.028 s |
+| `bandit -q -r core vita tools -f json -o /tmp/bandit-rc.json` | 1 | 131 LOW, 0 MEDIUM, 0 HIGH. O rc 1 é o do bandit quando o JSON tem achados; o workflow segue se o relatório existe e não há MEDIUM/HIGH. Nenhum achado em `core/tool_evidence_gate.py` |
+| `python tools/security_triage.py /tmp/bandit.json SECURITY_TRIAGE.md --check` | 0 | `SECURITY_TRIAGE.md` não foi editado |
+| `python tools/targeted_mutation.py` | 0 | `{"declared": 69, "applicable": 69, "killed": 69, "survived": 0, "not_applied": 0, "score_percent": 100.0}` |
+| `python tools/agente/validar_registro.py --expirados aviso` | 0 | registro OK |
+| `bash tools/agente/predeleg.sh HEAD origin/main` | 0 | `OK: sem conflito` (`HEAD` `6c91a12`, `origin/main` `d0aab245`) |
+| `python tools/cognitivo_eval.py --capability all` | 1 | `failed: ["M3"]`; WM1–WM6 e AT1–AT6 passaram |
+
+**M3.** No `--capability all`, M3 ficou `value: 0.0`, `regret_50: 0.0`, limite `v2: max_depth=8, regret(2000) < regret(50)`, `passed: false`. O mesmo comando só com `--capability mcts`, no `constitutional_brain.py` da base (diff de tool safety retirado), também saiu rc 1 com `failed: ["M3"]` e `regret_50: 0.0`. Inferência: esta falha já estava na base e não foi introduzida pelo ramo de permissão. WM e AT não quebraram.
+
+**Realidade** (commitada com o GREEN): núcleo 24920 linhas, 236 classes, 759 funções (antes 24886 / 236 / 757). As duas funções novas são `grant_permission` e `revoke_permission`. `core/tool_evidence_gate.py` fica fora da contagem do núcleo. `reality_audit` reexecutado: o diff versionado é só esses dois números.
+
+**Hipóteses.** H1 não se sustenta: no caso novo, sem grant, `success` era `True`. H2 descreve o baseline e o GREEN deixa de reproduzir essa passagem (executor não chamado, `failed_executions` soma 1, mensagem com `permission` e `grant`). H3 não se sustenta: o helper não existia e o import falhou. H4 não se sustenta no GREEN: omissão devolve `False` sem exceção; `None` e resultado que não é dict levantam `EvidenceGateRejection` com código próprio. Nada disso é controle de acesso pronto para produção. `permission_level` e `permission_hierarchy` continuam sem leitor. O helper não é chamado por `execute_tool`. O banner do núcleo e a suíte embutida continuam sendo demo, não evidência de capacidade.
+
+**Fora do que estes comandos medem:** CI hospedado; Python 3.11; merge contra as branches dos PRs #38, #39, #40, #41, #42, #44, #46, #48, #49, #50, #60, #77 e #79 (`predeleg` só compara com `origin/main`); state docs não atualizados, de propósito; compilador SCOPE, SMT/SCA, proveniência completa, self-mod e open-endedness; catálogo `tools/targeted_mutation.py` não foi editado, então o gate novo não tem mutante nesse script. Não há interface web nesta mudança.
