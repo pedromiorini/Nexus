@@ -652,6 +652,11 @@ CF_EXPLICIT = [
     ("system vulnerable", "apply patch"),
     ("alarm firing", "rollback"),
 ]
+CF_JACCARD = [
+    ("the cat sat on the mat", "the cat sat on a mat", 1 - 5 / 6),
+    ("outcome without intervention", "outcome with apply patch", 1 - 1 / 6),
+    ("alpha beta", "gamma delta", 1.0),
+]
 
 
 def eval_counterfactual(criteria="v1"):
@@ -715,6 +720,21 @@ def eval_counterfactual(criteria="v1"):
             explicit_ok += 1
     cf7_ok = explicit_ok == len(CF_EXPLICIT) and cf4_ok
 
+    jacc_ok = 0
+    if eng._calculate_outcome_difference("", "") == 0.0 and eng._calculate_outcome_difference("x", "x") == 0.0:
+        jacc_ok += 1
+    import math
+    pair_hits = 0
+    for a, b, expected in CF_JACCARD:
+        if math.isclose(eng._calculate_outcome_difference(a, b), expected, rel_tol=0, abs_tol=1e-9):
+            pair_hits += 1
+    if pair_hits == len(CF_JACCARD):
+        jacc_ok += 1
+    shared = eng._calculate_outcome_difference(
+        "outcome_without_intervention", "outcome_with_apply_patch")
+    if shared < 1.0 and math.isclose(shared, 1 - 1 / 6, rel_tol=0, abs_tol=1e-9):
+        jacc_ok += 1
+
     return [
         _check("CF1", cf1, cf1, "world_model.predict_outcome honrado", criteria="v1"),
         _check("CF2", cf2, cf2, "causal.extract_causal_relations honrado", criteria="v1"),
@@ -726,6 +746,8 @@ def eval_counterfactual(criteria="v1"):
                "intervenção altera counterfactual_outcome em S", criteria="v1"),
         _check("CF7", f"{explicit_ok}/{len(CF_EXPLICIT)}", cf7_ok,
                "API explícita preserva situation (E) e CF4 intacto", criteria="v1"),
+        _check("CF8", f"{jacc_ok}/3", jacc_ok == 3,
+               "diferença = 1-Jaccard(tokens alnum) no conjunto J", criteria="v1"),
     ]
 
 

@@ -1,6 +1,7 @@
 """Counterfactual reasoning (POST37) — extraído do monólito (strangler, move-only)."""
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
@@ -262,20 +263,19 @@ class RealCounterfactualReasoningEngine:
         return comparison
     
     def _calculate_outcome_difference(self, actual: str, counterfactual: str) -> float:
-        """Calcular diferença entre outcomes"""
-        # Heurística: diferença textual simples
+        """Calcular diferença entre outcomes via 1 − Jaccard de tokens alnum."""
         if actual == counterfactual:
             return 0.0
-        
-        # Levenshtein-like distance (simplificado)
-        max_len = max(len(actual), len(counterfactual))
-        if max_len == 0:
+
+        tokens_a = set(re.findall(r"[a-z0-9]+", actual.lower()))
+        tokens_b = set(re.findall(r"[a-z0-9]+", counterfactual.lower()))
+        if not tokens_a and not tokens_b:
             return 0.0
-        
-        common_chars = sum(1 for a, c in zip(actual, counterfactual) if a == c)
-        difference = 1.0 - (common_chars / max_len)
-        
-        return difference
+        if not tokens_a or not tokens_b:
+            return 1.0
+        intersection = len(tokens_a & tokens_b)
+        union = len(tokens_a | tokens_b)
+        return 1.0 - (intersection / union)
     
     def _extract_insights(self, scenario: CounterfactualScenario, 
                          difference: float) -> List[str]:

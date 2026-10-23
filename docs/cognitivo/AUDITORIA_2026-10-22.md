@@ -372,3 +372,36 @@ Pré-registro commitado **antes** da implementação e da execução do eval.
 
 **Antes:** `explore_what_if` só aceitava `question: str`; parse forçava `situation="current_situation"`.
 **Depois:** kwargs explícitos; chamador controla a situação.
+
+## CF gap 4 — diferença Jaccard de tokens — critérios pré-registrados
+
+**Objetivo:** substituir diff por `zip` de caracteres por `1 − Jaccard` sobre tokens alfanuméricos (stdlib `re`), para outcomes lexicalmente aparentados.
+**Não escopo:** CF3, Pearl `do(X)`, calibração de plausibilidade.
+
+### Critério CF8 (v1)
+
+| id | afirmação | protocolo falsificável | alvo |
+|---|---|---|---|
+| CF8 | diferença = 1 − Jaccard(tokens alnum) | (a) `""`/`""` e iguais → 0.0; (b) no conjunto J, valor exato = `1 - \|A∩B\|/\|A∪B\|` com tokens `re.findall(r"[a-z0-9]+", s.lower())`; (c) para o par de outcomes padrão `outcome_without_intervention` vs `outcome_with_apply_patch`, diferença **estritamente menor que 1.0** (compartilham o token `outcome`) | 3/3 subchecagens |
+
+### Conjunto J (pares → diferença Jaccard esperada)
+
+| actual | counterfactual | esperado |
+|---|---|---|
+| the cat sat on the mat | the cat sat on a mat | 1 − 5/6 ≈ 0.1667 |
+| outcome without intervention | outcome with apply patch | 1 − 1/6 ≈ 0.8333 |
+| alpha beta | gamma delta | 1.0 |
+
+Pré-registro commitado **antes** da implementação e da execução do eval.
+
+### Resultados CF8 (após pré-registro b538702)
+
+| id | valor | alvo | passou | nota |
+|---|---|---|---|---|
+| CF8 | 3/3 | 3/3 | **sim** | `1 − Jaccard` tokens alnum; outcomes padrão compartilham `outcome` (diff≈0.833 < 1) |
+| CF1/2/4/5/6/7 | (regressão) | pass | **sim** | sem regressão |
+| CF3 | falso | — | não | fora de escopo |
+
+**Antes (zip):** `outcome_without_intervention` vs `outcome_with_apply_patch` → ≈0.571 (prefixo comum de chars; ignora tokens).
+**Depois (Jaccard alnum):** ≈0.833; para "the cat sat on the mat" vs "… a mat" → ≈0.167 (antes zip ≈0.318).
+Golden SHA re-medido: `fbfb32e9466bf161155a7546e2db07e2f73434230d581217a44fd4b324eb646e`.

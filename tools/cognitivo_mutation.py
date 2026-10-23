@@ -40,7 +40,8 @@ R2_TESTS = ("test_futures_ranking_contract.py",)
 R3_TESTS = ("test_causal_extraction_contract.py",)
 R4_TESTS = ("test_scm_intervention_contract.py",)
 CF_TESTS = ("test_counterfactual_extraction_contract.py", "test_counterfactual_contract.py",
-            "test_counterfactual_gap3_contract.py")
+            "test_counterfactual_gap3_contract.py",
+            "test_counterfactual_gap4_contract.py")
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
@@ -267,7 +268,15 @@ MUTATIONS = [
              "        comparison = self.compare_outcomes(scenario)",
              "        comparison = scenario  # wrong type/shape",
              tests=("test_counterfactual_extraction_contract.py",)),
-        Mutation("cf_explicit_kwargs_ignored", COUNTERFACTUAL,
+    Mutation("cf_diff_reverts_to_zip", COUNTERFACTUAL,
+             "tokens_a = set(re.findall(r\"[a-z0-9]+\", actual.lower()))",
+             "tokens_a = set(actual)  # mutant: char-set not tokens",
+             tests=CF_TESTS),
+    Mutation("cf_diff_always_one", COUNTERFACTUAL,
+             "return 1.0 - (intersection / union)",
+             "return 1.0  # mutant: ignore overlap",
+             tests=CF_TESTS),
+    Mutation("cf_explicit_kwargs_ignored", COUNTERFACTUAL,
              "situation is not None and intervention is not None",
              "False  # mutant: ignore explicit API",
              tests=CF_TESTS),
