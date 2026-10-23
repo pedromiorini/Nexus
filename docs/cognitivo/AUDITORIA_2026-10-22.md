@@ -339,3 +339,36 @@ Comando: `python tools/cognitivo_eval.py --capability counterfactual --criteria 
 5. **Plausibilidade informada** — hoje `0.7 - 0.05*|chain|`; calibrar com frequência de co-ocorrência ou comprimento mínimo de cadeia causal real (Roese & Olson, 1995). Custo médio.
 
 Ordem sugerida (custo/benefício): 3 (API explícita) → 4 (Jaccard) → 1 (planner) → 2 (do(X)) → 5.
+
+## CF gap 3 — API explícita (situation, intervention) — critérios pré-registrados
+
+**Objetivo:** a situação não é descartada quando o chamador a informa explicitamente.
+**Não escopo:** CF3 (planner), Pearl `do(X)`, calibração de plausibilidade, Jaccard (gap 4).
+
+### Critério CF7 (v1)
+
+| id | afirmação | protocolo falsificável | alvo |
+|---|---|---|---|
+| CF7 | API explícita preserva `situation` | `explore_what_if(situation=S, intervention=I)` (sem `question`) produz `scenario.original_situation == S` e `scenario.intervention == I` para o conjunto E abaixo; a API antiga `explore_what_if(question)` permanece compatível (mesmos parses de W / CF4) | 4/4 no conjunto E **e** CF4 ainda ≥ 5/5 |
+
+### Conjunto E (situation, intervention)
+
+| situation | intervention |
+|---|---|
+| during the outage | we had patched |
+| on host db-1 | isolate the host |
+| system vulnerable | apply patch |
+| alarm firing | rollback |
+
+Pré-registro commitado **antes** da implementação e da execução do eval.
+
+### Resultados CF7 (após pré-registro 624ce27)
+
+| id | valor | alvo | passou | nota |
+|---|---|---|---|---|
+| CF7 | 4/4 | 4/4 + CF4≥5/5 | **sim** | `explore_what_if(situation=, intervention=)` preserva S; string API intacta (CF4 5/5) |
+| CF1–CF2, CF4–CF6 | (regressão) | pass | **sim** | sem regressão |
+| CF3 | falso | — | não | fora de escopo (não corrigido) |
+
+**Antes:** `explore_what_if` só aceitava `question: str`; parse forçava `situation="current_situation"`.
+**Depois:** kwargs explícitos; chamador controla a situação.

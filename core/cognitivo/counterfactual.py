@@ -294,32 +294,48 @@ class RealCounterfactualReasoningEngine:
         
         return insights
     
-    def explore_what_if(self, question: str) -> Dict[str, Any]:
+    def explore_what_if(
+        self,
+        question: Optional[str] = None,
+        *,
+        situation: Optional[str] = None,
+        intervention: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Explorar questão "What if?".
-        
+
+        Compatível com a API antiga (`explore_what_if(question)`).
+        Preferir kwargs explícitos `situation=` / `intervention=` quando o
+        chamador já conhece o contexto — assim a situação não é descartada
+        pelo parse lexical (que hoje força `current_situation`).
+
         Args:
             question: Questão "what if?" (ex: "What if I had studied more?")
-        
+            situation: Situação/contexto explícito (opcional)
+            intervention: Intervenção explícita (opcional; exige situation)
+
         Returns:
             Análise do cenário contrafactual
         """
-        # Extrair situação e intervenção da questão
-        situation, intervention = self._parse_what_if_question(question)
-        
-        # Gerar cenário
-        scenario = self.generate_counterfactual_scenario(situation, intervention)
-        
-        # Comparar outcomes
+        if situation is not None and intervention is not None:
+            sit, inter = situation, intervention
+            q_label = question if question is not None else f"What if {inter} ({sit})?"
+        elif question is not None:
+            sit, inter = self._parse_what_if_question(question)
+            q_label = question
+        else:
+            raise TypeError(
+                "explore_what_if requires question= or both situation= and intervention="
+            )
+
+        scenario = self.generate_counterfactual_scenario(sit, inter)
         comparison = self.compare_outcomes(scenario)
-        
-        # Retornar análise
         return {
-            "question": question,
+            "question": q_label,
             "scenario": scenario,
             "comparison": comparison,
             "plausibility": scenario.plausibility_score,
-            "insights": comparison.insights_learned
+            "insights": comparison.insights_learned,
         }
     
     def _parse_what_if_question(self, question: str) -> tuple:

@@ -646,6 +646,13 @@ CF_PAIRS = [
     ("host", "isolate"),
 ]
 
+CF_EXPLICIT = [
+    ("during the outage", "we had patched"),
+    ("on host db-1", "isolate the host"),
+    ("system vulnerable", "apply patch"),
+    ("alarm firing", "rollback"),
+]
+
 
 def eval_counterfactual(criteria="v1"):
     """Auditoria CF — critérios pré-registrados em AUDITORIA (v1)."""
@@ -700,6 +707,14 @@ def eval_counterfactual(criteria="v1"):
             altered += 1
     cf6_ok = altered == len(CF_PAIRS)
 
+    explicit_ok = 0
+    for sit, inter in CF_EXPLICIT:
+        out = eng.explore_what_if(situation=sit, intervention=inter)
+        sc = out["scenario"]
+        if sc.original_situation == sit and sc.intervention == inter:
+            explicit_ok += 1
+    cf7_ok = explicit_ok == len(CF_EXPLICIT) and cf4_ok
+
     return [
         _check("CF1", cf1, cf1, "world_model.predict_outcome honrado", criteria="v1"),
         _check("CF2", cf2, cf2, "causal.extract_causal_relations honrado", criteria="v1"),
@@ -709,6 +724,8 @@ def eval_counterfactual(criteria="v1"):
                values=ps),
         _check("CF6", f"{altered}/{len(CF_PAIRS)}", cf6_ok,
                "intervenção altera counterfactual_outcome em S", criteria="v1"),
+        _check("CF7", f"{explicit_ok}/{len(CF_EXPLICIT)}", cf7_ok,
+               "API explícita preserva situation (E) e CF4 intacto", criteria="v1"),
     ]
 
 

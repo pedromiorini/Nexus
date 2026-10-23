@@ -8,7 +8,7 @@ class CounterfactualEvalContractTests(unittest.TestCase):
     def test_ids_and_capability(self):
         self.assertIn("counterfactual", ev.CAPABILITIES)
         ids = [c["id"] for c in ev.eval_counterfactual()]
-        self.assertEqual(ids, ["CF1", "CF2", "CF3", "CF4", "CF5", "CF6"])
+        self.assertEqual(ids, ["CF1", "CF2", "CF3", "CF4", "CF5", "CF6", "CF7"])
 
     def test_cli(self):
         self.assertIn(ev.main(["--capability", "counterfactual", "--criteria", "v1"]),
