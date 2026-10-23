@@ -3,7 +3,7 @@
 Critérios: /workspace/nexus/cognitivo/AUDITORIA_2026-10-22.md (sha256 3d24a63d…), escritos
 antes da execução. Mede propósito, não só ausência de crash.
 
-Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,all} [--json PATH]
+Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,attention,all} [--json PATH]
 Saída: exit 0 se todo critério passa, 1 se algum falha, 2 para entrada ausente/vazia/desconhecida.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
-CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory")
+CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention")
 
 TOPICS = [
     ("database", "migration", "rollback"), ("network", "latency", "spike"), ("disk", "quota", "exceeded"),
@@ -1065,9 +1065,483 @@ def eval_working_memory(criteria="v1"):
     ]
 
 
+AT_SOURCE_SHA = "96090684b99d2568ea61f040c5eed9bbf6de774f5bad9d781f60c2a566ea2378"
+AT_BEHAVIOR_SHA = "07877c7f811006b479729aa7faa7d6b82f824afc0d2bf2dc7514d059ce5f990b"
+_AT_NAMES = (
+    "StimulusItem",
+    "AttentionalFocus",
+    "AttentionShift",
+    "BottomUpAttention",
+    "TopDownAttention",
+    "AttentionalSpotlight",
+    "RealAttentionSystem",
+)
+
+
+def attention_fingerprint(mod):
+    """Protocolo AT6. O dict, não o texto-fonte, entra no SHA comportamental."""
+    import contextlib
+    import inspect
+
+    StimulusItem = mod.StimulusItem
+    BottomUpAttention = mod.BottomUpAttention
+    TopDownAttention = mod.TopDownAttention
+    AttentionalSpotlight = mod.AttentionalSpotlight
+    RealAttentionSystem = mod.RealAttentionSystem
+
+    def stim(**kwargs):
+        values = {
+            "stimulus_id": "s1",
+            "stimulus_type": "visual",
+            "content": "x",
+            "salience": 0.5,
+            "priority": 0.5,
+            "timestamp": 1.0,
+        }
+        values.update(kwargs)
+        return StimulusItem(**values)
+
+    def typed(fn):
+        try:
+            return fn()
+        except Exception as exc:
+            return type(exc).__name__
+
+    bottom = BottomUpAttention()
+    weights = dict(bottom.salience_factors)
+    novel = stim(stimulus_id="new", contrast=1.0, motion=1.0)
+    familiar = stim(stimulus_id="old", contrast=1.0, motion=1.0)
+    contrast_cases = {
+        "fallback": bottom._assess_contrast(stim(), {}),
+        "stim_high": bottom._assess_contrast(stim(contrast=1.4), {}),
+        "stim_low": bottom._assess_contrast(stim(contrast=-0.2), {}),
+        "stim_true": bottom._assess_contrast(stim(contrast=True), {}),
+        "stim_false": bottom._assess_contrast(stim(contrast=False), {}),
+        "stim_nan": bottom._assess_contrast(stim(contrast=float("nan")), {}),
+        "stim_inf": bottom._assess_contrast(stim(contrast=float("inf")), {}),
+        "stim_ninf": bottom._assess_contrast(stim(contrast=float("-inf")), {}),
+        "ctx": bottom._assess_contrast(stim(), {"contrast": 0.25}),
+        "ctx_str": bottom._assess_contrast(stim(), {"contrast": "0.25"}),
+        "ctx_none": bottom._assess_contrast(stim(), {"contrast": None}),
+        "ctx_true": bottom._assess_contrast(stim(), {"contrast": True}),
+        "ctx_nan": bottom._assess_contrast(stim(), {"contrast": float("nan")}),
+        "stim_beats_ctx": bottom._assess_contrast(stim(contrast=0.1), {"contrast": 0.9}),
+    }
+    motion_cases = {
+        "fallback": bottom._assess_motion(stim()),
+        "high": bottom._assess_motion(stim(motion=1.4)),
+        "low": bottom._assess_motion(stim(motion=-0.2)),
+        "true": bottom._assess_motion(stim(motion=True)),
+        "false": bottom._assess_motion(stim(motion=False)),
+        "nan": bottom._assess_motion(stim(motion=float("nan"))),
+        "inf": bottom._assess_motion(stim(motion=float("inf"))),
+        "ninf": bottom._assess_motion(stim(motion=float("-inf"))),
+    }
+    errors = {
+        "contrast_str": typed(lambda: bottom._assess_contrast(stim(contrast="0.2"), {})),
+        "contrast_ctx_abc": typed(lambda: bottom._assess_contrast(stim(), {"contrast": "abc"})),
+        "motion_str": typed(lambda: bottom._assess_motion(stim(motion="0.2"))),
+    }
+    intensity = {
+        kind: bottom._assess_intensity(stim(stimulus_type=kind))
+        for kind in ("visual", "auditory", "internal", "tactile")
+    }
+    top = TopDownAttention()
+    no_goals = top.compute_goal_relevance(stim(content="find the cat"))
+    top.set_goals(["find cat"])
+    matches = {
+        "full": top.compute_goal_relevance(stim(content="please find the cat now")),
+        "one": top.compute_goal_relevance(stim(content="find the dog")),
+        "none": top.compute_goal_relevance(stim(content="zzzz")),
+        "case": top.compute_goal_relevance(stim(content="FIND CAT")),
+    }
+    cat = TopDownAttention()
+    cat.set_goals(["cat"])
+    substring = cat.compute_goal_relevance(stim(content="category"))
+    empty = TopDownAttention()
+    empty.set_goals([""])
+    empty_goal = empty.compute_goal_relevance(stim(content="anything"))
+    multi = TopDownAttention()
+    multi.set_goals(["alpha", "beta gamma"])
+    multi.update_goal_priority("alpha", 1.0)
+    multi.update_goal_priority("beta gamma", 0.5)
+    multi_scores = {
+        "beta": multi.compute_goal_relevance(stim(content="beta only")),
+        "alpha": multi.compute_goal_relevance(stim(content="alpha")),
+    }
+    multi.set_goals(["alpha"])
+    priority_kept = multi.goal_relevance["alpha"]
+    clamps = {}
+    for label, value in (
+        ("2", 2.0), ("-1", -1.0), ("0.5", 0.5), ("true", True), ("false", False),
+        ("inf", float("inf")), ("-inf", float("-inf")), ("nan", float("nan")),
+    ):
+        holder = TopDownAttention()
+        holder.update_goal_priority("g", value)
+        clamps[label] = holder.goal_relevance["g"]
+    priority_errors = {}
+    for bad in ("abc", None, [], {}):
+        holder = TopDownAttention()
+        priority_errors[repr(bad)] = typed(lambda bad=bad, holder=holder: holder.update_goal_priority("g", bad))
+
+    def spotlight_ids(pairs, extra):
+        spot = AttentionalSpotlight(capacity=3)
+        for index, salience in pairs:
+            spot.focus_on(stim(
+                stimulus_id=f"id{index}", content=f"c{index}", salience=salience,
+                priority=0.0, timestamp=float(index),
+            ))
+        spot.focus_on(stim(
+            stimulus_id=f"id{extra[0]}", content=f"c{extra[0]}", salience=extra[1],
+            priority=0.0, timestamp=float(extra[0]),
+        ))
+        return [item.stimulus_id for item in spot.spotlight]
+
+    evicted = spotlight_ids([(0, 0.9), (1, 0.2), (2, 0.8)], (3, 0.5))
+    tie = spotlight_ids([(0, 0.4), (1, 0.4), (2, 0.9)], (3, 0.7))
+    spot = AttentionalSpotlight(capacity=1)
+    held = stim(stimulus_id="id0", content="c0", salience=0.1, priority=0.0, timestamp=0.0)
+    spot.focus_on(held, strength=0.2)
+    spot.focus_on(held, strength=0.9)
+    twin = StimulusItem("id0", "visual", "c0", 0.1, 0.0, 0.0)
+    spot.focus_on(twin, strength=0.9)
+    refocus = {
+        "len": len(spot.spotlight),
+        "history": len(spot.focus_history),
+        "strength": spot.current_focus.focus_strength,
+        "twin_equal": twin == held,
+    }
+    broad = AttentionalSpotlight(capacity=3)
+    for index, salience in ((0, 0.9), (1, 0.2), (2, 0.8)):
+        broad.focus_on(stim(
+            stimulus_id=f"id{index}", content=f"c{index}", salience=salience,
+            priority=0.0, timestamp=float(index),
+        ))
+    broad.release_focus("id1")
+    released_low = [item.stimulus_id for item in broad.spotlight]
+    current_id = None if broad.current_focus is None else broad.current_focus.focused_item.stimulus_id
+    lone = AttentionalSpotlight()
+    lone.focus_on(stim(stimulus_id="gone", content="g", salience=0.4, priority=0.0, timestamp=1.0))
+    lone.release_focus("gone")
+    released_current = {
+        "current_none": lone.current_focus is None,
+        "duration_set": lone.focus_history[-1].duration is not None and lone.focus_history[-1].duration >= 0,
+        "focused": lone.is_focused("gone"),
+        "copy": lone.get_focused_items() is not lone.spotlight,
+    }
+
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured):
+        RealAttentionSystem()
+    banner = "POST 25" in captured.getvalue()
+
+    def add(system, sid, salience, priority, kind="visual", content="z"):
+        item = StimulusItem(sid, kind, content, salience, priority, 1.0)
+        system.available_stimuli.append(item)
+        return item
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        ordered = RealAttentionSystem()
+    for sid, sal, pri in (("a", 0.2, 0.2), ("b", 0.9, 0.9), ("c", 0.4, 0.8), ("d", 1.0, 0.0)):
+        add(ordered, sid, sal, pri)
+    selected = ordered.attend()
+    order = [[item.stimulus_id, item.attention_score] for item in selected]
+    with contextlib.redirect_stdout(io.StringIO()):
+        tied = RealAttentionSystem()
+    for index, (sal, pri) in enumerate(((0.5, 0.5), (0.4, 0.6), (0.6, 0.4), (0.0, 0.0))):
+        add(tied, f"t{index}", sal, pri)
+    tie_order = [item.stimulus_id for item in tied.attend()]
+    with contextlib.redirect_stdout(io.StringIO()):
+        stale = RealAttentionSystem()
+    stale_item = StimulusItem("z", "visual", "z", 0.1, 0.1, 1.0)
+    stale.available_stimuli.append(stale_item)
+    stale.attend(goals=["zzz"])
+    no_recompute = {
+        "salience": stale_item.salience,
+        "priority": stale_item.priority,
+        "score": stale_item.attention_score,
+        "goals": list(stale.top_down.active_goals),
+        "episodes": stale.total_attentional_episodes,
+    }
+    with contextlib.redirect_stdout(io.StringIO()):
+        registered = RealAttentionSystem()
+    registered.top_down.set_goals(["cat"])
+    created = registered.register_stimulus("visual", "a cat")
+    registered_values = {"salience": created.salience, "priority": created.priority}
+    with contextlib.redirect_stdout(io.StringIO()):
+        empty_system = RealAttentionSystem()
+    empty_attend = {"selected": empty_system.attend(), "episodes": empty_system.total_attentional_episodes}
+    with contextlib.redirect_stdout(io.StringIO()):
+        shifter = RealAttentionSystem()
+    visual_a = shifter.register_stimulus("visual", "one")
+    visual_b = shifter.register_stimulus("visual", "two")
+    auditory = shifter.register_stimulus("auditory", "three")
+    missing = shifter.shift_attention("missing")
+    shifts_after_miss = len(shifter.attention_shifts)
+    first = shifter.shift_attention(visual_a.stimulus_id, "voluntary")
+    second = shifter.shift_attention(visual_b.stimulus_id, "goal")
+    third = shifter.shift_attention(auditory.stimulus_id, "salience")
+    shift = {
+        "missing": missing,
+        "shifts_after_miss": shifts_after_miss,
+        "ok": [first, second, third],
+        "costs": [item.cost for item in shifter.attention_shifts],
+        "from_first_none": shifter.attention_shifts[0].from_focus is None,
+        "from_later_set": shifter.attention_shifts[1].from_focus is not None,
+        "voluntary": shifter.voluntary_shifts,
+        "involuntary": shifter.involuntary_shifts,
+    }
+    with contextlib.redirect_stdout(io.StringIO()):
+        fresh = RealAttentionSystem()
+    alone = fresh.register_stimulus("auditory", "beep")
+    fresh.shift_attention(alone.stimulus_id)
+    no_focus_cost = fresh.attention_shifts[-1].cost
+
+    class _Conscious:
+        def __init__(self):
+            self.calls = []
+
+        def attend_to(self, *args, **kwargs):
+            self.calls.append((args, kwargs))
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        aware = RealAttentionSystem(consciousness=_Conscious())
+    aware.available_stimuli.append(StimulusItem("z", "visual", "z", 1.0, 1.0, 1.0))
+    aware.attend()
+    call_args, call_kwargs = aware.consciousness.calls[0]
+    consciousness = {
+        "args": list(call_args),
+        "salience": call_kwargs.get("salience"),
+        "n": len(aware.consciousness.calls),
+    }
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        cleaner = RealAttentionSystem()
+    now = time.time()
+    cleaner.available_stimuli.extend([
+        StimulusItem("old", "visual", "o", 0.1, 0.1, 0.0),
+        StimulusItem("recent", "visual", "r", 0.1, 0.1, now - 61.0),
+        StimulusItem("live", "visual", "l", 0.1, 0.1, now),
+    ])
+    cleaner.clear_attended_stimuli()
+    kept = [item.stimulus_id for item in cleaner.available_stimuli]
+    init_params = inspect.signature(RealAttentionSystem.__init__).parameters
+    clear_params = list(inspect.signature(RealAttentionSystem.clear_attended_stimuli).parameters)
+    clock = "wall" if clear_params == ["self"] and "clock" not in init_params and "now" not in init_params else "injected"
+    with contextlib.redirect_stdout(io.StringIO()):
+        stats_system = RealAttentionSystem()
+    stats0 = stats_system.get_statistics()
+    return {
+        "banner": banner,
+        "clamps": clamps,
+        "clear_kept": kept,
+        "clock": clock,
+        "consciousness": consciousness,
+        "contrast": contrast_cases,
+        "current_after_release": current_id,
+        "empty_attend": empty_attend,
+        "empty_goal": empty_goal,
+        "errors": errors,
+        "evicted": evicted,
+        "intensity": intensity,
+        "matches": matches,
+        "motion": motion_cases,
+        "multi": multi_scores,
+        "no_focus_cost": no_focus_cost,
+        "no_goals": no_goals,
+        "no_recompute": no_recompute,
+        "novelty_absent": bottom._assess_novelty(stim(), {}),
+        "novelty_present": bottom._assess_novelty(stim(), {"seen_stimuli": ["s1"]}),
+        "order": order,
+        "priority_errors": priority_errors,
+        "priority_kept": priority_kept,
+        "refocus": refocus,
+        "registered": registered_values,
+        "released_current": released_current,
+        "released_low": released_low,
+        "salience_familiar": bottom.compute_salience(familiar, {"seen_stimuli": ["old"]}),
+        "salience_novel": bottom.compute_salience(novel, {}),
+        "shift": shift,
+        "stats0": stats0,
+        "substring": substring,
+        "tie_order": tie_order,
+        "tie_spotlight": tie,
+        "weights": weights,
+        "weights_sum": sum(weights.values()),
+    }
+
+
+def _at_sha(payload) -> str:
+    import hashlib
+    text = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def attention_source_text(src: str) -> str:
+    marker = "# MÓDULO 11A3: ATTENTION & FOCUS SYSTEM (POST 25)\n"
+    idx = src.index(marker)
+    line_start = src.rfind("\n", 0, idx - 1) + 1
+    end_marker = '            "focus_capacity": self.spotlight.capacity\n        }\n'
+    end = src.index(end_marker, idx) + len(end_marker)
+    return src[line_start:end]
+
+
+def _attention_source_sha() -> str:
+    import hashlib
+    text = (ROOT / "core/cognitivo/attention.py").read_text(encoding="utf-8")
+    return hashlib.sha256(attention_source_text(text).encode()).hexdigest()
+
+
+def _attention_standalone() -> bool:
+    """Árvore de imports: constitutional_brain, numpy ou vita no módulo extraído falha AT6.
+
+    Menção no docstring não conta. O bloqueio em runtime fica no contrato, fora de tools/.
+    """
+    import ast
+
+    tree = ast.parse((ROOT / "core/cognitivo/attention.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names = [node.module]
+        for name in names:
+            root = name.split(".")[0]
+            if root in {"numpy", "vita"} or name == "core.constitutional_brain" or name.startswith("core.constitutional_brain."):
+                return False
+    return True
+
+
+def eval_attention(criteria="v1"):
+    """AT1–AT6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    import core.cognitivo.attention as attention
+    import core.constitutional_brain as brain
+    import core.cognitivo as package
+
+    payload = attention_fingerprint(attention)
+    sha_module = _at_sha(payload)
+    sha_brain = _at_sha(attention_fingerprint(brain))
+    source_sha = _attention_source_sha()
+    standalone = _attention_standalone()
+    identity = all(
+        getattr(brain, name) is getattr(attention, name) is getattr(package, name)
+        and getattr(attention, name).__module__ == "core.cognitivo.attention"
+        for name in _AT_NAMES
+    )
+    weights = payload["weights"]
+    novel_formula = 0.3 * 0.9 + 0.25 * 0.7 + 0.25 * 1.0 + 0.2 * 1.0
+    familiar_formula = 0.3 * 0.2 + 0.25 * 0.7 + 0.25 * 1.0 + 0.2 * 1.0
+    at1 = (
+        payload["weights_sum"] == 1.0
+        and weights == {"novelty": 0.3, "intensity": 0.25, "contrast": 0.25, "motion": 0.2}
+        and payload["novelty_absent"] == 0.9
+        and payload["novelty_present"] == 0.2
+        and payload["intensity"] == {"visual": 0.7, "auditory": 0.6, "internal": 0.4, "tactile": 0.4}
+        and payload["salience_novel"] == novel_formula
+        and payload["salience_familiar"] == familiar_formula
+    )
+    contrast = payload["contrast"]
+    motion = payload["motion"]
+    at2 = (
+        contrast["stim_high"] == 1.0
+        and contrast["stim_low"] == 0.0
+        and contrast["fallback"] == 0.5
+        and contrast["ctx"] == 0.25
+        and contrast["ctx_str"] == 0.25
+        and contrast["ctx_none"] == 0.5
+        and contrast["stim_beats_ctx"] == 0.1
+        and motion["fallback"] == 0.6
+        and motion["high"] == 1.0
+        and motion["low"] == 0.0
+        and payload["errors"] == {
+            "contrast_str": "TypeError",
+            "contrast_ctx_abc": "ValueError",
+            "motion_str": "TypeError",
+        }
+    )
+    at3 = (
+        payload["no_goals"] == 0.3
+        and payload["matches"] == {"full": 0.5, "one": 0.25, "none": 0.05, "case": 0.5}
+        and payload["substring"] == 0.5
+        and payload["empty_goal"] == 0.05
+        and payload["multi"] == {"beta": 0.25, "alpha": 1.0}
+        and payload["priority_kept"] == 1.0
+        and payload["clamps"]["2"] == 1.0
+        and payload["clamps"]["-1"] == 0.0
+        and payload["clamps"]["0.5"] == 0.5
+        and payload["priority_errors"] == {
+            "'abc'": "TypeError", "None": "TypeError", "[]": "TypeError", "{}": "TypeError",
+        }
+    )
+    released = payload["released_current"]
+    at4 = (
+        payload["evicted"] == ["id0", "id2", "id3"]
+        and payload["tie_spotlight"] == ["id1", "id2", "id3"]
+        and payload["refocus"] == {"len": 1, "history": 1, "strength": 0.2, "twin_equal": True}
+        and payload["released_low"] == ["id0", "id2"]
+        and payload["current_after_release"] == "id2"
+        and released["current_none"] is True
+        and released["duration_set"] is True
+        and released["focused"] is False
+        and released["copy"] is True
+    )
+    shift = payload["shift"]
+    at5 = (
+        [row[0] for row in payload["order"]] == ["b", "c", "d"]
+        and payload["order"][1][1] == (0.4 + 0.8) / 2.0
+        and payload["tie_order"] == ["t0", "t1", "t2"]
+        and payload["no_recompute"]["salience"] == 0.1
+        and payload["no_recompute"]["priority"] == 0.1
+        and payload["no_recompute"]["goals"] == ["zzz"]
+        and shift["missing"] is False
+        and shift["shifts_after_miss"] == 0
+        and shift["costs"] == [0.2, 0.2, 0.5]
+        and shift["voluntary"] == 1
+        and shift["involuntary"] == 2
+        and payload["no_focus_cost"] == 0.2
+        and payload["empty_attend"] == {"selected": [], "episodes": 0}
+    )
+    at6 = (
+        identity
+        and standalone
+        and source_sha == AT_SOURCE_SHA
+        and sha_module == sha_brain == AT_BEHAVIOR_SHA
+    )
+    return [
+        _check("AT1", {"weights_sum": payload["weights_sum"], "novelty_absent": payload["novelty_absent"],
+                       "novelty_present": payload["novelty_present"], "intensity": payload["intensity"],
+                       "salience_novel": payload["salience_novel"], "salience_familiar": payload["salience_familiar"]},
+               at1, "pesos somam 1; novidade 0.9/0.2; intensidade 0.7/0.6/0.4"),
+        _check("AT2", {"contrast_high": contrast["stim_high"], "contrast_low": contrast["stim_low"],
+                       "fallback": contrast["fallback"], "ctx": contrast["ctx"], "motion": motion["fallback"],
+                       "errors": payload["errors"]},
+               at2, "clamp [0,1]; context; fallbacks 0.5/0.6; str inválida"),
+        _check("AT3", {"no_goals": payload["no_goals"], "matches": payload["matches"],
+                       "substring": payload["substring"], "empty_goal": payload["empty_goal"],
+                       "multi": payload["multi"], "priority_kept": payload["priority_kept"],
+                       "clamp_high": payload["clamps"]["2"], "priority_errors": payload["priority_errors"]},
+               at3, "sem goals 0.3; substring; clamp [0,1]; TypeError"),
+        _check("AT4", {"evicted": payload["evicted"], "tie": payload["tie_spotlight"],
+                       "refocus": payload["refocus"], "released_low": payload["released_low"]},
+               at4, "capacity 3; vítima = menor saliência; empate = primeiro"),
+        _check("AT5", {"order": [row[0] for row in payload["order"]], "tie_order": payload["tie_order"],
+                       "missing": shift["missing"], "costs": shift["costs"],
+                       "no_recompute_priority": payload["no_recompute"]["priority"],
+                       "empty_episodes": payload["empty_attend"]["episodes"]},
+               at5, "top capacity estável; id ausente False; cross-modal 0.5"),
+        _check("AT6", {"source_sha": source_sha, "sha_module": sha_module, "sha_brain": sha_brain,
+                       "identity": identity, "standalone": standalone, "clock": payload["clock"],
+                       "source_golden": AT_SOURCE_SHA, "behavior_golden": AT_BEHAVIOR_SHA},
+               at6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+    ]
+
+
+
 EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts,
               "causal": eval_causal, "counterfactual": eval_counterfactual,
-              "working_memory": eval_working_memory}
+              "working_memory": eval_working_memory,
+              "attention": eval_attention}
 
 
 def main(argv=None) -> int:

@@ -6,7 +6,7 @@
     "extracted_modules": [
       {
         "path": "core/cognitivo/__init__.py",
-        "lines": 19,
+        "lines": 35,
         "classes": 0,
         "functions": 0
       },
@@ -15,6 +15,12 @@
         "lines": 39,
         "classes": 0,
         "functions": 1
+      },
+      {
+        "path": "core/cognitivo/attention.py",
+        "lines": 508,
+        "classes": 7,
+        "functions": 24
       },
       {
         "path": "core/cognitivo/causal_world_model.py",
@@ -53,9 +59,9 @@
         "functions": 25
       }
     ],
-    "core_lines": 25664,
-    "classes": 246,
-    "functions": 788,
+    "core_lines": 25192,
+    "classes": 239,
+    "functions": 764,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -74,7 +80,6 @@
       "RealAdversarialRobustnessLayer.get_statistics",
       "RealAnalogicalReasoningSystem.get_statistics",
       "RealAttentionRoutingSystem.get_statistics",
-      "RealAttentionSystem.get_statistics",
       "RealCognitiveBudgetEnforcer.get_status",
       "RealCollaborativeIntelligenceEngine.get_statistics",
       "RealConsciousnessSystem.get_self_knowledge",
