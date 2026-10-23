@@ -1,0 +1,8 @@
+# Chaves SSH de assinatura aceitas no correio (formato allowed_signers do git).
+# Uma linha por agente; o principal DEVE ser o id do agente em REGISTRO_AGENTES.yaml (ou "pedro").
+# Protegido por CODEOWNERS (@pedromiorini): só o Pedro autoriza um agente a escrever no correio.
+# Vazio de propósito: com --assinaturas exigir (padrão) o validador falha até haver chaves.
+#
+# Exemplo (não é chave real):
+# pedro namespaces="git" ssh-ed25519 AAAA...
+# grok-bot namespaces="git" ssh-ed25519 AAAA...
