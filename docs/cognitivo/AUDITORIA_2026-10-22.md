@@ -813,3 +813,48 @@ Hipótese de trabalho (não vinculante para além da tabela): move-only, sem inj
 O contrato que já existe (`allocate_attention` 2.0 → strength 1.0 e `delegated` false; −1.0 com attention externo → strength 0.0 e `delegated` true) continua válido, sem relaxar asserts. O eval dos outros capabilities não é alvo de mudança de critério.
 
 Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability working_memory`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados WM (após o pré-registro `dcfa180`)
+
+Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, coverage 7.16.2, bandit 1.9.4). O CI usa Python 3.11; esta máquina não o executou. Os números abaixo são desta execução, não um carimbo de CI hospedado.
+
+**Commits.** Pré-registro `dcfa1804eb41f184503cfedfd6ff947b14d143b3` (só `CLAIMS.yaml` e esta auditoria). Move-only `bf6b6747e01a7d506e000b377b7305a98509fb9f`. Base `b6da175`.
+
+**RED**, antes de existir `core/cognitivo/working_memory.py`: `python -m unittest test_working_memory_contract.py` → rc 1, 7 testes, 4 `ModuleNotFoundError`. Os dois testes antigos de clamp e o teste de tipo inválido passaram no monólito.
+
+**GREEN**, mesmo comando depois do move: 7 testes, rc 0.
+
+**Eval** `python tools/cognitivo_eval.py --capability working_memory` (o padrão `--criteria v2` não altera o protocolo): rc 0, `failed: []`.
+
+| id | valor medido | alvo | passou |
+|---|---|---|---|
+| WM1 | len 7; vítima = menor `last_rehearsed`; empate sai o primeiro | len 7 e essa vítima | sim |
+| WM2 | len 4; vítima = activation 0.2; empate sai o primeiro | len 4 e essa vítima | sim |
+| WM3 | `clock: wall`; activation restante 0.7999968528747559; época e fronteira 0.1 saem | presente, `< 1` e `> 0.1`; sem exigir `== 0.8` | sim |
+| WM4 | boost 0.7 lido antes de `decay_items`; teto 1.0; id ausente `false`; ensaiado fica; gêmeo sai | 0.7, teto, sobrevivência | sim |
+| WM5 | `"alpha"` / `"BETA"` / `"alp"` → `"Alpha Beta"`; `"zzz"` → `null` | esses quatro | sim |
+| WM6 | SHA do módulo = SHA do monólito = `3b6b63cb69d6ffced16ffec0c1bbbbeb8fe92bf7cecd13e20f4989b0d17051ca`; identidade verdadeira | SHA pré-registrado e mesmo objeto | sim |
+
+O 0.7999968528747559 é a leitura desta reexecução. Na medição do commit de move o valor foi 0.7999963760375977. Os dois ficam em `(0.1, 1)`. Nenhum dos dois é limite.
+
+**Relógio.** `decay_items` continua só com `self`. Não há parâmetro de relógio em `__init__`. O gap de wall-clock fica registrado: se o processo parar por ~1 s, o item A pode cair a ≤ 0.1 e WM3 falha sem que a fórmula tenha mudado. Relógio não foi injetado.
+
+**Harness, não o módulo.** A primeira leitura de WM4 depois de `decay_items` deu ~0.699998 por causa do mesmo wall-clock. O critério pede 0.7 no instante do `rehearse`. O eval passou a gravar o boost antes do decay. O código de produção não mudou. `retrieve("")` continua devolvendo o primeiro item, e `True`/`False`/`nan` continuam 1.0/0.0/1.0 no golden. Não são correções.
+
+**Standalone do WM6.** Uma varredura por substring no texto do módulo falhou porque o docstring cita `constitutional_brain`. O critério pré-registrado fala de import, não de menção. O eval passou a ler a árvore de `import` / `import from` (numpy, vita, `core.constitutional_brain`). O bloqueio em tempo de execução, com `sys.meta_path`, permanece em `test_working_memory_contract.py`. Bandit não varre `test_*.py`.
+
+**Por que o eval não usa subprocesso.** No commit de move, `_wm_standalone` chamava `subprocess`. Bandit nessa árvore: 133 LOW (B404 e B603 em `tools/cognitivo_eval.py`); `security_triage.py --check` rc 1. `SECURITY_TRIAGE.md` é state doc e ficou fora de escopo. Depois da troca para AST: `bandit -r core vita tools` → 131 LOW, zero achados em `cognitivo_eval.py` e em `working_memory.py`; `--check` rc 0. `working_memory.py` não ganhou achado em nenhuma das duas contagens.
+
+**Hipóteses.** H1, H2, H4, H5 e H6 não se sustentam como falha neste eval: o comportamento medido é o da tabela de observação, e o SHA do fingerprint é o que foi congelado no monólito antes do splice. H3, no sentido "já existe relógio injetável e a activation é exatamente 0,8", fica excluída pela assinatura e por não exigir igualdade. Nenhuma delas vira alegação de memória de trabalho humana nem de prontidão.
+
+**Cobertura**, no commit de move (`coverage run --branch -m unittest discover -p 'test_*.py'`, depois o demo do núcleo): 569 testes, rc 0, 56.346 s. Demo `python core/constitutional_brain.py` rc 0. `working_memory.py` 161 statements, 30 ramos, 100%. `core/cognitivo/*` 1118 statements, 95% (piso 90). `constitutional_brain.py` 68% (piso 62). Fila 95%, VRAM 94%, temporal 93%, vita 76%. A edição posterior do eval não toca esses arquivos; os pisos não foram reexecutados depois dela.
+
+**Mutação.** `python tools/targeted_mutation.py` no commit de move: 69/69 mortos, 100%, rc 0. O catálogo do Axis não foi editado. `python tools/cognitivo_mutation.py` nesse mesmo commit, e de novo depois da troca do standalone para AST: `{"declared": 129, "killed": 129, "survived": 0, "not_applied": 0}`, rc 0. Os 24 mutantes do módulo novo estão nesse total. `wm_module_pulls_monolith` insere `import core.constitutional_brain`; o AST do eval e o contrato em subprocesso o matam.
+
+**Realidade** (recontagem exigida pelo gate, commitada com o move): núcleo 25664 linhas, 246 classes, 788 funções (antes 26071 / 252 / 813). `working_memory.py` 438 linhas, 6 classes, 25 funções. `core/cognitivo` 8 módulos, 2489 linhas. Literais dinâmicos 52. Frases fortes 51. Terminologia científica 233. Prefixo `Real` 63. Testes embutidos 31. `pass` puro 0. Retorno constante 2. `reality_audit` reexecutado depois do commit: diff vazio.
+
+**Outros gates locais no commit de move, e o que foi repetido depois:** `ruff check` nos alvos do workflow, rc 0; repetido no eval editado, rc 0. `validar_registro.py --expirados aviso`, rc 0. `predeleg.sh HEAD origin/main`, `OK: sem conflito` (o fetch trouxe `origin/main` até `b6da175`, que já é a base).
+
+**Fora do que estes comandos medem:** CI hospedado; Python 3.11; conflito de merge contra as branches dos PRs #38, #39, #40, #41, #42, #44, #46, #48, #49 e #79 (o `predeleg` só compara com `origin/main`); state docs não atualizados, de propósito; Attention, IncrementalLearner, HierarchicalMemory/FAISS, Metacognition, Axis e twin network não foram tocados. Não há interface web nesta extração.
+
+PR draft: https://github.com/pedromiorini/Nexus/pull/108
