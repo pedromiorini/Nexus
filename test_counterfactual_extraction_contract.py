@@ -38,7 +38,11 @@ class _Block:
         return None
 sys.meta_path.insert(0, _Block())
 import core.cognitivo.counterfactual as mod
-eng = mod.RealCounterfactualReasoningEngine()
+assert mod.CounterfactualScenario is not None
+# instantiate with stdout diverted
+import contextlib, io
+with contextlib.redirect_stdout(io.StringIO()):
+    eng = mod.RealCounterfactualReasoningEngine()
 assert eng._predict_outcome("s", None) == "outcome_without_intervention"
 leaked = sorted(n for n in sys.modules if n.split(".")[0] in {"numpy", "vita"} or n == "core.constitutional_brain")
 print("LEAKED=" + ",".join(leaked))

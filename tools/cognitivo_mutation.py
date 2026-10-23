@@ -33,11 +33,13 @@ MCTS_TESTS = ("test_mcts_planner_extraction_contract.py", "test_mcts_action_cont
 _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")'
 
 CAUSAL = "core/cognitivo/causal_world_model.py"
+COUNTERFACTUAL = "core/cognitivo/counterfactual.py"
 EFFECTS = "core/cognitivo/action_effects.py"
 R1_TESTS = ("test_action_effects_contract.py",)
 R2_TESTS = ("test_futures_ranking_contract.py",)
 R3_TESTS = ("test_causal_extraction_contract.py",)
 R4_TESTS = ("test_scm_intervention_contract.py",)
+CF_TESTS = ("test_counterfactual_extraction_contract.py", "test_counterfactual_contract.py")
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
@@ -234,6 +236,44 @@ MUTATIONS = [
              tests=R4_TESTS),
     Mutation("c4_adjacency_wrong_key", CAUSAL, "        for effect in adjacency.get(action, ()):",
              "        for effect in adjacency.get(action.lower(), ()):", tests=R4_TESTS),
+    Mutation("cf_module_pulls_monolith", COUNTERFACTUAL,
+             "from typing import Any, Dict, List, Optional",
+             "from typing import Any, Dict, List, Optional\nfrom core.constitutional_brain import RealCausalReasoning  # pull",
+             tests=CF_TESTS),
+    Mutation("cf_monolith_stops_reexporting", "core/constitutional_brain.py",
+             "from core.cognitivo.counterfactual import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    CausalIntervention, CounterfactualScenario, OutcomeComparison, RealCounterfactualReasoningEngine)\n",
+             "CausalIntervention = None  # broken reexport\nCounterfactualScenario = None\n"
+             "OutcomeComparison = None\nRealCounterfactualReasoningEngine = None\n",
+             tests=CF_TESTS),
+    Mutation("cf_predict_skips_world_model", COUNTERFACTUAL,
+             "        predictor = getattr(self.world_model, \"predict_outcome\", None)\n        if callable(predictor):\n            return str(predictor(situation, intervention))",
+             "        predictor = None\n        if False:\n            return str(predictor(situation, intervention))",
+             tests=CF_TESTS),
+    Mutation("cf_causal_chain_skips_extractor", COUNTERFACTUAL,
+             "        extractor = getattr(self.causal, \"extract_causal_relations\", None)\n        if callable(extractor):",
+             "        extractor = None\n        if False:",
+             tests=CF_TESTS),
+    Mutation("cf_plausibility_ignores_chain_len", COUNTERFACTUAL,
+             "        chain_penalty = len(causal_chain) * 0.05",
+             "        chain_penalty = 0.0",
+             tests=("test_counterfactual_extraction_contract.py",)),
+    Mutation("cf_compare_skips_insight_extend", COUNTERFACTUAL,
+             "        self.insights.extend(insights)",
+             "        pass",
+             tests=("test_counterfactual_extraction_contract.py",)),
+    Mutation("cf_what_if_skips_compare", COUNTERFACTUAL,
+             "        comparison = self.compare_outcomes(scenario)",
+             "        comparison = scenario  # wrong type/shape",
+             tests=("test_counterfactual_extraction_contract.py",)),
+    Mutation("cf_parse_what_if_always_default", COUNTERFACTUAL,
+             "        if \"what if\" in question_lower:",
+             "        if False:",
+             tests=("test_counterfactual_extraction_contract.py",)),
+    Mutation("cf_stats_scenarios_not_counted", COUNTERFACTUAL,
+             "        self.total_scenarios_generated += 1",
+             "        pass",
+             tests=("test_counterfactual_extraction_contract.py",)),
 ]
 
 

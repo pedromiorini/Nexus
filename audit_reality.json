@@ -23,6 +23,12 @@
         "functions": 9
       },
       {
+        "path": "core/cognitivo/counterfactual.py",
+        "lines": 361,
+        "classes": 4,
+        "functions": 14
+      },
+      {
         "path": "core/cognitivo/episodic_memory.py",
         "lines": 280,
         "classes": 2,
@@ -41,9 +47,9 @@
         "functions": 17
       }
     ],
-    "core_lines": 26418,
-    "classes": 256,
-    "functions": 827,
+    "core_lines": 26071,
+    "classes": 252,
+    "functions": 813,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -68,7 +74,6 @@
       "RealConsciousnessSystem.get_self_knowledge",
       "RealConsciousnessSystem.get_statistics",
       "RealContextAwareAdaptationEngine.get_statistics",
-      "RealCounterfactualReasoningEngine.get_statistics",
       "RealCreativitySystem.get_statistics",
       "RealCuriositySystem.get_statistics",
       "RealDistributedConsensusProtocol.get_statistics",
