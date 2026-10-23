@@ -237,6 +237,21 @@ class CounterfactualDoContractTests(unittest.TestCase):
         self.assertEqual(private.calls, ["APPLY_PATCH"])
         self.assertEqual(scenario.counterfactual_outcome, "state:system_status=secure")
 
+    def test_non_dict_simulate_state_falls_back_after_the_call(self):
+        class Weird:
+            def __init__(self):
+                self.calls = []
+
+            def simulate(self, actions):
+                self.calls.append(list(actions))
+                return SimpleNamespace(final_state=SimpleNamespace(state="nope"))
+
+        hook = Weird()
+        eng = _engine(world_model=hook)
+        scenario = eng.generate_counterfactual_scenario("sit", "APPLY_PATCH")
+        self.assertEqual(hook.calls, [["APPLY_PATCH"]])
+        self.assertEqual(scenario.counterfactual_outcome, "outcome_with_APPLY_PATCH")
+
     def test_empty_do_effects_fall_back_after_the_call(self):
         class EmptyDo:
             def __init__(self):
