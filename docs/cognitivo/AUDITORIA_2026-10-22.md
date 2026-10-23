@@ -480,6 +480,9 @@ Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, hyp
 
 **Fora do que este comando mede:** orçamento 8 não avalia qualidade do MCTS; a fórmula de plausibilidade não mudou, mas uma sequência não vazia alonga a cadeia e portanto reduz o número pela fórmula já existente.
 
+PR draft: https://github.com/pedromiorini/Nexus/pull/105
+
+
 ### Varredura §7.2 (2026-10-23, `gh pr list --state open`)
 
 Nenhum PR aberto altera `core/cognitivo/counterfactual.py`, `tools/cognitivo_mutation.py` ou este arquivo. O #79 (não editado) mexe no comentário de `docs/agentes/CLAIMS.yaml` e esvazia `claims` na branch dele. O claim obsoleto do #104, já mesclado, é substituído pelo claim desta tarefa a partir da `main` `fe57c82`, sem usar o #79 como base. State docs, Axis, #38–#50 e #60 ficam de fora.
