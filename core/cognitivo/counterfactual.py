@@ -1,0 +1,361 @@
+"""Counterfactual reasoning (POST37) — extraído do monólito (strangler, move-only)."""
+from __future__ import annotations
+
+import uuid
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MÓDULO 37: COUNTERFACTUAL REASONING ENGINE (POST 37)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class CounterfactualScenario:
+    """Cenário contrafactual ("What if?")"""
+    scenario_id: str
+    original_situation: str
+    intervention: str  # O que mudou
+    counterfactual_outcome: str
+    actual_outcome: str
+    causal_chain: List[str]
+    plausibility_score: float  # 0-1
+    
+@dataclass
+class CausalIntervention:
+    """Intervenção causal"""
+    intervention_id: str
+    variable_changed: str
+    original_value: Any
+    counterfactual_value: Any
+    expected_effects: List[str]
+    
+@dataclass
+class OutcomeComparison:
+    """Comparação de outcomes"""
+    comparison_id: str
+    actual_outcome: str
+    counterfactual_outcome: str
+    difference_score: float  # 0-1
+    insights_learned: List[str]
+
+class RealCounterfactualReasoningEngine:
+    """
+    POST37: Counterfactual Reasoning Engine — REAL "What If?" Reasoning
+    
+    Raciocínio Contrafactual = explorar cenários alternativos ("What if?").
+    "Counterfactual thinking is essential for learning and planning" - Pearl (2009)
+    
+    Princípios Centrais:
+    - Scenario generation: Gera cenários "what if?"
+    - Causal intervention: Modela intervenções causais
+    - Outcome prediction: Prediz outcomes alternativos
+    - Comparison: Compara com outcomes reais
+    - Learning: Aprende de contrafactuais
+    
+    Componentes:
+    1. Scenario Generator: Gera cenários contrafactuais
+    2. Intervention Modeler: Modela intervenções causais
+    3. Outcome Predictor: Prediz outcomes de cenários
+    4. Comparator: Compara outcomes reais vs. contrafactuais
+    5. Insight Extractor: Extrai insights de comparações
+    
+    Multiplica:
+    • × POST11 (Causal): Causal + Counterfactual = raciocínio completo
+    • × POST5 (Planning): Planejamento via counterfactuals
+    • × POST13 (WorldModel): Simula cenários alternativos
+    • × POST30 (Simulation): Mental simulation de "what ifs"
+    
+    Baseado em:
+    - Pearl's Causal Models (2009) - Structural Causal Models
+    - Counterfactual Thinking (Roese & Olson, 1995)
+    - Interventional Reasoning (Woodward, 2003)
+    - Causal Inference (Spirtes et al., 2000)
+    """
+    
+    def __init__(self, causal_reasoning=None, world_model=None, planner=None):
+        self.causal = causal_reasoning
+        self.world_model = world_model
+        self.planner = planner
+        
+        # Counterfactual scenarios
+        self.scenarios: List[CounterfactualScenario] = []
+        self.interventions: List[CausalIntervention] = []
+        
+        # Comparisons
+        self.outcome_comparisons: List[OutcomeComparison] = []
+        
+        # Insights learned
+        self.insights: List[str] = []
+        
+        # Estatísticas
+        self.total_scenarios_generated = 0
+        self.total_interventions_modeled = 0
+        self.total_comparisons = 0
+        self.avg_insight_value = 0.0
+        
+        print("🔮💭 POST 37 - RealCounterfactualReasoningEngine initialized (What-if reasoning active)")
+    
+    def generate_counterfactual_scenario(self, situation: str, intervention: str) -> CounterfactualScenario:
+        """
+        Gerar cenário contrafactual ("What if?").
+        
+        Args:
+            situation: Situação original
+            intervention: Intervenção contrafactual
+        
+        Returns:
+            CounterfactualScenario gerado
+        """
+        # Predizer outcome atual (sem intervenção)
+        actual_outcome = self._predict_outcome(situation, intervention=None)
+        
+        # Predizer outcome contrafactual (com intervenção)
+        counterfactual_outcome = self._predict_outcome(situation, intervention=intervention)
+        
+        # Construir causal chain
+        causal_chain = self._build_causal_chain(situation, intervention)
+        
+        # Calcular plausibilidade
+        plausibility = self._calculate_plausibility(intervention, causal_chain)
+        
+        # Criar cenário
+        scenario = CounterfactualScenario(
+            scenario_id=str(uuid.uuid4()),
+            original_situation=situation,
+            intervention=intervention,
+            counterfactual_outcome=counterfactual_outcome,
+            actual_outcome=actual_outcome,
+            causal_chain=causal_chain,
+            plausibility_score=plausibility
+        )
+        
+        self.scenarios.append(scenario)
+        self.total_scenarios_generated += 1
+        
+        return scenario
+    
+    def _predict_outcome(self, situation: str, intervention: Optional[str]) -> str:
+        """Predizer outcome (com ou sem intervenção)"""
+        predictor = getattr(self.world_model, "predict_outcome", None)
+        if callable(predictor):
+            return str(predictor(situation, intervention))
+        
+        # Heurística simples
+        if intervention:
+            return f"outcome_with_{intervention.replace(' ', '_')}"
+        else:
+            return "outcome_without_intervention"
+    
+    def _build_causal_chain(self, situation: str, intervention: str) -> List[str]:
+        """Construir cadeia causal"""
+        extractor = getattr(self.causal, "extract_causal_relations", None)
+        if callable(extractor):
+            relations = extractor(f"{situation} causes {intervention}")
+            if relations:
+                return [
+                    f"{relation.cause} causes {relation.effect}"
+                    for relation in relations
+                ]
+        
+        # Heurística: steps básicos
+        chain = [
+            f"1. {situation}",
+            f"2. Intervention: {intervention}",
+            "3. Immediate effect",
+            "4. Secondary effect",
+            "5. Final outcome"
+        ]
+        
+        return chain
+    
+    def _calculate_plausibility(self, intervention: str, causal_chain: List[str]) -> float:
+        """Calcular plausibilidade do cenário"""
+        # Heurística baseada em comprimento da chain
+        # Chains curtas = mais plausíveis
+        base_plausibility = 0.7
+        
+        chain_penalty = len(causal_chain) * 0.05
+        plausibility = max(0.1, base_plausibility - chain_penalty)
+        
+        return plausibility
+    
+    def model_causal_intervention(self, variable: str, original_value: Any, 
+                                  counterfactual_value: Any) -> CausalIntervention:
+        """
+        Modelar intervenção causal.
+        
+        Args:
+            variable: Variável a intervir
+            original_value: Valor original
+            counterfactual_value: Valor contrafactual
+        
+        Returns:
+            CausalIntervention
+        """
+        # Predizer efeitos da intervenção
+        expected_effects = self._predict_intervention_effects(variable, 
+                                                              original_value,
+                                                              counterfactual_value)
+        
+        intervention = CausalIntervention(
+            intervention_id=str(uuid.uuid4()),
+            variable_changed=variable,
+            original_value=original_value,
+            counterfactual_value=counterfactual_value,
+            expected_effects=expected_effects
+        )
+        
+        self.interventions.append(intervention)
+        self.total_interventions_modeled += 1
+        
+        return intervention
+    
+    def _predict_intervention_effects(self, variable: str, original: Any, 
+                                     counterfactual: Any) -> List[str]:
+        """Predizer efeitos de intervenção"""
+        effects = []
+        
+        # Heurística: mudança causa efeito
+        if original != counterfactual:
+            effects.append(f"Change in {variable}")
+            effects.append("Downstream effects on dependent variables")
+            effects.append("Potential cascade effects")
+        
+        return effects
+    
+    def compare_outcomes(self, scenario: CounterfactualScenario) -> OutcomeComparison:
+        """
+        Comparar outcomes real vs. contrafactual.
+        
+        Args:
+            scenario: Cenário contrafactual
+        
+        Returns:
+            OutcomeComparison
+        """
+        # Calcular diferença
+        difference = self._calculate_outcome_difference(
+            scenario.actual_outcome,
+            scenario.counterfactual_outcome
+        )
+        
+        # Extrair insights
+        insights = self._extract_insights(scenario, difference)
+        
+        comparison = OutcomeComparison(
+            comparison_id=str(uuid.uuid4()),
+            actual_outcome=scenario.actual_outcome,
+            counterfactual_outcome=scenario.counterfactual_outcome,
+            difference_score=difference,
+            insights_learned=insights
+        )
+        
+        self.outcome_comparisons.append(comparison)
+        self.total_comparisons += 1
+        
+        # Adicionar insights ao conhecimento
+        self.insights.extend(insights)
+        
+        # Update statistics
+        self._update_insight_statistics(insights)
+        
+        return comparison
+    
+    def _calculate_outcome_difference(self, actual: str, counterfactual: str) -> float:
+        """Calcular diferença entre outcomes"""
+        # Heurística: diferença textual simples
+        if actual == counterfactual:
+            return 0.0
+        
+        # Levenshtein-like distance (simplificado)
+        max_len = max(len(actual), len(counterfactual))
+        if max_len == 0:
+            return 0.0
+        
+        common_chars = sum(1 for a, c in zip(actual, counterfactual) if a == c)
+        difference = 1.0 - (common_chars / max_len)
+        
+        return difference
+    
+    def _extract_insights(self, scenario: CounterfactualScenario, 
+                         difference: float) -> List[str]:
+        """Extrair insights de comparação"""
+        insights = []
+        
+        if difference > 0.5:
+            insights.append(f"Intervention '{scenario.intervention}' would cause significant change")
+        else:
+            insights.append(f"Intervention '{scenario.intervention}' would cause minor change")
+        
+        if scenario.plausibility_score > 0.7:
+            insights.append("Scenario is highly plausible")
+        
+        insights.append(f"Key causal factor: {scenario.intervention}")
+        
+        return insights
+    
+    def explore_what_if(self, question: str) -> Dict[str, Any]:
+        """
+        Explorar questão "What if?".
+        
+        Args:
+            question: Questão "what if?" (ex: "What if I had studied more?")
+        
+        Returns:
+            Análise do cenário contrafactual
+        """
+        # Extrair situação e intervenção da questão
+        situation, intervention = self._parse_what_if_question(question)
+        
+        # Gerar cenário
+        scenario = self.generate_counterfactual_scenario(situation, intervention)
+        
+        # Comparar outcomes
+        comparison = self.compare_outcomes(scenario)
+        
+        # Retornar análise
+        return {
+            "question": question,
+            "scenario": scenario,
+            "comparison": comparison,
+            "plausibility": scenario.plausibility_score,
+            "insights": comparison.insights_learned
+        }
+    
+    def _parse_what_if_question(self, question: str) -> tuple:
+        """Parse questão 'what if?'"""
+        # Heurística: extrair de "what if X?"
+        question_lower = question.lower()
+        
+        if "what if" in question_lower:
+            # Extrair parte depois de "what if"
+            parts = question_lower.split("what if")
+            if len(parts) > 1:
+                intervention = parts[1].strip("? ")
+                situation = "current_situation"
+                return situation, intervention
+        
+        # Default
+        return "unknown_situation", question
+    
+    def _update_insight_statistics(self, insights: List[str]):
+        """Atualizar estatísticas de insights"""
+        if insights:
+            # Valor de insight baseado em quantidade
+            insight_value = min(1.0, len(insights) / 5.0)
+            
+            if self.avg_insight_value == 0:
+                self.avg_insight_value = insight_value
+            else:
+                self.avg_insight_value = (self.avg_insight_value + insight_value) / 2
+    
+    def get_statistics(self) -> Dict:
+        """Estatísticas do Counterfactual Reasoning Engine"""
+        return {
+            "total_scenarios_generated": self.total_scenarios_generated,
+            "total_interventions_modeled": self.total_interventions_modeled,
+            "total_comparisons": self.total_comparisons,
+            "avg_insight_value": self.avg_insight_value,
+            "insights_learned": len(self.insights),
+            "avg_plausibility": sum(s.plausibility_score for s in self.scenarios) / max(1, len(self.scenarios))
+        }
