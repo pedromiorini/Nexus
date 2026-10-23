@@ -1222,3 +1222,48 @@ Hipótese de trabalho, não vinculante para além da tabela: H1 e H3 descrevem o
 **Helper de B, congelado com os testes.** Módulo novo `core/tool_evidence_gate.py`. Função `evaluate_evidence_omission(required_evidence, tool_result) -> bool`. Exceção `EvidenceGateRejection(ValueError)` com atributo `code`. Uma chave exigida só conta se `tool_result[key] is True`. Subclasse de `dict` conta como dict (`isinstance`). O helper não é chamado por `execute_tool` nesta rodada.
 
 Pré-registro escrito **antes** dos contratos novos e **antes** de alterar `execute_tool`. O SHA deste commit entra no PR. Resultados de A e de B só numa seção posterior.
+
+### Resultados TS (após o pré-registro `fc48293`)
+
+Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, bandit 1.9.4, hypothesis 6.170.5, numpy 2.4.6). O lock deste commit instala ruff 0.17.1; o snapshot antigo da §10 citava 0.16.10. O CI usa Python 3.11; esta máquina não o executou. Os códigos de saída abaixo são desta execução, não um carimbo de CI hospedado.
+
+**Commits.** Base `d0aab245f6d0453428d1f530c82ddd23fed18c1b`. Pré-registro `fc48293bbee0e6af26846b4bd64a96097891d135`. RED `73b43a14f59664a1f20e5a6418e89e45ec131be2` (só os dois contratos; `execute_tool` ainda é o da base). GREEN `6c91a12f17d1e54ee37591343a90b0b4076b65d8`.
+
+**Critério A, na árvore do RED** (`PYTHONPATH=.`, `NEXUS_AUDIT_DB=/tmp/nexus_audit.sqlite3`):
+
+| id | A falhou no caso novo? | comando | rc |
+|---|---|---|---|
+| TS1 | sim | `python -m unittest test_tool_permission_failclosed_contract.py` | 1 |
+| TS2 | sim | `python -m unittest test_evidence_omission_contract.py` | 1 |
+
+TS1: 9 testes, `FAILED (failures=1, errors=10)`. `test_ts1a` falhou com `AssertionError: True is not false`: sem grant, `execute_tool` devolveu sucesso e portanto chamou o executor. `test_ts1b`, `test_ts1c` e os testes de `grant_permission`/`revoke_permission` deram `AttributeError: 'RealToolUse' object has no attribute 'grant_permission'` (os subtestes entram na conta de errors). Os três testes que já distinguiam o baseline passaram: nome vazio, nome `missing_tool` e built-in com a flag ainda falsa. TS2: coleta do módulo, `ModuleNotFoundError: No module named 'core.tool_evidence_gate'`.
+
+**Critério B, reexecutado no commit GREEN** `6c91a12`:
+
+| id | B passou? | comando | rc |
+|---|---|---|---|
+| TS1 | sim | `python -m unittest test_tool_permission_failclosed_contract.py test_evidence_omission_contract.py` | 0 |
+| TS2 | sim | o mesmo comando (19 testes, `OK`) | 0 |
+
+`python -m unittest discover -p 'test_tool_*.py'`: 33 testes, `OK`, rc 0. Nenhum assert foi relaxado entre o RED e o GREEN. Os `test_tool_*_contract.py` que já existiam estão dentro desses 33 e não acrescentaram falha.
+
+**Outros comandos na árvore do GREEN** (a suíte completa e o bandit rodaram no working tree idêntico ao que foi commitado em `6c91a12`; os contratos e o `predeleg` foram repetidos depois do commit):
+
+| comando | rc | resultado |
+|---|---|---|
+| `ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py` | 0 | All checks passed |
+| `python -m unittest discover -p 'test_*.py'` | 0 | 602 testes, `OK`, 18.028 s |
+| `bandit -q -r core vita tools -f json -o /tmp/bandit-rc.json` | 1 | 131 LOW, 0 MEDIUM, 0 HIGH. O rc 1 é o do bandit quando o JSON tem achados; o workflow segue se o relatório existe e não há MEDIUM/HIGH. Nenhum achado em `core/tool_evidence_gate.py` |
+| `python tools/security_triage.py /tmp/bandit.json SECURITY_TRIAGE.md --check` | 0 | `SECURITY_TRIAGE.md` não foi editado |
+| `python tools/targeted_mutation.py` | 0 | `{"declared": 69, "applicable": 69, "killed": 69, "survived": 0, "not_applied": 0, "score_percent": 100.0}` |
+| `python tools/agente/validar_registro.py --expirados aviso` | 0 | registro OK |
+| `bash tools/agente/predeleg.sh HEAD origin/main` | 0 | `OK: sem conflito` (`HEAD` `6c91a12`, `origin/main` `d0aab245`) |
+| `python tools/cognitivo_eval.py --capability all` | 1 | `failed: ["M3"]`; WM1–WM6 e AT1–AT6 passaram |
+
+**M3.** No `--capability all`, M3 ficou `value: 0.0`, `regret_50: 0.0`, limite `v2: max_depth=8, regret(2000) < regret(50)`, `passed: false`. O mesmo comando só com `--capability mcts`, no `constitutional_brain.py` da base (diff de tool safety retirado), também saiu rc 1 com `failed: ["M3"]` e `regret_50: 0.0`. Inferência: esta falha já estava na base e não foi introduzida pelo ramo de permissão. WM e AT não quebraram.
+
+**Realidade** (commitada com o GREEN): núcleo 24920 linhas, 236 classes, 759 funções (antes 24886 / 236 / 757). As duas funções novas são `grant_permission` e `revoke_permission`. `core/tool_evidence_gate.py` fica fora da contagem do núcleo. `reality_audit` reexecutado: o diff versionado é só esses dois números.
+
+**Hipóteses.** H1 não se sustenta: no caso novo, sem grant, `success` era `True`. H2 descreve o baseline e o GREEN deixa de reproduzir essa passagem (executor não chamado, `failed_executions` soma 1, mensagem com `permission` e `grant`). H3 não se sustenta: o helper não existia e o import falhou. H4 não se sustenta no GREEN: omissão devolve `False` sem exceção; `None` e resultado que não é dict levantam `EvidenceGateRejection` com código próprio. Nada disso é controle de acesso pronto para produção. `permission_level` e `permission_hierarchy` continuam sem leitor. O helper não é chamado por `execute_tool`. O banner do núcleo e a suíte embutida continuam sendo demo, não evidência de capacidade.
+
+**Fora do que estes comandos medem:** CI hospedado; Python 3.11; merge contra as branches dos PRs #38, #39, #40, #41, #42, #44, #46, #48, #49, #50, #60, #77 e #79 (`predeleg` só compara com `origin/main`); state docs não atualizados, de propósito; compilador SCOPE, SMT/SCA, proveniência completa, self-mod e open-endedness; catálogo `tools/targeted_mutation.py` não foi editado, então o gate novo não tem mutante nesse script. Não há interface web nesta mudança.
