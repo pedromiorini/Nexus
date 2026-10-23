@@ -1262,3 +1262,44 @@ A sonda já exclui H2, H3, H4, H5 e H6 como descrição do bloco atual. O eval a
 Não há contrato anterior destes três símbolos. O teste embutido 27 do demo continua chamando `imagine_future_event`, `preexperience_event`, `set_prospective_memory`, `project_future_self` e `get_statistics` pelo reexport. O eval dos outros capabilities não é alvo de mudança de critério.
 
 Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability episodic_future`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados EF (após o pré-registro `3e8940f`)
+
+Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, coverage 7.16.2, bandit 1.9.4, hypothesis 6.170.5, numpy 2.4.6). O CI usa Python 3.11; `python3.11` não existe nesta máquina e não foi executado. Os números abaixo são desta execução, não um carimbo de CI hospedado.
+
+**Commits.** Pré-registro `3e8940fe90c43db0bea55125c2a0be76c7953d89` (só `CLAIMS.yaml` e esta auditoria). Move-only `068e37a07d22188c904ea52d39d51cced17644d3`. Base `d0aab245f6d0453428d1f530c82ddd23fed18c1b`.
+
+**RED**, antes de existir `core/cognitivo/episodic_future_thinking.py`: `PYTHONPATH=. python3 -m unittest test_episodic_future_thinking_contract.py` → rc 1, 8 testes, 3 `ModuleNotFoundError: No module named 'core.cognitivo.episodic_future_thinking'`. Os cinco testes que importam o monólito passaram: descrição `int` e `details` lista/`True`; descrição vazia e `details` `""`/`0`/`False`; contexto ruim só com intenção em aberto; horizonte/`None` na pré-vivência/significância `str`; cumprir a mesma intenção duas vezes (taxa `2.0`).
+
+**GREEN**, o mesmo comando depois do move, no venv: 8 testes, rc 0, 0.041 s. Nenhum assert foi relaxado.
+
+**Eval** `python tools/cognitivo_eval.py --capability episodic_future --criteria v3` (v1/v2/v3 não alteram o protocolo; o padrão do argparse continua `v2`): rc 0, `failed: []`. O stdout ainda imprime o aviso de psutil/FAISS antes do JSON; isso já ocorria ao importar `core.constitutional_brain`.
+
+| id | valor medido | alvo | passou |
+|---|---|---|---|
+| EF1 | vividez `0.75`, plausibilidade `0.8` com memória; `homework` e `network` em `0.7`; `"challenge ahead"` com memória e emoção continua `happy`/`excited` | passado fixo e a substring `work` | sim |
+| EF2 | pré-vivências `2`; média do par `0.5`; média vazia `0.0` | contador `2` e média `0.5` | sim |
+| EF3 | `time=today` → send notes e day-match; `location=office` → call Ana e send notes; importância `1.5` | a tabela de substring e a importância sem corte | sim |
+| EF4 | taxa da intenção sozinha cumprida duas vezes `2.0`; `1 year and 1 month` segue `year`; empate de produto prefere `e` | taxa `2.0` e o segundo no empate | sim |
+| EF5 | descrição `int`, `details` lista/`True`, horizonte `int`/`None`, pré-vivência `None` e comparação incompleta: `AttributeError`; significância `str`: `TypeError`; contexto sem intenção: sem erro; com intenção: `AttributeError`; argumento omitido: `TypeError` | essas classes | sim |
+| EF6 | SHA de fonte do módulo = SHA medido no monólito antes do splice = `a72a34bcc303f98b37cd5e33e030ab69bea8579d4f111c95981b2cf9785cb3e7`; SHA comportamental módulo = monólito = `062870d6a044174d49150fc6008521105c05557c40c2f46a4e83cd116b761f27`; identidade verdadeira; `clock: wall` | os dois SHA pré-registrados e o mesmo objeto | sim |
+
+**Relógio.** `__init__` continua só com `memory`, `mental_simulation`, `consciousness` e `emotion`. `event_id` usa `uuid.uuid4()` e `created_at` usa `time.time()`. Relógio não foi injetado. O golden de EF6 não grava o número do instante nem o uuid cru.
+
+**Gaps que o eval mediu e não corrigiu.** `memory` e `emotion` verdadeiros não recebem chamada de método; `mental_simulation` e `consciousness` não são lidos. `work` casa dentro de `network` e `homework`. `where=""` casa com qualquer local verdadeiro. `"day"` casa com `"today"`. `fulfill_intention` soma de novo e a taxa chega a `2.0`. `details` falso (`False`, `0`, `""`) vira `{}`; `True` quebra. `bool` na significância compara como `int`. Vividez `nan` perde o `>`. Descrição `int` passa quando memória e emoção estão ambos verdadeiros. Nada disso foi editado no bloco.
+
+**Demo embutido.** `python core/constitutional_brain.py` rc 0. O teste 27 impresso por esse demo passou pelo reexport (`TEST 27 PASSED`). O banner não é evidência de capacidade.
+
+**Cobertura da suíte**, no commit de move (`NEXUS_INTEGRATED_SUMMARY=/tmp/integrated.json coverage run --branch -m unittest discover -p 'test_*.py'`, depois o demo do núcleo): 591 testes, rc 0, 18.808 s na descoberta sem coverage; a descoberta sob coverage também rc 0. `episodic_future_thinking.py` 122 statements, 34 ramos, 100%. `core/cognitivo/*` 1547 statements, 97% (piso 90). `constitutional_brain.py` 68% (piso 62). Fila 95%, VRAM 94%, temporal 93%, vita 76%.
+
+**Mutação.** `python tools/targeted_mutation.py`: `{"declared": 69, "applicable": 69, "killed": 69, "survived": 0, "not_applied": 0, "score_percent": 100.0}`, rc 0. O catálogo do Axis não foi editado. `python tools/cognitivo_mutation.py`: `{"declared": 208, "killed": 208, "survived": 0, "not_applied": 0}`, rc 0. Os 24 mutantes do módulo novo estão nesse total (passado fixo, emoção, substring, `details` falso, gatilho, taxa `2.0`, horizonte, empate, reexport e o import do monólito). `ef_module_pulls_monolith` insere `import core.constitutional_brain`; o AST do eval e o contrato em subprocesso o matam.
+
+**Realidade** (recontagem exigida pelo gate, commitada com o move): núcleo 24549 linhas, 233 classes, 741 funções (antes 24886 / 236 / 757). `episodic_future_thinking.py` 366 linhas, 3 classes, 16 funções. `core/cognitivo` 11 módulos, 3729 linhas. Literais dinâmicos 49 (antes 50; `compare_future_scenarios` saiu do núcleo). Frases fortes 51. Terminologia científica 233. Prefixo `Real` 63. Testes embutidos 31. `pass` puro 0. Retorno constante 1 (antes 2; `_anticipate_growth` saiu do núcleo e continua no módulo extraído, com o mesmo dict `0.8`/`0.7`/`0.6`). `reality_audit` reexecutado depois do commit de move: diff vazio.
+
+**Outros gates locais no commit de move:** `ruff check` nos alvos do workflow, rc 0, ruff 0.17.1 do lock. `bandit -r core vita tools` na `main` `d0aab24` gravou 131 LOW. No branch, `bandit -r core vita tools -b /tmp/base.json` rc 0, zero achados novos. O relatório completo do branch continua 131 LOW, zero MEDIUM/HIGH, nenhum achado em `episodic_future_thinking.py`, `tools/cognitivo_eval.py` ou `tools/cognitivo_mutation.py`. `security_triage.py --check` rc 0. `SECURITY_TRIAGE.md` não foi editado. `validar_registro.py --expirados aviso`, rc 0. `bash tools/agente/predeleg.sh HEAD origin/main` no commit de move `068e37a` contra `origin/main` `d0aab24`: `OK: sem conflito`, rc 0.
+
+**Hipóteses.** H1 não se sustenta como falha neste eval: os dois SHA são os que foram congelados no monólito antes do splice. H2, H3, H4, H5 e H6 já tinham sido excluídas pela sonda e o eval repetiu a exclusão. Nenhuma delas vira alegação de viagem mental no tempo, de memória prospectiva humana, nem de prontidão. O nome `RealEpisodicFutureThinkingSystem` e a suíte embutida do núcleo continuam sendo demo, não evidência de capacidade.
+
+**Fora do que estes comandos medem:** CI hospedado; Python 3.11 (o `nan` que perde o `>` e o token `NaN` do golden foram lidos em 3.12.3); conflito de merge contra as branches dos PRs #38, #39, #40, #41, #42, #44, #46, #48, #49, #50, #60, #77 e #79 (o `predeleg` só compara com `origin/main`, e nessa comparação não houve conflito); state docs não atualizados, de propósito (`tests: CURRENT_TESTS` já é sentinela); Mental Simulation, Analogical Reasoning, Embodied Cognition, blocos de ferramenta e o catálogo `tools/targeted_mutation.py` não foram alterados no comportamento. Não há interface web nesta extração. Não se mediu um backend real de memória: o colaborador verdadeiro só muda o booleano.
+
+PR draft: https://github.com/pedromiorini/Nexus/pull/111
