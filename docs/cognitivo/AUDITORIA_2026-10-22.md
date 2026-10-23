@@ -678,3 +678,40 @@ O golden de extração inclui `plausibility_score` de `generate("alarm","patch")
 Nenhum PR aberto altera `core/cognitivo/counterfactual.py`, `test_counterfactual_extraction_contract.py`, `tools/cognitivo_mutation.py`, `tools/cognitivo_eval.py` ou este arquivo. O #79 (draft, não usado como base) altera `docs/agentes/CLAIMS.yaml`; o claim do #106, já mesclado, é substituído por este, nos arquivos desta tarefa, sem editar `versao_aceita` de outro agente. `AUDIT_REALITY_REPORT.md` / `audit_reality.json` aparecem em #38, #39, #40, #41, #42, #44, #46, #48 e #49; recontagem, se o gate exigir, fica só nos números deste módulo. State docs, Axis, `constitutional_brain` e #60 ficam de fora.
 
 Pré-registro escrito **antes** da implementação, **antes** do contrato e **antes** de rodar o eval nesta rodada. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados CF10 (após o pré-registro `c77e57f`)
+
+Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, hypothesis 6.170.5, coverage 7.16.2, bandit 1.9.4). O CI usa Python 3.11; esta máquina não o executou. Números abaixo são desta execução, não um carimbo de CI hospedado.
+
+| id | valor | alvo | passou | nota |
+|---|---|---|---|---|
+| CF5 | 0.65, 0.55, 0.45, 0.20 e monótono | v1, sem grafo | **sim** | eval `values` e o contrato; alvo não foi reescrito |
+| CF10-length | 0.45 na heurística de 5 passos | igual à fórmula antiga | **sim** | sem grafo |
+| CF10-scm / CF10-rel | 0.65 em cadeia de 5 atestada | acima de 0.45 | **sim** | mesmo comprimento, número diferente |
+| CF10-freq | 0.49 com 1/5 passos | fração, não bônus cheio | **sim** | |
+| CF10-text | 0.45 sem grafo | texto não é evidência | **sim** | `do(` e `causes` sozinhos |
+| CF10-live | 0.85 e 0.8 | não 0.65 e não 0.6 | **sim** | relação extraída; aresta C4 + template |
+| CF11 | 0.1 | piso | **sim** | `""`, `"   "`, `False`, com ou sem grafo |
+| CF12 | 0.25 / 0.5 / 0.7 | abaixo / vazio / sem grafo | **sim** | `str` no lugar do conjunto não é aresta |
+| CF13 | `TypeError` | não vira número | **sim** | string `"-1"` permanece 0.65 |
+| CF1–CF4, CF6–CF8 | pass | pass | **sim** | `failed: []`, inclusive CF3 |
+
+**RED** (commit `51b8e07`, código ainda o de `29a5711`): `python -m unittest test_counterfactual_plausibility_contract.py` → rc 1, 14 testes, 26 falhas de subteste. Quatro controles sem grafo passaram (CF5 nos literais, heurística de 5 passos, texto sem aresta, propriedade de grafo vazio).
+
+**GREEN:** `eed5139` mais a recontagem de realidade deste commit. O mesmo unittest, rc 0. Golden re-medido `64488affedd89003faa5bc18de333bff4c52cb1e126a379e6f376b00cdd2c509`. O payload contra a fórmula antiga difere só em `sc2.plausibility_score` e `stats2.avg_plausibility` (0.65 → 0.85).
+
+**Eval:** `python tools/cognitivo_eval.py --capability counterfactual --criteria v1` → rc 0, `failed: []`. CF5 `values`: 0.6499999999999999, 0.5499999999999999, 0.44999999999999996, 0.19999999999999996.
+
+**Implementação:** comprimento `max(0.1, 0.7-0.05*n)` mais fração de passos atestados por `_adjacency()` (`+0.2*f`), penalidade `0.2` se o grafo tem aresta e nenhum passo casa, piso `0.1` se a intervenção é `False` ou `str` vazia depois de `strip`. `causal_world_model.py` e `tools/cognitivo_eval.py` não foram editados.
+
+**Hipóteses:** H1 ficou excluída pela sonda anterior ao código (comprimento 5 com e sem aresta = 0.45) e pelo RED. H2 não foi implementada; não há CF5v2. H3 não se sustenta em CF10-text. H4 não se sustenta em CF11. H5 não se sustentou neste eval. Nenhuma delas vira alegação de capacidade causal geral.
+
+**Efeito colateral observado** (não era critério): `compare_outcomes` acrescenta `"Scenario is highly plausible"` quando o score passa de 0.7. Sonda à parte, `PYTHONPATH=.`: cadeia `alarm causes patch` (0.85) inclui essa frase; a heurística de 5 passos (0.45) não. A suíte de cobertura não executou o statement 495.
+
+**Mutação:** `python tools/cognitivo_mutation.py` → `{"declared": 105, "killed": 105, "survived": 0, "not_applied": 0}`, rc 0. Inclui os oito mutantes novos de plausibilidade (fórmula antiga sempre, vazio na fórmula de comprimento, texto `do(` ou `causes` sem grafo, bônus sem fração, sem penalidade, atestação zerada, aresta `str` iterada). `python tools/targeted_mutation.py` → 69/69 mortos, rc 0. O catálogo do Axis não foi editado.
+
+**Suíte:** `coverage run --branch -m unittest discover -p 'test_*.py'` → 564 testes, rc 0. Cobertura `core/cognitivo/*` 95% (piso 90); `counterfactual.py` 95% (8 statements sem execução). `core/constitutional_brain.py` 68% (piso 62), com `NEXUS_INTEGRATED_SUMMARY=/tmp/integrated.json`, rc 0 do script. Pisos de fila 95%, VRAM 94%, temporal 93%, vita 76%. `ruff check` nos alvos do workflow, rc 0. `reality_audit.py`: counterfactual.py 581 linhas, 26 funções; soma `core/cognitivo` 2033 linhas; núcleo permanece 26071 / 252 / 813. Bandit: 131 LOW, 0 MEDIUM/HIGH; `security_triage.py --check` rc 0. `validar_registro.py --expirados aviso` rc 0. `predeleg.sh HEAD origin/main` → `OK: sem conflito`.
+
+**Fora do que estes comandos medem:** a fração é atestação na cadeia, não frequência num corpus; não há abdução nem twin network; o factual não é lido do SCM; passo `planner:` não é atestado; CI hospedado e Python 3.11 não rodaram. Nenhum script novo: capability vazia do eval continua no contrato já existente (rc 2). Conflito de merge com os PRs que também versionam o relatório de realidade não foi resolvido contra as branches deles.
+
+PR draft: https://github.com/pedromiorini/Nexus/pull/107

@@ -13,4 +13,5 @@ claims:
       - docs/agentes/CLAIMS.yaml
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
+    pr: 107
     expira_em: "2026-10-26T03:00:00Z"
