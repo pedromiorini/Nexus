@@ -405,3 +405,84 @@ Pré-registro commitado **antes** da implementação e da execução do eval.
 **Antes (zip):** `outcome_without_intervention` vs `outcome_with_apply_patch` → ≈0.571 (prefixo comum de chars; ignora tokens).
 **Depois (Jaccard alnum):** ≈0.833; para "the cat sat on the mat" vs "… a mat" → ≈0.167 (antes zip ≈0.318).
 Golden SHA re-medido: `fbfb32e9466bf161155a7546e2db07e2f73434230d581217a44fd4b324eb646e`.
+
+## CF gap CF3 / planner — critérios pré-registrados
+
+**Objetivo:** o `planner` injetado (em especial `RealMCTSPlanner`) passa a ser usado em `generate_counterfactual_scenario`. `explore_what_if` entra no mesmo caminho porque delega a esse método.
+**Não escopo:** Pearl `do(X)` completo, calibração de plausibilidade, alterar a fórmula de plausibilidade, Jaccard, a API explícita CF7, state docs, escopo Axis, `core/constitutional_brain.py`.
+
+### Observação herdada (rodada CF v1; este commit não reexecuta o eval)
+
+Após o pré-registro `b3e7c04`, CF3 ficou falso: `self.planner` só é atribuído em `__init__`. Os critérios abaixo foram escritos **antes** de nova execução e **antes** de implementar.
+
+### Hipóteses concorrentes (Strong Inference)
+
+| id | hipótese | o que a falsifica | teste barato |
+|---|---|---|---|
+| H1 | CF3 falha porque o AST não vê `self.planner` fora de `__init__`; o planner já seria chamado por via dinâmica | no base `fe57c82`, um stub com `plan` registra 0 chamadas em `generate_counterfactual_scenario` / `explore_what_if` | contrato CF3b no código atual |
+| H2 | qualquer leitura de `self.planner` fora de `__init__` cumpre o objetivo | CF3 (AST) passa e o stub ainda registra 0 chamadas a `plan` | CF3 versus CF3b no mesmo commit |
+| H3 | integrar `plan` muda a heurística quando `planner is None` | CF1, CF2, CF4, CF5, CF6, CF7, CF8 ou o golden `fbfb32e9466bf161155a7546e2db07e2f73434230d581217a44fd4b324eb646e` mudam com `planner=None` | `cognitivo_eval` + extração |
+| H4 | `RealMCTSPlanner.plan(goal, available_actions=None, max_iterations=200)` é incompatível com o what-if | `RealMCTSPlanner(max_depth=1)` injetado não incrementa `total_plans`, ou levanta, para `situation`/`intervention` `str` | CF3b com o planner real |
+| H5 | desenho rejeitado antes de codar: trocar `intervention` pela primeira ação do plano | quebraria a preservação de `intervention` (CF7) assim que um planner fosse injetado | não implementar; CF3b exige `intervention` intacta |
+
+Hipótese de trabalho (não vinculante; só depois deste pré-registro): se `self.planner` expõe `plan` chamável, `generate_counterfactual_scenario` chama `plan(situation, available_actions=[intervention], max_iterations=8)`. Se `best_action_sequence` for `list` ou `tuple` de `str`, anexa `planner: {ação}` ao fim de `causal_chain`. `planner is None`, `plan` ausente ou `plan` não chamável (`bool`, `int` negativo, `NaN`, `±inf`) mantêm a cadeia atual. A fórmula de plausibilidade não muda; o comprimento da cadeia só cresce quando há passos `str` do planner. Isto não é `do(X)`.
+
+### Critério CF3 (já existente, v1)
+
+| id | afirmação | protocolo falsificável | alvo |
+|---|---|---|---|
+| CF3 | `self.planner` referenciado fora de `__init__` | AST do avaliador em `tools/cognitivo_eval.py` (`Attribute` `planner` sobre `self` em método ≠ `__init__`) | verdadeiro |
+
+### Critério CF3b (novo, comportamental)
+
+Caminho documentado **P**: `generate_counterfactual_scenario(situation, intervention)`. `explore_what_if` (string ou kwargs) entra em P por delegação.
+
+| id | afirmação | protocolo falsificável | alvo |
+|---|---|---|---|
+| CF3b-call | stub ou `RealMCTSPlanner` com `plan` chamável é consultado em P | 1 chamada por `generate_counterfactual_scenario` ou por `explore_what_if`; `goal==situation` (ou `current_situation` no parse); `available_actions==[intervention]`; `max_iterations==8`. No planner real, `total_plans` sobe 1 e não há exceção para pares `str` | 1 chamada |
+| CF3b-use | a sequência devolvida entra na cadeia | cada item `str` de `best_action_sequence` (`list`/`tuple`, ou dict com essa chave) aparece como `planner: {ação}`; uma `str` solta não é fatiada em caracteres; item não-`str` é ignorado; sequência vazia ou ausente não acrescenta passo | só `str` |
+| CF3b-keep | sem planner útil, o comportamento atual fica | `planner is None` ou `plan` não chamável: cadeia heurística de 5 passos sem extrator causal; outcomes heurísticos; `original_situation` e `intervention` preservados; CF1/2/4/5/6/7/8 passam | sem regressão |
+| CF3b-scope | o planner não vaza para o resto da API | `model_causal_intervention`, `compare_outcomes` (cenário já pronto) e `_predict_outcome` não chamam `plan` | 0 chamadas |
+| CF3b-invalid | entrada inválida do contrato de `plan` não é normalizada | `situation is None` com `RealMCTSPlanner` propaga `ValueError`; `plan` igual a `True`, `-1`, `float("nan")`, `float("inf")` ou `float("-inf")` não é chamado | exceção ou fallback |
+| CF3b-empty | string vazia não vira situação default | `situation=""` e `intervention=""` ainda chamam `plan("", available_actions=[""], max_iterations=8)`; `planner is None` não chama | chamada com vazio |
+
+Pares de exemplo (não substituem W, S, E, J): `("system vulnerable", "isolate")`, `("during the outage", "we had patched")`, `"What if we isolate the host?"` → `("current_situation", "we isolate the host")`.
+
+O inteiro `8` é orçamento de sonda, distinto do default `200` de `RealMCTSPlanner.plan` e distinto de calibração de plausibilidade.
+
+### Regressão exigida
+
+`python tools/cognitivo_eval.py --capability counterfactual --criteria v1` — CF1, CF2, CF4, CF5, CF6, CF7 e CF8 continuam passando; CF3 passa a passar. Golden de extração permanece `fbfb32e9466bf161155a7546e2db07e2f73434230d581217a44fd4b324eb646e` enquanto `planner is None` (H3).
+
+Pré-registro commitado **antes** da implementação e **antes** de rodar o eval nesta rodada: `a4f591e122ccb34646e7dbb344c1f1dea3591cdc`. Resultados abaixo são de execução posterior.
+
+### Resultados CF3 / CF3b (após o pré-registro)
+
+Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, hypothesis 6.170.5, coverage 7.16.2, bandit 1.9.4). O CI usa Python 3.11; esta máquina não o executou.
+
+| id | valor | alvo | passou | nota |
+|---|---|---|---|---|
+| CF3 | verdadeiro | verdadeiro | **sim** | `self.planner` lido em `_planner_steps` |
+| CF3b | 13/13 no contrato | chamada + uso + fallback | **sim** | ver comando abaixo |
+| CF1, CF2, CF4, CF5, CF6, CF7, CF8 | pass | pass | **sim** | `cognitivo_eval` rc 0, `failed: []` |
+
+**RED (antes da correção, commit `85c0280`):** `python -m unittest test_counterfactual_planner_contract.py` → 11 falhas, rc 1. Dois controles que já descreviam o comportamento sem planner passaram (`test_absent_or_noncallable_plan_keeps_heuristic`, `test_other_methods_do_not_call_plan`).
+
+**GREEN:** o mesmo unittest, mais os contratos CF de extração/gap3/gap4/eval, passou (28 testes no conjunto focado). `python tools/cognitivo_eval.py --capability counterfactual --criteria v1` → rc 0. Golden de extração permaneceu `fbfb32e9466bf161155a7546e2db07e2f73434230d581217a44fd4b324eb646e` (o teste de extração passou com `planner is None`).
+
+**Implementação:** `generate_counterfactual_scenario` chama `_planner_steps`. Se `plan` é chamável, a chamada é `plan(situation, available_actions=[intervention], max_iterations=8)`. Itens `str` de `best_action_sequence` entram no fim da cadeia como `planner: {ação}`. A intervenção do chamador não é trocada. Isto não é `do(X)`.
+
+**Hipóteses:** H1 (planner já era chamado por via dinâmica) ficou excluída pelo RED (0 chamadas). H3 (heurística muda com `planner is None`) ficou excluída pelo eval e pelo golden. H4 (contrato de `RealMCTSPlanner.plan` incompatível com pares `str`) ficou excluída pelo teste que vê `total_plans == 1`. H5 não foi implementada. H2 (basta uma leitura morta de `self.planner`) não é a correção entregue: o mutante `cf_planner_never_consulted` morre no contrato.
+
+**Mutação:** `python tools/cognitivo_mutation.py` → `{"declared": 92, "killed": 92, "survived": 0, "not_applied": 0}`, rc 0. `python tools/targeted_mutation.py` → 69/69 mortos, rc 0.
+
+**Suíte:** `python -m unittest discover -p 'test_*.py'` → 530 testes, rc 0. Cobertura `core/cognitivo/*` 92% (piso 90). `ruff check` nos alvos do workflow, rc 0. `reality_audit.py` sem diff depois do commit de recontagem (counterfactual.py 409 linhas, 15 funções). Bandit: 131 LOW, 0 MEDIUM/HIGH; rc 1 do Bandit é o exit conhecido por LOW; `security_triage.py --check` rc 0. `validar_registro.py --expirados aviso` rc 0. `predeleg.sh HEAD origin/main` → `OK: sem conflito`.
+
+**Fora do que este comando mede:** orçamento 8 não avalia qualidade do MCTS; a fórmula de plausibilidade não mudou, mas uma sequência não vazia alonga a cadeia e portanto reduz o número pela fórmula já existente.
+
+PR draft: https://github.com/pedromiorini/Nexus/pull/105
+
+
+### Varredura §7.2 (2026-10-23, `gh pr list --state open`)
+
+Nenhum PR aberto altera `core/cognitivo/counterfactual.py`, `tools/cognitivo_mutation.py` ou este arquivo. O #79 (não editado) mexe no comentário de `docs/agentes/CLAIMS.yaml` e esvazia `claims` na branch dele. O claim obsoleto do #104, já mesclado, é substituído pelo claim desta tarefa a partir da `main` `fe57c82`, sem usar o #79 como base. State docs, Axis, #38–#50 e #60 ficam de fora.

@@ -3,17 +3,14 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "Fix CF gap4: diferença Jaccard de tokens"
+    tarefa: "CF3: usar planner.plan no raciocínio contrafactual"
     arquivos:
       - core/cognitivo/counterfactual.py
-      - core/constitutional_brain.py
-      - test_counterfactual_extraction_contract.py
-      - test_counterfactual_contract.py
+      - test_counterfactual_planner_contract.py
       - tools/cognitivo_mutation.py
-      - tools/cognitivo_eval.py
-      - AUDIT_REALITY_REPORT.md
-      - audit_reality.json
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - docs/agentes/CLAIMS.yaml
-    pr: 104
-    expira_em: "2026-10-26T01:45:23Z"
+      - AUDIT_REALITY_REPORT.md
+      - audit_reality.json
+    pr: 105
+    expira_em: "2026-10-26T03:00:00Z"

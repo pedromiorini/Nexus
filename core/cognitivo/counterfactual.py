@@ -6,6 +6,10 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+# Sonda ao planner injetado. Não é o default 200 de RealMCTSPlanner.plan
+# e não calibra plausibilidade.
+PLANNER_PROBE_ITERATIONS = 8
+
 # ═══════════════════════════════════════════════════════════════════════════
 # MÓDULO 37: COUNTERFACTUAL REASONING ENGINE (POST 37)
 # ═══════════════════════════════════════════════════════════════════════════
@@ -107,14 +111,19 @@ class RealCounterfactualReasoningEngine:
         Returns:
             CounterfactualScenario gerado
         """
+        # Consulta o planner antes das heurísticas: goal inválido propaga
+        # sem normalizar e sem gravar cenário.
+        planner_steps = self._planner_steps(situation, intervention)
+
         # Predizer outcome atual (sem intervenção)
         actual_outcome = self._predict_outcome(situation, intervention=None)
         
         # Predizer outcome contrafactual (com intervenção)
         counterfactual_outcome = self._predict_outcome(situation, intervention=intervention)
         
-        # Construir causal chain
-        causal_chain = self._build_causal_chain(situation, intervention)
+        # Construir causal chain. Passos do planner, se houver, vêm depois.
+        causal_chain = list(self._build_causal_chain(situation, intervention))
+        causal_chain.extend(planner_steps)
         
         # Calcular plausibilidade
         plausibility = self._calculate_plausibility(intervention, causal_chain)
@@ -135,6 +144,29 @@ class RealCounterfactualReasoningEngine:
         
         return scenario
     
+    def _planner_steps(self, situation: str, intervention: str) -> List[str]:
+        """Pede uma sequência a ``planner.plan`` para o caminho what-if.
+
+        Lista vazia quando não há planner ou ``plan`` não é chamável: a
+        heurística de cadeia permanece. A intervenção pedida pelo chamador
+        não é substituída. ``ValueError``/``TypeError`` de ``plan`` propagam.
+        """
+        planner = self.planner
+        plan = getattr(planner, "plan", None) if planner is not None else None
+        if not callable(plan):
+            return []
+        result = plan(
+            situation,
+            available_actions=[intervention],
+            max_iterations=PLANNER_PROBE_ITERATIONS,
+        )
+        sequence = getattr(result, "best_action_sequence", None)
+        if sequence is None and isinstance(result, dict):
+            sequence = result.get("best_action_sequence")
+        if isinstance(sequence, (str, bytes)) or not isinstance(sequence, (list, tuple)):
+            return []  # str solta não vira lista de caracteres
+        return [f"planner: {action}" for action in sequence if isinstance(action, str)]
+
     def _predict_outcome(self, situation: str, intervention: Optional[str]) -> str:
         """Predizer outcome (com ou sem intervenção)"""
         predictor = getattr(self.world_model, "predict_outcome", None)

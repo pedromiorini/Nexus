@@ -41,7 +41,8 @@ R3_TESTS = ("test_causal_extraction_contract.py",)
 R4_TESTS = ("test_scm_intervention_contract.py",)
 CF_TESTS = ("test_counterfactual_extraction_contract.py", "test_counterfactual_contract.py",
             "test_counterfactual_gap3_contract.py",
-            "test_counterfactual_gap4_contract.py")
+            "test_counterfactual_gap4_contract.py",
+            "test_counterfactual_planner_contract.py")
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
@@ -292,6 +293,20 @@ MUTATIONS = [
              "        self.total_scenarios_generated += 1",
              "        pass",
              tests=("test_counterfactual_extraction_contract.py",)),
+    Mutation("cf_planner_never_consulted", COUNTERFACTUAL,
+             "        planner = self.planner\n"
+             "        plan = getattr(planner, \"plan\", None) if planner is not None else None\n"
+             "        if not callable(plan):\n"
+             "            return []",
+             "        planner = None  # mutant: planner injetado ignorado\n"
+             "        plan = None\n"
+             "        if True:\n"
+             "            return []",
+             tests=("test_counterfactual_planner_contract.py",)),
+    Mutation("cf_planner_sequence_discarded", COUNTERFACTUAL,
+             "        return [f\"planner: {action}\" for action in sequence if isinstance(action, str)]",
+             "        return []  # mutant: sequência do planner descartada",
+             tests=("test_counterfactual_planner_contract.py",)),
 ]
 
 
