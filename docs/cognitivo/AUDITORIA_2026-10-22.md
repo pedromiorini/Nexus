@@ -982,3 +982,44 @@ Hipótese de trabalho (não vinculante para além da tabela): move-only, sem inj
 `test_attention_signal_contract.py` continua importando `BottomUpAttention` e `StimulusItem` de `core.constitutional_brain` e os três asserts permanecem. O eval dos outros capabilities não é alvo de mudança de critério.
 
 Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability attention`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados AT (após o pré-registro `a8323fa`)
+
+Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, coverage 7.16.2, bandit 1.9.4, hypothesis 6.170.5, numpy 2.4.6). O CI usa Python 3.11; esta máquina não o executou. Os números abaixo são desta execução, não um carimbo de CI hospedado.
+
+**Commits.** Pré-registro `a8323faf8b612503382106892db11ed6340b0a62` (só `CLAIMS.yaml` e esta auditoria). Move-only `27aad64e962a34d99d9bb9ccf4faa34b233f32be`. Base `4f1613020de535d64bc6a69fe3046c523b14fd98`.
+
+**RED**, antes de existir `core/cognitivo/attention.py`, com o contrato de 6 testes e o eval já apontando para o módulo: `PYTHONPATH=. python -m unittest test_attention_contract.py` → rc 1, 6 testes, 3 `ModuleNotFoundError: No module named 'core.cognitivo.attention'`. Os três testes de tipo inválido (`str` em contrast/motion, context `"abc"`, prioridade `"abc"`/`None`/`[]`/`{}`) passaram no monólito.
+
+**GREEN**, mesmo comando depois do move, já com o sétimo teste (segundo `attend`, ramo em que o item já está no spotlight): `test_attention_contract.py` + `test_attention_signal_contract.py` → 10 testes, rc 0. O contrato de sinais antigo não foi relaxado.
+
+**Eval** `python tools/cognitivo_eval.py --capability attention --criteria v3` (v1/v2/v3 não alteram o protocolo; o padrão do argparse continua `v2`): rc 0, `failed: []`.
+
+| id | valor medido | alvo | passou |
+|---|---|---|---|
+| AT1 | soma 1.0; novidade 0.9/0.2; intensidade 0.7/0.6/0.4/0.4; saliência nova 0.895; familiar 0.685 | esses produtos | sim |
+| AT2 | clamp 1.4→1.0 e −0.2→0.0; context 0.25; fallbacks 0.5/0.6; `str` → `TypeError`; context `"abc"` → `ValueError` | os números e as duas exceções | sim |
+| AT3 | sem goals 0.3; `"find cat"` 0.5/0.25/0.05/0.5; `"category"` 0.5; goal vazio 0.05; máximo 1.0 e 0.25; peso 1.0 preservado; clamp 2→1; tipos inválidos → `TypeError` | esses números e `TypeError` | sim |
+| AT4 | sai o 0.2; empate sai o primeiro 0.4; refoco não cresce o histórico; strength permanece 0.2 | essa vítima e o refoco | sim |
+| AT5 | ordem b, c, d; empate t0, t1, t2; id ausente `false` e zero shifts; custos 0.2, 0.2, 0.5; `attend(goals=)` não recomputa a prioridade 0.1; sem estímulos, episódios 0 | ordem, `False`, 0.2 e 0.5 | sim |
+| AT6 | SHA de fonte do módulo = SHA medido no monólito antes do splice = `96090684b99d2568ea61f040c5eed9bbf6de774f5bad9d781f60c2a566ea2378`; SHA comportamental módulo = monólito = `07877c7f811006b479729aa7faa7d6b82f824afc0d2bf2dc7514d059ce5f990b`; identidade verdadeira; `clock: wall` | os dois SHA pré-registrados e o mesmo objeto | sim |
+
+**Relógio.** `clear_attended_stimuli` continua só com `self`. `__init__` não tem `clock` nem `now`. Duração de foco e o corte de 60 s usam `time.time()`. Relógio não foi injetado. O golden de AT6 não grava a duração numérica.
+
+**Gaps que o eval mediu e não corrigiu.** `attend(goals=)` só chama `set_goals`. `"cat"` casa com `"category"`. `bool` vira 1.0/0.0 no clamp; `nan` vira 0.0 neste CPython 3.12.3. Um dataclass com os mesmos campos é tratado como já focado. A soma ponderada máxima observada é 0.895, então `min(1.0, salience)` não muda estes casos. Nada disso foi editado no bloco.
+
+**Harness, não o módulo.** O sétimo teste chama `attend` duas vezes para cobrir o ramo em que `is_focused` já é verdadeiro. O código de produção não mudou. Coverage 7.16.2, só nesses testes, reportou `attention.py` com 181 statements, 48 ramos, 100%.
+
+**Cobertura da suíte**, no commit de move (`NEXUS_INTEGRATED_SUMMARY=/tmp/integrated.json coverage run --branch -m unittest discover -p 'test_*.py'`, depois o demo do núcleo): 576 testes, rc 0, 52.603 s. Demo `python core/constitutional_brain.py` rc 0. `attention.py` 100%. `core/cognitivo/*` 1300 statements, 96% (piso 90). `constitutional_brain.py` 68% (piso 62). Fila 95%, VRAM 94%, temporal 93%, vita 76%.
+
+**Mutação.** `python tools/targeted_mutation.py`: `{"declared": 69, "applicable": 69, "killed": 69, "survived": 0, "not_applied": 0, "score_percent": 100.0}`, rc 0. O catálogo do Axis não foi editado. `python tools/cognitivo_mutation.py`: `{"declared": 156, "killed": 156, "survived": 0, "not_applied": 0}`, rc 0. Os 27 mutantes do módulo novo estão nesse total (saliência, capacity, vítima de menor saliência, relevância de goal, custo cross-modal, reexport e o import do monólito).
+
+**Realidade** (recontagem exigida pelo gate, commitada com o move): núcleo 25192 linhas, 239 classes, 764 funções (antes 25664 / 246 / 788). `attention.py` 508 linhas, 7 classes, 24 funções. `core/cognitivo` 9 módulos, 3013 linhas. Literais dinâmicos 51. Frases fortes 51. Terminologia científica 233. Prefixo `Real` 63. Testes embutidos 31. `pass` puro 0. Retorno constante 2. `reality_audit` reexecutado depois do commit de move: diff vazio.
+
+**Outros gates locais no commit de move:** `ruff check` nos alvos do workflow, rc 0. `bandit -q -r core vita tools` grava o JSON com rc 1 (há achados LOW; o workflow aceita o relatório não vazio). Contagem 131 LOW, zero MEDIUM/HIGH, nenhum achado em `attention.py` nem em `tools/cognitivo_eval.py`. `security_triage.py --check` rc 0. `SECURITY_TRIAGE.md` não foi editado. `validar_registro.py --expirados aviso`, rc 0. `bash tools/agente/predeleg.sh HEAD origin/main` no commit de move `27aad64` contra `origin/main` `4f16130`: `OK: sem conflito`, rc 0.
+
+**Hipóteses.** H1–H6 não se sustentam como falha neste eval: os números medidos são os da tabela de observação, e os dois SHA são os que foram congelados no monólito antes do splice. Nenhuma delas vira alegação de atenção humana, de modelo de Posner verificado, nem de prontidão. O banner `POST 25` e a suíte embutida do núcleo continuam sendo demo, não evidência de capacidade.
+
+**Fora do que estes comandos medem:** CI hospedado; Python 3.11 (o 0.0 do `nan` foi lido em 3.12.3); conflito de merge contra as branches dos PRs #38, #39, #40, #41, #42, #44, #46, #48, #49, #50, #60, #77 e #79 (o `predeleg` só compara com `origin/main`); state docs não atualizados, de propósito; `AttentionalState`, POST49, GlobalWorkspace/Consciousness, IncrementalLearner, HierarchicalMemory/FAISS, Metacognition, Axis e o catálogo `tools/targeted_mutation.py` não foram tocados. Não há interface web nesta extração.
+
+PR draft: https://github.com/pedromiorini/Nexus/pull/109
