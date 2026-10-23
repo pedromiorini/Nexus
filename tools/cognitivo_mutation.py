@@ -36,6 +36,7 @@ CAUSAL = "core/cognitivo/causal_world_model.py"
 EFFECTS = "core/cognitivo/action_effects.py"
 R1_TESTS = ("test_action_effects_contract.py",)
 R2_TESTS = ("test_futures_ranking_contract.py",)
+R3_TESTS = ("test_causal_extraction_contract.py",)
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
@@ -173,8 +174,8 @@ MUTATIONS = [
              'if exploration_constant < 0:', 'if exploration_constant <= 0:', tests=MCTS_INPUT),
     Mutation("causal_lazy_cause_group", CAUSAL, r"r'(.+?)\s+causes?\s+(.+)'", r"r'(.+)\s+causes?\s+(.+)'",
              tests=CAUSAL_TESTS),
-    Mutation("causal_case_sensitive", CAUSAL, "text, re.IGNORECASE)", "text)", tests=CAUSAL_TESTS),
-    Mutation("causal_confidence", CAUSAL, "effect, 0.9,", "effect, 0.8,", tests=CAUSAL_TESTS),
+    Mutation("causal_case_sensitive", CAUSAL, "_F = re.IGNORECASE", "_F = 0", tests=CAUSAL_TESTS),
+    Mutation("causal_confidence", CAUSAL, '"direct_cause", 0.9', '"direct_cause", 0.8', tests=CAUSAL_TESTS),
     Mutation("causal_counter_not_incremented", CAUSAL, "self.relations_extracted += 1", "pass",
              tests=CAUSAL_TESTS),
     Mutation("causal_graph_not_updated", CAUSAL, 'self.causal_graph["adjacency"][cause].add(effect)', "pass",
@@ -185,7 +186,8 @@ MUTATIONS = [
              '"world": {}', tests=CAUSAL_TESTS),
     Mutation("r1_unknown_action_silent", CAUSAL, 'warnings.append(f"unknown action: {action!r}")', "pass",
              tests=R1_TESTS),
-    Mutation("r1_unknown_action_applies_nothing_but_breaks", CAUSAL, "                continue\n", "                break\n",
+    Mutation("r1_unknown_action_applies_nothing_but_breaks", CAUSAL, "unknown action: {action!r}\")\n                continue\n",
+             "unknown action: {action!r}\")\n                break\n",
              tests=R1_TESTS),
     Mutation("r1_planner_shares_mutable_table", EFFECTS, "dict(entry[\"metrics\"])", "entry[\"metrics\"]",
              tests=R1_TESTS),
@@ -202,6 +204,22 @@ MUTATIONS = [
     Mutation("r2_vulnerable_equals_compromised", CAUSAL, '"vulnerable": 1,\n', '"vulnerable": 0,\n', tests=R2_TESTS),
     Mutation("r2_unknown_status_ranks_high", CAUSAL, '"system_status"), -1)', '"system_status"), 9)',
              tests=R2_TESTS),
+    Mutation("r3_negation_ignored", CAUSAL, "            if not first or not second or _negated(text[:match.start(2)], first, kind):",
+             "            if not first or not second:", tests=R3_TESTS),
+    Mutation("r3_negation_window_empty", CAUSAL, "window = words[-6:-1] if", "window = words[-1:-1] if",
+             tests=R3_TESTS),
+    Mutation("r3_nt_contraction_missed", CAUSAL, ' or w.endswith("n\'t")', "", tests=R3_TESTS),
+    Mutation("r3_noun_cause_allowed", CAUSAL, 'return bool(last) and last[-1] in _DETERMINERS', "return False",
+             tests=R3_TESTS),
+    Mutation("r3_because_forward", CAUSAL, 'because\\s+(.+)", _F), "backward_cause", 0.8, True)',
+             'because\\s+(.+)", _F), "backward_cause", 0.8, False)', tests=R3_TESTS),
+    Mutation("r3_because_of_after_because", CAUSAL,
+             '    (re.compile(r"(.+?)\\s+because\\s+of\\s+(.+)", _F), "backward_cause", 0.8, True),\n',
+             "", tests=R3_TESTS),
+    Mutation("r3_multiple_relations", CAUSAL, "            self.causal_graph[\"adjacency\"][cause].add(effect)\n            break\n",
+             "            self.causal_graph[\"adjacency\"][cause].add(effect)\n", tests=R3_TESTS + CAUSAL_TESTS),
+    Mutation("r3_negation_continues_search", CAUSAL, "_negated(text[:match.start(2)], first, kind):\n                break\n",
+             "_negated(text[:match.start(2)], first, kind):\n                continue\n", tests=R3_TESTS),
 ]
 
 

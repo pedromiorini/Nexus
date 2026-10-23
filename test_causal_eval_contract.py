@@ -15,6 +15,9 @@ class CausalEvalContractTests(unittest.TestCase):
         self.assertEqual(sum(lab is not None for _, lab in ev.CAUSAL_L), 18)
         self.assertEqual(len(ev.CAUSAL_C3_SETS), 6)
         self.assertEqual(len(ev.CAUSAL_ACTION_VOCAB), 10)
+        self.assertEqual(len(ev.CAUSAL_H), 24)
+        self.assertEqual(sum(lab is not None for _, lab in ev.CAUSAL_H), 14)
+        self.assertFalse({t for t, _ in ev.CAUSAL_H} & {t for t, _ in ev.CAUSAL_L})
 
     def test_c3_sets_have_unique_valid_optimum(self):
         for seqs, best in ev.CAUSAL_C3_SETS:
@@ -22,7 +25,7 @@ class CausalEvalContractTests(unittest.TestCase):
 
     def test_evaluator_reports_all_criteria(self):
         ids = [c["id"] for c in ev.eval_causal()]
-        self.assertEqual(ids, ["C1a", "C1b", "C2a", "C2b", "C3", "C4"])
+        self.assertEqual(ids, ["C1a", "C1b", "C2a", "C2b", "C3", "C4", "H-F1", "H-FP"])
 
     def test_cli_accepts_causal_capability(self):
         self.assertIn("causal", ev.CAPABILITIES)
