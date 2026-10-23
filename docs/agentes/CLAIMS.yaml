@@ -3,7 +3,7 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "Extração move-only RealCounterfactualReasoningEngine + auditoria funcional"
+    tarefa: "Auditoria funcional CF1-CF6 do counterfactual"
     arquivos:
       - core/cognitivo/counterfactual.py
       - core/constitutional_brain.py
@@ -15,5 +15,5 @@ claims:
       - audit_reality.json
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - docs/agentes/CLAIMS.yaml
-    pr: 101
-    expira_em: "2026-10-26T00:49:52Z"
+    pr: 102
+    expira_em: "2026-10-26T00:58:42Z"

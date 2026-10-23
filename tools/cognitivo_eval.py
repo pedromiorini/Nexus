@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
-CAPABILITIES = ("episodic", "predictive", "mcts", "causal")
+CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual")
 
 TOPICS = [
     ("database", "migration", "rollback"), ("network", "latency", "spike"), ("disk", "quota", "exceeded"),
@@ -631,7 +631,88 @@ def eval_causal(criteria="v1"):
     ]
 
 
-EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts, "causal": eval_causal}
+
+CF_WHAT_IF = [
+    ("What if we apply the patch?", "we apply the patch"),
+    ("what if the server reboots?", "the server reboots"),
+    ("WHAT IF isolation is enabled?", "isolation is enabled"),
+    ("What if?", ""),
+    ("And what if DNS fails", "dns fails"),
+]
+CF_PAIRS = [
+    ("system vulnerable", "apply patch"),
+    ("alarm", "patch"),
+    ("outage", "rollback"),
+    ("host", "isolate"),
+]
+
+
+def eval_counterfactual(criteria="v1"):
+    """Auditoria CF — critérios pré-registrados em AUDITORIA (v1)."""
+    import ast
+    import contextlib
+    import io
+    from pathlib import Path as _P
+
+    from core.cognitivo.causal_world_model import RealCausalReasoning
+    from core.cognitivo.counterfactual import RealCounterfactualReasoningEngine
+
+    def _silent(factory):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return factory()
+
+    class _WM:
+        def predict_outcome(self, situation, intervention):
+            return f"wm:{situation}:{intervention}"
+
+    eng_proto = _silent(lambda: RealCounterfactualReasoningEngine(
+        world_model=_WM(), causal_reasoning=RealCausalReasoning()))
+    cf1 = eng_proto._predict_outcome("sit", "act") == "wm:sit:act"
+    cf2 = eng_proto._build_causal_chain("alarm", "patch") == ["alarm causes patch"]
+
+    src = _P("core/cognitivo/counterfactual.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    planner_used = False
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == "RealCounterfactualReasoningEngine":
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef) and item.name != "__init__":
+                    for sub in ast.walk(item):
+                        if isinstance(sub, ast.Attribute) and sub.attr == "planner":
+                            if isinstance(sub.value, ast.Name) and sub.value.id == "self":
+                                planner_used = True
+    cf3 = planner_used
+
+    eng = _silent(lambda: RealCounterfactualReasoningEngine())
+    parse_hits = sum(
+        1 for q, exp in CF_WHAT_IF if eng._parse_what_if_question(q)[1] == exp
+    )
+    cf4_ok = parse_hits >= 5
+
+    lens = (1, 3, 5, 10)
+    ps = [eng._calculate_plausibility("x", ["a"] * n) for n in lens]
+    cf5 = all(ps[i] > ps[i + 1] for i in range(len(ps) - 1))
+
+    altered = 0
+    for sit, inter in CF_PAIRS:
+        sc = eng.generate_counterfactual_scenario(sit, inter)
+        if sc.counterfactual_outcome != sc.actual_outcome:
+            altered += 1
+    cf6_ok = altered == len(CF_PAIRS)
+
+    return [
+        _check("CF1", cf1, cf1, "world_model.predict_outcome honrado", criteria="v1"),
+        _check("CF2", cf2, cf2, "causal.extract_causal_relations honrado", criteria="v1"),
+        _check("CF3", cf3, cf3, "planner injetado é referenciado fora de __init__", criteria="v1"),
+        _check("CF4", f"{parse_hits}/{len(CF_WHAT_IF)}", cf4_ok, "parse what-if >= 5/5", criteria="v1"),
+        _check("CF5", cf5, cf5, "plausibilidade monótona em (1,3,5,10)", criteria="v1",
+               values=ps),
+        _check("CF6", f"{altered}/{len(CF_PAIRS)}", cf6_ok,
+               "intervenção altera counterfactual_outcome em S", criteria="v1"),
+    ]
+
+
+EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts, "causal": eval_causal, "counterfactual": eval_counterfactual}
 
 
 def main(argv=None) -> int:

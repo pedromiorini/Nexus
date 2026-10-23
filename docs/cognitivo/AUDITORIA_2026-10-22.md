@@ -286,3 +286,56 @@ Registrado **antes** de implementar/executar, em commit próprio. Critérios C1�
 | não regressão | C1a/C1b/C2a/C2b/C3/H-F1/H-FP e MCTS M1/M2/M4/M5 + M3 v3 | 1.0 / 0.0 / 0.80 / T / 6/6 / 0.963 / 0.0 |
 
 Escopo: compilar arestas do grafo causal já extraído num SCM mínimo (stdlib) e, em `simulate`, aplicar intervenção `do(ação)` (Pearl, 2009) — efeitos simbólicos das arestas causa→efeito, sem substituir a tabela `ACTION_EFFECTS`. API retrocompatível. Sem dependências pesadas, sem alterar workflows/Axis/congelados.
+
+## Auditoria funcional CF — raciocínio contrafactual (pré-registro)
+
+Registrado **antes** de qualquer execução, em commit próprio, sobre `core/cognitivo/counterfactual.py` (extraído no PR de move-only). Propósito declarado: POST37 "What-if reasoning" (Pearl 2009; Roese & Olson 1995). Avaliador: `tools/cognitivo_eval.py --capability counterfactual --criteria v1`. Conjuntos congelados abaixo; qualquer mudança neles invalida a rodada.
+
+### Conjunto W (parse "what if", 5 itens com marcador + 1 negativo informativo)
+
+| # | questão | intervenção esperada |
+|---|---|---|
+| 1 | What if we apply the patch? | we apply the patch |
+| 2 | what if the server reboots? | the server reboots |
+| 3 | WHAT IF isolation is enabled? | isolation is enabled |
+| 4 | What if? | *(vazio)* |
+| 5 | And what if DNS fails | dns fails |
+| — | Suppose we rollback | *(sem marcador; não conta no denominador de CF4)* |
+
+### Pares S (situação, intervenção) para CF6
+
+`("system vulnerable", "apply patch")`, `("alarm", "patch")`, `("outage", "rollback")`, `("host", "isolate")`.
+
+| id | capacidade | métrica | alvo | baseline documentado (não é alvo) |
+|---|---|---|---|---|
+| CF1 | honrar protocolo `world_model.predict_outcome` | com WM stub que prefixa `wm:`, `_predict_outcome("sit","act") == "wm:sit:act"` | verdadeiro | heurística `outcome_with_*` |
+| CF2 | honrar protocolo `causal.extract_causal_relations` | `_build_causal_chain("alarm","patch") == ["alarm causes patch"]` com `RealCausalReasoning` | verdadeiro | chain heurística de 5 passos |
+| CF3 | usar o `planner` injetado | `self.planner` aparece no corpo de algum método público/privado além de `__init__` (AST) | verdadeiro | — |
+| CF4 | parse de "what if" em inglês | acertos em W (5 com marcador) | ≥ 5/5 | — |
+| CF5 | plausibilidade monótona no comprimento da chain | para comprimentos (1,3,5,10), cada passo é estritamente menor | verdadeiro | — |
+| CF6 | intervenção altera o outcome declarado | nos 4 pares S, `counterfactual_outcome != actual_outcome` | 4/4 | — |
+
+Comando: `python tools/cognitivo_eval.py --capability counterfactual --criteria v1` — determinístico (sem semente; uuid irrelevante aos critérios).
+
+### Resultados CF (v1, executado após o pré-registro b3e7c04)
+
+| id | valor | alvo | passou | nota |
+|---|---|---|---|---|
+| CF1 | verdadeiro | verdadeiro | sim | protocolo world_model |
+| CF2 | verdadeiro | verdadeiro | sim | protocolo causal |
+| CF3 | falso | verdadeiro | **não** | `self.planner` nunca lido fora de `__init__` |
+| CF4 | 5/5 | ≥ 5/5 | sim | só inglês "what if" |
+| CF5 | verdadeiro | verdadeiro | sim | cai até o piso 0.1 |
+| CF6 | 4/4 | 4/4 | sim | heurística `outcome_with_*` vs `outcome_without_intervention` |
+
+**Conclusão honesta:** o módulo cumpre os protocolos duck-typed já cobertos por `test_counterfactual_contract` e as heurísticas internas são coerentes consigo mesmas (CF4–CF6), mas **não integra o planner** (CF3) e o "raciocínio contrafactual" permanece lexical (diferença por zip de caracteres; situação original descartada no parse; template `{situation} causes {intervention}` não é intervenção `do(X)` de Pearl). Nada foi "corrigido" nesta rodada além de medir.
+
+### Lacunas e opções de correção (literatura; nenhuma aplicada)
+
+1. **Integrar o planner (CF3)** — em `explore_what_if` / `generate_counterfactual_scenario`, se `self.planner` expõe `plan`, usá-lo para propor intervenções ou avaliar sequências (Pearl 2009 + planejamento; cf. "counterfactual planning"). Custo médio; exige contrato do planner.
+2. **Intervenção `do(X)` real** — em vez de `"situation causes intervention"`, mapear a intervenção para `do(variável=valor)` sobre o SCM/world model já usado em C4 (Pearl, *Causality*, 2009; Woodward, 2003). Custo médio-alto.
+3. **Preservar a situação no parse** — "What if we had patched *during the outage*?" deveria carregar contexto; hoje vira sempre `current_situation`. Opção: spaCy/regex leve de adjunctos; ou API explícita `(situation, intervention)`. Custo baixo se API explícita.
+4. **Diferença semântica de outcomes** — substituir zip de caracteres por overlap de tokens / embedding leve (stdlib: token Jaccard). Evita `difference≈1` para strings longas quase iguais no prefixo. Custo baixo.
+5. **Plausibilidade informada** — hoje `0.7 - 0.05*|chain|`; calibrar com frequência de co-ocorrência ou comprimento mínimo de cadeia causal real (Roese & Olson, 1995). Custo médio.
+
+Ordem sugerida (custo/benefício): 3 (API explícita) → 4 (Jaccard) → 1 (planner) → 2 (do(X)) → 5.
