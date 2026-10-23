@@ -51,6 +51,8 @@ MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
 PC_LEARNING = ("test_predictive_learning_contract.py",)
 
 RETRIEVAL = ("test_episodic_retrieval_contract.py",)
+WM = "core/cognitivo/working_memory.py"
+WM_TESTS = ("test_working_memory_contract.py",)
 
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
@@ -379,6 +381,114 @@ MUTATIONS = [
              "        for hook_name in (\"do\", \"_do\"):\n",
              "        for hook_name in (\"_do\", \"do\"):\n",
              tests=("test_counterfactual_dox_contract.py",)),
+    Mutation("wm_phono_evicts_newest", WM,
+             "oldest = min(self.buffer, key=lambda x: x.last_rehearsed)",
+             "oldest = max(self.buffer, key=lambda x: x.last_rehearsed)", tests=WM_TESTS),
+    Mutation("wm_phono_ignores_capacity", WM,
+             "        # Se buffer cheio, remover item mais antigo\n"
+             "        if len(self.buffer) >= self.capacity:",
+             "        # Se buffer cheio, remover item mais antigo\n"
+             "        if len(self.buffer) > self.capacity:", tests=WM_TESTS),
+    Mutation("wm_visual_evicts_highest", WM,
+             "            # Remover menos ativado\n"
+             "            least_active = min(self.buffer, key=lambda x: x.activation)",
+             "            # Remover menos ativado\n"
+             "            least_active = max(self.buffer, key=lambda x: x.activation)", tests=WM_TESTS),
+    Mutation("wm_spatial_evicts_by_entered_at", WM,
+             "        \"\"\"Armazenar informação espacial\"\"\"\n"
+             "        if len(self.buffer) >= self.capacity:\n"
+             "            least_active = min(self.buffer, key=lambda x: x.activation)",
+             "        \"\"\"Armazenar informação espacial\"\"\"\n"
+             "        if len(self.buffer) >= self.capacity:\n"
+             "            least_active = min(self.buffer, key=lambda x: x.entered_at)", tests=WM_TESTS),
+    Mutation("wm_decay_keeps_low_activation", WM,
+             "if i.activation > 0.1", "if i.activation > 0.0", tests=WM_TESTS),
+    Mutation("wm_decay_uses_entered_at", WM,
+             "time_since_rehearsal = current_time - item.last_rehearsed",
+             "time_since_rehearsal = current_time - item.entered_at", tests=WM_TESTS),
+    Mutation("wm_rehearse_no_boost", WM,
+             "item.activation = min(1.0, item.activation + 0.3)",
+             "item.activation = min(1.0, item.activation + 0.0)", tests=WM_TESTS),
+    Mutation("wm_rehearse_no_cap", WM,
+             "item.activation = min(1.0, item.activation + 0.3)",
+             "item.activation = item.activation + 0.3", tests=WM_TESTS),
+    Mutation("wm_rehearse_skips_timestamp", WM,
+             "        item.activation = min(1.0, item.activation + 0.3)\n"
+             "        item.last_rehearsed = time.time()",
+             "        item.activation = min(1.0, item.activation + 0.3)", tests=WM_TESTS),
+    Mutation("wm_retrieve_case_sensitive", WM,
+             "if query_lower in str(item.content).lower():",
+             "if query_lower in str(item.content):", tests=WM_TESTS),
+    Mutation("wm_allocate_no_clamp", WM,
+             "normalized_strength = max(0.0, min(1.0, float(strength)))",
+             "normalized_strength = float(strength)", tests=WM_TESTS),
+    Mutation("wm_allocate_ignores_attention", WM,
+             '"delegated": self.attention_system is not None,',
+             '"delegated": False,', tests=WM_TESTS),
+    Mutation("wm_refresh_no_boost", WM,
+             "        item.activation = min(1.0, item.activation + 0.2)\n"
+             "        item.last_rehearsed = time.time()\n"
+             "\n"
+             "        return True",
+             "        item.activation = min(1.0, item.activation + 0.0)\n"
+             "        item.last_rehearsed = time.time()\n"
+             "\n"
+             "        return True", tests=WM_TESTS),
+    Mutation("wm_switch_same_task_costs", WM,
+             "            return 0.0  # Sem custo se mesma tarefa",
+             "            return self.task_switching_cost  # Sem custo se mesma tarefa", tests=WM_TESTS),
+    Mutation("wm_integrate_evicts_by_activation", WM,
+             "oldest = min(self.episodic_buffer, key=lambda x: x.entered_at)",
+             "oldest = min(self.episodic_buffer, key=lambda x: x.activation)", tests=WM_TESTS),
+    Mutation("wm_maintain_rehearses_none", WM,
+             "for item in self.phonological_loop.buffer[:3]:  # Top 3",
+             "for item in self.phonological_loop.buffer[:0]:  # Top 3", tests=WM_TESTS),
+    Mutation("wm_transfer_inverted", WM,
+             "        if not self.ltm:\n            return",
+             "        if self.ltm:\n            return", tests=WM_TESTS),
+    Mutation("wm_consciousness_skipped", WM,
+             "        if self.consciousness:",
+             "        if False and self.consciousness:", tests=WM_TESTS),
+    Mutation("wm_retrieve_wm_no_boost", WM,
+             "            item.activation = min(1.0, item.activation + 0.2)\n"
+             "            return item",
+             "            item.activation = min(1.0, item.activation + 0.0)\n"
+             "            return item", tests=WM_TESTS),
+    Mutation("wm_active_sort_ascending", WM,
+             "all_items.sort(key=lambda x: x.activation, reverse=True)",
+             "all_items.sort(key=lambda x: x.activation, reverse=False)", tests=WM_TESTS),
+    Mutation("wm_spatial_modality_visual", WM,
+             '            modality="spatial",',
+             '            modality="visual",', tests=WM_TESTS),
+    Mutation("wm_rehearse_verbal_ignores_hit", WM,
+             "        success = self.phonological_loop.rehearse(item_id)\n"
+             "\n"
+             "        if success:",
+             "        success = self.phonological_loop.rehearse(item_id)\n"
+             "\n"
+             "        if False:", tests=WM_TESTS),
+    Mutation("wm_module_pulls_monolith", WM,
+             "import time\n",
+             "import time\nimport core.constitutional_brain  # noqa: F401\n", tests=WM_TESTS),
+    Mutation("wm_monolith_stops_reexporting", "core/constitutional_brain.py",
+             "from core.cognitivo.working_memory import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    CentralExecutive,\n"
+             "    PhonologicalLoop,\n"
+             "    RealWorkingMemorySystem,\n"
+             "    RehearsalEvent,\n"
+             "    VisuospatialSketchpad,\n"
+             "    WorkingMemoryItem,\n"
+             ")\n",
+             "from core.cognitivo.working_memory import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    CentralExecutive as _CentralExecutive,\n"
+             "    PhonologicalLoop,\n"
+             "    RealWorkingMemorySystem,\n"
+             "    RehearsalEvent,\n"
+             "    VisuospatialSketchpad,\n"
+             "    WorkingMemoryItem,\n"
+             ")\n"
+             "CentralExecutive = type(\"CentralExecutive\", (_CentralExecutive,), {})\n",
+             tests=WM_TESTS),
 ]
 
 

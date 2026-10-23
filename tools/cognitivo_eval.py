@@ -3,7 +3,7 @@
 Critérios: /workspace/nexus/cognitivo/AUDITORIA_2026-10-22.md (sha256 3d24a63d…), escritos
 antes da execução. Mede propósito, não só ausência de crash.
 
-Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,all} [--json PATH]
+Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,all} [--json PATH]
 Saída: exit 0 se todo critério passa, 1 se algum falha, 2 para entrada ausente/vazia/desconhecida.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
-CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual")
+CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory")
 
 TOPICS = [
     ("database", "migration", "rollback"), ("network", "latency", "spike"), ("disk", "quota", "exceeded"),
@@ -751,7 +751,323 @@ def eval_counterfactual(criteria="v1"):
     ]
 
 
-EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts, "causal": eval_causal, "counterfactual": eval_counterfactual}
+# SHA-256 do fingerprint WM6, medido no monólito em b6da175 e congelado no
+# pré-registro dcfa180 (docs/cognitivo/AUDITORIA_2026-10-22.md). Não recalibrar.
+WM_GOLDEN_SHA = "3b6b63cb69d6ffced16ffec0c1bbbbeb8fe92bf7cecd13e20f4989b0d17051ca"
+_WM_NAMES = (
+    "WorkingMemoryItem", "RehearsalEvent", "PhonologicalLoop",
+    "VisuospatialSketchpad", "CentralExecutive", "RealWorkingMemorySystem",
+)
+
+
+def working_memory_fingerprint(mod):
+    """Protocolo WM6. O dict, não o texto-fonte, entra no SHA."""
+    import contextlib
+
+    CentralExecutive = mod.CentralExecutive
+    PhonologicalLoop = mod.PhonologicalLoop
+    VisuospatialSketchpad = mod.VisuospatialSketchpad
+    RealWorkingMemorySystem = mod.RealWorkingMemorySystem
+    WorkingMemoryItem = mod.WorkingMemoryItem
+    ex = CentralExecutive()
+    clamp = {}
+    for strength in (2.0, -1.0, 0.5, 0.0, 1.0, 1, True, False, float("inf"), float("-inf"), float("nan")):
+        clamp[repr(strength)] = ex.allocate_attention("planning", strength=strength)["strength"]
+    same = ex.switch_task("planning")
+    other = ex.switch_task("other")
+    plain = CentralExecutive().allocate_attention("planning", strength=2.0)
+    delegated = CentralExecutive(attention_system=object()).allocate_attention("monitoring", strength=-1.0)
+    errors = {}
+    for bad in ("abc", None, [], {}):
+        try:
+            CentralExecutive().allocate_attention("t", strength=bad)
+            errors[repr(bad)] = None
+        except Exception as exc:
+            errors[repr(bad)] = type(exc).__name__
+    item = WorkingMemoryItem("i", "c", "verbal", 0.5, 0.0, 0.0)
+    CentralExecutive().prioritize_item(item, 1.0)
+    prioritized = item.activation
+    CentralExecutive().prioritize_item(item, 10.0)
+    prioritized_cap = item.activation
+    pad = VisuospatialSketchpad()
+    visual = pad.store_visual("pic")
+    visual.activation = 0.5
+    pad.refresh(visual.item_id)
+    refreshed = visual.activation
+    visual.activation = 0.9
+    pad.refresh(visual.item_id)
+    refreshed_cap = visual.activation
+    refresh_miss = pad.refresh("nope")
+    spatial_pad = VisuospatialSketchpad(capacity=4)
+    spatial = []
+    for index, (activation, entered) in enumerate(((0.9, 1.0), (0.1, 4.0), (0.8, 2.0), (0.5, 3.0))):
+        stored = spatial_pad.store_spatial(f"s{index}")
+        stored.activation = activation
+        stored.entered_at = entered
+        spatial.append(stored)
+    spatial_pad.store_spatial("s4")
+    spatial_ids = {stored.item_id for stored in spatial_pad.buffer}
+    loop = PhonologicalLoop()
+    loop.store("Alpha Beta")
+    loop.store("other")
+    empty_hit = loop.retrieve("")
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured):
+        system = RealWorkingMemorySystem()
+        stats0 = system.get_statistics()
+        for index in range(4):
+            stored = system.store_verbal(f"m{index}")
+            stored.activation = 1.0
+            stored.last_rehearsed = time.time()
+        system.maintain_items()
+        maintain_count = system.rehearsal_count
+        system.rehearse_verbal("missing")
+        miss_count = system.rehearsal_count
+        spatial_item = system.store_spatial({"x": 1})
+        integrated = []
+        for index, (entered, activation) in enumerate(((1.0, 0.9), (2.0, 0.8), (3.0, 0.4), (4.0, 0.2))):
+            created = system.integrate_multimodal(f"v{index}", index)
+            created.entered_at = entered
+            created.activation = activation
+            integrated.append(created)
+        system.integrate_multimodal("v4", 4)
+        integrated_ids = {stored.item_id for stored in system.episodic_buffer}
+
+        class _LTM:
+            def __init__(self):
+                self.calls = []
+
+            def store(self, content, kind, importance):
+                self.calls.append([content, kind, importance])
+
+        ltm = _LTM()
+        with_ltm = RealWorkingMemorySystem(long_term_memory=ltm)
+        with_ltm.transfer_to_ltm(with_ltm.store_verbal("memo"))
+        without_ltm = RealWorkingMemorySystem()
+        without_ltm.transfer_to_ltm(without_ltm.store_verbal("z"))
+
+        class _Consciousness:
+            def __init__(self):
+                self.calls = []
+
+            def attend_to(self, *args, **kwargs):
+                self.calls.append({"args": list(args), "kwargs": kwargs})
+
+        consciousness = _Consciousness()
+        aware = RealWorkingMemorySystem(consciousness=consciousness)
+        aware.store_verbal("hello consciousness buffer text that is definitely longer than fifty characters!!")
+        ordered = RealWorkingMemorySystem()
+        low = ordered.store_verbal("low")
+        low.activation = 0.2
+        high = ordered.store_visual("high")
+        high.activation = 0.9
+        order = [stored.content for stored in ordered.get_active_items()]
+        boosted = system.store_verbal("BoostMe")
+        boosted.activation = 0.5
+        found = system.retrieve_from_wm("boostme")
+        missed = system.retrieve_from_wm("zzz")
+    return {
+        "banner_printed": "POST 6" in captured.getvalue(),
+        "capacities": [PhonologicalLoop().capacity, VisuospatialSketchpad().capacity, system.episodic_capacity],
+        "clamp": clamp,
+        "consciousness": consciousness.calls[0] if consciousness.calls else None,
+        "decay_rate": PhonologicalLoop().decay_rate,
+        "delegated": delegated,
+        "errors": errors,
+        "get_active_order": order,
+        "integrate_evicted_oldest_entered_at": integrated[0].item_id not in integrated_ids,
+        "integrate_len": len(integrated_ids),
+        "integrate_low_activation_remains": integrated[3].item_id in integrated_ids,
+        "ltm_calls": ltm.calls,
+        "ltm_count": with_ltm.items_transferred_to_ltm,
+        "maintain_count": maintain_count,
+        "no_ltm_count": without_ltm.items_transferred_to_ltm,
+        "plain": plain,
+        "prioritize": [prioritized, prioritized_cap],
+        "refresh": [refreshed, refreshed_cap, refresh_miss],
+        "rehearse_verbal_miss_count": miss_count,
+        "retrieve_boost": None if found is None else found.activation,
+        "retrieve_empty": None if empty_hit is None else empty_hit.content,
+        "retrieve_miss": missed is None,
+        "spatial_modality": spatial_item.modality,
+        "spatial_oldest_remains": spatial[0].item_id in spatial_ids,
+        "spatial_victim_is_low_activation": spatial[1].item_id not in spatial_ids,
+        "stats0": stats0,
+        "switch_other": other,
+        "switch_same": same,
+    }
+
+
+def _wm_sha(payload) -> str:
+    import hashlib
+    text = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def _wm_standalone() -> bool:
+    script = r"""
+import sys
+class _Block:
+    def find_spec(self, name, path=None, target=None):
+        root = name.split(".")[0]
+        if root in {"numpy", "vita"} or name == "core.constitutional_brain":
+            raise ImportError("blocked dependency: " + name)
+        return None
+sys.meta_path.insert(0, _Block())
+import core.cognitivo.working_memory as mod
+ex = mod.CentralExecutive()
+assert ex.allocate_attention("planning", strength=2.0)["strength"] == 1.0
+leaked = sorted(n for n in sys.modules if n.split(".")[0] in {"numpy", "vita"} or n == "core.constitutional_brain")
+print("LEAKED=" + ",".join(leaked))
+"""
+    import os
+    import subprocess
+    env = dict(os.environ, PYTHONPATH=str(ROOT))
+    proc = subprocess.run([sys.executable, "-c", script], cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
+    return proc.returncode == 0 and "LEAKED=\n" in proc.stdout
+
+
+def eval_working_memory(criteria="v1"):
+    """WM1–WM6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    import inspect
+
+    import core.cognitivo.working_memory as wm
+    import core.constitutional_brain as brain
+
+    loop = wm.PhonologicalLoop(capacity=7)
+    stored = [loop.store(f"w{i}") for i in range(7)]
+    for index, item in enumerate(stored):
+        item.last_rehearsed = float(index + 1)
+    eighth = loop.store("w7")
+    kept = {item.item_id for item in loop.buffer}
+    wm1_len = len(loop.buffer) == 7 and eighth.item_id in kept and stored[0].item_id not in kept
+    tie = wm.PhonologicalLoop(capacity=7)
+    tied = [tie.store(f"t{i}") for i in range(7)]
+    for item in tied:
+        item.last_rehearsed = 5.0
+    tie.store("t7")
+    tie_ids = {item.item_id for item in tie.buffer}
+    wm1_tie = tied[0].item_id not in tie_ids and tied[1].item_id in tie_ids and len(tie.buffer) == 7
+
+    pad = wm.VisuospatialSketchpad(capacity=4)
+    visuals = [pad.store_visual(f"v{i}") for i in range(4)]
+    for item, activation in zip(visuals, (0.9, 0.2, 0.8, 0.4)):
+        item.activation = activation
+    fifth = pad.store_visual("v4")
+    visual_ids = {item.item_id for item in pad.buffer}
+    wm2 = len(pad.buffer) == 4 and visuals[1].item_id not in visual_ids and fifth.item_id in visual_ids
+    tie_pad = wm.VisuospatialSketchpad(capacity=4)
+    tied_visual = [tie_pad.store_visual(f"e{i}") for i in range(4)]
+    tie_pad.store_visual("e4")
+    tie_visual_ids = {item.item_id for item in tie_pad.buffer}
+    wm2_tie = tied_visual[0].item_id not in tie_visual_ids and tied_visual[1].item_id in tie_visual_ids
+
+    decay = wm.PhonologicalLoop()
+    kept_item = decay.store("keep")
+    kept_item.activation = 1.0
+    kept_item.last_rehearsed = time.time() - 0.4
+    epoch = decay.store("epoch")
+    epoch.activation = 1.0
+    epoch.last_rehearsed = 0.0
+    boundary = decay.store("boundary")
+    boundary.activation = 0.1
+    boundary.last_rehearsed = time.time()
+    decay.decay_items()
+    decay_ids = {item.item_id for item in decay.buffer}
+    init_params = inspect.signature(wm.PhonologicalLoop.__init__).parameters
+    decay_params = list(inspect.signature(wm.PhonologicalLoop.decay_items).parameters)
+    no_clock = decay_params == ["self"] and "clock" not in init_params and "now" not in init_params
+    wm3 = (
+        epoch.item_id not in decay_ids
+        and boundary.item_id not in decay_ids
+        and kept_item.item_id in decay_ids
+        and kept_item.activation < 1.0
+        and kept_item.activation > 0.1
+    )
+
+    pair = wm.PhonologicalLoop()
+    rehearsed = pair.store("rehearsed")
+    twin = pair.store("twin")
+    rehearsed.activation = 0.4
+    twin.activation = 0.4
+    rehearsed.last_rehearsed = 0.0
+    twin.last_rehearsed = 0.0
+    before = time.time()
+    rehearse_ok = pair.rehearse(rehearsed.item_id)
+    boost = rehearsed.activation
+    rehearse_miss = pair.rehearse("missing")
+    pair.decay_items()
+    pair_ids = {item.item_id for item in pair.buffer}
+    cap_loop = wm.PhonologicalLoop()
+    near = cap_loop.store("near")
+    near.activation = 0.9
+    cap_loop.rehearse(near.item_id)
+    topped = cap_loop.store("top")
+    topped.activation = 1.0
+    cap_loop.rehearse(topped.item_id)
+    wm4 = (
+        rehearse_ok is True
+        and boost == 0.7
+        and rehearsed.last_rehearsed >= before
+        and rehearse_miss is False
+        and near.activation == 1.0
+        and topped.activation == 1.0
+        and rehearsed.item_id in pair_ids
+        and twin.item_id not in pair_ids
+    )
+
+    found_loop = wm.PhonologicalLoop()
+    found_loop.store("Alpha Beta")
+    found_loop.store("other")
+    alpha = found_loop.retrieve("alpha")
+    beta = found_loop.retrieve("BETA")
+    alp = found_loop.retrieve("alp")
+    miss = found_loop.retrieve("zzz")
+    wm5 = (
+        alpha is not None and alpha.content == "Alpha Beta"
+        and beta is not None and beta.content == "Alpha Beta"
+        and alp is not None and alp.content == "Alpha Beta"
+        and miss is None
+    )
+
+    import core.cognitivo as package
+    identity = all(
+        getattr(brain, name) is getattr(wm, name) is getattr(package, name)
+        and getattr(wm, name).__module__ == "core.cognitivo.working_memory"
+        for name in _WM_NAMES
+    )
+    sha_module = _wm_sha(working_memory_fingerprint(wm))
+    sha_brain = _wm_sha(working_memory_fingerprint(brain))
+    standalone = _wm_standalone()
+    wm6 = identity and standalone and sha_module == sha_brain == WM_GOLDEN_SHA
+
+    return [
+        _check("WM1", {"len": len(loop.buffer), "evicted_min": wm1_len, "tie_evicts_first": wm1_tie},
+               wm1_len and wm1_tie, "len==7; vítima = menor last_rehearsed; empate = primeiro"),
+        _check("WM2", {"len": len(pad.buffer), "evicted_low_activation": wm2, "tie_evicts_first": wm2_tie},
+               wm2 and wm2_tie, "len==4; vítima = menor activation; empate = primeiro"),
+        _check("WM3", {"clock": "wall" if no_clock else "injected", "kept_activation": kept_item.activation,
+                       "removed_epoch": epoch.item_id not in decay_ids,
+                       "removed_boundary": boundary.item_id not in decay_ids},
+               wm3, "decay reduz activation; activation<=0.1 sai; sem exigir igualdade de relógio",
+               clock="wall" if no_clock else "injected"),
+        _check("WM4", {"boost": boost, "cap": near.activation, "at_cap": topped.activation,
+                       "miss": rehearse_miss, "rehearsed_survives": rehearsed.item_id in pair_ids,
+                       "twin_removed": twin.item_id not in pair_ids},
+               wm4, "rehearse +0.3 teto 1.0; ensaiado sobrevive; gêmeo sai"),
+        _check("WM5", {"alpha": None if alpha is None else alpha.content,
+                       "BETA": None if beta is None else beta.content,
+                       "alp": None if alp is None else alp.content, "miss": miss},
+               wm5, "substring sem maiúsculas; miss é None"),
+        _check("WM6", {"sha_module": sha_module, "sha_brain": sha_brain, "identity": identity,
+                       "standalone": standalone, "golden": WM_GOLDEN_SHA},
+               wm6, "reexport idêntico e fingerprint SHA pré-registrado"),
+    ]
+
+
+EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts,
+              "causal": eval_causal, "counterfactual": eval_counterfactual,
+              "working_memory": eval_working_memory}
 
 
 def main(argv=None) -> int:
