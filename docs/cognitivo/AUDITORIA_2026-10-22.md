@@ -1125,3 +1125,44 @@ A sonda já exclui H2, H3, H4 e H5 como descrição do bloco atual. O eval as re
 Não há contrato anterior destes três símbolos. O eval dos outros capabilities não é alvo de mudança de critério. O atalho do orquestrador continua chamando `self.learner.consolidate_learning`.
 
 Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability incremental`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados IL (após o pré-registro `f11610d`)
+
+Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, coverage 7.16.2, bandit 1.9.4, hypothesis 6.170.5, numpy 2.4.6). O CI usa Python 3.11; esta máquina não o executou. Os números abaixo são desta execução, não um carimbo de CI hospedado.
+
+**Commits.** Pré-registro `f11610d775c50d5ab462287cad5f98e2bbab4b08` (só `CLAIMS.yaml` e esta auditoria). Move-only `33226db5e030beb4881bb31b86b3b0ae1a937f14`. Base `ab3a22bf9697f2a5e45ebbb4d32a423b8150da74`.
+
+**RED**, antes de existir `core/cognitivo/incremental_learner.py`: `PYTHONPATH=. python -m unittest test_incremental_learner_contract.py` → rc 1, 7 testes, 3 `ModuleNotFoundError: No module named 'core.cognitivo.incremental_learner'`. Os quatro testes que importam o monólito passaram: `str` em relevância/importância, plano com reward texto / sem sequência / `goal=None`, item de memória que não é dict, e os contadores de consolidação (só promoção 1/0 e só reforço 0/1).
+
+**GREEN**, o mesmo comando depois do move: 7 testes, rc 0. Nenhum assert foi relaxado.
+
+**Eval** `python tools/cognitivo_eval.py --capability incremental --criteria v3` (v1/v2/v3 não alteram o protocolo; o padrão do argparse continua `v2`): rc 0, `failed: []`. O stdout do monólito ainda imprime o aviso de psutil/FAISS antes do JSON; isso já ocorria ao importar `core.constitutional_brain`.
+
+| id | valor medido | alvo | passou |
+|---|---|---|---|
+| IL1 | `new=0.9199999999999999`; segunda chamada `promotion=false` e `total_promotions` 1; 0.749/0.4 sem evento; teto 0.99; id `None` vazio; id 0 promove | esses stores e a não-repromoção | sim |
+| IL2 | 0.5/0.7 → `0.7799999999999999`; abaixo dos limiares, zero eventos; 0.8/0.8 um único evento de promoção | o boost e o `elif` | sim |
+| IL3 | chave `repeat me`; duas gravações quando `retrieve` ecoa o sintético; tag achada → 0; log `PATTERN_DETECTED` | 0.92 e a segunda gravação | sim |
+| IL4 | `None`, 0.699 e reward ausente → `None`; reward 0.7 → importância 0.845; `str` → `TypeError`; sem sequência → `AttributeError` | `None`, 0.845 e as exceções | sim |
+| IL5 | 3 episódios, 1 promoção, 1 reforço, 1 padrão; flags falsas zeram o padrão e o `DECAY_APPLIED`; `apply_decay` de 1 id devolve 4 e não chama `store` | as contagens e a heurística | sim |
+| IL6 | SHA de fonte do módulo = SHA medido no monólito antes do splice = `e09c2d75df964dd52915eaf0c0660dd45a6ac34cbf476804c786423910057542`; SHA comportamental módulo = monólito = `636c95bfaebbd60ca55a5e14f12e9f5ff7b6f7868f5a476b31fa479528db7767`; identidade verdadeira; `clock: wall` | os dois SHA pré-registrados e o mesmo objeto | sim |
+
+**Relógio.** `__init__` continua só com `episodic_memory`, `hierarchical_memory` e `constitutional_log`. Timestamps e `duration` usam `time.time()`. Relógio não foi injetado. O golden de IL6 não grava o número da duração.
+
+**Gaps que o eval mediu e não corrigiu.** A segunda `detect_and_store_patterns` grava de novo quando `retrieve` devolve o sintético `[PATTERN freq=N] {chave}`, porque a busca usa `tag[:30]` = `[PATTERN] {chave}`[:30] e essa substring não está no sintético. `apply_decay` não chama `store`; devolve `max(0, 5-len)` só com log e conjunto não vazio. `bool` segue `int`. Relevância `nan` não promove. Importância `nan` promove com `new_importance` 0.99 neste CPython 3.12.3 (`min(0.99, nan)` fica com o primeiro argumento). Importância `-inf` é gravada como `-inf`. Reward `nan` passa do `< 0.7` e é gravado com texto `reward=nan`. O reason de relevância 0.749 formata `rel=0.75`. Nada disso foi editado no bloco.
+
+**Harness, não o módulo.** O teste dos contadores (1/0 e 0/1) existe porque o cenário misto do IL5 tem uma promoção e um reforço: trocar os dois predicados manteria os dois números em 1 e o SHA. O código de produção não mudou. Coverage 7.16.2, na suíte inteira, reportou `incremental_learner.py` com 123 statements, 32 ramos, 100%.
+
+**Cobertura da suíte**, no commit de move (`NEXUS_INTEGRATED_SUMMARY=/tmp/integrated.json coverage run --branch -m unittest discover -p 'test_*.py'`, depois o demo do núcleo): 583 testes, rc 0, 53.941 s. Demo `python core/constitutional_brain.py` rc 0. O banner impresso por esse demo não é evidência de capacidade. `incremental_learner.py` 100%. `core/cognitivo/*` 1424 statements, 96% (piso 90). `constitutional_brain.py` 68% (piso 62). Fila 95%, VRAM 94%, temporal 93%, vita 76%.
+
+**Mutação.** `python tools/targeted_mutation.py`: `{"declared": 69, "applicable": 69, "killed": 69, "survived": 0, "not_applied": 0, "score_percent": 100.0}`, rc 0. O catálogo do Axis não foi editado. `python tools/cognitivo_mutation.py`: `{"declared": 184, "killed": 184, "survived": 0, "not_applied": 0}`, rc 0. Os 28 mutantes do módulo novo estão nesse total (limiar, teto, id já promovido, padrão, decay heurístico, flags, reexport e o import do monólito). `il_module_pulls_monolith` insere `import core.constitutional_brain`; o AST do eval e o contrato em subprocesso o matam.
+
+**Realidade** (recontagem exigida pelo gate, commitada com o move): núcleo 24886 linhas, 236 classes, 757 funções (antes 25192 / 239 / 764). `incremental_learner.py` 334 linhas, 3 classes, 7 funções. `core/cognitivo` 10 módulos, 3355 linhas. Literais dinâmicos 50. Frases fortes 51. Terminologia científica 233. Prefixo `Real` 63. Testes embutidos 31. `pass` puro 0. Retorno constante 2. `reality_audit` reexecutado depois do commit de move: diff vazio.
+
+**Outros gates locais no commit de move:** `ruff check` nos alvos do workflow, rc 0. `bandit -q -r core vita tools` grava o JSON com rc 1 (há achados LOW; o workflow aceita o relatório não vazio). Contagem 131 LOW, zero MEDIUM/HIGH, nenhum achado em `incremental_learner.py` nem em `tools/cognitivo_eval.py`. `security_triage.py --check` rc 0. `SECURITY_TRIAGE.md` não foi editado. `validar_registro.py --expirados aviso`, rc 0. `bash tools/agente/predeleg.sh HEAD origin/main` no commit de move `33226db` contra `origin/main` `ab3a22b`: `OK: sem conflito`, rc 0.
+
+**Hipóteses.** H1 não se sustenta como falha neste eval: os dois SHA são os que foram congelados no monólito antes do splice. H2, H3, H4 e H5 já tinham sido excluídas pela sonda e o eval repetiu a exclusão. Nenhuma delas vira alegação de aprendizado humano, de consolidação de memória verificada fora deste contrato, nem de prontidão. O nome `RealIncrementalLearner` e a suíte embutida do núcleo continuam sendo demo, não evidência de capacidade.
+
+**Fora do que estes comandos medem:** CI hospedado; Python 3.11 (o 0.99 de `min(0.99, nan)` e o token `-Infinity` foram lidos em 3.12.3); conflito de merge contra as branches dos PRs #38, #39, #40, #41, #42, #44, #46, #48, #49, #50, #60, #77 e #79 (o `predeleg` só compara com `origin/main`); state docs não atualizados, de propósito; ObservationalLearner, ImitationLearner, VicariousLearner, HierarchicalMemory/FAISS, Metacognition, Attention, Working Memory, Lifelong Learning Engine, o atalho `consolidate_learning` do orquestrador e o catálogo `tools/targeted_mutation.py` não foram alterados no comportamento. Não há interface web nesta extração.
+
+PR draft: https://github.com/pedromiorini/Nexus/pull/110
