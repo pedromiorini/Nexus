@@ -393,3 +393,15 @@ Pré-registro commitado **antes** da implementação e da execução do eval.
 | alpha beta | gamma delta | 1.0 |
 
 Pré-registro commitado **antes** da implementação e da execução do eval.
+
+### Resultados CF8 (após pré-registro b538702)
+
+| id | valor | alvo | passou | nota |
+|---|---|---|---|---|
+| CF8 | 3/3 | 3/3 | **sim** | `1 − Jaccard` tokens alnum; outcomes padrão compartilham `outcome` (diff≈0.833 < 1) |
+| CF1/2/4/5/6/7 | (regressão) | pass | **sim** | sem regressão |
+| CF3 | falso | — | não | fora de escopo |
+
+**Antes (zip):** `outcome_without_intervention` vs `outcome_with_apply_patch` → ≈0.571 (prefixo comum de chars; ignora tokens).
+**Depois (Jaccard alnum):** ≈0.833; para "the cat sat on the mat" vs "… a mat" → ≈0.167 (antes zip ≈0.318).
+Golden SHA re-medido: `fbfb32e9466bf161155a7546e2db07e2f73434230d581217a44fd4b324eb646e`.
