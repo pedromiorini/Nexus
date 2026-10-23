@@ -858,3 +858,127 @@ O 0.7999968528747559 é a leitura desta reexecução. Na medição do commit de 
 **Fora do que estes comandos medem:** CI hospedado; Python 3.11; conflito de merge contra as branches dos PRs #38, #39, #40, #41, #42, #44, #46, #48, #49 e #79 (o `predeleg` só compara com `origin/main`); state docs não atualizados, de propósito; Attention, IncrementalLearner, HierarchicalMemory/FAISS, Metacognition, Axis e twin network não foram tocados. Não há interface web nesta extração.
 
 PR draft: https://github.com/pedromiorini/Nexus/pull/108
+
+## Attention — critérios pré-registrados (AT1–AT6)
+
+**Objetivo desta rodada:** extrair, em move-only, o bloco POST25 (`StimulusItem`, `AttentionalFocus`, `AttentionShift`, `BottomUpAttention`, `TopDownAttention`, `AttentionalSpotlight`, `RealAttentionSystem`) de `core/constitutional_brain.py` para `core/cognitivo/attention.py`, com reexport strangler no ponto original e em `core/cognitivo/__init__.py`. Medir AT1–AT6. Se todos passam, documentar e parar. Se algum falha no monólito atual, registrar o gap. Não corrigir comportamento depois de ver o número.
+**Não escopo:** injetar relógio; corrigir gaps de comportamento (substring de goal, coerção de `bool`/`NaN`, `attend` que não recomputa prioridade, igualdade de dataclass no spotlight, ramo morto de `relevances`, clamp de saliência que os pesos atuais não atingem); `AttentionalState`; GlobalWorkspace/Consciousness; IncrementalLearner; HierarchicalMemory/FAISS; Metacognition (#42); POST49 (`AttentionRequest` / `AttentionRoute` / `AttentionAllocation` / `RealAttentionRoutingSystem`); Axis e `tools/targeted_mutation.py`; state docs (`CONTINUATION.md`, `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md`, `SECURITY_TRIAGE.md`); PRs congelados #38–#50, #60, #77, #79 (não rebasear, não editar as branches, não resolver os conflitos deles).
+**Eval:** `python tools/cognitivo_eval.py --capability attention`. O protocolo abaixo é único; `--criteria` v1/v2/v3 não o altera. Seeds não se aplicam: `stimulus_id` de `register_stimulus` e ids de foco/shift são `uuid.uuid4()`, e os instantes vêm de `time.time()`. O golden não inclui esses ids nem timestamps crus. O contrato que já existe (`test_attention_signal_contract.py`: contrast 1.4→1.0, motion −0.2→0.0, context 0.25, fallbacks 0.5 e 0.6) continua válido, sem relaxar asserts.
+**Base da observação:** `4f1613020de535d64bc6a69fe3046c523b14fd98` (merge do #108). Sonda só de leitura, `PYTHONPATH=.`, Python 3.12.3, antes deste texto, antes de criar `core/cognitivo/attention.py` e antes de qualquer harness `attention`.
+
+### Varredura §7.2 (2026-10-23, `gh pr list --state open`)
+
+PRs abertos que editam `core/constitutional_brain.py`: #38, #39, #40, #41, #42, #44, #46, #48, #49. São os congelados do pedido; não são a base. A extração precisa do reexport no monólito (§16). Isso tensiona a fila única da §11.2: o conflito com esses PRs fica declarado, sem rebase neles.
+Nenhum PR aberto altera `core/cognitivo/attention.py` (o arquivo ainda não existe), `test_attention_contract.py`, `test_attention_signal_contract.py`, `tools/cognitivo_eval.py`, `tools/cognitivo_mutation.py`, `core/cognitivo/__init__.py` ou este arquivo. O #79 (draft, não usado como base) altera `docs/agentes/CLAIMS.yaml`. `AUDIT_REALITY_REPORT.md` / `audit_reality.json` aparecem em #38, #39, #40, #41, #42, #44, #46, #48 e #49; se o gate exigir recontagem depois do move, o diff fica só nos números deste módulo. O claim da Working Memory, já mesclado em `4f16130` e ainda listado, é substituído pelo claim grok-bot desta tarefa, prazo `2026-10-26T05:00:00Z`.
+
+### Observação (código e sonda, antes do move e antes do eval)
+
+**Fato, lido no bloco ~L4921–L5405:** `BottomUpAttention.salience_factors` é novelty 0.3, intensity 0.25, contrast 0.25, motion 0.2. `compute_salience` devolve `min(1.0, soma ponderada)`. Novidade: 0.9 se `stimulus_id` não está em `context["seen_stimuli"]` (ausente → lista vazia), senão 0.2. Intensidade: visual 0.7, auditory 0.6, qualquer outro tipo 0.4 (o nome "internal" não é especial; é o `else`). Contraste: se `stimulus.contrast is not None`, `min(1.0, max(0.0, valor))` sem `float()`; senão `context["contrast"]` passa por `float()` e o mesmo clamp; senão 0.5. `context["contrast"] is None` cai no fallback. Movimento: se `stimulus.motion is not None`, o mesmo clamp; senão 0.6. Não há movimento vindo do context.
+
+`TopDownAttention.compute_goal_relevance`: sem `active_goals` → 0.3. Com goals, `max(relevance * weight)`. `set_goals` grava a lista e põe 0.5 só no goal que ainda não está em `goal_relevance`. `_assess_relevance_to_goal` faz `word in str(content).lower()` para cada palavra de `goal.lower().split()`; se `matches > 0`, `min(1.0, matches / len(words))`; senão 0.1. Goal vazio tem `split()` vazio, `matches == 0`, devolve 0.1. `update_goal_priority` é `min(1.0, max(0.0, priority))`.
+
+`AttentionalSpotlight(capacity=3)`. `focus_on`: se `stimulus in self.spotlight` (igualdade de dataclass, campo a campo), retorna sem mudar força nem histórico. Se `len >= capacity`, remove `min(spotlight, key=salience)` — empate fica com o primeiro — e então acrescenta. `release_focus` filtra por `stimulus_id`; se o foco corrente é esse id, `duration = time.time() - start_time` e `current_focus = None`. `get_focused_items` devolve `spotlight.copy()`. `is_focused` procura o id.
+
+`RealAttentionSystem.attend`: se `goals` é verdadeiro, só chama `set_goals`. Não recomputa `salience` nem `priority` dos estímulos já registrados. Lista vazia → `[]` e o contador de episódios não sobe. Senão `_select_for_attention` grava `attention_score = (salience + priority) / 2` e `sorted(..., reverse=True)` estável, corta em `spotlight.capacity`, e `focus_on` só nos que `is_focused` ainda recusa. `shift_attention` de id ausente devolve `False` antes de criar shift. Custo base 0.2; se há foco corrente e a modalidade difere, soma 0.3; `min(1.0, base)`. `reason == "voluntary"` incrementa `voluntary_shifts`; qualquer outra string incrementa `involuntary_shifts`. `clear_attended_stimuli` mantém `time.time() - timestamp < 60`. `__init__` imprime a linha `POST 25`. `consciousness.attend_to("attention", f"Attending to {n} stimuli", "attentional", salience=0.6)` só se `consciousness` não é `None`. Não há parâmetro de relógio em `__init__`, `clear_attended_stimuli` nem `focus_on`.
+
+**Fato, sonda no monólito** (atribuir campos já públicos; isso não é API nova):
+
+| sonda | valor |
+|---|---|
+| soma dos quatro pesos | 1.0 |
+| novidade ausente / presente | 0.9 / 0.2 |
+| intensidade visual / auditory / internal / tactile | 0.7 / 0.6 / 0.4 / 0.4 |
+| visual, contrast 1, motion 1, id novo | saliência 0.895 |
+| o mesmo id em `seen_stimuli` | 0.685 |
+| contrast 1.4 / −0.2 / 0 / 1 no stimulus | 1.0 / 0.0 / 0.0 / 1.0 |
+| contrast ausente; context 0.25 / `"0.25"` / `None` | 0.25 / 0.25 / 0.5 |
+| stimulus 0.1 com context 0.9 | 0.1 (o stimulus vence) |
+| motion ausente / 1.4 / −0.2 | 0.6 / 1.0 / 0.0 |
+| contrast ou motion `str` no stimulus | `TypeError` |
+| context contrast `"abc"` | `ValueError` |
+| contrast/motion `True` / `False` / `nan` / `inf` / `-inf` | 1.0 / 0.0 / 0.0 / 1.0 / 0.0 |
+| sem goals | 0.3 |
+| goal `"find cat"` (peso 0.5), conteúdo com as duas palavras / só `"find"` / nenhuma / maiúsculas | 0.5 / 0.25 / 0.05 / 0.5 |
+| goal `"cat"`, conteúdo `"category"` | 0.5 (substring, não token) |
+| goal `""` | 0.05 (0.1 × peso 0.5); não é o 0.3 de lista vazia |
+| goals `"alpha"` peso 1.0 e `"beta gamma"` peso 0.5 | conteúdo `"alpha"` → 1.0; `"beta only"` → 0.25 (máximo, não soma) |
+| `set_goals` de novo depois de `update_goal_priority(..., 1.0)` | o 1.0 permanece |
+| `update_goal_priority` 2 / −1 / 0.5 / `True` / `False` / `inf` / `-inf` / `nan` | 1.0 / 0.0 / 0.5 / 1.0 / 0.0 / 1.0 / 0.0 / 0.0 |
+| `update_goal_priority` `"abc"` / `None` / `[]` / `{}` | `TypeError` |
+| spotlight 0.9, 0.2, 0.8 e 4º com 0.5 | ficam o 0.9, o 0.8 e o 4º; sai o 0.2 |
+| empate de saliência 0.4, 0.4, 0.9 e 4º com 0.7 | sai o primeiro 0.4 |
+| `focus_on` repetido no mesmo objeto, ou noutro com os mesmos campos | histórico não cresce; strength permanece a da primeira chamada |
+| `release_focus` do id de saliência baixa | esse id sai; o foco corrente continua o último |
+| `release_focus` do foco corrente | `current_focus is None`, `duration is not None` e `>= 0`, `is_focused` falso; `get_focused_items()` não é o mesmo objeto da lista |
+| `attend` com scores (0.2+0.2)/2, (0.9+0.9)/2, (0.4+0.8)/2, (1.0+0.0)/2 | ordem b, c, d; o a fica de fora; score de c é o float IEEE de 0.6 |
+| quatro itens com score 0.5, 0.5, 0.5, 0.0 | os três primeiros na ordem original |
+| `attend(goals=["zzz"])` num item já gravado com prioridade 0.1 | prioridade e saliência continuam 0.1; o goal fica gravado; episódios sobem 1 |
+| `register_stimulus("visual", "a cat")` depois de `set_goals(["cat"])` | saliência é o float IEEE da fórmula com fallbacks 0.5 e 0.6 (JSON `0.6900000000000001`); prioridade 0.5 |
+| `shift_attention` de id ausente | `False`; nenhum shift é acrescentado |
+| primeiro shift, mesma modalidade, cross-modal | custos 0.2, 0.2, 0.5; o primeiro `from_focus` é `None`; o seguinte não é; voluntary 1, involuntary 2 no trio voluntary/goal/salience |
+| shift sem foco corrente | custo 0.2 |
+| `attend` sem estímulos | `[]`, episódios 0 |
+| `clear` com timestamps 0, `time.time()-61` e `time.time()` | só o último permanece |
+| consciência stub | uma chamada `("attention", "Attending to 1 stimuli", "attentional")`, `salience` 0.6 |
+| estatísticas do sistema vazio | os sete contadores em zero e `focus_capacity` 3; o `__init__` imprime `POST 25` |
+| assinatura | `clear_attended_stimuli` só tem `self`; `__init__` não tem `clock` nem `now` |
+
+O 0.0 do `nan` **não** é um rejeite de tipo. É `max(0.0, nan)` neste CPython 3.12.3: comparação com NaN é falsa e `max` fica com o primeiro argumento; `min(1.0, 0.0)` é 0.0. `True`/`False` passam pelo mesmo clamp porque `bool` é `int`. Não serão "corrigidos" nesta rodada. Python 3.11 não foi executado.
+
+A soma ponderada máxima com estes pesos e fatores já clampados é 0.895. `return min(1.0, salience)` não altera nenhum caso desta sonda. O `else` de `max(relevances) if relevances else 0.3` não é alcançado por uma lista normal: lista vazia já voltou 0.3 no `if not self.active_goals`. Os dois ficam registrados como estão. Não autorizam editar o bloco.
+
+### Hipóteses concorrentes (Strong Inference)
+
+| id | hipótese | o que a falsifica | teste barato |
+|---|---|---|---|
+| H1 | os pesos não somam 1, ou a novidade/intensidade não são as constantes lidas | AT1 mede outra soma, 0.9/0.2 trocados, ou tactile diferente de internal | AT1 |
+| H2 | contrast/motion ignoram o clamp, o context ou os fallbacks 0.5/0.6 | AT2 ou o contrato já existente (`test_attention_signal_contract.py`) falha sem que o assert tenha sido relaxado | AT2 |
+| H3 | sem goals a relevância não é 0.3, ou o match é token inteiro (logo `"cat"` não casa com `"category"`), ou `update_goal_priority` não clampa | AT3 mede outro número, `"category"` fica em 0.1×peso, ou 2.0 permanece 2.0 | AT3 |
+| H4 | o estouro do spotlight remove a maior saliência, ou o empate remove o segundo | no protocolo AT4 o 0.2 permanece, ou o segundo 0.4 sai | AT4 |
+| H5 | `attend(goals=)` recomputa prioridade, ou o custo cross-modal não é 0.2+0.3, ou id ausente devolve `True` | prioridade 0.1 muda ao passar goals, o custo cross-modal não é 0.5, ou o id ausente não é `False` | AT5 |
+| H6 | mover o bloco muda o texto ou o fingerprint de comportamento | SHA de fonte ou SHA comportamental ≠ os valores abaixo, ou as classes reexportadas não são o mesmo objeto | AT6 |
+
+Hipótese de trabalho (não vinculante para além da tabela): move-only, sem injetar relógio e sem alterar fórmulas. Se H5 no sentido "recomputa prioridade" falhar, isso é o gap já lido no código, não um convite a mudar `attend`.
+
+### Critérios
+
+| id | afirmação | protocolo falsificável | alvo |
+|---|---|---|---|
+| AT1 | pesos somam 1.0; novidade 0.9 se o id não está em `seen_stimuli`, 0.2 se está; intensidade visual/auditory/internal/tactile = 0.7/0.6/0.4/0.4 | Ler `salience_factors`. `compute_salience` de visual com contrast 1 e motion 1: id novo = `0.3*0.9+0.25*0.7+0.25*1+0.2*1`; o mesmo id em `seen_stimuli` troca 0.9 por 0.2. tactile usa o `else`, igual a internal | soma 1.0 e esses produtos |
+| AT2 | contrast/motion no stimulus clampam [0, 1]; senão context (só contrast, via `float`); senão 0.5 / 0.6 | Stimulus 1.4→1.0 e −0.2→0.0 nos dois sinais. Context 0.25 e `"0.25"` → 0.25; context `None` → 0.5. Stimulus 0.1 vence context 0.9. Motion sem valor → 0.6. `str` no stimulus → `TypeError`; context `"abc"` → `ValueError`. Os três testes de `test_attention_signal_contract.py` permanecem. `bool`/`nan`/`inf` ficam no golden de AT6 e não são motivo para rejeitar o tipo nesta rodada | os números e as duas exceções |
+| AT3 | sem goals → 0.3; match é substring sem maiúsculas, vezes o peso; `update_goal_priority` clampa [0, 1] | `"find cat"` peso 0.5: as duas palavras → 0.5, uma → 0.25, nenhuma → 0.05, `"FIND CAT"` → 0.5. `"cat"` em `"category"` → 0.5. Goal `""` → 0.05. Dois goals: máximo, não soma (`"alpha"` peso 1 → 1.0; `"beta only"` contra `"beta gamma"` peso 0.5 → 0.25). `set_goals` não apaga peso 1.0 já escrito. Clamp 2→1, −1→0, 0.5→0.5. `"abc"`, `None`, `[]`, `{}` → `TypeError` | esses números e `TypeError` |
+| AT4 | capacity 3: o 4º `focus_on` remove o de menor saliência; empate = o primeiro; refoco e `release_focus` | Itens 0.9, 0.2, 0.8 e 4º 0.5: sai o 0.2. Empate 0.4/0.4/0.9 e 4º 0.7: sai o primeiro 0.4. Segundo `focus_on` do mesmo objeto, strength 0.9, não muda o 0.2 nem o tamanho do histórico. Objeto com os mesmos campos também não entra de novo. `release_focus` do menor id o tira e deixa o foco corrente. `release_focus` do corrente: `current_focus is None`, duração definida e `>= 0`, `is_focused` falso. `get_focused_items()` não é a lista interna | essa vítima, o empate e o refoco |
+| AT5 | `attend` ordena por `(salience+priority)/2`, estável, top capacity; id ausente em `shift_attention` → `False`; cross-modal custa 0.5 | Quatro itens (0.2,0.2), (0.9,0.9), (0.4,0.8), (1.0,0.0): selecionados b, c, d. Empate de score 0.5: os três primeiros na ordem de registro. `attend(goals=)` não recomputa prioridade já gravada. Id ausente → `False` e a lista de shifts não cresce. Sem foco ou mesma modalidade → 0.2. Modalidade diferente → 0.5. `"voluntary"` conta em voluntary; outra razão, em involuntary. Sem estímulos, `attend` devolve `[]` e episódios continuam 0 | ordem, `False`, custos 0.2 e 0.5 |
+| AT6 | move-only: o texto do bloco e o fingerprint comportamental são os mesmos; reexport é o mesmo objeto | O texto UTF-8 que começa na linha de `═` imediatamente antes de `# MÓDULO 11A3: ATTENTION & FOCUS SYSTEM (POST 25)` e termina no `}` de `get_statistics` (a chave `"focus_capacity"`) tem SHA-256 `96090684b99d2568ea61f040c5eed9bbf6de774f5bad9d781f60c2a566ea2378` no monólito, antes do splice, e o mesmo SHA no módulo novo. As sete classes: `core.constitutional_brain` e `core.cognitivo` são o mesmo objeto que `core.cognitivo.attention`, e `__module__` é `core.cognitivo.attention`. O módulo importa sem puxar o monólito, numpy ou vita (árvore de `import` / `import from`; menção no docstring não conta). O dict do protocolo abaixo, `json.dumps(..., sort_keys=True, ensure_ascii=False)`, tem SHA-256 `07877c7f811006b479729aa7faa7d6b82f824afc0d2bf2dc7514d059ce5f990b`, igual pela classe do monólito e pela do módulo novo | os dois SHA e a identidade |
+
+**Protocolo do fingerprint comportamental de AT6** (o que entra no dict; stdout do banner desviado, mas `banner` é verdadeiro se o texto capturado contém `POST 25`):
+
+- `weights` e `weights_sum`; `novelty_absent` 0.9 e `novelty_present` 0.2; `intensity` visual/auditory/internal/tactile.
+- `salience_novel` / `salience_familiar` com contrast 1 e motion 1.
+- `contrast`: fallback, stimulus 1.4, −0.2, `True`, `False`, `nan`, `inf`, `-inf`, context 0.25, `"0.25"`, `None`, `True`, `nan`, e stimulus 0.1 contra context 0.9.
+- `motion`: fallback, 1.4, −0.2, `True`, `False`, `nan`, `inf`, `-inf`.
+- `errors`: contrast `str` → `TypeError`; context `"abc"` → `ValueError`; motion `str` → `TypeError`.
+- `no_goals` 0.3; `matches` full/one/none/case do goal `"find cat"`; `substring` de `"cat"` em `"category"`; `empty_goal` de `""`.
+- `multi` beta/alpha; `priority_kept` 1.0 depois de `set_goals` de novo.
+- `clamps` de 2, −1, 0.5, `True`, `False`, `inf`, `-inf`, `nan`. `priority_errors` de `"abc"`, `None`, `[]`, `{}`.
+- `evicted` = `["id0", "id2", "id3"]`; `tie_spotlight` = `["id1", "id2", "id3"]`.
+- `refocus`: len 1, history 1, strength 0.2, `twin_equal` verdadeiro.
+- `released_low` = `["id0", "id2"]` e `current_after_release` = `"id2"`.
+- `released_current`: current none, duration set, focused falso, copy verdadeiro. A duração numérica não entra (relógio de parede).
+- `order` = `[["b", 0.9], ["c", 0.6000000000000001], ["d", 0.5]]`; `tie_order` = `["t0", "t1", "t2"]`.
+- `no_recompute`: saliência 0.1, prioridade 0.1, score 0.1, goals `["zzz"]`, episódios 1.
+- `registered`: saliência `0.6900000000000001`, prioridade 0.5.
+- `empty_attend`: lista vazia, episódios 0.
+- `shift`: missing falso, zero shifts depois do miss, três `True`, custos `[0.2, 0.2, 0.5]`, primeiro `from_focus` none, o seguinte preenchido, voluntary 1, involuntary 2.
+- `no_focus_cost` 0.2.
+- `consciousness`: args `["attention", "Attending to 1 stimuli", "attentional"]`, salience 0.6, uma chamada.
+- `clear_kept` = `["live"]` para timestamps 0, `time.time()-61` e `time.time()` lido imediatamente antes. `clock` = `"wall"`.
+- `stats0` com as sete chaves atuais em zero e `focus_capacity` 3. `banner` verdadeiro.
+
+`bool`/`nan`, a substring `"category"` e o `attend` que não recomputa fazem parte do golden de identidade. Não são metas de qualidade e não serão "corrigidas" nesta rodada.
+
+### Regressão exigida
+
+`test_attention_signal_contract.py` continua importando `BottomUpAttention` e `StimulusItem` de `core.constitutional_brain` e os três asserts permanecem. O eval dos outros capabilities não é alvo de mudança de critério.
+
+Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability attention`. O SHA deste commit entra no PR. Resultados só numa seção posterior.

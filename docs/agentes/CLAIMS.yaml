@@ -3,16 +3,16 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "Extrair Working Memory (move-only) e auditar WM1–WM6 com critérios pré-registrados"
+    tarefa: "Extrair Attention POST25 (move-only) e auditar AT1–AT6 com critérios pré-registrados"
     arquivos:
-      - core/cognitivo/working_memory.py
+      - core/cognitivo/attention.py
       - core/cognitivo/__init__.py
       - core/constitutional_brain.py
-      - test_working_memory_contract.py
+      - test_attention_contract.py
       - tools/cognitivo_eval.py
       - tools/cognitivo_mutation.py
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - docs/agentes/CLAIMS.yaml
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
-    expira_em: "2026-10-26T04:00:00Z"
+    expira_em: "2026-10-26T05:00:00Z"
