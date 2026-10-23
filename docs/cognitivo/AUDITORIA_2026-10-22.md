@@ -567,6 +567,38 @@ Conjunto D (mapeia): `APPLY_PATCH`, `apply patch`, `patch apply`, `apply_patch`,
 
 Pré-registro escrito **antes** da implementação e **antes** de rodar o eval nesta rodada. O SHA deste commit entra no PR. Resultados, se houver, só numa seção posterior.
 
+### Resultados CF9 (após o pré-registro `c187c12`)
+
+Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, hypothesis 6.170.5, coverage 7.16.2, bandit 1.9.4). O CI usa Python 3.11; esta máquina não o executou. Números abaixo são desta execução, não um carimbo de CI hospedado.
+
+| id | valor | alvo | passou | nota |
+|---|---|---|---|---|
+| CF9-outcome | serialização do spy e do simulador real | 1 chamada e `state:` | **sim** | `APPLY_PATCH` / `apply patch` / `patch apply`; `DEPLOY_FIX` fica `system_status=secure` via `simulate` (C4 `_do` por dentro) |
+| CF9-chain | lista com `do(DEPLOY_FIX): system_status=secure` antes do template | igualdade | **sim** | também sem `world_model`, se a aresta já existe; `|E|==0` não inventa `do(` |
+| CF9-fallback | 0 chamadas em N; heurística sem modelo | 0 chamadas | **sim** | `patch` não vira `APPLY_PATCH` |
+| CF9-precedence | `wm:sit:act` e `simulate` parado | 0 chamadas | **sim** | CF1 intacto |
+| CF9-invalid | `AttributeError` em não-str; `ValueError` de `simulate` propaga | exceção | **sim** | cenário não é gravado |
+| CF9-keep | `plan` com a string original; fórmula `max(0.1, 0.7-0.05*len)` | fórmula | **sim** | não recalibrada |
+| CF9-regression | CF1–CF8 | `failed: []` | **sim** | comando abaixo |
+
+**RED** (commit `312c751`, código ainda o de `629541f`): `python -m unittest test_counterfactual_dox_contract.py` → 15 falhas, rc 1. Sete métodos de controle passaram.
+
+**GREEN:** `0184a72` (código, mutantes e o caso extra de `simulate` sem `dict`, cláusula já escrita no pré-registro). `python -m unittest test_counterfactual_dox_contract.py` → 20 testes, rc 0. O RED tinha 19 métodos; o vigésimo não entra nas 15 falhas.
+
+**Eval:** `python tools/cognitivo_eval.py --capability counterfactual --criteria v1` → rc 0, `failed: []`. O contrato de extração que fixa o golden `fbfb32e9466bf161155a7546e2db07e2f73434230d581217a44fd4b324eb646e` passou na suíte (não reexecutei o hash à parte).
+
+**Implementação:** `_predict_outcome` continua a honrar `predict_outcome` chamável. Senão, se a intervenção mapeia, chama `simulate([ação])` ou, na falta dele, `do` e só então `_do`. A cadeia lê efeitos da adjacência antes do extrator. `causal_world_model.py` não foi editado. O factual sem `predict_outcome` continua `outcome_without_intervention`.
+
+**Hipóteses:** H1 ficou excluída pela sonda anterior ao código (cadeia só lexical com a aresta já gravada). H2, H3 e H4 não se sustentam nos controles que passaram. H5 (regressão de CF1–CF8) não se sustentou neste eval. Nenhuma delas vira alegação de capacidade causal geral.
+
+**Mutação:** `python tools/cognitivo_mutation.py` → `{"declared": 97, "killed": 97, "survived": 0, "not_applied": 0}`, rc 0. Inclui `cf_do_never_consulted`, `cf_scm_edges_ignored`, `cf_do_swallows_simulate_error`, `cf_token_set_match_dropped` e `cf_do_hook_prefers_private`. `python tools/targeted_mutation.py` → 69/69 mortos, rc 0. O catálogo do Axis não foi editado.
+
+**Suíte:** `python -m unittest discover -p 'test_*.py'` → 550 testes, rc 0. Cobertura `core/cognitivo/*` 94% (piso 90); `counterfactual.py` 94% (8 statements sem execução). `core/constitutional_brain.py` 68% (piso 62), com `NEXUS_INTEGRATED_SUMMARY=/tmp/integrated.json`. `ruff check` nos alvos do workflow, rc 0. `reality_audit.py`: counterfactual.py 524 linhas, 21 funções; soma `core/cognitivo` 1976 linhas; núcleo permanece 26071 / 252 / 813. Bandit: 131 LOW, 0 MEDIUM/HIGH; `security_triage.py --check` rc 0. `validar_registro.py --expirados aviso` rc 0. `predeleg.sh HEAD origin/main` → `OK: sem conflito`.
+
+**Fora do que estes comandos medem:** o factual não é lido do SCM; não há abdução nem twin network; a fórmula de plausibilidade não foi calibrada; uma cadeia mais longa só muda o número pela fórmula antiga. CI hospedado e Python 3.11 não rodaram. Conflito de merge com os PRs que também versionam o relatório de realidade não foi resolvido.
+
+PR draft: https://github.com/pedromiorini/Nexus/pull/106
+
 ### Varredura §7.2 desta rodada (2026-10-23, `gh pr list --state open`, 16 PRs)
 
 Nenhum PR aberto altera `core/cognitivo/counterfactual.py`, `core/cognitivo/causal_world_model.py`, `core/cognitivo/action_effects.py`, `tools/cognitivo_mutation.py`, `tools/cognitivo_eval.py` ou este arquivo. O #79 (draft, não usado como base) altera `docs/agentes/CLAIMS.yaml`. `AUDIT_REALITY_REPORT.md` / `audit_reality.json` aparecem em #38, #39, #40, #41, #42, #44, #46, #48 e #49; se o gate de realidade exigir recontagem depois da edição de `counterfactual.py`, o diff fica só nessa recontagem, sem o código desses PRs. State docs, Axis, `constitutional_brain` e #60 ficam de fora. O claim do #105 (já mesclado) é substituído pelo claim grok-bot desta tarefa, prazo `2026-10-26T03:00:00Z`.
