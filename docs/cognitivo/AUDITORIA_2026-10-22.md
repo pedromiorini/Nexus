@@ -602,3 +602,79 @@ PR draft: https://github.com/pedromiorini/Nexus/pull/106
 ### Varredura §7.2 desta rodada (2026-10-23, `gh pr list --state open`, 16 PRs)
 
 Nenhum PR aberto altera `core/cognitivo/counterfactual.py`, `core/cognitivo/causal_world_model.py`, `core/cognitivo/action_effects.py`, `tools/cognitivo_mutation.py`, `tools/cognitivo_eval.py` ou este arquivo. O #79 (draft, não usado como base) altera `docs/agentes/CLAIMS.yaml`. `AUDIT_REALITY_REPORT.md` / `audit_reality.json` aparecem em #38, #39, #40, #41, #42, #44, #46, #48 e #49; se o gate de realidade exigir recontagem depois da edição de `counterfactual.py`, o diff fica só nessa recontagem, sem o código desses PRs. State docs, Axis, `constitutional_brain` e #60 ficam de fora. O claim do #105 (já mesclado) é substituído pelo claim grok-bot desta tarefa, prazo `2026-10-26T03:00:00Z`.
+
+## CF gap plausibilidade — critérios pré-registrados (CF10–CF13)
+
+**Objetivo:** `_calculate_plausibility` deixa de ser só `max(0.1, 0.7 - 0.05*|chain|)`. O comprimento da chain continua na conta, e um termo de atestação no grafo causal injetado muda o número quando há aresta real. Heurística explícita, não probabilidade e não réplica de Roese e Olson (1995): o paper está citado na lacuna 5 como motivo para não usar só o comprimento; a operacionalização desta rodada é a fração de passos da cadeia que coincidem com uma aresta já gravada.
+**Não escopo:** twin network, abdução de Pearl, Axis, state docs congelados (`CONTINUATION.md`, `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md`, `SECURITY_TRIAGE.md`), `core/constitutional_brain.py`, `tools/targeted_mutation.py`, `tools/cognitivo_eval.py` (CF5 v1 permanece o critério do avaliador), PRs #38–#50 / #60 / #79. Nenhum script novo: o harness `tools/cognitivo_eval.py` já recusa capability vazia com rc 2, distinto de 0 e de 1 (`test_cognitivo_eval_cli_contract.py`).
+**CF5:** o alvo v1 não muda. Monotonia estrita em comprimentos (1, 3, 5, 10), com a mesma semântica de comprimento (`len(causal_chain)`), no motor sem grafo que o avaliador já usa. Não há CF5v2. Se o eval falhar depois da implementação, o defeito é a fórmula vazar evidência no grafo vazio; o alvo não será reescrito para acomodar a falha.
+
+### Observação (base `29a5711`, antes de código novo e antes de reexecutar o eval)
+
+Comando (só leitura), `PYTHONPATH=.`, Python 3.12.3, `RealCounterfactualReasoningEngine` sem argumentos e com um grafo stub `alarm → {patch}` e `APPLY_PATCH → {system_status secure}`:
+
+| chamada | score impresso |
+|---|---|
+| `_calculate_plausibility("x", ["a"]*n)` para n = 1, 3, 5, 10 | 0.65, 0.55, 0.45, 0.20 (monótono; resíduos binários de `0.05`) |
+| cadeia `["noise"]*5`, texto `do(APPLY_PATCH): system_status=secure` ×5, ou `alarm causes patch` ×5, com ou sem o grafo | o mesmo 0.45 |
+| intervenção `""` ou `"   "` com cadeia de 5 | 0.45 |
+| `generate_counterfactual_scenario("alarm", "patch")` com `RealCausalReasoning` | cadeia `["alarm causes patch"]`, score 0.65 |
+| `generate_counterfactual_scenario("system vulnerable", "apply patch")` sem causal | 5 passos heurísticos, score 0.45 |
+
+O grafo não entra na conta. Duas cadeias de comprimento 5, uma com aresta e outra sem, recebem o mesmo número. Intervenção vazia não abaixa o score.
+
+### Fórmula congelada (heurística; constantes de calibração, não evidência de capacidade)
+
+`length_score(n) = max(0.1, 0.7 - 0.05*n)`.
+
+1. `causal_chain` tem de ser `list` de `str`. Caso contrário `TypeError` (não iterar `str`/`tuple` como cadeia; não aceitar item `bool`/`int`/`float`).
+2. Intervenção `False`, ou `str` cujo `strip` é vazio (`""`, `"   "`): retornar `0.1`, mesmo se a cadeia estaria atestada. `False` acompanha o sentinela já coberto por CF9 (`outcome_without_intervention`); não entra como magnitude. `True`, `int` (inclusive `-1`), `float` (`nan`, `±inf`), `None` e qualquer outro não-`str`: `TypeError`. A string `"-1"` ou `"nan"` é intervenção não vazia e segue a fórmula.
+3. Passo atestado, só com o mesmo `_adjacency()` de CF9 (aresta prévia; o template lexical desta chamada só conta se o extrator já a gravou antes da plausibilidade, que é a ordem atual de `generate_counterfactual_scenario`):
+   - `do(AÇÃO): chave=valor` casa o passo inteiro, e algum efeito de `adjacency[AÇÃO]` parte por `str(effect).strip().split(None, 1)` em exatamente `(chave, valor)`;
+   - `CAUSA causes EFEITO` casa o passo inteiro, e `str(item) == EFEITO` para algum item de `adjacency[CAUSA]`.
+   - Valor de adjacência que seja `str` ou `bytes` não é conjunto de efeitos (não iterar caracteres) e não conta como aresta.
+4. `f = (passos atestados) / n` quando `n > 0`. Se há passo atestado: `min(1.0, length_score(n) + 0.2*f)`. Se não há passo atestado e o grafo tem ao menos uma aresta (container `set`/`list`/`tuple`/`frozenset` não vazio): `max(0.1, length_score(n) - 0.2)`. Senão: `length_score(n)`.
+5. Comparações nos testes: `math.isclose(..., abs_tol=1e-9)`. Os literais abaixo são os valores decimais dessa conta.
+
+Passos `planner: …`, `Immediate effect` e o resto do template de 5 passos não casam o formato. Sem grafo, não ganham bônus: o comprimento efetivo depois de filtrar esses passos **não** substitui `len(causal_chain)` (hipótese H2, rejeitada antes de codar).
+
+### Hipóteses concorrentes (Strong Inference)
+
+| id | hipótese | o que a falsifica | teste barato |
+|---|---|---|---|
+| H1 | a fórmula fixa já separa cadeia SCM de cadeia heurística; nada a fazer | na base `29a5711`, comprimento 5 com aresta e comprimento 5 sem aresta dão o mesmo 0.45 | sonda desta seção (já observada) e CF10 |
+| H2 | o alvo certo é o comprimento depois de descartar "Immediate effect" / "Secondary effect" / "Final outcome", e CF5 vira CF5v2 | seria preciso mudar o alvo do eval, que mede `len(["a"]*n)` | não implementar; CF5 v1 permanece |
+| H3 | basta o texto `do(` ou `causes`, sem aresta no grafo | cadeia `alarm causes patch` ×5 ou `do(APPLY_PATCH): system_status=secure` ×5, grafo vazio, score ≠ `length_score(5)` | CF10-text |
+| H4 | intervenção vazia deve continuar em `length_score` | `""` / `"   "` com n=5 dão 0.45 | CF11 |
+| H5 | o termo de atestação derruba CF1–CF8 ou a monotonia de CF5 no motor sem grafo | `cognitivo_eval --criteria v1` falha, em particular CF5 | CF5 no contrato e o eval |
+
+Hipótese de trabalho (não vinculante para além do que a tabela de critérios já fixa): implementar os itens 1–5 em `_calculate_plausibility`, sem editar `causal_world_model.py` nem o avaliador.
+
+### Critérios
+
+| id | afirmação | protocolo falsificável | alvo |
+|---|---|---|---|
+| CF5 | monotonia v1 intacta, mesmos valores da fórmula de comprimento quando não há grafo | motor sem grafo, intervenção `"x"`, cadeias `["a"]*n` para n em (1, 3, 5, 10): scores `isclose` de 0.65, 0.55, 0.45, 0.20 e cada um estritamente menor que o anterior. n=2 continua `isclose` de 0.6 (o assert já existente em CF9) | monótono e esses literais |
+| CF10-length | heurística de 5 passos sem grafo não muda | `generate_counterfactual_scenario("system vulnerable", "apply patch")` sem causal: cadeia de 5, score `isclose` de 0.45 | igual à fórmula antiga |
+| CF10-scm | aresta SCM, mesmo comprimento, sobe | grafo `APPLY_PATCH → {system_status secure}`, intervenção `"APPLY_PATCH"`, cadeia de 5 cópias de `do(APPLY_PATCH): system_status=secure`: score `isclose` de 0.65, e não `isclose` de 0.45 | 0.65 |
+| CF10-rel | relação extraída no grafo, mesmo comprimento, sobe | grafo `alarm → {patch}`, intervenção `"patch"`, `alarm causes patch` ×5: score `isclose` de 0.65 | 0.65 |
+| CF10-freq | a fração entra na conta | o mesmo grafo, cadeia com 1 passo `alarm causes patch` e 4 `"noise"`: score `isclose` de 0.49 (0.45+0.2×0.2), não `isclose` de 0.65 nem de 0.45 | 0.49 |
+| CF10-text | texto sem aresta não é evidência | sem grafo, as duas cadeias de CF10-scm e CF10-rel: score `isclose` de 0.45 | 0.45 |
+| CF10-live | o cenário gravado usa a conta nova | com `RealCausalReasoning` e sem world model: `("alarm","patch")` → cadeia `["alarm causes patch"]` e score `isclose` de 0.85 (não 0.65). Com a aresta C4 já extraída (`DEPLOY_FIX causes system_status secure`): cadeia `["do(DEPLOY_FIX): system_status=secure", "host exposed causes DEPLOY_FIX"]` e score `isclose` de 0.8 (não 0.6) | 0.85 e 0.8 |
+| CF11 | intervenção vazia ou sem texto → piso | `""`, `"   "` e `False`, cadeia de 5, com ou sem o grafo de CF10-rel: score `isclose` de 0.1, estritamente menor que 0.45. `generate(..., "")`, `generate(..., "   ")` e `generate(..., False)` gravam cenário com esse piso; o outcome de `""` e de `False` continua `outcome_without_intervention` | 0.1 |
+| CF12 | grafo com aresta e cadeia sem passo atestado → abaixo da fórmula de comprimento | grafo de CF10-rel, intervenção `"patch"`, `["noise"]*5`: score `isclose` de 0.25. Cadeia `[]` com o mesmo grafo: `isclose` de 0.5. Sem grafo, cadeia `[]` e intervenção `"x"`: `isclose` de 0.7. Valor `str` em vez de conjunto (`{"alarm": "patch"}`) não é aresta: score de `["noise"]*5` continua `isclose` de 0.45 | 0.25 / 0.5 / 0.7 |
+| CF13 | tipo inválido não vira número | `TypeError` em `_calculate_plausibility` para intervenção `True`, `1`, `-1`, `nan`, `inf`, `-inf`, `None`; cadeia `"abc"`, `("a",)`, `None`, `True`, `["a", 1]`, `["a", True]`, `["a", nan]`. A string `"-1"` com n=1 e sem grafo permanece `isclose` de 0.65 | exceção ou 0.65 |
+
+Ordem exigida no contraste de comprimento 5, intervenção não vazia: score sem suporte (0.25) < score sem grafo (0.45) < score com os 5 passos atestados (0.65).
+
+O golden de extração inclui `plausibility_score` de `generate("alarm","patch")` com `RealCausalReasoning`. Esse campo, e `stats2["avg_plausibility"]`, passam de 0.65 a 0.85. O SHA será medido de novo **depois** da implementação e registrado na seção de resultados; não é alvo deste pré-registro. Os demais campos do payload (cenário sem grafo, Jaccard, parse) não são alvo de mudança.
+
+### Regressão exigida
+
+`python tools/cognitivo_eval.py --capability counterfactual --criteria v1` — CF1, CF2, CF3, CF4, CF5, CF6, CF7 e CF8 continuam passando. CF5 conforme a linha CF5 acima (monotonia v1; o eval não exige os literais, o contrato novo exige). Os asserts de CF9 que comparam a fórmula de comprimento em motor **sem** aresta (`test_plausibility_formula_not_retuned`, planner+spy sem grafo) continuam válidos e não serão relaxados.
+
+### Varredura §7.2 (2026-10-23, `gh pr list --state open`)
+
+Nenhum PR aberto altera `core/cognitivo/counterfactual.py`, `test_counterfactual_extraction_contract.py`, `tools/cognitivo_mutation.py`, `tools/cognitivo_eval.py` ou este arquivo. O #79 (draft, não usado como base) altera `docs/agentes/CLAIMS.yaml`; o claim do #106, já mesclado, é substituído por este, nos arquivos desta tarefa, sem editar `versao_aceita` de outro agente. `AUDIT_REALITY_REPORT.md` / `audit_reality.json` aparecem em #38, #39, #40, #41, #42, #44, #46, #48 e #49; recontagem, se o gate exigir, fica só nos números deste módulo. State docs, Axis, `constitutional_brain` e #60 ficam de fora.
+
+Pré-registro escrito **antes** da implementação, **antes** do contrato e **antes** de rodar o eval nesta rodada. O SHA deste commit entra no PR. Resultados só numa seção posterior.
