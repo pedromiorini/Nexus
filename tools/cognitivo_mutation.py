@@ -39,7 +39,8 @@ R1_TESTS = ("test_action_effects_contract.py",)
 R2_TESTS = ("test_futures_ranking_contract.py",)
 R3_TESTS = ("test_causal_extraction_contract.py",)
 R4_TESTS = ("test_scm_intervention_contract.py",)
-CF_TESTS = ("test_counterfactual_extraction_contract.py", "test_counterfactual_contract.py")
+CF_TESTS = ("test_counterfactual_extraction_contract.py", "test_counterfactual_contract.py",
+            "test_counterfactual_gap3_contract.py")
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
@@ -266,6 +267,14 @@ MUTATIONS = [
              "        comparison = self.compare_outcomes(scenario)",
              "        comparison = scenario  # wrong type/shape",
              tests=("test_counterfactual_extraction_contract.py",)),
+        Mutation("cf_explicit_kwargs_ignored", COUNTERFACTUAL,
+             "situation is not None and intervention is not None",
+             "False  # mutant: ignore explicit API",
+             tests=CF_TESTS),
+    Mutation("cf_explicit_swaps_sit_inter", COUNTERFACTUAL,
+             "sit, inter = situation, intervention",
+             "sit, inter = intervention, situation  # mutant: swap",
+             tests=CF_TESTS),
     Mutation("cf_parse_what_if_always_default", COUNTERFACTUAL,
              "        if \"what if\" in question_lower:",
              "        if False:",

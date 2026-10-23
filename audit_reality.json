@@ -24,7 +24,7 @@
       },
       {
         "path": "core/cognitivo/counterfactual.py",
-        "lines": 361,
+        "lines": 377,
         "classes": 4,
         "functions": 14
       },

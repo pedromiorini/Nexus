@@ -361,3 +361,14 @@ Ordem sugerida (custo/benefício): 3 (API explícita) → 4 (Jaccard) → 1 (pla
 | alarm firing | rollback |
 
 Pré-registro commitado **antes** da implementação e da execução do eval.
+
+### Resultados CF7 (após pré-registro 624ce27)
+
+| id | valor | alvo | passou | nota |
+|---|---|---|---|---|
+| CF7 | 4/4 | 4/4 + CF4≥5/5 | **sim** | `explore_what_if(situation=, intervention=)` preserva S; string API intacta (CF4 5/5) |
+| CF1–CF2, CF4–CF6 | (regressão) | pass | **sim** | sem regressão |
+| CF3 | falso | — | não | fora de escopo (não corrigido) |
+
+**Antes:** `explore_what_if` só aceitava `question: str`; parse forçava `situation="current_situation"`.
+**Depois:** kwargs explícitos; chamador controla a situação.
