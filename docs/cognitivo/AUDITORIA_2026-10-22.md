@@ -454,7 +454,31 @@ O inteiro `8` é orçamento de sonda, distinto do default `200` de `RealMCTSPlan
 
 `python tools/cognitivo_eval.py --capability counterfactual --criteria v1` — CF1, CF2, CF4, CF5, CF6, CF7 e CF8 continuam passando; CF3 passa a passar. Golden de extração permanece `fbfb32e9466bf161155a7546e2db07e2f73434230d581217a44fd4b324eb646e` enquanto `planner is None` (H3).
 
-Pré-registro commitado **antes** da implementação e **antes** de rodar o eval nesta rodada. Resultados só num commit posterior.
+Pré-registro commitado **antes** da implementação e **antes** de rodar o eval nesta rodada: `a4f591e122ccb34646e7dbb344c1f1dea3591cdc`. Resultados abaixo são de execução posterior.
+
+### Resultados CF3 / CF3b (após o pré-registro)
+
+Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, hypothesis 6.170.5, coverage 7.16.2, bandit 1.9.4). O CI usa Python 3.11; esta máquina não o executou.
+
+| id | valor | alvo | passou | nota |
+|---|---|---|---|---|
+| CF3 | verdadeiro | verdadeiro | **sim** | `self.planner` lido em `_planner_steps` |
+| CF3b | 13/13 no contrato | chamada + uso + fallback | **sim** | ver comando abaixo |
+| CF1, CF2, CF4, CF5, CF6, CF7, CF8 | pass | pass | **sim** | `cognitivo_eval` rc 0, `failed: []` |
+
+**RED (antes da correção, commit `85c0280`):** `python -m unittest test_counterfactual_planner_contract.py` → 11 falhas, rc 1. Dois controles que já descreviam o comportamento sem planner passaram (`test_absent_or_noncallable_plan_keeps_heuristic`, `test_other_methods_do_not_call_plan`).
+
+**GREEN:** o mesmo unittest, mais os contratos CF de extração/gap3/gap4/eval, passou (28 testes no conjunto focado). `python tools/cognitivo_eval.py --capability counterfactual --criteria v1` → rc 0. Golden de extração permaneceu `fbfb32e9466bf161155a7546e2db07e2f73434230d581217a44fd4b324eb646e` (o teste de extração passou com `planner is None`).
+
+**Implementação:** `generate_counterfactual_scenario` chama `_planner_steps`. Se `plan` é chamável, a chamada é `plan(situation, available_actions=[intervention], max_iterations=8)`. Itens `str` de `best_action_sequence` entram no fim da cadeia como `planner: {ação}`. A intervenção do chamador não é trocada. Isto não é `do(X)`.
+
+**Hipóteses:** H1 (planner já era chamado por via dinâmica) ficou excluída pelo RED (0 chamadas). H3 (heurística muda com `planner is None`) ficou excluída pelo eval e pelo golden. H4 (contrato de `RealMCTSPlanner.plan` incompatível com pares `str`) ficou excluída pelo teste que vê `total_plans == 1`. H5 não foi implementada. H2 (basta uma leitura morta de `self.planner`) não é a correção entregue: o mutante `cf_planner_never_consulted` morre no contrato.
+
+**Mutação:** `python tools/cognitivo_mutation.py` → `{"declared": 92, "killed": 92, "survived": 0, "not_applied": 0}`, rc 0. `python tools/targeted_mutation.py` → 69/69 mortos, rc 0.
+
+**Suíte:** `python -m unittest discover -p 'test_*.py'` → 530 testes, rc 0. Cobertura `core/cognitivo/*` 92% (piso 90). `ruff check` nos alvos do workflow, rc 0. `reality_audit.py` sem diff depois do commit de recontagem (counterfactual.py 409 linhas, 15 funções). Bandit: 131 LOW, 0 MEDIUM/HIGH; rc 1 do Bandit é o exit conhecido por LOW; `security_triage.py --check` rc 0. `validar_registro.py --expirados aviso` rc 0. `predeleg.sh HEAD origin/main` → `OK: sem conflito`.
+
+**Fora do que este comando mede:** orçamento 8 não avalia qualidade do MCTS; a fórmula de plausibilidade não mudou, mas uma sequência não vazia alonga a cadeia e portanto reduz o número pela fórmula já existente.
 
 ### Varredura §7.2 (2026-10-23, `gh pr list --state open`)
 
