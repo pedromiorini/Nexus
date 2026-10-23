@@ -216,3 +216,17 @@ Registrado antes de implementar/executar. Critérios C1–C4 inalterados (v1, `-
 | golden de extração | `feb0815a…` inalterado (se mudar, re-pin só com justificativa no PR) | — |
 
 Escopo: tabela declarativa única em `core/cognitivo/action_effects.py`, consumida pelo `RealMCTSPlanner` (deltas numéricos) e pelo `RealWorldModelSimulator` (efeitos simbólicos); ação fora da tabela → `warnings` e estado inalterado. C1, C3 e C4 não são alvo (resultado relatado mesmo assim).
+
+---
+
+## Correção R2 — ranking ordinal de futuros (pré-registro)
+
+Registrado antes de implementar/executar. Empilhado em R1 (#97) só para evitar conflitos nos arquivos append-only (AUDITORIA, CLAIMS, lista de mutantes). Critérios C inalterados.
+
+| id | critério de sucesso R2 | antes (R1) |
+|---|---|---|
+| C3 | ≥ 5/6 top-1 nos 6 conjuntos congelados | 3/6 |
+| compatibilidade | `compare_futures` mantém as chaves `results`, `best_future_index`, `best_future` e o `ValueError` para lista vazia; quando o sucesso difere, o futuro com sucesso continua vencendo | — |
+| não regressão | C2a ≥ 0.80, C2b verdadeiro; golden de extração inalterado (re-pin só com justificativa) | 0.80 / verdadeiro |
+
+Escopo: utilidade ordinal por `system_status` (secure > stable > isolated = offline = vulnerable > compromised), chave `(success, utilidade)`, empate → menor índice.
