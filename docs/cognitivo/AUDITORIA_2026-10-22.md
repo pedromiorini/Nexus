@@ -715,3 +715,146 @@ Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, hyp
 **Fora do que estes comandos medem:** a fração é atestação na cadeia, não frequência num corpus; não há abdução nem twin network; o factual não é lido do SCM; passo `planner:` não é atestado; CI hospedado e Python 3.11 não rodaram. Nenhum script novo: capability vazia do eval continua no contrato já existente (rc 2). Conflito de merge com os PRs que também versionam o relatório de realidade não foi resolvido contra as branches deles.
 
 PR draft: https://github.com/pedromiorini/Nexus/pull/107
+
+---
+
+## Working Memory — critérios pré-registrados (WM1–WM6)
+
+**Objetivo desta rodada:** extrair, em move-only, o bloco POST6 (`WorkingMemoryItem`, `RehearsalEvent`, `PhonologicalLoop`, `VisuospatialSketchpad`, `CentralExecutive`, `RealWorkingMemorySystem`) de `core/constitutional_brain.py` para `core/cognitivo/working_memory.py`, com reexport strangler no ponto original e em `core/cognitivo/__init__.py`. Medir WM1–WM6. Se todos passam, documentar e parar. Se algum falha no monólito atual, registrar o gap. Não corrigir comportamento depois de ver o número.
+**Não escopo:** injetar relógio, Attention, IncrementalLearner, HierarchicalMemory/FAISS, Metacognition (#42), Axis, state docs (`CONTINUATION.md`, `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md`, `SECURITY_TRIAGE.md`), `tools/targeted_mutation.py`, PRs congelados #38–#50 / #60 / #79, twin network. Bool/`NaN` no clamp ficam como estão: o golden os registra; esta rodada não os rejeita.
+**Eval:** `python tools/cognitivo_eval.py --capability working_memory`. O protocolo abaixo é único; `--criteria` v1/v2/v3 não o altera. Seeds não se aplicam: `item_id` é `uuid.uuid4()` e os instantes vêm de `time.time()`. O golden não inclui ids nem timestamps crus.
+**Base da observação:** `b6da175` (merge do #107). Sonda só de leitura, `PYTHONPATH=.`, Python 3.12.3, antes deste texto e antes de qualquer harness `working_memory`.
+
+### Varredura §7.2 (2026-10-23, `gh pr list --state open`)
+
+PRs abertos que editam `core/constitutional_brain.py`: #38, #39, #40, #41, #42, #44, #46, #48, #49. São os congelados do pedido; não são a base. A extração precisa do reexport no monólito (§16). Isso tensiona a fila única da §11.2: o conflito com esses PRs fica declarado, sem rebase neles.
+Nenhum PR aberto altera `test_working_memory_contract.py`, `tools/cognitivo_eval.py`, `tools/cognitivo_mutation.py`, `core/cognitivo/__init__.py` ou este arquivo. O #79 (draft, não usado como base) altera `docs/agentes/CLAIMS.yaml`. `AUDIT_REALITY_REPORT.md` / `audit_reality.json` aparecem em #38, #39, #40, #41, #42, #44, #46, #48 e #49; se o gate exigir recontagem depois do move, o diff fica só nos números deste módulo. O claim do #107, já mesclado em `b6da175` e ainda listado, é substituído pelo claim grok-bot desta tarefa, prazo `2026-10-26T04:00:00Z`.
+
+### Observação (código e sonda, antes do move e antes do eval)
+
+**Fato, lido no bloco ~L5412–L5827:** não há parâmetro de relógio. `PhonologicalLoop.decay_items` e `rehearse` chamam `time.time()`. `store` remove `min(buffer, key=last_rehearsed)` quando `len >= capacity`. `store_visual` / `store_spatial` removem `min(buffer, key=activation)`. O filtro de decay é `activation > 0.1` (igual a 0,1 sai). `rehearse` faz `min(1.0, activation + 0.3)` e reescreve `last_rehearsed`. `retrieve` é `str(query).lower() in str(content).lower()`, primeiro hit, senão `None`. `allocate_attention` faz `max(0.0, min(1.0, float(strength)))`.
+
+**Fato, sonda no monólito** (atribuir `last_rehearsed` / `activation` / `entered_at` já públicos; isso não é API nova):
+
+| sonda | valor |
+|---|---|
+| 7 `store`, `last_rehearsed` = 1..7, 8º store | len 7; sai o de `last_rehearsed` 1 |
+| empate de `last_rehearsed` | `min` estável: sai o primeiro do buffer |
+| 4 `store_visual`, activations 0.9, 0.2, 0.8, 0.4, 5º store | len 4; sai o 0.2 |
+| empate de activation 1.0 | sai o primeiro |
+| activation 1.0, `last_rehearsed = time.time()-0.4`, mais um com `last_rehearsed=0`, mais um com activation 0.1 | depois de `decay_items` só o primeiro permanece, activation impressa 0.8 em 4 casas; os outros saem |
+| `rehearse` com activation 0.4 | 0.7; `last_rehearsed` atualizado; id ausente → `False`; 0.9 → 1.0; 1.0 → 1.0 |
+| gêmeo com `last_rehearsed=0` não ensaiado | `decay_items` o remove; o ensaiado fica |
+| `retrieve("alpha"/"BETA"/"alp")` em `"Alpha Beta"` | o item; `"zzz"` → `None`; `""` → o primeiro (substring vazia) |
+| clamp `float` | 2.0→1.0, −1→0.0, 0.5→0.5, `True`→1.0, `False`→0.0, `inf`→1.0, `-inf`→0.0, `nan`→1.0 (`min(1.0, nan)` fica 1.0 porque comparação com NaN é falsa) |
+| `"abc"` / `None` / `[]` / `{}` | `ValueError` / `TypeError` / `TypeError` / `TypeError` |
+| `switch_task` da tarefa corrente / outra | 0.0 / 0.2 |
+| `prioritize_item` 0.5 com prioridade 1, depois 10 | 0.8, depois 1.0 |
+| `refresh` 0.5 / 0.9 / id ausente | 0.7 / 1.0 / `False` |
+| `maintain_items` com 4 itens activation 1.0 e `last_rehearsed=time.time()` | `rehearsal_count` 3; `rehearse_verbal` de id ausente não incrementa |
+| `integrate_multimodal` cheio, vítima = menor `entered_at` (não a menor activation) | len 4; o mais antigo sai |
+| `store_spatial` cheio | vítima = menor activation, não o menor `entered_at` |
+| `transfer_to_ltm` com stub / sem ltm | uma chamada `store(content, "long_term", importance=activation)` e contador 1 / contador 0 |
+| `consciousness.attend_to` | `("working_memory", "Stored in WM: " + content[:50] + "...", "cognitive", salience=0.5)` |
+| `retrieve_from_wm` com activation 0.5 | 0.7; miss → `None` |
+| `get_active_items` | ordem decrescente de activation |
+| estatísticas do sistema vazio | contadores 0 e usos 0.0; o `__init__` imprime a linha `POST 6` |
+
+O 0.8 da sonda de decay **não** é limite. É uma leitura de wall-clock. O critério WM3 não exige igualdade.
+
+### Hipóteses concorrentes (Strong Inference)
+
+| id | hipótese | o que a falsifica | teste barato |
+|---|---|---|---|
+| H1 | o estouro fonológico remove o menor `last_rehearsed` (empate: o primeiro do buffer), não `entered_at` | no protocolo WM1 o item de `last_rehearsed` mínimo permanece, ou o segundo do empate sai | WM1 |
+| H2 | o estouro visual/espacial remove a menor activation (empate: o primeiro), não o mais antigo | no protocolo WM2 o item de activation 0.2 permanece | WM2 |
+| H3 | já existe relógio injetável e a activation depois de Δt=0,4 s é exatamente 0,8 | a assinatura de `decay_items` / `__init__` não tem relógio, ou a activation observada não é `== 0.8` | leitura da assinatura (já feita) e WM3 |
+| H4 | `rehearse` não altera a sobrevivência; os dois gêmeos caem juntos | o ensaiado sai, ou o não ensaiado fica, ou 0.4 não vai a 0.7, ou 0.9 passa de 1.0 | WM4 |
+| H5 | `retrieve` é igualdade de token, ou distingue maiúsculas | `"alp"` ou `"BETA"` não acham `"Alpha Beta"`, ou `"zzz"` devolve item | WM5 |
+| H6 | mover o bloco muda o clamp ou o restante do fingerprint | SHA do protocolo WM6 ≠ o valor abaixo, ou as classes reexportadas não são o mesmo objeto | WM6 |
+
+Hipótese de trabalho (não vinculante para além da tabela): move-only, sem injetar relógio e sem alterar fórmulas. Se H3 no sentido "exatamente 0,8" falhar, isso é o gap de relógio já previsto, não um convite a mudar o código.
+
+### Critérios
+
+| id | afirmação | protocolo falsificável | alvo |
+|---|---|---|---|
+| WM1 | `PhonologicalLoop(capacity=7)`: 8 `store` distintos deixam `len(buffer)==7`; a vítima é o menor `last_rehearsed` | Depois de 7 `store`, atribuir `last_rehearsed` a 1..7 e dar o 8º `store`. O item de valor 1 sai; o 8º fica; len 7. Empate: os 7 com `last_rehearsed=5.0`; sai o primeiro; o segundo fica | len 7 e essa vítima |
+| WM2 | `VisuospatialSketchpad(capacity=4)`: 5 `store_visual` deixam len 4; a vítima é a menor activation | 4 stores, activations 0.9, 0.2, 0.8, 0.4, 5º store: sai o 0.2. Empate com activation 1.0: sai o primeiro | len 4 e essa vítima |
+| WM3 | sem relógio injetável, medir o que é determinístico: decay reduz activation; item com activation ≤ 0.1 sai | (1) `inspect.signature`: `decay_items` só tem `self` e `__init__` não tem parâmetro de relógio — registrar `clock: "wall"`, sem falhar o id por isso. (2) Três itens no mesmo loop: A activation 1.0 e `last_rehearsed=time.time()-0.4`; B activation 1.0 e `last_rehearsed=0.0`; C activation 0.1 e `last_rehearsed=time.time()`. Depois de `decay_items`: B ausente, C ausente, A presente, `A.activation < 1.0` e `A.activation > 0.1`. Não exigir `== 0.8`. Se o processo parar por mais de ~1 s entre a atribuição e o decay, A pode cair a ≤ 0.1: isso é o gap de wall-clock, registrado, e **não** autoriza injetar relógio nesta rodada | (2) como escrito; (1) só documenta |
+| WM4 | `rehearse(id)` sobe activation com teto 1.0, atualiza `last_rehearsed`; o ensaiado sobrevive a um decay que remove o gêmeo | Dois itens, activation 0.4, `last_rehearsed=0`. `rehearse` do primeiro → `True`, activation 0.7, `last_rehearsed` ≥ instante lido imediatamente antes da chamada. Id ausente → `False`. Outro loop: 0.9 → 1.0; 1.0 → 1.0. `decay_items` no par: o ensaiado fica, o gêmeo sai | 0.7, teto 1.0, sobrevivência |
+| WM5 | `retrieve(query)` é substring sem distinguir maiúsculas; miss → `None` | `store("Alpha Beta")` depois `store("other")`. `retrieve("alpha")`, `retrieve("BETA")` e `retrieve("alp")` devolvem o primeiro. `retrieve("zzz")` é `None` | esses quatro resultados |
+| WM6 | move-only: reexports públicos são o mesmo objeto; fingerprint do comportamento atual, inclusive o clamp, é idêntico | Classes `WorkingMemoryItem`, `RehearsalEvent`, `PhonologicalLoop`, `VisuospatialSketchpad`, `CentralExecutive`, `RealWorkingMemorySystem`: `core.constitutional_brain` e `core.cognitivo` são o mesmo objeto que `core.cognitivo.working_memory`, e `__module__` é `core.cognitivo.working_memory`. O módulo importa sem puxar o monólito, numpy ou vita. O dict do protocolo abaixo, serializado com `json.dumps(..., sort_keys=True, ensure_ascii=False)`, tem SHA-256 `3b6b63cb69d6ffced16ffec0c1bbbbeb8fe92bf7cecd13e20f4989b0d17051ca`, igual pela classe do monólito e pela do módulo novo | SHA e identidade |
+
+**Protocolo do fingerprint WM6** (o que entra no dict; stdout do banner desviado para não misturar com o hash, mas `banner_printed` é verdadeiro se o texto capturado contém `POST 6`):
+
+- `clamp`: `repr(s) → strength` para s em `(2.0, -1.0, 0.5, 0.0, 1.0, 1, True, False, inf, -inf, nan)`, alvo `"planning"`.
+- Em seguida, nesse mesmo executivo (tarefa corrente `"planning"`): `switch_same = switch_task("planning")`, `switch_other = switch_task("other")`.
+- `plain`: `allocate_attention("planning", 2.0)` sem attention → `{target: planning, strength: 1.0, delegated: false}`.
+- `delegated`: com `attention_system=object()`, `("monitoring", -1.0)` → strength 0.0 e `delegated: true`.
+- `errors`: `"abc"` → `ValueError`; `None`, `[]`, `{}` → `TypeError`.
+- `prioritize`: item activation 0.5, prioridade 1.0 → 0.8; o mesmo item, prioridade 10.0 → 1.0. Lista `[0.8, 1.0]`.
+- `refresh`: visual 0.5 → 0.7; 0.9 → 1.0; id ausente → `false`. Lista `[0.7, 1.0, false]`.
+- Esboço espacial capacity 4, pares (activation, entered_at) `(0.9, 1.0), (0.1, 4.0), (0.8, 2.0), (0.5, 3.0)`, depois mais um `store_spatial`: `spatial_victim_is_low_activation` verdadeiro e `spatial_oldest_remains` verdadeiro.
+- `PhonologicalLoop`: `store("Alpha Beta")`, `store("other")`, `retrieve("")` → `"Alpha Beta"` (`retrieve_empty`). Isso não é WM5; é o comportamento atual da substring vazia, preso no golden para o move não "corrigir" em silêncio.
+- Sistema vazio: `stats0` com as nove chaves atuais (`total_items_stored`, `rehearsal_count`, `items_transferred_to_ltm`, três `current_*`, três `*_capacity_usage`) em zero. Quatro `store_verbal`, activation 1.0, `last_rehearsed=time.time()` imediatamente antes de `maintain_items`: `maintain_count==3`. `rehearse_verbal("missing")` deixa o contador em 3.
+- `store_spatial({"x": 1})` → `spatial_modality=="spatial"`.
+- Quatro `integrate_multimodal`, depois `(entered_at, activation)` = `(1.0, 0.9), (2.0, 0.8), (3.0, 0.4), (4.0, 0.2)`, quinto integrate: len 4, o menor `entered_at` sai, o de activation 0.2 fica.
+- LTM stub: `transfer_to_ltm` de `"memo"` → `[["memo", "long_term", 1.0]]` e contador 1. Sem LTM, contador 0.
+- Consciência stub: um `attend_to` com args e `salience` 0.5, texto `Stored in WM: ` + os primeiros 50 caracteres + `...`.
+- Outro sistema: verbal activation 0.2 conteúdo `"low"`, visual activation 0.9 conteúdo `"high"`: `get_active_items` → `["high", "low"]`.
+- `retrieve_from_wm("boostme")` com activation 0.5 → 0.7; `"zzz"` → miss.
+- `decay_rate` 0.5; `capacities` `[7, 4, 4]`.
+
+`retrieve("")` e a coerção de `bool`/`nan` fazem parte do golden de identidade. Não são metas de qualidade e não serão "corrigidas" nesta rodada.
+
+### Regressão exigida
+
+O contrato que já existe (`allocate_attention` 2.0 → strength 1.0 e `delegated` false; −1.0 com attention externo → strength 0.0 e `delegated` true) continua válido, sem relaxar asserts. O eval dos outros capabilities não é alvo de mudança de critério.
+
+Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability working_memory`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados WM (após o pré-registro `dcfa180`)
+
+Ambiente local: Python 3.12.3, venv com `requirements-ci.lock` (ruff 0.17.1, coverage 7.16.2, bandit 1.9.4). O CI usa Python 3.11; esta máquina não o executou. Os números abaixo são desta execução, não um carimbo de CI hospedado.
+
+**Commits.** Pré-registro `dcfa1804eb41f184503cfedfd6ff947b14d143b3` (só `CLAIMS.yaml` e esta auditoria). Move-only `bf6b6747e01a7d506e000b377b7305a98509fb9f`. Base `b6da175`.
+
+**RED**, antes de existir `core/cognitivo/working_memory.py`: `python -m unittest test_working_memory_contract.py` → rc 1, 7 testes, 4 `ModuleNotFoundError`. Os dois testes antigos de clamp e o teste de tipo inválido passaram no monólito.
+
+**GREEN**, mesmo comando depois do move: 7 testes, rc 0.
+
+**Eval** `python tools/cognitivo_eval.py --capability working_memory` (o padrão `--criteria v2` não altera o protocolo): rc 0, `failed: []`.
+
+| id | valor medido | alvo | passou |
+|---|---|---|---|
+| WM1 | len 7; vítima = menor `last_rehearsed`; empate sai o primeiro | len 7 e essa vítima | sim |
+| WM2 | len 4; vítima = activation 0.2; empate sai o primeiro | len 4 e essa vítima | sim |
+| WM3 | `clock: wall`; activation restante 0.7999968528747559; época e fronteira 0.1 saem | presente, `< 1` e `> 0.1`; sem exigir `== 0.8` | sim |
+| WM4 | boost 0.7 lido antes de `decay_items`; teto 1.0; id ausente `false`; ensaiado fica; gêmeo sai | 0.7, teto, sobrevivência | sim |
+| WM5 | `"alpha"` / `"BETA"` / `"alp"` → `"Alpha Beta"`; `"zzz"` → `null` | esses quatro | sim |
+| WM6 | SHA do módulo = SHA do monólito = `3b6b63cb69d6ffced16ffec0c1bbbbeb8fe92bf7cecd13e20f4989b0d17051ca`; identidade verdadeira | SHA pré-registrado e mesmo objeto | sim |
+
+O 0.7999968528747559 é a leitura desta reexecução. Na medição do commit de move o valor foi 0.7999963760375977. Os dois ficam em `(0.1, 1)`. Nenhum dos dois é limite.
+
+**Relógio.** `decay_items` continua só com `self`. Não há parâmetro de relógio em `__init__`. O gap de wall-clock fica registrado: se o processo parar por ~1 s, o item A pode cair a ≤ 0.1 e WM3 falha sem que a fórmula tenha mudado. Relógio não foi injetado.
+
+**Harness, não o módulo.** A primeira leitura de WM4 depois de `decay_items` deu ~0.699998 por causa do mesmo wall-clock. O critério pede 0.7 no instante do `rehearse`. O eval passou a gravar o boost antes do decay. O código de produção não mudou. `retrieve("")` continua devolvendo o primeiro item, e `True`/`False`/`nan` continuam 1.0/0.0/1.0 no golden. Não são correções.
+
+**Standalone do WM6.** Uma varredura por substring no texto do módulo falhou porque o docstring cita `constitutional_brain`. O critério pré-registrado fala de import, não de menção. O eval passou a ler a árvore de `import` / `import from` (numpy, vita, `core.constitutional_brain`). O bloqueio em tempo de execução, com `sys.meta_path`, permanece em `test_working_memory_contract.py`. Bandit não varre `test_*.py`.
+
+**Por que o eval não usa subprocesso.** No commit de move, `_wm_standalone` chamava `subprocess`. Bandit nessa árvore: 133 LOW (B404 e B603 em `tools/cognitivo_eval.py`); `security_triage.py --check` rc 1. `SECURITY_TRIAGE.md` é state doc e ficou fora de escopo. Depois da troca para AST: `bandit -r core vita tools` → 131 LOW, zero achados em `cognitivo_eval.py` e em `working_memory.py`; `--check` rc 0. `working_memory.py` não ganhou achado em nenhuma das duas contagens.
+
+**Hipóteses.** H1, H2, H4, H5 e H6 não se sustentam como falha neste eval: o comportamento medido é o da tabela de observação, e o SHA do fingerprint é o que foi congelado no monólito antes do splice. H3, no sentido "já existe relógio injetável e a activation é exatamente 0,8", fica excluída pela assinatura e por não exigir igualdade. Nenhuma delas vira alegação de memória de trabalho humana nem de prontidão.
+
+**Cobertura**, no commit de move (`coverage run --branch -m unittest discover -p 'test_*.py'`, depois o demo do núcleo): 569 testes, rc 0, 56.346 s. Demo `python core/constitutional_brain.py` rc 0. `working_memory.py` 161 statements, 30 ramos, 100%. `core/cognitivo/*` 1118 statements, 95% (piso 90). `constitutional_brain.py` 68% (piso 62). Fila 95%, VRAM 94%, temporal 93%, vita 76%. A edição posterior do eval não toca esses arquivos; os pisos não foram reexecutados depois dela.
+
+**Mutação.** `python tools/targeted_mutation.py` no commit de move: 69/69 mortos, 100%, rc 0. O catálogo do Axis não foi editado. `python tools/cognitivo_mutation.py` nesse mesmo commit, e de novo depois da troca do standalone para AST: `{"declared": 129, "killed": 129, "survived": 0, "not_applied": 0}`, rc 0. Os 24 mutantes do módulo novo estão nesse total. `wm_module_pulls_monolith` insere `import core.constitutional_brain`; o AST do eval e o contrato em subprocesso o matam.
+
+**Realidade** (recontagem exigida pelo gate, commitada com o move): núcleo 25664 linhas, 246 classes, 788 funções (antes 26071 / 252 / 813). `working_memory.py` 438 linhas, 6 classes, 25 funções. `core/cognitivo` 8 módulos, 2489 linhas. Literais dinâmicos 52. Frases fortes 51. Terminologia científica 233. Prefixo `Real` 63. Testes embutidos 31. `pass` puro 0. Retorno constante 2. `reality_audit` reexecutado depois do commit: diff vazio.
+
+**Outros gates locais no commit de move, e o que foi repetido depois:** `ruff check` nos alvos do workflow, rc 0; repetido no eval editado, rc 0. `validar_registro.py --expirados aviso`, rc 0. `predeleg.sh HEAD origin/main`, `OK: sem conflito` (o fetch trouxe `origin/main` até `b6da175`, que já é a base).
+
+**Fora do que estes comandos medem:** CI hospedado; Python 3.11; conflito de merge contra as branches dos PRs #38, #39, #40, #41, #42, #44, #46, #48, #49 e #79 (o `predeleg` só compara com `origin/main`); state docs não atualizados, de propósito; Attention, IncrementalLearner, HierarchicalMemory/FAISS, Metacognition, Axis e twin network não foram tocados. Não há interface web nesta extração.
+
+PR draft: https://github.com/pedromiorini/Nexus/pull/108

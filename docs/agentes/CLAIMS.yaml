@@ -3,15 +3,16 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "CF10: plausibilidade contrafactual informada pelo grafo (atestação de passos), sem redefinir CF5"
+    tarefa: "Extrair Working Memory (move-only) e auditar WM1–WM6 com critérios pré-registrados"
     arquivos:
-      - core/cognitivo/counterfactual.py
-      - test_counterfactual_plausibility_contract.py
-      - test_counterfactual_extraction_contract.py
+      - core/cognitivo/working_memory.py
+      - core/cognitivo/__init__.py
+      - core/constitutional_brain.py
+      - test_working_memory_contract.py
+      - tools/cognitivo_eval.py
       - tools/cognitivo_mutation.py
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - docs/agentes/CLAIMS.yaml
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
-    pr: 107
-    expira_em: "2026-10-26T03:00:00Z"
+    expira_em: "2026-10-26T04:00:00Z"

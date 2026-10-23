@@ -6,7 +6,7 @@
     "extracted_modules": [
       {
         "path": "core/cognitivo/__init__.py",
-        "lines": 1,
+        "lines": 19,
         "classes": 0,
         "functions": 0
       },
@@ -45,11 +45,17 @@
         "lines": 490,
         "classes": 3,
         "functions": 17
+      },
+      {
+        "path": "core/cognitivo/working_memory.py",
+        "lines": 438,
+        "classes": 6,
+        "functions": 25
       }
     ],
-    "core_lines": 26071,
-    "classes": 252,
-    "functions": 813,
+    "core_lines": 25664,
+    "classes": 246,
+    "functions": 788,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -113,8 +119,7 @@
       "RealTemporalReasoningEngine.get_statistics",
       "RealTheoryOfMind.get_statistics",
       "RealTransferLearningEngine.get_statistics",
-      "RealUncertaintyQuantificationEngine.get_statistics",
-      "RealWorkingMemorySystem.get_capacity_usage"
+      "RealUncertaintyQuantificationEngine.get_statistics"
     ],
     "embedded_test_markers": 31,
     "optional_dependency_warnings": [
