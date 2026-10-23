@@ -17,7 +17,7 @@ O runner deve manter modo Git `100755`: `tools/agente/replay/run_replay.sh` func
 
 ## Registro e aceite das instruções
 
-`python tools/agente/validar_registro.py --expirados aviso` valida registro e claims sem escrever nos arquivos. No schema 2, aceite anterior só gera aviso se versão, artefato e SHA forem verificáveis; versão desconhecida/futura, arquivo ausente ou SHA divergente continuam falhando. O schema 1 permanece estrito. Contrato, caminhos de migração e limites de confiança em [ACEITE_VERSIONADO.md](../../docs/agentes/ACEITE_VERSIONADO.md). Essa migração local mantém ambos os agentes em 3.4.1 e não aprova a v3.4.2.
+`python tools/agente/validar_registro.py --expirados aviso` valida registro e claims sem escrever nos arquivos. No schema 2, aceite anterior só gera aviso se versão, artefato e SHA forem verificáveis; versão desconhecida/futura, arquivo ausente ou SHA divergente continuam falhando. O schema 1 permanece estrito. Contrato, caminhos de migração e limites de confiança em [ACEITE_VERSIONADO.md](../../docs/agentes/ACEITE_VERSIONADO.md). A migração schema 2 foi integrada pela #113. A composição local da #79 seleciona instruções atuais 3.4.2, com Grok em 3.4.2 por aceite explícito verificado e Axis preservado em 3.4.1; somente o aviso de desatualização do Axis é esperado. O validador não consulta claims dos PRs abertos: a união com os claims locais ainda é verificada manualmente (§9C.3).
 
 ## Dependências e limitações
 - Rodar de dentro de um clone do repositório (o padrão é `git rev-parse --show-toplevel`; pode-se definir `R=`/`REPO=`). Requer `git` ≥ 2.38 (`merge-tree --write-tree`), `rg` e `awk`.

@@ -227,9 +227,11 @@ O rigor existe para evitar ilusão, não para impedir descoberta. Em consolidaç
 - Antes de alterar scripts de guarda ou skills: rodar `tools/agente/replay/run_replay.sh`; saída diferente de 0 = não prosseguir.
 - Afirmação sem comando ou link verificável no turno leva rótulo Inferência ou Hipótese.
 
-## 9C. Registro de agentes e claims (v3.3)
+## 9C. Registro de agentes e claims (v3.3; item 3 v3.4.2)
 1. Antes do 1º PR: declare-se em `docs/agentes/REGISTRO_AGENTES.yaml` (instruções, sha256, versão aceita, skills, escopo, limites). Autodeclaração é Hipótese; só hash e claims são verificados.
 2. Antes de começar: leia o registro e `docs/agentes/CLAIMS.yaml`; abra um claim (arquivos/tarefa, PR, `expira_em` ≤ 72 h). Claim ativo sobreposto ao seu → não comece; coordene com o dono.
-3. No corpo do PR: `Agent-Id: <id>`. Ao terminar: remova o claim.
+3. No corpo do PR: `Agent-Id: <id>`. (v3.4.2) O claim vive só no branch do PR enquanto ele está aberto: o 1º commit adiciona o claim em `docs/agentes/CLAIMS.yaml` e o **último commit do mesmo PR o remove antes do merge**, sem PR separado de remoção. Claims ativos = os do `CLAIMS.yaml` da `main` mais os do `CLAIMS.yaml` de cada PR aberto, lidos com:
+   `for n in $(gh pr list -R pedromiorini/Nexus --state open --json number -q '.[].number'); do echo "## PR #$n"; gh api -H 'Accept: application/vnd.github.raw' "repos/pedromiorini/Nexus/contents/docs/agentes/CLAIMS.yaml?ref=refs/pull/$n/head"; done`
+   (sem `gh`: `git fetch origin '+refs/pull/*/head:refs/remotes/origin/pr/*'` e `git show origin/pr/<n>:docs/agentes/CLAIMS.yaml`, só para PRs abertos). HTTP 404 = PR sem `CLAIMS.yaml` (base anterior à v3.3), sem claims. PR fechado sem merge: o claim some junto. A sobreposição entre PRs ainda é conferida à mão; o validador só lê o arquivo local.
 4. CI: `tools/agente/validar_registro.py --expirados aviso` (expirado = aviso para não quebrar PR alheio; hash/versão/sobreposição = falha). Mudança na v3 exige atualizar os hashes no mesmo PR.
 
