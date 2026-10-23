@@ -15,5 +15,5 @@ claims:
       - audit_reality.json
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - docs/agentes/CLAIMS.yaml
-    pr: 0
+    pr: 104
     expira_em: "2026-10-26T01:45:23Z"
