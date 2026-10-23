@@ -23,6 +23,47 @@ def _serialize_state(state: Dict[str, object]) -> str:
     """Serialização estável do pré-registro: state:k=v com chaves ordenadas."""
     return "state:" + ",".join(f"{key}={state[key]}" for key in sorted(state))
 
+
+# Passos atestáveis (pré-registro CF10). Texto sem aresta no grafo não conta.
+_DO_STEP = re.compile(r"do\(([^)]+)\): ([^=]+)=(.+)\Z")
+_CAUSES_STEP = re.compile(r"(.+) causes (.+)\Z")
+
+
+def _effect_members(raw: object) -> List[object]:
+    """Efeitos de uma aresta. str/bytes não são um conjunto (não fatiar em caracteres)."""
+    if isinstance(raw, (str, bytes)) or not isinstance(raw, (set, list, tuple, frozenset)):
+        return []
+    return list(raw)
+
+
+def _graph_has_edge(adjacency: Dict[str, object]) -> bool:
+    return any(_effect_members(value) for value in adjacency.values())
+
+
+def _do_step_in_graph(match: re.Match[str], adjacency: Dict[str, object]) -> bool:
+    action, key, value = match.group(1), match.group(2), match.group(3)
+    for effect in _effect_members(adjacency.get(action)):
+        parts = str(effect).strip().split(None, 1)
+        if len(parts) == 2 and parts[0] == key and parts[1] == value:
+            return True
+    return False
+
+
+def _causes_step_in_graph(match: re.Match[str], adjacency: Dict[str, object]) -> bool:
+    cause, effect = match.group(1), match.group(2)
+    return any(str(item) == effect for item in _effect_members(adjacency.get(cause)))
+
+
+def _step_attested(step: str, adjacency: Dict[str, object]) -> bool:
+    do_match = _DO_STEP.fullmatch(step)
+    if do_match and _do_step_in_graph(do_match, adjacency):
+        return True
+    causes_match = _CAUSES_STEP.fullmatch(step)
+    if causes_match and _causes_step_in_graph(causes_match, adjacency):
+        return True
+    return False
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # MÓDULO 37: COUNTERFACTUAL REASONING ENGINE (POST 37)
 # ═══════════════════════════════════════════════════════════════════════════
@@ -316,16 +357,32 @@ class RealCounterfactualReasoningEngine:
         
         return chain
     
-    def _calculate_plausibility(self, intervention: str, causal_chain: List[str]) -> float:
-        """Calcular plausibilidade do cenário"""
-        # Heurística baseada em comprimento da chain
-        # Chains curtas = mais plausíveis
-        base_plausibility = 0.7
-        
+    def _calculate_plausibility(self, intervention: object, causal_chain: object) -> float:
+        """Heurística de plausibilidade (não é probabilidade).
+
+        Comprimento da cadeia mais a fração de passos atestados por aresta
+        já gravada no grafo injetado. Sem grafo, fica max(0.1, 0.7-0.05*n).
+        Constantes e limites: pré-registro CF10. Não replica Roese e Olson.
+        """
+        if (
+            not isinstance(causal_chain, list)
+            or any(not isinstance(step, str) for step in causal_chain)
+        ):
+            raise TypeError("causal_chain must be a list of str")
+        if intervention is False or (isinstance(intervention, str) and intervention.strip() == ""):
+            return 0.1
+        if not isinstance(intervention, str):
+            raise TypeError("intervention must be str")
         chain_penalty = len(causal_chain) * 0.05
-        plausibility = max(0.1, base_plausibility - chain_penalty)
-        
-        return plausibility
+        length_score = max(0.1, 0.7 - chain_penalty)
+        adjacency = self._adjacency()
+        attested = sum(1 for step in causal_chain if _step_attested(step, adjacency))
+        if attested:
+            fraction = attested / len(causal_chain)
+            return min(1.0, length_score + 0.2 * fraction)
+        if _graph_has_edge(adjacency):
+            return max(0.1, length_score - 0.2)
+        return length_score
     
     def model_causal_intervention(self, variable: str, original_value: Any, 
                                   counterfactual_value: Any) -> CausalIntervention:

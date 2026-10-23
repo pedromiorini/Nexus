@@ -3,7 +3,7 @@ para core.cognitivo.counterfactual. Escrito antes da extração.
 
 (a) identidade: monólito reexporta os MESMOS objetos do módulo novo;
 (b) import standalone sem numpy, vita ou o monólito;
-(c) golden SHA-256 re-medido após CF8 (Jaccard; uuid.uuid4 sequencial);
+(c) golden SHA-256 re-medido após CF10 (plausibilidade atestada; uuid.uuid4 sequencial);
 (d) casos ausentes/inválidos: diferença "" vs "" = 0; parse sem "what if" → default.
 """
 
@@ -21,7 +21,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent
-GOLDEN_SHA256 = "fbfb32e9466bf161155a7546e2db07e2f73434230d581217a44fd4b324eb646e"
+GOLDEN_SHA256 = "64488affedd89003faa5bc18de333bff4c52cb1e126a379e6f376b00cdd2c509"
 NAMES = (
     "CounterfactualScenario",
     "CausalIntervention",

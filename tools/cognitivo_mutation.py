@@ -261,7 +261,49 @@ MUTATIONS = [
     Mutation("cf_plausibility_ignores_chain_len", COUNTERFACTUAL,
              "        chain_penalty = len(causal_chain) * 0.05",
              "        chain_penalty = 0.0",
-             tests=("test_counterfactual_extraction_contract.py",)),
+             tests=("test_counterfactual_plausibility_contract.py",
+                    "test_counterfactual_extraction_contract.py")),
+    Mutation("cf_plausibility_ignores_graph_evidence", COUNTERFACTUAL,
+             "        if attested:\n"
+             "            fraction = attested / len(causal_chain)\n"
+             "            return min(1.0, length_score + 0.2 * fraction)\n"
+             "        if _graph_has_edge(adjacency):\n"
+             "            return max(0.1, length_score - 0.2)\n"
+             "        return length_score",
+             "        return length_score",
+             tests=("test_counterfactual_plausibility_contract.py",)),
+    Mutation("cf_plausibility_empty_uses_length", COUNTERFACTUAL,
+             "        if intervention is False or (isinstance(intervention, str) and intervention.strip() == \"\"):\n"
+             "            return 0.1\n",
+             "        if False:\n"
+             "            return 0.1\n",
+             tests=("test_counterfactual_plausibility_contract.py",)),
+    Mutation("cf_plausibility_do_text_counts", COUNTERFACTUAL,
+             "    if do_match and _do_step_in_graph(do_match, adjacency):\n",
+             "    if do_match:\n",
+             tests=("test_counterfactual_plausibility_contract.py",)),
+    Mutation("cf_plausibility_causes_text_counts", COUNTERFACTUAL,
+             "    if causes_match and _causes_step_in_graph(causes_match, adjacency):\n",
+             "    if causes_match:\n",
+             tests=("test_counterfactual_plausibility_contract.py",)),
+    Mutation("cf_plausibility_bonus_not_fraction", COUNTERFACTUAL,
+             "return min(1.0, length_score + 0.2 * fraction)",
+             "return min(1.0, length_score + 0.2)",
+             tests=("test_counterfactual_plausibility_contract.py",)),
+    Mutation("cf_plausibility_no_unsupported_penalty", COUNTERFACTUAL,
+             "return max(0.1, length_score - 0.2)",
+             "return length_score",
+             tests=("test_counterfactual_plausibility_contract.py",)),
+    Mutation("cf_plausibility_ignores_attestation", COUNTERFACTUAL,
+             "attested = sum(1 for step in causal_chain if _step_attested(step, adjacency))",
+             "attested = 0",
+             tests=("test_counterfactual_plausibility_contract.py",)),
+    Mutation("cf_plausibility_iterates_string_edge", COUNTERFACTUAL,
+             "    if isinstance(raw, (str, bytes)) or not isinstance(raw, (set, list, tuple, frozenset)):\n"
+             "        return []\n",
+             "    if False:\n"
+             "        return []\n",
+             tests=("test_counterfactual_plausibility_contract.py",)),
     Mutation("cf_compare_skips_insight_extend", COUNTERFACTUAL,
              "        self.insights.extend(insights)",
              "        pass",

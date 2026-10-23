@@ -24,9 +24,9 @@
       },
       {
         "path": "core/cognitivo/counterfactual.py",
-        "lines": 524,
+        "lines": 581,
         "classes": 4,
-        "functions": 21
+        "functions": 26
       },
       {
         "path": "core/cognitivo/episodic_memory.py",

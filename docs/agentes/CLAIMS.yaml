@@ -3,14 +3,15 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "CF9: intervenção do(X) Pearl no contrafactual (outcome via simulate/_do; cadeia com arestas SCM)"
+    tarefa: "CF10: plausibilidade contrafactual informada pelo grafo (atestação de passos), sem redefinir CF5"
     arquivos:
       - core/cognitivo/counterfactual.py
-      - test_counterfactual_dox_contract.py
+      - test_counterfactual_plausibility_contract.py
+      - test_counterfactual_extraction_contract.py
       - tools/cognitivo_mutation.py
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - docs/agentes/CLAIMS.yaml
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
-    pr: 106
+    pr: 107
     expira_em: "2026-10-26T03:00:00Z"
