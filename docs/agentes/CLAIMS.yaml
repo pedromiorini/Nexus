@@ -10,4 +10,6 @@ claims:
       - tools/cognitivo_mutation.py
       - docs/cognitivo/AUDITORIA_2026-10-22.md
       - docs/agentes/CLAIMS.yaml
+      - AUDIT_REALITY_REPORT.md
+      - audit_reality.json
     expira_em: "2026-10-26T03:00:00Z"
