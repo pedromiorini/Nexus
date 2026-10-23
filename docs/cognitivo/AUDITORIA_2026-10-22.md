@@ -275,3 +275,14 @@ Mesma regra de acerto de L (par exato após `strip().lower()` e pontuação fina
 | 22 | Because is a conjunction | ∅ |
 | 23 | He gave no cause for alarm | ∅ |
 | 24 | Causality is a philosophical topic | ∅ |
+
+## Correção C4 — SCM mínimo com intervenções do(X) (pré-registro)
+
+Registrado **antes** de implementar/executar, em commit próprio. Critérios C1–C3, H-F1/H-FP e MCTS (M1/M2/M4/M5, M3 v3) são guarda de não-regressão; o alvo é só C4 (v1 inalterado).
+
+| id | critério de sucesso C4 | antes (pós-R3) |
+|---|---|---|
+| C4 | após `extract_causal_relations("DEPLOY_FIX causes system_status secure")`, `simulate(["DEPLOY_FIX"]).final_state.state["system_status"] == "secure"` | falso (`causal_reasoning` nunca lido pelo simulador) |
+| não regressão | C1a/C1b/C2a/C2b/C3/H-F1/H-FP e MCTS M1/M2/M4/M5 + M3 v3 | 1.0 / 0.0 / 0.80 / T / 6/6 / 0.963 / 0.0 |
+
+Escopo: compilar arestas do grafo causal já extraído num SCM mínimo (stdlib) e, em `simulate`, aplicar intervenção `do(ação)` (Pearl, 2009) — efeitos simbólicos das arestas causa→efeito, sem substituir a tabela `ACTION_EFFECTS`. API retrocompatível. Sem dependências pesadas, sem alterar workflows/Axis/congelados.
