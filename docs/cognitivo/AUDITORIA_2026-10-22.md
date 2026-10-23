@@ -316,3 +316,26 @@ Registrado **antes** de qualquer execução, em commit próprio, sobre `core/cog
 | CF6 | intervenção altera o outcome declarado | nos 4 pares S, `counterfactual_outcome != actual_outcome` | 4/4 | — |
 
 Comando: `python tools/cognitivo_eval.py --capability counterfactual --criteria v1` — determinístico (sem semente; uuid irrelevante aos critérios).
+
+### Resultados CF (v1, executado após o pré-registro b3e7c04)
+
+| id | valor | alvo | passou | nota |
+|---|---|---|---|---|
+| CF1 | verdadeiro | verdadeiro | sim | protocolo world_model |
+| CF2 | verdadeiro | verdadeiro | sim | protocolo causal |
+| CF3 | falso | verdadeiro | **não** | `self.planner` nunca lido fora de `__init__` |
+| CF4 | 5/5 | ≥ 5/5 | sim | só inglês "what if" |
+| CF5 | verdadeiro | verdadeiro | sim | cai até o piso 0.1 |
+| CF6 | 4/4 | 4/4 | sim | heurística `outcome_with_*` vs `outcome_without_intervention` |
+
+**Conclusão honesta:** o módulo cumpre os protocolos duck-typed já cobertos por `test_counterfactual_contract` e as heurísticas internas são coerentes consigo mesmas (CF4–CF6), mas **não integra o planner** (CF3) e o "raciocínio contrafactual" permanece lexical (diferença por zip de caracteres; situação original descartada no parse; template `{situation} causes {intervention}` não é intervenção `do(X)` de Pearl). Nada foi "corrigido" nesta rodada além de medir.
+
+### Lacunas e opções de correção (literatura; nenhuma aplicada)
+
+1. **Integrar o planner (CF3)** — em `explore_what_if` / `generate_counterfactual_scenario`, se `self.planner` expõe `plan`, usá-lo para propor intervenções ou avaliar sequências (Pearl 2009 + planejamento; cf. "counterfactual planning"). Custo médio; exige contrato do planner.
+2. **Intervenção `do(X)` real** — em vez de `"situation causes intervention"`, mapear a intervenção para `do(variável=valor)` sobre o SCM/world model já usado em C4 (Pearl, *Causality*, 2009; Woodward, 2003). Custo médio-alto.
+3. **Preservar a situação no parse** — "What if we had patched *during the outage*?" deveria carregar contexto; hoje vira sempre `current_situation`. Opção: spaCy/regex leve de adjunctos; ou API explícita `(situation, intervention)`. Custo baixo se API explícita.
+4. **Diferença semântica de outcomes** — substituir zip de caracteres por overlap de tokens / embedding leve (stdlib: token Jaccard). Evita `difference≈1` para strings longas quase iguais no prefixo. Custo baixo.
+5. **Plausibilidade informada** — hoje `0.7 - 0.05*|chain|`; calibrar com frequência de co-ocorrência ou comprimento mínimo de cadeia causal real (Roese & Olson, 1995). Custo médio.
+
+Ordem sugerida (custo/benefício): 3 (API explícita) → 4 (Jaccard) → 1 (planner) → 2 (do(X)) → 5.
