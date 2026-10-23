@@ -57,6 +57,8 @@ ATT = "core/cognitivo/attention.py"
 AT_TESTS = ("test_attention_contract.py",)
 IL = "core/cognitivo/incremental_learner.py"
 IL_TESTS = ("test_incremental_learner_contract.py",)
+EF = "core/cognitivo/episodic_future_thinking.py"
+EF_TESTS = ("test_episodic_future_thinking_contract.py",)
 
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
@@ -696,6 +698,67 @@ MUTATIONS = [
              ")\n"
              "LearningEvent = type(\"LearningEvent\", (_LearningEvent,), {})\n",
              tests=IL_TESTS),
+    Mutation("ef_memory_gate_closed", EF, "if self.memory:", "if False:", tests=EF_TESTS),
+    Mutation("ef_emotion_gate_closed", EF, "if self.emotion:", "if False:", tests=EF_TESTS),
+    Mutation("ef_past_emotions_ignored", EF, "if past_emotions:", "if False:", tests=EF_TESTS),
+    Mutation("ef_challenge_keyword_dropped", EF, 'if "challenge" in description.lower():', "if False:", tests=EF_TESTS),
+    Mutation("ef_vividness_ignores_past_size", EF, "0.3 + detail_count * 0.15", "0.3", tests=EF_TESTS),
+    Mutation("ef_plausibility_ignores_past", EF, "if past_elements:", "if False:", tests=EF_TESTS),
+    Mutation("ef_common_events_ignored", EF,
+             "if any(event in description.lower() for event in common_events):",
+             "if False:", tests=EF_TESTS),
+    Mutation("ef_false_details_not_coerced", EF, "details = details or {}",
+             "details = {} if details is None else details", tests=EF_TESTS),
+    Mutation("ef_significance_treats_zero_as_missing", EF, 'details.get("significance", 0.5)',
+             'details.get("significance") or 0.5', tests=EF_TESTS),
+    Mutation("ef_blank_trigger_stays_blank", EF, "trigger if trigger else when", "trigger", tests=EF_TESTS),
+    Mutation("ef_skips_open_intentions", EF, "if intention.fulfilled:", "if not intention.fulfilled:", tests=EF_TESTS),
+    Mutation("ef_time_trigger_is_equality", EF, 'intention.when in str(context.get("time"))',
+             'intention.when == str(context.get("time"))', tests=EF_TESTS),
+    Mutation("ef_where_trigger_is_equality", EF, 'intention.where in str(context.get("location"))',
+             'intention.where == str(context.get("location"))', tests=EF_TESTS),
+    Mutation("ef_fulfill_is_idempotent", EF, "if intention:\n",
+             "if intention and not intention.fulfilled:\n", tests=EF_TESTS),
+    Mutation("ef_preexperience_does_not_count", EF, "self.total_preexperiences += 1",
+             "self.total_preexperiences += 0", tests=EF_TESTS),
+    Mutation("ef_active_counts_fulfilled", EF, "if not p.fulfilled", "if p.fulfilled", tests=EF_TESTS),
+    Mutation("ef_empty_average_divides_by_zero", EF, "max(1, len(self.imagined_events))",
+             "len(self.imagined_events)", tests=EF_TESTS),
+    Mutation("ef_year_requires_plural", EF, 'if "year" in horizon.lower():',
+             'if "years" in horizon.lower():', tests=EF_TESTS),
+    Mutation("ef_growth_wisdom_changes", EF, '"wisdom": 0.6', '"wisdom": 0.5', tests=EF_TESTS),
+    Mutation("ef_vivid_tie_takes_first", EF, "event1.vividness > event2.vividness",
+             "event1.vividness >= event2.vividness", tests=EF_TESTS),
+    Mutation("ef_preferred_tie_takes_first", EF, "event1.vividness * event1.personal_significance >",
+             "event1.vividness * event1.personal_significance >=", tests=EF_TESTS),
+    Mutation("ef_module_pulls_monolith", EF, "import time\n",
+             "import time\nimport core.constitutional_brain  # noqa: F401\n", tests=EF_TESTS),
+    Mutation("ef_monolith_stops_reexporting", "core/constitutional_brain.py",
+             "from core.cognitivo.episodic_future_thinking import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    FutureEvent,\n"
+             "    ProspectiveMemory,\n"
+             "    RealEpisodicFutureThinkingSystem,\n"
+             ")\n",
+             "from core.cognitivo.episodic_future_thinking import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    FutureEvent as _FutureEvent,\n"
+             "    ProspectiveMemory,\n"
+             "    RealEpisodicFutureThinkingSystem,\n"
+             ")\n"
+             "FutureEvent = type(\"FutureEvent\", (_FutureEvent,), {})\n",
+             tests=EF_TESTS),
+    Mutation("ef_package_stops_reexporting", "core/cognitivo/__init__.py",
+             "from core.cognitivo.episodic_future_thinking import (\n"
+             "    FutureEvent,\n"
+             "    ProspectiveMemory,\n"
+             "    RealEpisodicFutureThinkingSystem,\n"
+             ")\n",
+             "from core.cognitivo.episodic_future_thinking import (\n"
+             "    FutureEvent,\n"
+             "    ProspectiveMemory,\n"
+             "    RealEpisodicFutureThinkingSystem as _RealEpisodicFutureThinkingSystem,\n"
+             ")\n"
+             "RealEpisodicFutureThinkingSystem = type(\"RealEpisodicFutureThinkingSystem\", (_RealEpisodicFutureThinkingSystem,), {})\n",
+             tests=EF_TESTS),
     Mutation("il_package_stops_reexporting", "core/cognitivo/__init__.py",
              "from core.cognitivo.incremental_learner import (\n"
              "    ConsolidationReport,\n"

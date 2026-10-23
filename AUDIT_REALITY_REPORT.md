@@ -4,19 +4,19 @@
 
 ## Evidência estrutural
 
-O núcleo analisado possui **24920 linhas**, **236 classes** e **759 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **2** funções com retorno constante simples e **31** marcadores de testes embutidos.
+O núcleo analisado possui **24583 linhas**, **233 classes** e **743 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **1** funções com retorno constante simples e **31** marcadores de testes embutidos.
 
 | Área | Resultado | Interpretação |
 |---|---:|---|
 | Testes embutidos marcados | 31 | Evidência de demos internas, não de capacidade geral |
 | Funções somente com `pass` | 0 | Lacunas explícitas que exigem revisão |
-| Funções com retorno constante (estrito: só literais) | 2 | Possíveis heurísticas, stubs ou simplificações |
-| Funções que retornam dict/list/tuple literal com valores dinâmicos | 50 | Em geral getters e estatísticas; não são stubs por si só |
+| Funções com retorno constante (estrito: só literais) | 1 | Possíveis heurísticas, stubs ou simplificações |
+| Funções que retornam dict/list/tuple literal com valores dinâmicos | 49 | Em geral getters e estatísticas; não são stubs por si só |
 | Padrões proibidos de alegação no código (gate: zero) | 0 | Cobre só as frases listadas em CODE_OVERCLAIMS; não significa ausência de linguagem de capacidade |
 | Frases fortes de capacidade no código (inventário; só pode diminuir) | 51 | Ênfase "REAL <Capacidade>", "REAL e FUNCIONAL", "100% funcional"; limite em test_reality_audit.py |
 | Terminologia científica no código (informativo) | 233 | Nomes de constructos modelados; não são alegações por si só |
 | Classes com prefixo Real (identificadores) | 63 | Nome histórico; renomear exige alias de compatibilidade |
-| Módulos extraídos em core/cognitivo (inventário de alegações inclui estes) | 10 (3352 linhas) | Fora das contagens do núcleo; cobertos pelos mesmos padrões de alegação |
+| Módulos extraídos em core/cognitivo (inventário de alegações inclui estes) | 11 (3726 linhas) | Fora das contagens do núcleo; cobertos pelos mesmos padrões de alegação |
 | Dependências opcionais sinalizadas | 2 | Fallbacks podem alterar o comportamento |
 
 ## Alegações (README e código-fonte)
