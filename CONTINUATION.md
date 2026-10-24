@@ -2,10 +2,26 @@
 
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
-ci_run: CURRENT_RUN
-tests: 477
+ci_run: not_ci
+tests: 479
 bandit_low: 135
 -->
+
+## Replay temporal da PR 50 2026-10-24
+
+Branch `fix/temporal-corroboration-replay-20261024`, baseada exatamente no head da #50 `ab342ffa264a2aca26a62d51380cf7fbd843f8ec`. Implementação local no commit `fbeb0bbf56cbcdb80facdd023f4f9cbdf829b7b7`, filho direto desse head. O checkpoint documental posterior é o `HEAD` desta branch. No registro desta rodada, #50 continuava aberta em draft e `main` estava em `cb74cad7cfcd0ab536178ed984989ef2425c8211`; nada foi publicado ou alterado remotamente.
+
+**Contrato:** no replay de snapshot, `corroborate` não pode repetir a fonte primária nem uma fonte já corroborada para o mesmo fato; uma fonte nova segue aceita. Eventos `close`/`corroborate` exigem `fact_id` de tipo `str` built-in antes de consultar o índice; entradas inválidas geram `ValueError`, não vazam `TypeError`. O schema permanece v1. O self-successor já é rejeitado pelo head da #50; não foi duplicado neste follow-up.
+
+**Red/green:** no head-base, o teste de corroboração falhou em dois subcasos (`ValueError` não levantado); lista e subclasse de `str` não hashable em `fact_id` provocaram `TypeError`. Com a correção, os controles aceitam uma fonte genuinamente nova. O diff final congelado é `/workspace/nexus-temporal-corroboration-evidence-20261024/frozen.diff`, SHA-256 `f2b3fa2dbf8a563cd7392188c1fb9756f12f931c8be8e4846a55ce3c19a87684`.
+
+**Validação local em Python 3.12.3:** suíte temporal/integrações: 67/67; suíte completa `python -B -m unittest discover -p 'test_*.py'`: 479/479, sem falhas ou skips. O comando focado foi `python -B -m unittest -v test_temporal_facts_contract test_temporal_graph_integration_contract test_temporal_head_hash_concurrency_contract test_audit_atomic_restore_regression test_consolidated_pr_contract test_knowledge_graph_contract test_knowledge_graph_projection_preflight_contract`. Ruff, `py_compile` e `git diff --check` passaram. NetworkX 3.6.1 foi instalado apenas em `/tmp/nexus-temporal-networkx-3.6.1`; FAISS, SentenceTransformers e psutil não estavam disponíveis. Python 3.11 não estava instalado neste ambiente.
+
+Bandit no escopo do CI (`bandit -r core vita tools -f json -o /tmp/nexus-temporal-bandit-canonical.json`): 135 LOW, zero MEDIUM/HIGH e zero erros do scanner; exit 1 pelos achados LOW. `python tools/security_triage.py /tmp/nexus-temporal-bandit-canonical.json SECURITY_TRIAGE.md --check` passou. A revisão independente do diff final não encontrou bloqueadores. Não foi executado CI remoto, gate de mutação ou auditoria com manifesto de CI; `ci_run=not_ci` é intencional.
+
+**Limites de compatibilidade:** snapshots v1 externos/legados com fonte primária repetida ou corroboração duplicada, antes aceitos pelo loader, passam a ser rejeitados; sua existência externa não é conhecida. Dicionários Python diretos com subclasses de `str` em `fact_id` também são rejeitados; strings JSON normais não são afetadas. Não há unicidade de fonte entre fatos diferentes nem autenticação de proveniência. Evidência local não constitui garantia de segurança em produção ou capacidade cognitiva.
+
+Os registros seguintes são históricos e não descrevem esta rodada.
 
 ## Isolamento de head_hash — 2026-10-19
 

@@ -2,10 +2,18 @@
 
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
-ci_run: CURRENT_RUN
-tests: 477
+ci_run: not_ci
+tests: 479
 bandit_low: 135
 -->
+
+## Replay temporal canônico - follow-up local da #50 - 2026-10-24
+
+Base/head #50: `ab342ffa264a2aca26a62d51380cf7fbd843f8ec`; branch local `fix/temporal-corroboration-replay-20261024`; commit de implementação `fbeb0bbf56cbcdb80facdd023f4f9cbdf829b7b7`. Diff congelado externo `/workspace/nexus-temporal-corroboration-evidence-20261024/frozen.diff`, SHA-256 `f2b3fa2dbf8a563cd7392188c1fb9756f12f931c8be8e4846a55ce3c19a87684`.
+
+O replay rejeita uma corroboração que repita a fonte primária ou fonte anterior do mesmo fato; fontes novas continuam válidas. `fact_id` em eventos `close`/`corroborate` é validado como `str` built-in antes de acesso ao índice. RED na base: duas aceitações indevidas (fonte primária e duplicada) e `TypeError` para lista/subclasse não hashable. GREEN: **67/67** testes temporais/integrações e **479/479** testes totais em Python 3.12.3; Ruff, compilação, diff-check e triagem Bandit passaram. Bandit canônico: 135 LOW, 0 MEDIUM/HIGH, sem erros do scanner; processo retornou exit 1 somente pelos achados LOW. NetworkX 3.6.1 foi disponibilizado só em `/tmp`. Revisão independente do hash congelado: nenhum bloqueador.
+
+Limite: o schema permanece v1, mas snapshots não canônicos anteriormente aceitos com corroborações repetidas passam a ser recusados; compatibilidade com payloads externos não é conhecida. `fact_id` em dict Python direto que seja subclasse de `str` também passa a ser recusado. `main` permanecia em `cb74cad7cfcd0ab536178ed984989ef2425c8211`; a #50 estava aberta em draft. Sem CI remoto, mutation gate, commit em main, publicação ou merge. Comandos completos, outputs e outras limitações em [CONTINUATION.md](CONTINUATION.md#replay-temporal-da-pr-50-2026-10-24).
 
 ## D-027 — Leitura concorrente do head — 2026-10-19
 
