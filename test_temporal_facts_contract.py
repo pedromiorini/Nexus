@@ -445,6 +445,61 @@ class SnapshotContract(unittest.TestCase):
         self.assertEqual(restored_prior.valid_to, 11.0)
         self.assertIsNone(restored_prior.superseded_by)
 
+    def test_loader_rejects_duplicate_or_primary_source_corroboration(self):
+        from core import temporal_facts as tf
+
+        c = Clock(100.0)
+        s = store(c, functional=())
+        s.assert_fact("ana", "tag", "A", valid_from=10.0, source="observation")
+        c.t = 101.0
+        s.assert_fact("ana", "tag", "A", valid_from=10.0, source="tool:crm")
+        base = s.export_snapshot()
+        self.assertEqual(s.history("ana", "tag")[0].corroborated_by, ("tool:crm",))
+
+        def append_corroboration(source):
+            snap = copy.deepcopy(base)
+            snap["events"].append({
+                "kind": "corroborate", "fact_id": "tf-000001", "source": source,
+                "recorded_at": 102.0,
+            })
+            previous = tf.GENESIS
+            for sequence, event in enumerate(snap["events"], 1):
+                event["seq"], event["prev"] = sequence, previous
+                event["hash"] = tf._digest(event)
+                previous = event["hash"]
+            snap["head"] = previous
+            return snap
+
+        for source in ("tool:crm", "observation"):
+            with self.subTest(source=source), self.assertRaises(ValueError):
+                TemporalFactStore.from_snapshot(append_corroboration(source), clock=c)
+
+        fresh = TemporalFactStore.from_snapshot(append_corroboration("user"), clock=c)
+        self.assertEqual(fresh.history("ana", "tag")[0].corroborated_by,
+                         ("tool:crm", "user"))
+
+    def test_loader_rejects_unhashable_fact_id_without_leaking_typeerror(self):
+        from core import temporal_facts as tf
+
+        s, c = self.build()
+
+        class UnhashableString(str):
+            __hash__ = None
+
+        for invalid_id in (["tf-000001"], UnhashableString("tf-000001")):
+            with self.subTest(invalid_type=type(invalid_id).__name__):
+                malformed = s.export_snapshot()
+                malformed["events"][1]["fact_id"] = invalid_id
+                previous = tf.GENESIS
+                for sequence, event in enumerate(malformed["events"], 1):
+                    event["seq"], event["prev"] = sequence, previous
+                    event["hash"] = tf._digest(event)
+                    previous = event["hash"]
+                malformed["head"] = previous
+
+                with self.assertRaises(ValueError):
+                    TemporalFactStore.from_snapshot(malformed, clock=c)
+
 
 if __name__ == "__main__":
     unittest.main()

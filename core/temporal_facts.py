@@ -357,7 +357,8 @@ class TemporalFactStore:
                     raise ValueError(f"fact_id ou superseded_by inválido no evento {n}")
                 store._seq += 1
             elif kind in ("close", "corroborate"):
-                if raw.get("fact_id") not in store._facts:
+                fact_id = raw.get("fact_id")
+                if type(fact_id) is not str or fact_id not in store._facts:
                     raise ValueError(f"referência inexistente no evento {n}")
                 if kind == "close":
                     close_at = _number(raw.get("valid_to"), "valid_to")
@@ -374,7 +375,10 @@ class TemporalFactStore:
                     ):
                         raise ValueError(f"superseded_by inválido no evento {n}")
                 else:
-                    _text(raw.get("source"), "source")
+                    source = _text(raw.get("source"), "source")
+                    fact = store._facts[raw["fact_id"]]
+                    if source == fact.source or source in fact.corroborated_by:
+                        raise ValueError(f"fonte de corroboração repetida no evento {n}")
             else:
                 raise ValueError(f"tipo de evento desconhecido no evento {n}")
             try:
