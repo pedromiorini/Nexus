@@ -2,10 +2,14 @@
 
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
-ci_run: CURRENT_RUN
-tests: 477
+ci_run: not_ci
+tests: 479
 bandit_low: 135
 -->
+
+## Follow-up local do replay temporal - 2026-10-24
+
+Na branch isolada `fix/temporal-corroboration-replay-20261024`, baseada no head #50 `ab342ffa264a2aca26a62d51380cf7fbd843f8ec`, o loader agora rejeita corroborações repetidas/da fonte primária e `fact_id` que não seja `str` built-in. Implementação local `fbeb0bbf56cbcdb80facdd023f4f9cbdf829b7b7`; 479/479 testes, Bandit 135 LOW e revisão independente sem bloqueadores, todos resultados locais, não CI. Compatibilidade de snapshots v1 não canônicos é desconhecida; detalhes, comandos e limites em [CONTINUATION.md](CONTINUATION.md#replay-temporal-da-pr-50-2026-10-24) e [NEXUS_EVIDENCE.md](NEXUS_EVIDENCE.md).
 
 ## Follow-up F-04 local — 2026-10-19
 

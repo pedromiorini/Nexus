@@ -2,8 +2,8 @@
 
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
-ci_run: CURRENT_RUN
-tests: 477
+ci_run: not_ci
+tests: 479
 bandit_low: 135
 -->
 
