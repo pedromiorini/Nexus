@@ -48,7 +48,7 @@
       },
       {
         "path": "core/cognitivo/mcts_planner.py",
-        "lines": 449,
+        "lines": 446,
         "classes": 3,
         "functions": 19
       },
