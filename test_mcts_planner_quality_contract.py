@@ -23,6 +23,28 @@ class MCTSPlannerQualityContractTests(unittest.TestCase):
         RealMCTSPlanner(max_depth=2).plan("secure the system", available_actions=allowed, max_iterations=50)
         self.assertEqual(allowed, ["MONITOR", "ROLLBACK"])
 
+    def test_custom_actions_remain_available_after_root_expansion(self):
+        from unittest.mock import patch
+
+        planner = RealMCTSPlanner(max_depth=2)
+        caller_actions = ["CUSTOM_X"]
+        actions_at_depth_one = []
+        get_available_actions = planner._get_available_actions
+
+        def capture_available_actions(state, depth):
+            actions = get_available_actions(state, depth)
+            if depth == 1:
+                actions_at_depth_one.append(actions)
+            return actions
+
+        with patch.object(planner, "_get_available_actions", side_effect=capture_available_actions):
+            with patch.object(planner, "_evaluate_state", return_value=0.0):
+                planner.plan("neutral custom action", available_actions=caller_actions, max_iterations=1)
+
+        self.assertEqual(caller_actions, ["CUSTOM_X"])
+        self.assertTrue(actions_at_depth_one)
+        self.assertTrue(any("CUSTOM_X" in actions for actions in actions_at_depth_one))
+
     def test_every_depth_respects_available_actions(self):
         allowed = ["MONITOR", "ROLLBACK", "ESCALATE"]
         for seed in range(5):

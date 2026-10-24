@@ -11,6 +11,12 @@ class MCTSActionContractTests(unittest.TestCase):
         self.assertGreater(result.tree_nodes_created, 1)
         self.assertTrue(result.alternative_plans)
 
+    def test_depth_equal_to_max_depth_has_no_available_actions(self):
+        planner = RealMCTSPlanner(max_depth=2)
+
+        self.assertTrue(planner._get_available_actions({}, depth=1))
+        self.assertEqual(planner._get_available_actions({}, depth=2), [])
+
     def test_empty_action_space_is_respected(self):
         planner = RealMCTSPlanner(max_depth=1)
         result = planner.plan("secure the system", available_actions=[], max_iterations=5)
