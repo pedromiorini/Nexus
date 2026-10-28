@@ -1,5 +1,10 @@
 """Capacidades cognitivas extraídas do monólito core/constitutional_brain.py."""
 
+from core.cognitivo.analogical_reasoning import (
+    AnalogyMapping,
+    AnalogySituation,
+    RealAnalogicalReasoningSystem,
+)
 from core.cognitivo.attention import (
     AttentionShift,
     AttentionalFocus,
@@ -34,6 +39,8 @@ from core.cognitivo.working_memory import (
 )
 
 __all__ = [
+    "AnalogyMapping",
+    "AnalogySituation",
     "AttentionShift",
     "AttentionalFocus",
     "AttentionalSpotlight",
@@ -46,6 +53,7 @@ __all__ = [
     "MentalSimulationResult",
     "PhonologicalLoop",
     "ProspectiveMemory",
+    "RealAnalogicalReasoningSystem",
     "RealAttentionSystem",
     "RealEpisodicFutureThinkingSystem",
     "RealIncrementalLearner",

@@ -1563,3 +1563,128 @@ PRs abertos: #38–#50, #60, #77, #79, #115, #116. Nenhum edita `core/cognitivo/
 
 **Não medido.** CI hospedada; efeito em cenários fora dos pré-registrados; mescla real com #79, #115 ou #116.
 
+
+## Analogical Reasoning — critérios pré-registrados (AR1–AR6)
+
+**Objetivo desta rodada:** extrair, em move-only, o bloco POST27 (`AnalogySituation`, `AnalogyMapping`, `RealAnalogicalReasoningSystem`) de `core/constitutional_brain.py` para `core/cognitivo/analogical_reasoning.py`, com reexport strangler no ponto original e em `core/cognitivo/__init__.py`. Medir AR1–AR6. Gap medido é registrado, não corrigido. Não ajustar limite, seed, grade ou valor esperado depois de ver o número.
+**Por que este bloco:** é o próximo da trilha cognitiva depois de Mental Simulation (#118/#119). Em `f2b6b5f` (`main`) o bloco tem 234 linhas, só stdlib (`dataclass`, `typing`, `uuid`), nenhuma chamada a outra classe do monólito, e o único uso fora dele é o construtor do orquestrador (`RealAnalogicalReasoningSystem(reasoning=…, memory=…, semantic_networks=None)`) e o teste 25 da suíte embutida. Não existe contrato anterior destes símbolos. A nota do pré-registro do MS («depende de mais estado compartilhado») foi conferida: o estado é só `known_situations` e dois contadores, nada compartilhado.
+**Não escopo:** corrigir qualquer gap abaixo (mapeamento um-para-um, injetividade, substituição simultânea ou por palavra inteira, entidades reais em `reason_by_analogy`, taxa > 1, aliasing, domínio sem normalização); passar a usar `reasoning`, `memory` ou `semantic_networks`; validar entradas; o construtor do orquestrador e o teste 25 do demo; Embodied Cognition e demais blocos; Axis e `tools/targeted_mutation.py` (mutantes só em `tools/cognitivo_mutation.py`); #79, #115, #116, #120 e os arquivos que eles alteram, exceto os relatórios de realidade gerados por `tools/reality_audit.py`; state docs (`CONTINUATION.md`, `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md`, `SECURITY_TRIAGE.md`, exceto o que a ferramenta regenerar); PRs congelados #38–#50, #60, #77 (não rebasear, não editar, não resolver os conflitos deles).
+**Eval:** `python tools/cognitivo_eval.py --capability analogical_reasoning` (id curto `analogical_reasoning`). Protocolo único: `--criteria` v1/v2/v3 não o altera. Não há relógio nem `random` no bloco; a única aleatoriedade é `uuid.uuid4()` para `situation_id` e `mapping_id`, que **nunca** entram no golden nem em comparação (as situações são identificadas pelo índice em `known_situations`). Todas as instâncias sintéticas usam `random.Random(seed)` local, com as seeds abaixo. Saída: 0 se tudo passa, 1 se algum critério falha, 2 para `--capability` ausente, vazia ou desconhecida, 3 se um critério marca `scenario_invalid` (precondição do cenário inválida).
+**Base da observação:** `f2b6b5f` (`main`, merge do #119). Este pré-registro foi escrito **só com a leitura do código** do bloco (linhas 5070–5303 do monólito) e **antes de executar qualquer harness, contrato ou instância** de Analogical Reasoning. Única medição prévia: o SHA-256 do **texto** do bloco (hash de arquivo estático, não de comportamento), registrado em AR6. O **SHA comportamental** (AR6) não pode ser congelado aqui sem executar o fingerprint; ele será capturado **uma única vez**, no monólito **antes do move**, e commitado junto do harness RED (o commit RED precede o move). O move só passa se o SHA pós-move for idêntico. Os valores esperados de AR1–AR5 estão todos neste texto.
+
+### Varredura §7.2 (2026-10-28, `gh pr list --state open`)
+
+PRs abertos: #38–#50, #60, #77, #79, #115, #116, #120. Editam `core/constitutional_brain.py`: #38, #39, #40, #41, #42, #44, #46, #48, #49 (congelados; mesmo conflito declarado de #108–#119, sem rebase neles). Nenhum PR aberto altera `core/cognitivo/analogical_reasoning.py` (ainda não existe), `test_analogical_reasoning_contract.py`, `tools/cognitivo_eval.py`, `core/cognitivo/__init__.py` ou este arquivo. **Sobreposição declarada, de outro agente em pausa:** o #116 (Axis) altera `tools/cognitivo_mutation.py` e os relatórios de realidade; o #79 altera `docs/agentes/CLAIMS.yaml`. O #120 altera `tools/correction_claim_audit.py`, `docs/agentes/LICOES_APRENDIDAS.md`, `docs/agentes/REGISTRO_AGENTES.yaml` e state docs, nenhum que esta rodada toque. Nenhum deles será tocado.
+
+### Leitura do bloco (o que os critérios afirmam)
+
+`add_situation(domain, entities, relations, solution=None)` guarda a situação (referências, sem cópia) em `known_situations` e a devolve. `find_analogy(domain, entities, relations)` monta o alvo (`situation_id="target"`) e percorre `known_situations` em ordem, **pulando o mesmo domínio por igualdade exata de string**; para cada fonte chama `_map_structures` e fica com o primeiro de **maior** `quality_score` (`>` estrito: empate fica com o primeiro). Só se houver vencedor soma 1 em `total_analogies_found`.
+`_map_structures(source, target)`: para cada relação do alvo, em ordem, procura a **primeira** relação da fonte com o mesmo rótulo; se achar, `entity_mappings[s_e1] = t_e1`, `entity_mappings[s_e2] = t_e2` (sobrescreve), soma 1 em `matched_relations` e passa à próxima relação do alvo (`break`). Sem nenhuma correspondência devolve `None`. `quality = matched / max(len(source.relations), len(target.relations))`. A mesma relação da fonte pode ser reutilizada por várias relações do alvo, e duas entidades da fonte podem apontar para a mesma entidade do alvo.
+`transfer_solution(mapping)`: `None` se `source_situation.solution` for falsa (`None` ou `""`), sem somar; senão aplica `str.replace(fonte, alvo)` **em sequência**, na ordem de inserção do dicionário, soma 1 em `successful_transfers` e devolve o texto.
+`reason_by_analogy(text, domain)`: `_extract_entities` (palavras separadas por espaço cuja 1ª letra é maiúscula e `len > 1` **antes** de remover `.,!?` das pontas; no máximo 5) e `_extract_relations` (por **substring minúscula**, nesta ordem: `similar to` → `("SIMILAR","entity1","entity2")`, `causes` → `("CAUSES",…)`, `part of` → `("PART_OF",…)`; as entidades da relação são **sempre** os literais `entity1` e `entity2`, nunca as extraídas). Depois `find_analogy` e `transfer_solution`; `None` se não houver analogia.
+`get_statistics`: `total_analogies_found`, `successful_transfers`, `known_situations` e `transfer_success_rate = successful_transfers / max(1, total_analogies_found)`. `reasoning`, `memory` e `semantic_networks` são guardados e nunca lidos.
+
+**Gaps previstos pela leitura (fora de correção):** (i) uma relação da fonte pode sustentar várias do alvo, então a qualidade pode chegar a `1.0` sem correspondência um-para-um; (ii) o mapeamento não é injetivo; (iii) `transfer_solution` substitui em sequência, então uma cadeia `a→b, b→c` corrompe o texto, e substitui por substring, então `sunny` vira `starny`; (iv) `reason_by_analogy` nunca usa as entidades extraídas: a solução volta com os literais `entity1`/`entity2`; (v) a taxa de transferência passa de `1.0` se `transfer_solution` for chamado de novo no mesmo mapeamento; (vi) `dissimilar to` conta como `SIMILAR`, `counterpart of` como `PART_OF`, negação é ignorada, `The` e `A.` viram entidades; (vii) `Physics` e `physics` contam como domínios diferentes; (viii) as listas do chamador são guardadas por referência (aliasing); (ix) nenhuma entrada é validada. **Inferência, ainda não medida:** (i), (ii), (iii) e (iv) são medidos como falha em AR3 e AR4; os demais são só registrados em AR5.
+
+### Hipóteses concorrentes (Strong Inference)
+
+| id | hipótese | o que a falsifica | teste barato |
+|---|---|---|---|
+| H1 | mover o bloco muda o texto ou o fingerprint de comportamento | SHA de fonte ou SHA comportamental ≠ os valores de AR6, ou as três classes reexportadas não são o mesmo objeto | AR6 |
+| H2 | `find_analogy`, `_map_structures` e `transfer_solution` seguem as regras lidas | alguma das 120 instâncias difere da referência independente, ou muda uma lista do chamador | AR1 |
+| H3 | os limites (domínio, rótulo, empate, qualidade, extração de texto) seguem a leitura | algum dos 19 casos da tabela de borda difere | AR2 |
+| H4 | o mapeamento estrutural é um-para-um e injetivo, como diz o docstring (Gentner/SME) | em alguma das duas famílias a taxa de acerto fica abaixo do limite das 20 instâncias | AR3 |
+| H5 | a transferência de solução produz um texto fiel ao alvo (entidades reais, substituição simultânea, palavra inteira) | em alguma das três famílias a taxa fica abaixo do limite das 20 instâncias | AR4 |
+| H6 | contadores, taxa, colaboradores, contratos de erro e gaps seguem a leitura | algum valor de AR5 difere do registrado | AR5 |
+
+Hipótese de trabalho, não vinculante além da tabela: H1, H2, H3, H6 se sustentam; H4 e H5 **falham** (previsão pela leitura, itens (i)–(iv) acima). O move não pode alterar nenhum resultado, inclusive os que falham.
+
+### Critérios
+
+| id | afirmação | protocolo falsificável | alvo |
+|---|---|---|---|
+| AR1 | analogia, mapeamento e transferência seguem as regras lidas e não sujam a entrada | Grade de 120 instâncias com `random.Random(2027)`: domínios em `physics`, `biology`, `economics`, `computing`, `music`; rótulos em `CAUSES`, `PART_OF`, `SIMILAR`, `ABOVE`, `BEFORE`; 0–5 situações conhecidas (2–4 entidades `s<i>_<k>_<j>`, 0–4 relações com duas entidades distintas da própria situação, solução em `None`, `""` ou `"use <e1> with <e2>"`); alvo com domínio sorteado, 2–4 entidades `t<i>_<j>` e 0–4 relações. Sistema novo por instância. Comparação com uma **referência independente** escrita no harness (índice da fonte vencedora, `entity_mappings`, `quality_score`, campos do alvo, texto transferido, contadores `total_analogies_found`, `successful_transfers`, `known_situations`); listas do chamador e situações conhecidas comparadas por cópia profunda antes e depois | 120/120 iguais, 0 entradas alteradas |
+| AR2 | limites de domínio, rótulo, qualidade, empate, transferência e extração de texto | 19 casos, valores esperados abaixo | 19/19 |
+| AR3 | o mapeamento estrutural é um-para-um e injetivo | Seeds `0..19` (`random.Random(seed)` sorteia rótulos e nomes). **one_to_one:** fonte com 1 relação `(L, a, b)`; alvo com 2 relações do mesmo rótulo `L` e entidades distintas; esperado `quality_score <= 0.5` (uma relação da fonte sustenta no máximo uma do alvo), taxa ≥ 0.90. **injective:** fonte `[(L1,a,b),(L2,c,d)]` com `L1 != L2`, alvo `[(L1,x,y),(L2,x,z)]`; esperado que o mapeamento devolvido, se houver, tenha valores distintos (injetivo), taxa ≥ 0.90. **control_isomorphic:** fonte `[(L1,a,b),(L2,b,c)]`, alvo `[(L1,x,y),(L2,y,z)]`; esperado `quality_score == 1.0` e mapeamento `{a:x,b:y,c:z}`, taxa ≥ 0.90 (controle: tem de passar, para o teste não reprovar tudo). O critério passa só se as três passam | 3/3 famílias nos limites |
+| AR4 | a transferência de solução é fiel ao alvo | Seeds `0..19`. **real_entities:** fonte (domínio `src`, entidades `Rain`/`Flood`, relação `("CAUSES","Rain","Flood")`, solução `"avoid Rain before Flood"`); `reason_by_analogy("<C1> causes <C2>.", "tgt")` com `C1`, `C2` distintos sorteados de `Alpha`, `Bravo`, `Cedar`, `Delta`, `Echo`, `Fable`, `Gamma`, `Harbor`; esperado exatamente `"avoid <C1> before <C2>"`, taxa ≥ 0.90. **simultaneous:** fonte `(R, a, b)` e alvo `(R, b, c)` com `a`, `b`, `c` de nomes `a<seed>`, `b<seed>`, `c<seed>`, solução `"<a> then <b>"`; esperado `"<b> then <c>"` (substituição simultânea), taxa ≥ 0.90. **whole_word:** fonte `(R, p, q)` com `p`,`q` distintos de `sun`, `moon`, `cat`, `dog`, `red`, `blue`, alvo `(R, tp, tq)` de `alpha`, `bravo`, `charlie`, `delta`, `echo`, `foxtrot`, solução `"<p>ny and <q>ish with <p> and <q> (case <seed>)"`; esperado que só as palavras inteiras mudem: `"<p>ny and <q>ish with <tp> and <tq> (case <seed>)"`, taxa ≥ 0.90. **control_plain:** mesma construção, solução `"move <p> to <q>"`, esperado `"move <tp> to <tq>"`, taxa ≥ 0.90 (controle). O critério passa só se as quatro passam | 4/4 famílias nos limites |
+| AR5 | contadores, taxa, colaboradores, contratos de erro e gaps | Valores registrados abaixo. Os gaps contam como afirmação medida: o critério mede que o valor atual é o registrado, não que o comportamento é desejável | todos conforme registrado |
+| AR6 | move-only: o texto do bloco e o fingerprint comportamental são os mesmos; reexport é o mesmo objeto | O texto UTF-8 que começa na linha de `═` imediatamente antes de `# MÓDULO 27: ANALOGICAL REASONING SYSTEM (POST 27)` e termina no `}` de `get_statistics` (a chave `"transfer_success_rate"`), 234 linhas, tem SHA-256 `a603eafc39db384ac6670c6cdba0b490155b46f9e1a38ea79a00202f24741c6a` no monólito antes do splice e o mesmo SHA no módulo novo. As três classes: `core.constitutional_brain` e `core.cognitivo` são o mesmo objeto que `core.cognitivo.analogical_reasoning`, e `__module__` é `core.cognitivo.analogical_reasoning`. O módulo importa sem puxar monólito, numpy ou vita (árvore de `import`). O dict do protocolo, `json.dumps(..., sort_keys=True, ensure_ascii=False)`, tem o SHA-256 comportamental capturado **no monólito antes do move** (commit RED) e igual pela classe do monólito e pela do módulo novo, em 3.11 e 3.12. `clock` é `none`. Parâmetros do construtor `self, reasoning, memory, semantic_networks`; banner exato `🧠🔄 POST 27 - RealAnalogicalReasoningSystem initialized (Cross-domain transfer active)` | os dois SHA, a identidade e o construtor |
+
+**AR2 — os 19 casos** (`C`=`CAUSES`, `P`=`PART_OF`; fonte no domínio `S` salvo indicação; alvo no domínio `T`):
+
+| # | caso | esperado |
+|---|---|---|
+| 1 | nenhuma situação conhecida; alvo `[C x y]` | `None`; `total_analogies_found == 0` |
+| 2 | fonte no mesmo domínio `T` com `[C a b]` | `None` |
+| 3 | fonte `[P a b]`, alvo `[C x y]` | `None` |
+| 4 | fonte `[C a b]`, alvo `[C x y]` | `{a:x, b:y}`, qualidade `1.0`, `total_analogies_found == 1` |
+| 5 | fonte `[C a b]`, alvo `[C x y, P p q]` | `{a:x, b:y}`, qualidade `0.5` |
+| 6 | fonte `[C a b, P c d]`, alvo `[C x y]` | `{a:x, b:y}`, qualidade `0.5` |
+| 7 | fonte `[C a b, P c d]`, alvo `[P p q, C x y]` | `{c:p, d:q, a:x, b:y}`, qualidade `1.0` |
+| 8 | duas fontes (`S1`, `S2`), ambas `[C …]`, qualidade `1.0` | vence a primeira (`S1`) |
+| 9 | `S1` com `[C a b, P e f]` (qualidade `0.5`), `S2` com `[C c d]` (qualidade `1.0`), alvo `[C x y]` | vence `S2` |
+| 10 | fonte `[C a b]`, alvo sem relações | `None` |
+| 11 | fonte sem relações, alvo `[C x y]` | `None` |
+| 12 | `transfer_solution` com solução `"move a to b"` e `{a:x, b:y}` | `"move x to y"`; `successful_transfers == 1` |
+| 13 | solução `None` | `None`; `successful_transfers == 0` |
+| 14 | solução `""` | `None`; `successful_transfers == 0` |
+| 15 | `_extract_entities("Alice meets Bob. carol Dave")` | `["Alice", "Bob", "Dave"]` |
+| 16 | `_extract_entities("Aa Bb Cc Dd Ee Ff Gg")` | `["Aa", "Bb", "Cc", "Dd", "Ee"]` |
+| 17 | `_extract_relations("x CAUSES y, part of z, SIMILAR TO w")` | `[("SIMILAR","entity1","entity2"), ("CAUSES","entity1","entity2"), ("PART_OF","entity1","entity2")]` |
+| 18 | `_extract_relations("nothing relational here")`, `_extract_relations("")`, `_extract_entities("")` | `[]`, `[]`, `[]` |
+| 19 | fonte `[C a b]` no domínio `S`; `reason_by_analogy("Nothing relational here.", "T")` | `None`; `total_analogies_found == 0`, `successful_transfers == 0` |
+
+**AR5 — valores registrados.**
+- Estatísticas de um sistema novo: `{total_analogies_found: 0, successful_transfers: 0, known_situations: 0, transfer_success_rate: 0.0}`. Soma dos contadores da grade de AR1 igual à da referência.
+- **Gap (v):** com uma analogia achada e `transfer_solution` chamado duas vezes no mesmo mapeamento, `successful_transfers == 2`, `total_analogies_found == 1`, `transfer_success_rate == 2.0`.
+- **Colaboradores:** `reasoning`, `memory` e `semantic_networks` guardados por identidade e **nunca lidos** (objeto `_ArBoom`, qualquer atributo lido levanta `AssertionError`) em `add_situation`, `find_analogy`, `transfer_solution`, `reason_by_analogy` e `get_statistics`.
+- **Gaps (iv), (vi), (vii), (viii):** `reason_by_analogy` com fonte `Rain`/`Flood`, solução `"stop Rain"` e texto `"Storm causes Damage."` devolve `"stop entity1"`; `_extract_relations("dissimilar to the rest")` devolve `[("SIMILAR","entity1","entity2")]`; `_extract_relations("a counterpart of b")` devolve `[("PART_OF","entity1","entity2")]`; `_extract_relations("X never causes Y")` devolve `[("CAUSES","entity1","entity2")]`; `_extract_entities("The cat causes Harm")` devolve `["The", "Harm"]`; `_extract_entities("A. Bob")` devolve `["A", "Bob"]`; fonte em `Physics` e alvo em `physics` com rótulo comum acha analogia; a lista de relações passada a `add_situation`, se crescer depois, cresce na situação guardada; `mapping.target_situation.entities is` a lista passada ao `find_analogy`.
+- **Erros por nome de classe** (`"no-error"` quando não levanta): `add_situation(None, None, None)` → `no-error`; `find_analogy` com `target_relations=None` sem situações conhecidas → `no-error`; com uma fonte de outro domínio → `TypeError`; relação do alvo com 2 elementos → `ValueError`; relação do alvo `5` → `TypeError`; fonte com `relations=None` e alvo com uma relação → `TypeError`; `find_analogy` sem argumentos → `TypeError`; `transfer_solution(None)` → `AttributeError`; mapeamento com solução `5` e `entity_mappings` não vazio → `AttributeError`; `reason_by_analogy(None, "T")` → `AttributeError`; `reason_by_analogy(5, "T")` → `AttributeError`; `reason_by_analogy("", "T")` → `no-error`; `reason_by_analogy("   ", "T")` → `no-error`; `_extract_entities(None)` → `AttributeError`; construtor com 4 argumentos → `TypeError`.
+
+**O que o fingerprint de AR6 contém** (sem uuid, sem SQLite): `clock`, `randomness`, `init_params`, `banner` exato, campos dos dois dataclasses; a grade de AR1 (digest, contagens, entradas intactas, acertos da referência); a tabela de 19 casos; as seeds e resultados por instância de AR3 e AR4; contadores, taxa, colaboradores, gaps e erros de AR5.
+
+**Resultado esperado:** AR1, AR2, AR5 e AR6 passam; **AR3 e AR4 falham** (`one_to_one`, `injective`, `real_entities`, `simultaneous` e `whole_word` com taxa `0.00`; os dois controles com `1.00`). Se AR3 ou AR4 falhar, o harness sai com código 1 e o PR continua draft: as opções vão para o relatório (nenhuma será aplicada nesta rodada).
+
+### Regressão exigida
+
+Não há contrato anterior destes três símbolos. O teste 25 do demo continua chamando `add_situation`, `find_analogy`, `transfer_solution` e `get_statistics` pelo reexport, e o construtor do orquestrador continua instanciando `RealAnalogicalReasoningSystem(reasoning=…, memory=…, semantic_networks=None)`. O eval dos outros capabilities não é alvo de mudança de critério.
+
+### Teste negativo e código de entrada inválida
+
+`--capability` ausente, vazio, só espaços ou com grafia desconhecida (`analogical-reasoning`, `Analogical_Reasoning`, `analogy`, `analogical_reasoning2`) sai com **código 2** (`EXIT_USAGE`) e mensagem em `stderr`, sem imprimir relatório. Um critério que marca `scenario_invalid` sai com **código 3** (`EXIT_INVALID_SCENARIO`), diferente de 1 (critério falhou). No sistema, entrada vazia ou irresolúvel (`reason_by_analogy("")`, `reason_by_analogy("   ")`, texto sem relação, domínio sem fonte compatível) devolve `None` sem somar contadores; as entradas de tipo errado (AR5) levantam as exceções registradas, não são coerçadas. Como o move não pode alterar comportamento, o bloco **não ganha** código próprio de erro: os códigos 2 e 3 são os do harness.
+
+Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability analogical_reasoning`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados AR (depois do pré-registro `3a14895`)
+
+**Commits, em ordem:** `3a14895` pré-registro e claim; `d3b9380` harness e contrato, **RED** (módulo ausente: 16 testes, 9 passam e 7 dão erro, código de saída 1; `--capability analogical_reasoning` sai com 1); `c50dc6f` move-only (**GREEN** nos critérios que não são lacuna), com 30 mutantes novos; `f09fc03` marca `# nosec B311` nas seis seeds sintéticas do harness (a triagem de segurança continua com 131 LOW); este commit de resultados e o commit que remove o claim. A branch foi rebaseada sobre `77c1861` (merge do #120) depois do pré-registro; os SHA acima são os de depois do rebase (`f0eacfb`, `c53aee5`, `51015a3`, `7faaf8b` antes). Nenhum limite, seed, tamanho ou valor de AR1–AR6 foi alterado depois do pré-registro.
+
+**Declarações de transparência.**
+1. O SHA de comportamento (`517a4d8e…7b6b`) não podia ser congelado antes de rodar qualquer coisa; foi capturado **uma vez** no monólito antes do move e commitado no RED, e é idêntico depois do move, em 3.11 e em 3.12. O SHA da fonte (`a603eafc…1c6a`) é o do texto do bloco original.
+2. O teste de adulteração do contrato RED (`test_tampered_behavior_changes_the_fingerprint`) usava um desvio (`_map_structures` devolvendo `None`) que derrubava o próprio harness com `AttributeError` em vez de mudar o SHA. Troquei o desvio por um que altera uma estatística (`get_statistics` com `known_situations + 1`) e o teste agora verifica o que dizia verificar. Ajuste do teste, não de critério.
+
+**Comando:** `python tools/cognitivo_eval.py --capability analogical_reasoning`, Python 3.11 e 3.12. Saída: código 1, porque AR3 e AR4 falham (como previsto).
+
+| id | resultado | valor medido |
+|---|---|---|
+| AR1 | **passa** | 120/120 iguais à referência independente; contadores iguais (52 analogias, 21 transferências); 0 entradas alteradas |
+| AR2 | **passa** | 19/19 |
+| AR3 | **falha** | `one_to_one` 0/20 (0.00), `injective` 0/20 (0.00); controle isomorfo 20/20 (1.00) |
+| AR4 | **falha** | `real_entities` 0/20, `simultaneous` 0/20, `whole_word` 0/20 (0.00 nas três); controle simples 20/20 (1.00) |
+| AR5 | **passa** | sistema novo zerado; gaps 10/10; erros 15/15; colaboradores nunca lidos; `transfer_success_rate` chega a 2.0 (gap v) |
+| AR6 | **passa** | SHA da fonte igual; SHA de comportamento igual no módulo e no monólito; reexport é o mesmo objeto; importa sozinho sem o monólito |
+
+**Hipóteses.** H1, H2, H3 e H6 sustentadas. **H4 e H5 refutadas** (previstas): o mapeamento não é um-para-um nem injetivo, e a transferência de solução não usa entidades reais, substitui em sequência e por substring. Os valores medidos coincidem exatamente com os pré-registrados.
+
+**Código de entrada inválida.** O harness sai com **2** para `--capability` ausente, vazio, só espaços ou de grafia desconhecida, e com **3** para `scenario_invalid`; ambos cobertos por teste. O bloco movido não ganha código novo, porque é move-only: entradas de tipo errado continuam levantando as exceções registradas em AR5 (`TypeError`, `ValueError`, `AttributeError`), e `add_situation(None, None, None)` continua aceitando tudo.
+
+**Opções para AR3 e AR4 (decisão do dono; nada foi corrigido aqui).**
+1. Aceitar a lacuna e manter este PR em rascunho como inventário medido.
+2. PR de comportamento separado, com novo pré-registro (mapeamento um-para-um e injetivo, substituição simultânea por palavra inteira, entidades reais em `reason_by_analogy`).
+3. Um protocolo `v2` com critérios novos, mantendo o v1 como linha de base.
+
+**Efeito colateral a decidir antes de mesclar.** `--capability all` do eval passa a sair com 1 enquanto AR3/AR4 falharem; os testes existentes que usam `all` continuam verdes (703 testes OK).
+
+**Gates locais (não substituem a CI hospedada).** `ruff` limpo; `compileall`; `reality_audit` regenerado só pela ferramenta (sem diferença depois do rebase); 703 testes OK em 3.11 e em 3.12 (685 antes do rebase sobre o #120); cobertura `core/cognitivo/*` 97% (`analogical_reasoning.py` 100% com ramos) e monólito 68%; `tools/cognitivo_mutation.py` 292/292 mortos (30 novos); `tools/targeted_mutation.py` 80/80; Bandit 137→131 LOW sem alteração em `SECURITY_TRIAGE.md` (`--check` ok), zero MEDIUM/HIGH; `embedded_assert_audit` ok; `predeleg.sh HEAD origin/main` sem conflito. `git merge-tree` contra #115 e #116: já conflitam com `main` (relatórios e outros arquivos) antes desta mudança; esta mudança só acrescenta os mesmos relatórios gerados.
+
+**Não medido.** CI hospedada; efeito em cenários fora dos pré-registrados; mescla real com #79, #115 ou #116. O #120 já estava mesclado em `main` quando o rebase foi feito.
