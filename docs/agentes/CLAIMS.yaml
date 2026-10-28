@@ -1,4 +1,12 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: cursor-grok-4-7
+    tarefa: "Auditor de declarações de correção e reincidência de lições"
+    arquivos:
+      - tools/correction_claim_audit.py
+      - test_correction_claim_audit_contract.py
+      - docs/agentes/LICOES_APRENDIDAS.md
+      - docs/agentes/REGISTRO_AGENTES.yaml
+    expira_em: "2026-10-31T18:00:00Z"
