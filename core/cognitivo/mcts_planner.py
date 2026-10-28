@@ -128,8 +128,8 @@ class RealMCTSPlanner:
 
         # Biblioteca de domínios de ação predefinidos
         self._action_effects: Dict[str, Dict] = planner_deltas()  # tabela única (core.cognitivo.action_effects)
-        # Escopo de um plan(): ações permitidas, efeitos de ações customizadas e
-        # melhor sequência completa encontrada nos rollouts (estratégia "top score").
+        # Escopo de um plan(): ações permitidas apenas durante o plano e melhor
+        # sequência completa encontrada nos rollouts (estratégia "top score").
         self._plan_actions: Optional[List[str]] = None
         self._plan_effects: Dict[str, Dict] = {}
         self._best_found: Optional[tuple] = None
@@ -368,14 +368,11 @@ class RealMCTSPlanner:
         initial_state = self._get_initial_state(goal)
 
         # Ações fornecidas valem em todas as profundidades, só neste plano; a lista do
-        # chamador é copiada e ações desconhecidas recebem efeitos neutros locais.
+        # chamador é copiada. Ações sem modelo deixam as métricas do estado intactas.
         allowed = list(available_actions) if available_actions is not None else None
         try:
             self._plan_actions = allowed
-            self._plan_effects = {
-                action: {"security": 0.1, "stability": 0.1, "cost": -0.1}
-                for action in (allowed or []) if action not in self._action_effects
-            }
+            self._plan_effects = {}
             self._best_found = None
             return self._run_plan(goal, initial_state, allowed, max_iterations, start_time)
         finally:
