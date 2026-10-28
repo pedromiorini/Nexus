@@ -1,16 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "Analogical Reasoning: mapeamento um-para-um/injetivo e transferência fiel (AR3, AR4, AR7–AR10), PR de comportamento draft"
-    arquivos:
-      - core/cognitivo/analogical_reasoning.py
-      - test_analogical_reasoning_contract.py
-      - tools/cognitivo_eval.py
-      - tools/cognitivo_mutation.py
-      - docs/cognitivo/AUDITORIA_2026-10-22.md
-      - docs/agentes/CLAIMS.yaml
-      - AUDIT_REALITY_REPORT.md
-      - audit_reality.json
-    expira_em: "2026-10-29T06:00:00Z"
+claims: []

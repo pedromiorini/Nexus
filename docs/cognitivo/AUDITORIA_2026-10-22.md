@@ -1786,3 +1786,32 @@ Não há contrato anterior dos três símbolos além de AR1–AR6; AR1 (referên
 ### Varredura §7.2 (2026-10-28, `gh pr list --state open`)
 
 PRs abertos: #38–#50, #60, #77, #79, #115, #116 (o #120 já foi mesclado). Nenhum edita `core/cognitivo/analogical_reasoning.py`, `test_analogical_reasoning_contract.py`, `tools/cognitivo_eval.py` nem este arquivo. **Sobreposição declarada, de outro agente em pausa:** #116 (Axis) altera `tools/cognitivo_mutation.py` e os relatórios de realidade; #79 altera `docs/agentes/CLAIMS.yaml`; #115 e #50 alteram `SECURITY_TRIAGE.md`. Este PR não toca nem rebaseia nenhum deles; se algum entrar antes, os relatórios são regenerados pelas ferramentas, nunca à mão. Claim `grok-bot`, prazo `2026-10-29T06:00:00Z` (≈ 8 h), removido no último commit (`claims: []`).
+
+### Resultados da correção AR3/AR4 (depois do pré-registro `0e0e1d3`)
+
+**Commits, em ordem:** `0e0e1d3` pré-registro e claim; `ce8aa5b` **RED** (contrato e harness AR7–AR10; `--capability analogical_reasoning` sai com 1); `32b20fc` **GREEN** (a correção mínima em `core/cognitivo/analogical_reasoning.py`, mutantes, SHAs de AR6 re-fixados, relatórios regenerados por `tools/reality_audit.py`); este commit de resultados (esta seção e `docs/agentes/CLAIMS.yaml` de volta a `claims: []`).
+
+**Valores no RED (código de `main` em `3eebbbb`) e no GREEN** — nenhum limite, seed, tamanho, caso ou valor foi alterado depois da primeira execução:
+
+| id | RED | GREEN |
+|---|---|---|
+| AR1 | falha: 95/120 iguais à referência v2; contadores 116/120 | **passa**: 120/120; contadores iguais (52 analogias, 23 transferências); 0 entradas alteradas |
+| AR2 | passa 19/19 | **passa** 19/19 |
+| AR3 | falha: `one_to_one` 0.00, `injective` 0.00; controle isomorfo 1.00 | **passa**: `one_to_one` 1.00 (20/20), `injective` 1.00 (20/20); controle isomorfo 1.00 |
+| AR4 | falha: `real_entities` 0.00, `simultaneous` 0.00, `whole_word` 0.00; controle simples 1.00 | **passa**: 1.00 (20/20) nas três; controle simples 1.00 |
+| AR5 | falha: gaps 10/12 (o pré-registro atualiza três gaps) | **passa**: gaps 12/12; erros 15/15; colaboradores nunca lidos |
+| AR6 | falha (SHAs ainda dos valores do #121) | **passa** após o re-fixar dos detectores (veja a declaração 1) |
+| AR7 | falha: tabela 4/14; propriedades 138/200 | **passa**: 14/14 e 200/200 |
+| AR8 | falha: tabela 4/12; propriedades 20/100 | **passa**: 12/12 e 100/100 |
+| AR9 | falha: 4/8 | **passa**: 8/8 |
+| AR10 | passa: 95 linhas não afetadas, 0 diferenças | **passa**: 95 ≥ 52 linhas não afetadas, 0 diferenças |
+
+**Declarações de transparência.**
+1. Os SHAs de AR6 (fonte `64e1bd06…66e1`, comportamento `997c1e59…4201`) são detectores: o pré-registro declarou que mudam com o GREEN. Foram re-fixados uma única vez no commit GREEN, depois de todos os outros critérios passarem, como MS6 no #119. São iguais em 3.11 e 3.12.
+2. **Deslize no pré-registro de AR8:** o cabeçalho diz "`successful_transfers == 1` por chamada, exceto o caso 10", mas a linha do caso 10 da tabela diz 1, igual às outras. Não ajustei nada; a tabela (a linha) é o que o harness executa e o que passou. Registrado aqui para o revisor.
+3. O teste de regressão da transferência sequencial legada exigia AR9 por engano; corrigi o teste (ele afirma só AR4 e AR8) antes do commit GREEN. Não é critério do harness.
+4. Cinco testes extras no contrato (par parcial vazado, relação rejeitada com um par concordante, chave vazia, chave mais longa com prefixo curto, nomes reais não sobrescritos) existem para matar mutantes que sobreviveriam; não mudam critérios.
+
+**Lacunas residuais (mantidas em AR5 ou fora de escopo; nada disto foi tocado).** `_extract_entities` ainda aceita `The` e `A` como entidade (gap `stop The`); os argumentos de cada relação são sempre as duas primeiras entidades do texto, não posicionais; detecção de relação por substring, sem negação, `dissimilar to` nem `counterpart of`; domínio com diferenciação de maiúsculas; listas do chamador com aliasing; `transfer_success_rate` pode passar de 1.0; `reasoning`, `memory` e `semantic_networks` não são usados; com menos de 2 entidades os literais `entity1`/`entity2` ficam; entrada não validada; casamento guloso, não ótimo; solução não-str com mapa não vazio agora sempre dá `AttributeError` (antes `bytes` dava `TypeError`). Não afetados: o construtor do orquestrador e o teste 25 da demo.
+
+**Opções se algo for recusado na revisão.** (a) Manter em rascunho como inventário medido; (b) PR separado para as lacunas residuais (extração posicional, `The`/`A`, negação) com novo pré-registro; (c) trocar o casamento guloso por ótimo, com novo protocolo.
