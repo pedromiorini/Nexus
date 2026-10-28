@@ -216,6 +216,10 @@ class RealMentalSimulationSystem:
         if success:
             return 0.9
 
+        # Objetivo só de posição: o crédito parcial mede o progresso da posição, não recursos nem estruturas.
+        if self._is_position_only_goal(goal):
+            return min(1.0, 0.3 + 0.4 * self._position_progress(final_state))
+
         # Partial credit por progresso
         quality = 0.3
 
@@ -225,6 +229,22 @@ class RealMentalSimulationSystem:
             quality += 0.2
 
         return min(1.0, quality)
+
+    @staticmethod
+    def _is_position_only_goal(goal) -> bool:
+        """Objetivo textual que menciona posição e nem recursos nem estruturas."""
+        if not isinstance(goal, str):
+            return False
+        goal_lower = goal.lower()
+        return "position" in goal_lower and "resource" not in goal_lower and "structure" not in goal_lower
+
+    @staticmethod
+    def _position_progress(state: Dict) -> float:
+        """Fração (0..1) da posição rumo ao limite de sucesso 10; valor inválido não dá crédito."""
+        position = state.get("position", 0)
+        if isinstance(position, (int, float)) and position == position:
+            return min(1.0, max(0.0, position) / 10.0)
+        return 0.0
 
     def rollout_planning(self, initial_state: Dict, possible_actions: List[str], 
                         goal: str, num_rollouts: int = 5) -> str:

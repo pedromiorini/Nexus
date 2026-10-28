@@ -60,7 +60,7 @@ IL_TESTS = ("test_incremental_learner_contract.py",)
 EF = "core/cognitivo/episodic_future_thinking.py"
 EF_TESTS = ("test_episodic_future_thinking_contract.py",)
 MS = "core/cognitivo/mental_simulation.py"
-MS_TESTS = ("test_mental_simulation_contract.py",)
+MS_TESTS = ("test_mental_simulation_contract.py", "test_mental_simulation_goal_credit.py")
 
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
@@ -789,12 +789,27 @@ MUTATIONS = [
     Mutation('ms_resource_goal_threshold', MS, 'state.get("resources", 0) >= 5', 'state.get("resources", 0) >= 4', tests=MS_TESTS),
     Mutation('ms_structure_goal_threshold', MS, 'state.get("structures", 0) >= 3', 'state.get("structures", 0) >= 2', tests=MS_TESTS),
     Mutation('ms_position_goal_threshold', MS, 'state.get("position", 0) >= 10', 'state.get("position", 0) >= 11', tests=MS_TESTS),
-    Mutation('ms_goal_case_sensitive', MS, 'goal_lower = goal.lower()', 'goal_lower = goal', tests=MS_TESTS),
+    Mutation('ms_goal_case_sensitive', MS, 'goal_lower = goal.lower()\n\n        if "resource" in goal_lower and state', 'goal_lower = goal\n\n        if "resource" in goal_lower and state', tests=MS_TESTS),
     Mutation('ms_success_does_not_stop', MS, '                success = True\n                break', '                success = True', tests=MS_TESTS),
     Mutation('ms_success_quality_changed', MS, '            return 0.9', '            return 0.8', tests=MS_TESTS),
     Mutation('ms_base_quality_changed', MS, 'quality = 0.3', 'quality = 0.4', tests=MS_TESTS),
     Mutation('ms_resource_credit_dropped', MS, 'quality += 0.2\n        if final_state.get("structures"', 'quality += 0.0\n        if final_state.get("structures"', tests=MS_TESTS),
     Mutation('ms_structure_credit_dropped', MS, 'if final_state.get("structures", 0) > 0:\n            quality += 0.2', 'if final_state.get("structures", 0) > 0:\n            quality += 0.0', tests=MS_TESTS),
+    Mutation('ms_goal_credit_position_case_sensitive', MS, 'goal_lower = goal.lower()\n        return "position"', 'goal_lower = goal\n        return "position"', tests=MS_TESTS),
+    Mutation('ms_goal_credit_ignores_resource_exclusion', MS, ' and "resource" not in goal_lower', '', tests=MS_TESTS),
+    Mutation('ms_goal_credit_ignores_structure_exclusion', MS, ' and "structure" not in goal_lower', '', tests=MS_TESTS),
+    Mutation('ms_goal_credit_requires_no_position_word', MS, 'return "position" in goal_lower and', 'return "position" not in goal_lower and', tests=MS_TESTS),
+    Mutation('ms_goal_credit_non_string_guard_dropped', MS, 'if not isinstance(goal, str):\n            return False\n        goal_lower', 'if False:\n            return False\n        goal_lower', tests=MS_TESTS),
+    Mutation('ms_goal_credit_branch_disabled', MS, 'if self._is_position_only_goal(goal):', 'if False:', tests=MS_TESTS),
+    Mutation('ms_goal_credit_base_changed', MS, 'return min(1.0, 0.3 + 0.4 *', 'return min(1.0, 0.4 + 0.4 *', tests=MS_TESTS),
+    Mutation('ms_goal_credit_weight_changed', MS, '0.3 + 0.4 * self._position_progress', '0.3 + 0.5 * self._position_progress', tests=MS_TESTS),
+    Mutation('ms_goal_credit_cap_dropped', MS, 'return min(1.0, 0.3 + 0.4 * self._position_progress(final_state))', 'return 0.3 + 0.4 * self._position_progress(final_state)', tests=MS_TESTS),
+    Mutation('ms_goal_credit_divisor_changed', MS, 'max(0.0, position) / 10.0', 'max(0.0, position) / 9.0', tests=MS_TESTS),
+    Mutation('ms_goal_credit_negative_not_floored', MS, 'max(0.0, position) / 10.0', 'position / 10.0', tests=MS_TESTS),
+    Mutation('ms_goal_credit_progress_cap_dropped', MS, 'return min(1.0, max(0.0, position) / 10.0)', 'return max(0.0, position) / 10.0', tests=MS_TESTS),
+    Mutation('ms_goal_credit_nan_accepted', MS, 'isinstance(position, (int, float)) and position == position', 'isinstance(position, (int, float))', tests=MS_TESTS),
+    Mutation('ms_goal_credit_str_position_accepted', MS, 'isinstance(position, (int, float)) and position == position', 'position == position', tests=MS_TESTS),
+    Mutation('ms_goal_credit_ignores_final_state', MS, 'self._position_progress(final_state)', 'self._position_progress({})', tests=MS_TESTS),
     Mutation('ms_failure_utility_factor', MS, '(1.0 if success else 0.5)', '(1.0 if success else 0.6)', tests=MS_TESTS),
     Mutation('ms_cache_write_dropped', MS, 'self.simulation_cache[scenario.scenario_id] = result\n', 'pass\n', tests=MS_TESTS),
     Mutation('ms_counter_dropped', MS, '        self.total_simulations += 1\n', '        self.total_simulations += 0\n', tests=MS_TESTS),

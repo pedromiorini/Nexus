@@ -1498,3 +1498,68 @@ Pré-registro escrito **antes** do move, **antes** do contrato novo de extraçã
 ### Decisão do Pedro sobre o MS3 (2026-10-28, mensagem t111u: «Prossiga com a melhor opção»)
 
 O Pedro autorizou a melhor opção proposta: **aceitar a falha do MS3 (`increase` 0.00 contra 0.80) como gap documentado deste PR move-only**, mesclar o #118 como está e tratar a correção num **PR separado de comportamento (opção 2)**, com novo pré-registro (MS3-v2) e crédito parcial ciente do objetivo. O MS3 original **não** foi alterado: limite, seeds e cenário continuam os pré-registrados em `cf8f9f2`, e o resultado 0.00 permanece como o número medido da extração. O gap fica aberto até o PR de correção ser mesclado por decisão do Pedro.
+
+## Mental Simulation — crédito parcial ciente do objetivo (pré-registro MS3-v2 e MS7)
+
+**Autorização:** Pedro, mensagem t111u (2026-10-28), «Prossiga com a melhor opção»: mesclar o #118 com o MS3 aceito como gap e corrigir num PR separado de comportamento, com novo pré-registro. Este PR é **draft e não será mesclado sem nova autorização**. Base: `c856e1a` (merge do #118).
+
+**Pré-registro escrito antes** do teste RED, antes da mudança em `core/cognitivo/mental_simulation.py` e antes de qualquer execução do eval com o comportamento novo. A única leitura feita antes deste texto foi sobre o **código base inalterado** (`c856e1a`), só para fixar os controles de não regressão abaixo; nenhum resultado de MS3-v2 ou MS7 foi lido.
+
+### Hipótese
+
+**H-MS3v2:** o crédito parcial de `_evaluate_outcome` só premia `resources` e `structures`, e por isso `rollout_planning` prefere `acquire` a `move` quando o objetivo é `increase position`. Se, para objetivos **só de posição**, o crédito parcial passar a medir o progresso da posição em direção ao limite de sucesso (10), o rollout escolherá `move` nas seeds pré-registradas.
+
+**Falsificação:** `increase` ou `increase_late` com taxa de `move` < 0.80 em 20 seeds; ou qualquer controle de não regressão diferente do fixado abaixo.
+
+**Previsão (registrada, não vinculante):** taxa 1.00 nos dois casos. Cálculo à mão: com 3 ações aleatórias, cada `move` extra soma 0.4 × 0.1 × 0.5 = 0.02 de utilidade média; com 100 rollouts por ação o erro-padrão da diferença é ≈ 0.0023 (z ≈ 8).
+
+### A mudança (a única permitida)
+
+`_evaluate_outcome(final_state, goal, success)`, só no ramo sem sucesso:
+
+- Se `goal` é `str`, contém `position` e **não** contém `resource` nem `structure` (minúsculas): `quality = min(1.0, 0.3 + 0.4 * progresso)`, com `progresso = min(1.0, max(0.0, position) / 10.0)` quando `position` é `int`/`float` e não é `NaN`; qualquer outro valor (ausente, `None`, `str`, `NaN`) vale `progresso = 0.0`. Recursos e estruturas **não** dão crédito nesse caso, porque não são progresso do objetivo declarado.
+- Qualquer outro `goal` (inclusive `None`, `int`, `survive` e objetivos mistos como `increase position and gather resources`): comportamento atual, byte a byte (0.3, +0.2 se `resources > 0`, +0.2 se `structures > 0`).
+- O sucesso (`0.9`), a verificação do objetivo, os riscos, as oportunidades e o resto da classe não mudam. Nenhum erro novo é introduzido (posição inválida sem ações continua sem erro).
+
+### Critérios (protocolo MS-v2; ids mantidos, MS7 novo)
+
+Comando: `python tools/cognitivo_eval.py --capability mental_simulation`. Seeds `0..19`, `num_rollouts = 100` e grade `Random(2026)` com 120 cenários **não mudam**. Alvo: todos passam, rc 0.
+
+| id | mudança declarada | critério |
+|---|---|---|
+| MS1 | a referência independente ganha a regra acima | 120/120 iguais à referência nova; **e** as 93 linhas cujo objetivo não é só de posição ou que têm sucesso têm SHA-256 `acf3d3c2d4b7e0d3e46facfe1dc9b0e055a6232e7a936e21d8c700a3ec81dd09` (medido no código base) |
+| MS2 | nenhuma | 14/14 casos de borda |
+| MS3-v2 | casos e controles novos | `reach` ≥ 0.90 (`move`); `increase` ≥ 0.80 (`move`, estado `{position: 0}`, ações `[move, wait, acquire]`); **`increase_late`** ≥ 0.80 (`move`, estado `{position: 3}`, ações `[wait, acquire, move]`, objetivo `increase position`, `move` não é o primeiro); `gather` ≥ 0.90 (`acquire resource`); **controles**: `survive_control` (`{position: 0}`, `[move, wait, acquire]`, `survive`) e `mixed_control` (mesmo estado e ações, objetivo `increase position and gather resources`) escolhem `acquire` nas 20 seeds (valor medido no código base, SHA-256 da lista `a68f7c3120fc85b88c4acd3c8ca5f8934350fa1c65aeb29d4e1182a13b98fd12`) |
+| MS4 | referência nova | 120/120 contrafactuais |
+| MS5 | nenhuma | contadores, erros e gaps como no fingerprint; o gap de objetivo `None` sem ações continua sem erro |
+| MS6 | **os SHA de fonte e de comportamento são recalculados e re-fixados depois do GREEN** (declarado aqui; são detectores de mudança, não limites de hipótese). Os valores base ficam registrados: fonte `43803b05…9df67`, comportamento `15dadf71…de76` | reexport idêntico; módulo sem monólito/numpy/vita; SHA igual no módulo e no monólito e em 3.11/3.12 |
+| MS7 | novo | tabela de qualidade em objetivo só de posição, sem sucesso, tolerância 1e-9: posição 0 → 0.30; 5 → 0.50; 9 → 0.66; −3 → 0.30; `{position: 0, resources: 3, structures: 2}` → 0.30 (sem crédito de recursos); posição `None`, `"a"` e `NaN` sem ações → 0.30 e sem erro; ação `wait` com posição 5 → 0.50; objetivo misto com `resources: 1` → 0.50 (legado); objetivo `survive` com `structures: 1` → 0.50 (legado); sucesso com `position: 10` → 0.90 |
+
+**Regra:** nenhum limite, seed, tamanho ou valor acima é alterado depois da primeira execução. Se algum critério falhar, o PR continua draft e as opções vão para o relatório, sem ajuste.
+
+### Varredura §7.2 (2026-10-28, `gh pr list --state open`)
+
+PRs abertos: #38–#50, #60, #77, #79, #115, #116. Nenhum edita `core/cognitivo/mental_simulation.py`, `tools/cognitivo_eval.py` nem `test_mental_simulation_*`. **Sobreposição declarada:** #116 (Axis, em pausa) altera `tools/cognitivo_mutation.py` e os relatórios de realidade; #79 altera a linha 1 de `docs/agentes/CLAIMS.yaml`; #115 e #50 alteram `SECURITY_TRIAGE.md`. Este PR não toca neles; se algum entrar antes, os relatórios são regenerados pelas ferramentas, nunca à mão. Claim `grok-bot`, prazo `2026-10-29T00:00:00Z` (≈ 6 h), removido no último commit.
+
+### Resultados MS-v2 (depois do pré-registro `82308d0`)
+
+**Commits, em ordem:** `82308d0` pré-registro e claim; `24ad165` harness e testes, **RED** (18 falhas em 3.11 e em 3.12 sobre o código base; os controles do código base passam, como fixado); `88618ae` mudança (**GREEN**) com os SHA do MS6 re-fixados e 15 mutantes novos; este commit de resultados, que remove o claim. Nenhum limite, seed, tamanho ou valor de MS1–MS7 foi alterado depois do pré-registro.
+
+**Comando:** `python tools/cognitivo_eval.py --capability mental_simulation`, Python 3.11 e 3.12. Na primeira execução com o comportamento novo, **só o MS6 falhou**, porque os SHA ainda eram os do move-only (re-pin declarado no pré-registro). Depois de re-fixar os dois SHA (fonte `4b2356be…4c26`, comportamento `c8d6f43d…48b4`, completos em `tools/cognitivo_eval.py`; iguais em 3.11 e 3.12), saída: código **0**, `failed: []`.
+
+| id | resultado | valor medido |
+|---|---|---|
+| MS1 | **passa** | 120/120 iguais à referência nova; 93 linhas invariantes com SHA `acf3d3c2…dd09`, o valor medido no código base |
+| MS2 | **passa** | 14/14 |
+| MS3-v2 | **passa** | `reach` 1.00, **`increase` 1.00** (limite 0.80), **`increase_late` 1.00** (limite 0.80), `gather` 1.00; controles `survive_control` e `mixed_control` 1.00 em `acquire`, iguais ao código base |
+| MS4 | **passa** | 120/120 contrafactuais |
+| MS5 | **passa** | contadores, erros e gaps iguais; `successful_predictions == 0` e `simulation_accuracy == 0.0` (gap H6 permanece) |
+| MS6 | **passa** (após o re-pin declarado) | reexport idêntico, módulo sem monólito/numpy/vita |
+| MS7 | **passa** | 12/12: 0.30, 0.50, 0.66, 0.30, 0.30 (sem crédito de recursos), 0.30, 0.30, 0.30, 0.50, 0.50, 0.50, 0.90 |
+
+**Hipótese H-MS3v2 sustentada.** O gap do #118 (`increase` 0.00) passa a 1.00, e a previsão registrada (1.00 nos dois casos) se confirmou. O efeito é restrito a objetivos só de posição: objetivos `survive` e mistos continuam escolhendo `acquire` (gap residual conhecido e declarado: o crédito de recursos sozinho ainda não distingue ações para esses objetivos).
+
+**Gates locais (não substituem a CI hospedada).** `ruff` limpo; `compileall`; `reality_audit` regenerado só pela ferramenta (única mudança: 4059 → 4079 linhas dos módulos extraídos); 669 testes OK; cobertura `core/cognitivo/*` 97% (`mental_simulation.py` 100% com ramos) e monólito 68%; `tools/cognitivo_mutation.py` 262/262 mortos (15 novos); Bandit 131 LOW, zero MEDIUM/HIGH, `security_triage --check` verde sem mudança em `SECURITY_TRIAGE.md`; `validar_registro.py`.
+
+**Não medido.** CI hospedada; efeito em cenários fora dos pré-registrados; mescla real com #79, #115 ou #116.
+
