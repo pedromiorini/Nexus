@@ -2868,8 +2868,12 @@ def eval_episodic_future(criteria="v1"):
     ]
 
 
-MS_SOURCE_SHA = "43803b05cafb6461911aeba7b94e067e3bb83e0a0e3eb0b295b11f1306e9df67"
-MS_BEHAVIOR_SHA = "15dadf71b6aac11280a10d72533065ab7f6ffb5e7a9ce29d688eefe1273ede76"
+# Goldens do move-only (#118, c856e1a); registro histórico, não são mais comparados.
+MS_SOURCE_SHA_BASE = "43803b05cafb6461911aeba7b94e067e3bb83e0a0e3eb0b295b11f1306e9df67"
+MS_BEHAVIOR_SHA_BASE = "15dadf71b6aac11280a10d72533065ab7f6ffb5e7a9ce29d688eefe1273ede76"
+# Re-fixados depois do GREEN do crédito ciente do objetivo (declarado no pré-registro 82308d0); iguais em 3.11 e 3.12.
+MS_SOURCE_SHA = "4b2356be6ff2543acb1ed8e9d32348c5bb4fbcb502e0d58249a4b02c69ae4c26"
+MS_BEHAVIOR_SHA = "c8d6f43d0b58f7dcce277fa713df7d499601b9408e91c212d51f4704cadf48b4"
 _MS_NAMES = ("MentalScenario", "MentalSimulationResult", "RealMentalSimulationSystem")
 _MS_MARKER = "# MÓDULO 30: MENTAL SIMULATION SYSTEM (POST 30)"
 _MS_END = '            "cached_simulations": len(self.simulation_cache)\n        }'

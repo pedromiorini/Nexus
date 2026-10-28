@@ -60,9 +60,9 @@
       },
       {
         "path": "core/cognitivo/mental_simulation.py",
-        "lines": 325,
+        "lines": 345,
         "classes": 3,
-        "functions": 11
+        "functions": 13
       },
       {
         "path": "core/cognitivo/predictive_coding.py",
