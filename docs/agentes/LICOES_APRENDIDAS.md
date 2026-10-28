@@ -16,6 +16,11 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - Regra/checagem derivada: regra para as instruções ou checagem automática proposta.
 - Evidência: PR, SHA e/ou ID de execução do CI verificáveis (obrigatório; "evidência: ver texto" só para entradas anteriores à v3.4).
 - Derivada de: lições em uso quando esta foi escrita (ex.: L-003) ou "nenhuma".
+- Reincidência (eixos separados; um não preenche o outro):
+  - Falha-alvo: corrigida | não corrigida | não medido
+  - Falhas parecidas: melhoraram | não melhoraram | mistas | não medido
+  - Casos novos: melhoraram | pioraram | inalterados | não medido
+- Propostas rejeitadas ou que não funcionaram: <texto> | nenhuma registrada
 - Status: pendente | ativa | promovida (onde: instrução §/arquivo, ou teste/gate) | aposentada (data, motivo)
 ```
 
@@ -25,6 +30,12 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
 - **Teste dos três casos** (política local, sem verificação automática; não é o replay de guardas): critérios escritos no PR antes de rodar; passa só se o caso de origem fica corrigido, um caso anterior bem-sucedido não regride e um caso semelhante incompatível é rejeitado ou sinalizado.
 - **Teto de 15:** contam só `ativa` e as legadas `registrada` (equivalem a `ativa`); `pendente`, `promovida` e `aposentada` não contam. Para ativar além de 15, aposente uma explicitamente (`Status: aposentada`, data e motivo), sem apagar o texto. 15 é teto operacional escolhido para o Nexus, não resultado de paper (arXiv 2608.05810, preprint, só sustenta cautela com acúmulo sem filtro).
 - **Registros legados:** L-001..L-007 são anteriores à v3.4: mantêm o status original sem refazer o teste; o campo `Evidência` foi acrescentado só quando ela já constava no texto. Evidência que não é PR/SHA/run verificável externamente fica marcada como legada (L-006).
+
+## Reincidência medida à parte
+
+Corrigir a falha-alvo não preenche os outros eixos. Lição nova (`Status` começando por `pendente` ou `ativa`) registra os três, mais as propostas rejeitadas ou que não funcionaram. `não medido` é valor explícito; omitir o bloco nessas lições faz `tools/correction_claim_audit.py` falhar. Lição `registrada`, `promovida` ou `aposentada` sem o bloco permanece `nao_checavel`: o auditor reporta os três eixos como `não medido` e não os infere. L-001..L-007 não foram remedidas.
+
+O replay `tools/agente/replay/run_replay.sh` não executa este auditor. Tipo desconhecido nele falha fechado de propósito, e a tabela cobre guardas de shell (L-001..L-003). O análogo, para lição, é o trio falha-alvo / falhas parecidas / casos novos, no lugar de origem / anterior / incompatível. Motivação externa, não replicada aqui: arXiv 2610.14662 (corrigir a falha-alvo não implicou melhora em casos novos) e arXiv 2610.35950 (declaração de PASS/correção não é observação).
 
 ## Regra de promoção
 - Uma lição **repetida 2 vezes** ou de **alto risco** (estado compartilhado do GitHub, segurança, perda de dado, gate enfraquecido) deve ser promovida a regra nas instruções dos agentes **ou** a checagem automática (teste/gate).
