@@ -3449,7 +3449,7 @@ def _ar_err(fn):
 
 
 def _ar_grid():
-    rng = random.Random(_AR_GRID_SEED)
+    rng = random.Random(_AR_GRID_SEED)  # nosec B311 - dados sintéticos de avaliação
     rows = []
     for i in range(_AR_GRID_SIZE):
         known = []
@@ -3508,7 +3508,7 @@ def _ar_find(cls, known, domain, ents, rels):
 
 
 def _ar_family_one_to_one(cls, seed):
-    rng = random.Random(1000 + seed)
+    rng = random.Random(1000 + seed)  # nosec B311 - dados sintéticos de avaliação
     label = rng.choice(_AR_LABELS)
     known = [("src", ["a%d" % seed, "b%d" % seed], [(label, "a%d" % seed, "b%d" % seed)], None)]
     rels = [(label, "u%d" % seed, "v%d" % seed), (label, "w%d" % seed, "x%d" % seed)]
@@ -3517,7 +3517,7 @@ def _ar_family_one_to_one(cls, seed):
 
 
 def _ar_family_injective(cls, seed):
-    rng = random.Random(2000 + seed)
+    rng = random.Random(2000 + seed)  # nosec B311 - dados sintéticos de avaliação
     l1, l2 = rng.sample(_AR_LABELS, 2)
     a, b, c, d = ("a%d" % seed, "b%d" % seed, "c%d" % seed, "d%d" % seed)
     known = [("src", [a, b, c, d], [(l1, a, b), (l2, c, d)], None)]
@@ -3530,7 +3530,7 @@ def _ar_family_injective(cls, seed):
 
 
 def _ar_family_control_isomorphic(cls, seed):
-    rng = random.Random(3000 + seed)
+    rng = random.Random(3000 + seed)  # nosec B311 - dados sintéticos de avaliação
     l1, l2 = rng.sample(_AR_LABELS, 2)
     a, b, c = ("a%d" % seed, "b%d" % seed, "c%d" % seed)
     x, y, z = ("x%d" % seed, "y%d" % seed, "z%d" % seed)
@@ -3540,7 +3540,7 @@ def _ar_family_control_isomorphic(cls, seed):
 
 
 def _ar_family_real_entities(cls, seed):
-    rng = random.Random(4000 + seed)
+    rng = random.Random(4000 + seed)  # nosec B311 - dados sintéticos de avaliação
     c1, c2 = rng.sample(_AR_NAMES_POOL, 2)
     system = _ar_system(cls, [("src", ["Rain", "Flood"], [("CAUSES", "Rain", "Flood")], "avoid Rain before Flood")])
     return system.reason_by_analogy("%s causes %s." % (c1, c2), "tgt") == "avoid %s before %s" % (c1, c2)
@@ -3554,7 +3554,7 @@ def _ar_family_simultaneous(cls, seed):
 
 
 def _ar_words(seed):
-    rng = random.Random(5000 + seed)
+    rng = random.Random(5000 + seed)  # nosec B311 - dados sintéticos de avaliação
     p, q = rng.sample(_AR_SRC_WORDS, 2)
     tp, tq = rng.sample(_AR_TGT_WORDS, 2)
     return p, q, tp, tq
