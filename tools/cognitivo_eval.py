@@ -3,7 +3,7 @@
 Critérios: /workspace/nexus/cognitivo/AUDITORIA_2026-10-22.md (sha256 3d24a63d…), escritos
 antes da execução. Mede propósito, não só ausência de crash.
 
-Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,attention,incremental,episodic_future,mental_simulation,all} [--json PATH]
+Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,attention,incremental,episodic_future,mental_simulation,analogical_reasoning,all} [--json PATH]
 Saída: exit 0 se todo critério passa, 1 se algum falha, 2 para entrada ausente/vazia/desconhecida.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
-CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future", "mental_simulation")
+CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future", "mental_simulation", "analogical_reasoning")
 
 TOPICS = [
     ("database", "migration", "rollback"), ("network", "latency", "spike"), ("disk", "quota", "exceeded"),
@@ -3417,13 +3417,529 @@ def eval_mental_simulation(criteria="v1"):
     ]
 
 
+# ── Analogical Reasoning (POST27) ───────────────────────────────────────────
+
+AR_SOURCE_SHA = "a603eafc39db384ac6670c6cdba0b490155b46f9e1a38ea79a00202f24741c6a"
+AR_BEHAVIOR_SHA = "517a4d8e2b52d8159e0445d3440a3b1c30cb553b9eb6a7f01ec6a40f07617b6b"  # capturado no monólito antes do move (RED), 3.12 e 3.11
+_AR_NAMES = ("AnalogySituation", "AnalogyMapping", "RealAnalogicalReasoningSystem")
+_AR_MARKER = "# MÓDULO 27: ANALOGICAL REASONING SYSTEM (POST 27)"
+_AR_END = '            "transfer_success_rate": self.successful_transfers / max(1, self.total_analogies_found)\n        }'
+_AR_DOMAINS = ("physics", "biology", "economics", "computing", "music")
+_AR_LABELS = ("CAUSES", "PART_OF", "SIMILAR", "ABOVE", "BEFORE")
+_AR_GRID_SEED = 2027
+_AR_GRID_SIZE = 120
+_AR_SEEDS = tuple(range(20))
+_AR_LIMIT = 0.90
+_AR_NAMES_POOL = ("Alpha", "Bravo", "Cedar", "Delta", "Echo", "Fable", "Gamma", "Harbor")
+_AR_SRC_WORDS = ("sun", "moon", "cat", "dog", "red", "blue")
+_AR_TGT_WORDS = ("alpha", "bravo", "charlie", "delta", "echo", "foxtrot")
+
+
+class _ArBoom:
+    def __getattr__(self, name):
+        raise AssertionError("called " + name)
+
+
+def _ar_err(fn):
+    try:
+        fn()
+    except Exception as exc:
+        return type(exc).__name__
+    return "no-error"
+
+
+def _ar_grid():
+    rng = random.Random(_AR_GRID_SEED)
+    rows = []
+    for i in range(_AR_GRID_SIZE):
+        known = []
+        for k in range(rng.randint(0, 5)):
+            ents = ["s%d_%d_%d" % (i, k, j) for j in range(rng.randint(2, 4))]
+            rels = [(rng.choice(_AR_LABELS),) + tuple(rng.sample(ents, 2)) for _ in range(rng.randint(0, 4))]
+            solution = rng.choice([None, "", "use %s with %s" % (ents[0], ents[1])])
+            known.append((rng.choice(_AR_DOMAINS), ents, rels, solution))
+        t_ents = ["t%d_%d" % (i, j) for j in range(rng.randint(2, 4))]
+        t_rels = [(rng.choice(_AR_LABELS),) + tuple(rng.sample(t_ents, 2)) for _ in range(rng.randint(0, 4))]
+        rows.append((known, rng.choice(_AR_DOMAINS), t_ents, t_rels))
+    return rows
+
+
+def _ar_reference(known, domain, t_rels):
+    """Referência independente, escrita só da leitura do bloco. Devolve (índice, mapa, qualidade, texto) ou None."""
+    best = None
+    for index, (s_domain, _ents, s_rels, solution) in enumerate(known):
+        if s_domain == domain:
+            continue
+        first = {}
+        for label, e1, e2 in s_rels:
+            first.setdefault(label, (e1, e2))
+        mapping, matched = {}, 0
+        for label, e1, e2 in t_rels:
+            if label in first:
+                mapping[first[label][0]] = e1
+                mapping[first[label][1]] = e2
+                matched += 1
+        if not matched:
+            continue
+        quality = matched / max(len(s_rels), len(t_rels))
+        if best is None or quality > best[2]:
+            text = None
+            if solution:
+                text = solution
+                for src, dst in mapping.items():
+                    text = text.replace(src, dst)
+            best = (index, mapping, quality, text, bool(solution))
+    return best
+
+
+def _ar_system(cls, known, **kwargs):
+    import contextlib
+    import io
+    with contextlib.redirect_stdout(io.StringIO()):
+        system = cls(**kwargs)
+    for domain, ents, rels, solution in known:
+        system.add_situation(domain, ents, rels, solution)
+    return system
+
+
+def _ar_find(cls, known, domain, ents, rels):
+    system = _ar_system(cls, known)
+    return system, system.find_analogy(domain, ents, rels)
+
+
+def _ar_family_one_to_one(cls, seed):
+    rng = random.Random(1000 + seed)
+    label = rng.choice(_AR_LABELS)
+    known = [("src", ["a%d" % seed, "b%d" % seed], [(label, "a%d" % seed, "b%d" % seed)], None)]
+    rels = [(label, "u%d" % seed, "v%d" % seed), (label, "w%d" % seed, "x%d" % seed)]
+    _, mapping = _ar_find(cls, known, "tgt", ["u", "v", "w", "x"], rels)
+    return mapping is not None and mapping.quality_score <= 0.5
+
+
+def _ar_family_injective(cls, seed):
+    rng = random.Random(2000 + seed)
+    l1, l2 = rng.sample(_AR_LABELS, 2)
+    a, b, c, d = ("a%d" % seed, "b%d" % seed, "c%d" % seed, "d%d" % seed)
+    known = [("src", [a, b, c, d], [(l1, a, b), (l2, c, d)], None)]
+    x, y, z = ("x%d" % seed, "y%d" % seed, "z%d" % seed)
+    _, mapping = _ar_find(cls, known, "tgt", [x, y, z], [(l1, x, y), (l2, x, z)])
+    if mapping is None:
+        return True
+    values = list(mapping.entity_mappings.values())
+    return len(set(values)) == len(values)
+
+
+def _ar_family_control_isomorphic(cls, seed):
+    rng = random.Random(3000 + seed)
+    l1, l2 = rng.sample(_AR_LABELS, 2)
+    a, b, c = ("a%d" % seed, "b%d" % seed, "c%d" % seed)
+    x, y, z = ("x%d" % seed, "y%d" % seed, "z%d" % seed)
+    known = [("src", [a, b, c], [(l1, a, b), (l2, b, c)], None)]
+    _, mapping = _ar_find(cls, known, "tgt", [x, y, z], [(l1, x, y), (l2, y, z)])
+    return mapping is not None and mapping.quality_score == 1.0 and mapping.entity_mappings == {a: x, b: y, c: z}
+
+
+def _ar_family_real_entities(cls, seed):
+    rng = random.Random(4000 + seed)
+    c1, c2 = rng.sample(_AR_NAMES_POOL, 2)
+    system = _ar_system(cls, [("src", ["Rain", "Flood"], [("CAUSES", "Rain", "Flood")], "avoid Rain before Flood")])
+    return system.reason_by_analogy("%s causes %s." % (c1, c2), "tgt") == "avoid %s before %s" % (c1, c2)
+
+
+def _ar_family_simultaneous(cls, seed):
+    a, b, c = ("a%d" % seed, "b%d" % seed, "c%d" % seed)
+    system = _ar_system(cls, [("src", [a, b], [("CAUSES", a, b)], "%s then %s" % (a, b))])
+    mapping = system.find_analogy("tgt", [b, c], [("CAUSES", b, c)])
+    return mapping is not None and system.transfer_solution(mapping) == "%s then %s" % (b, c)
+
+
+def _ar_words(seed):
+    rng = random.Random(5000 + seed)
+    p, q = rng.sample(_AR_SRC_WORDS, 2)
+    tp, tq = rng.sample(_AR_TGT_WORDS, 2)
+    return p, q, tp, tq
+
+
+def _ar_family_whole_word(cls, seed):
+    p, q, tp, tq = _ar_words(seed)
+    solution = "%sny and %sish with %s and %s (case %d)" % (p, q, p, q, seed)
+    system = _ar_system(cls, [("src", [p, q], [("USES", p, q)], solution)])
+    mapping = system.find_analogy("tgt", [tp, tq], [("USES", tp, tq)])
+    expected = "%sny and %sish with %s and %s (case %d)" % (p, q, tp, tq, seed)
+    return mapping is not None and system.transfer_solution(mapping) == expected
+
+
+def _ar_family_control_plain(cls, seed):
+    p, q, tp, tq = _ar_words(seed)
+    system = _ar_system(cls, [("src", [p, q], [("USES", p, q)], "move %s to %s" % (p, q))])
+    mapping = system.find_analogy("tgt", [tp, tq], [("USES", tp, tq)])
+    return mapping is not None and system.transfer_solution(mapping) == "move %s to %s" % (tp, tq)
+
+
+_AR_FAMILIES = {
+    "AR3": {"one_to_one": _ar_family_one_to_one, "injective": _ar_family_injective,
+            "control_isomorphic": _ar_family_control_isomorphic},
+    "AR4": {"real_entities": _ar_family_real_entities, "simultaneous": _ar_family_simultaneous,
+            "whole_word": _ar_family_whole_word, "control_plain": _ar_family_control_plain},
+}
+
+
+def _ar_view(mapping):
+    if mapping is None:
+        return None
+    return {"mappings": dict(mapping.entity_mappings), "quality": mapping.quality_score,
+            "target_domain": mapping.target_situation.domain, "target_id": mapping.target_situation.situation_id,
+            "source_domain": mapping.source_situation.domain}
+
+
+_AR_CM = {"a": "x", "b": "y"}
+# casos de borda esperados pela leitura do bloco (pré-registro AR2, 19 casos)
+_AR_TABLE_EXPECTED = {
+    "c01": [None, 0], "c02": [None, 0], "c03": [None, 0],
+    "c04": [_AR_CM, 1.0, 1], "c05": [_AR_CM, 0.5, 1], "c06": [_AR_CM, 0.5, 1],
+    "c07": [{"c": "p", "d": "q", "a": "x", "b": "y"}, 1.0, 1],
+    "c08": ["S1", 1.0], "c09": ["S2", 1.0], "c10": [None, 0], "c11": [None, 0],
+    "c12": ["move x to y", 1], "c13": [None, 0], "c14": [None, 0],
+    "c15": ["Alice", "Bob", "Dave"], "c16": ["Aa", "Bb", "Cc", "Dd", "Ee"],
+    "c17": [["SIMILAR", "entity1", "entity2"], ["CAUSES", "entity1", "entity2"], ["PART_OF", "entity1", "entity2"]],
+    "c18": [[], [], []], "c19": [None, 0, 0],
+}
+_AR_GAPS_EXPECTED = {
+    "repeated_transfer_stats": {"total_analogies_found": 1, "successful_transfers": 2, "known_situations": 1,
+                                "transfer_success_rate": 2.0},
+    "placeholder_transfer": "stop entity1",
+    "dissimilar": [["SIMILAR", "entity1", "entity2"]],
+    "counterpart": [["PART_OF", "entity1", "entity2"]],
+    "negation": [["CAUSES", "entity1", "entity2"]],
+    "the_cat": ["The", "Harm"], "single_letter": ["A", "Bob"],
+    "domain_case_found": True, "aliased_relations": True, "aliased_target_entities": True,
+}
+_AR_FRESH_STATS = {"total_analogies_found": 0, "successful_transfers": 0, "known_situations": 0,
+                   "transfer_success_rate": 0.0}
+_AR_BANNER = "🧠🔄 POST 27 - RealAnalogicalReasoningSystem initialized (Cross-domain transfer active)\n"
+_AR_ERRORS_EXPECTED = {
+    "add_all_none": "no-error", "find_rels_none_no_known": "no-error", "find_rels_none_with_known": "TypeError",
+    "find_rel_two_items": "ValueError", "find_rel_int": "TypeError", "source_rels_none": "TypeError",
+    "find_no_args": "TypeError", "transfer_none": "AttributeError", "transfer_solution_int": "AttributeError",
+    "reason_none": "AttributeError", "reason_int": "AttributeError", "reason_empty": "no-error",
+    "reason_blank": "no-error", "extract_entities_none": "AttributeError", "construct_extra": "TypeError",
+}
+
+
+def analogical_reasoning_fingerprint(ns):
+    import contextlib
+    import copy
+    import inspect
+    import io
+    if isinstance(ns, dict):
+        cls, sit_cls, map_cls = ns["RealAnalogicalReasoningSystem"], ns["AnalogySituation"], ns["AnalogyMapping"]
+    else:
+        cls, sit_cls, map_cls = ns.RealAnalogicalReasoningSystem, ns.AnalogySituation, ns.AnalogyMapping
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        fresh = cls()
+    banner = buf.getvalue()
+    fresh_stats = fresh.get_statistics()
+
+    # grade (AR1)
+    grid = _ar_grid()
+    rows, mutated, reference_matches, counter_matches, found_sum, transfer_sum = [], 0, 0, 0, 0, 0
+    ref_found_sum = ref_transfer_sum = 0
+    for known, domain, t_ents, t_rels in grid:
+        known_before, ents_before, rels_before = copy.deepcopy(known), list(t_ents), list(t_rels)
+        system = _ar_system(cls, known)
+        mapping = system.find_analogy(domain, t_ents, t_rels)
+        text = system.transfer_solution(mapping) if mapping is not None else None
+        stats = system.get_statistics()
+        sources = [(s.domain, s.entities, s.relations, s.solution) for s in system.known_situations]
+        if sources != known_before or t_ents != ents_before or t_rels != rels_before:
+            mutated += 1
+        ref = _ar_reference(known, domain, t_rels)
+        if ref is None:
+            same = mapping is None and text is None
+            counters = (0, 0)
+        else:
+            index, ref_map, ref_quality, ref_text, has_solution = ref
+            same = (
+                mapping is not None
+                and mapping.source_situation is system.known_situations[index]
+                and mapping.entity_mappings == ref_map and mapping.quality_score == ref_quality
+                and mapping.target_situation.situation_id == "target"
+                and mapping.target_situation.domain == domain
+                and mapping.target_situation.entities == t_ents
+                and mapping.target_situation.relations == t_rels
+                and mapping.target_situation.solution is None
+                and text == ref_text
+            )
+            counters = (1, 1 if has_solution else 0)
+        ref_found_sum += counters[0]
+        ref_transfer_sum += counters[1]
+        reference_matches += bool(same)
+        counter_matches += (
+            stats["total_analogies_found"], stats["successful_transfers"], stats["known_situations"]
+        ) == (counters[0], counters[1], len(known))
+        found_sum += stats["total_analogies_found"]
+        transfer_sum += stats["successful_transfers"]
+        rows.append({"view": _ar_view(mapping), "text": text, "stats": stats})
+    grid_info = {"count": len(rows), "digest": _ms_sha(rows), "mutated_inputs": mutated,
+                 "reference_matches": reference_matches, "counter_matches": counter_matches,
+                 "found_sum": found_sum, "transfer_sum": transfer_sum,
+                 "ref_found_sum": ref_found_sum, "ref_transfer_sum": ref_transfer_sum}
+
+    # tabela de borda (AR2): 19 casos
+    c, p = "CAUSES", "PART_OF"
+    table = {}
+
+    def edge(name, known, rels, tgt_ents=("x", "y")):
+        system, mapping = _ar_find(cls, known, "T", list(tgt_ents), rels)
+        if name in ("c01", "c02", "c03", "c10", "c11"):
+            table[name] = [_ar_view(mapping), system.total_analogies_found]
+        elif name in ("c08", "c09"):
+            table[name] = [mapping.source_situation.domain, mapping.quality_score]
+        else:
+            table[name] = [dict(mapping.entity_mappings), mapping.quality_score, system.total_analogies_found]
+
+    edge("c01", [], [(c, "x", "y")])
+    edge("c02", [("T", ["a", "b"], [(c, "a", "b")], None)], [(c, "x", "y")])
+    edge("c03", [("S", ["a", "b"], [(p, "a", "b")], None)], [(c, "x", "y")])
+    edge("c04", [("S", ["a", "b"], [(c, "a", "b")], None)], [(c, "x", "y")])
+    edge("c05", [("S", ["a", "b"], [(c, "a", "b")], None)], [(c, "x", "y"), (p, "p", "q")])
+    edge("c06", [("S", ["a", "b", "c", "d"], [(c, "a", "b"), (p, "c", "d")], None)], [(c, "x", "y")])
+    edge("c07", [("S", ["a", "b", "c", "d"], [(c, "a", "b"), (p, "c", "d")], None)], [(p, "p", "q"), (c, "x", "y")])
+    edge("c08", [("S1", ["a", "b"], [(c, "a", "b")], None), ("S2", ["c", "d"], [(c, "c", "d")], None)],
+         [(c, "x", "y")])
+    edge("c09", [("S1", ["a", "b", "e", "f"], [(c, "a", "b"), (p, "e", "f")], None),
+                 ("S2", ["c", "d"], [(c, "c", "d")], None)], [(c, "x", "y")])
+    edge("c10", [("S", ["a", "b"], [(c, "a", "b")], None)], [])
+    edge("c11", [("S", [], [], None)], [(c, "x", "y")])
+
+    def transfer_case(solution):
+        known = [("S", ["a", "b"], [(c, "a", "b")], solution)]
+        system, mapping = _ar_find(cls, known, "T", ["x", "y"], [(c, "x", "y")])
+        return [system.transfer_solution(mapping), system.successful_transfers]
+
+    table["c12"] = transfer_case("move a to b")
+    table["c13"] = transfer_case(None)
+    table["c14"] = transfer_case("")
+    probe = _ar_system(cls, [])
+    table["c15"] = probe._extract_entities("Alice meets Bob. carol Dave")
+    table["c16"] = probe._extract_entities("Aa Bb Cc Dd Ee Ff Gg")
+    table["c17"] = [list(r) for r in probe._extract_relations("x CAUSES y, part of z, SIMILAR TO w")]
+    table["c18"] = [probe._extract_relations("nothing relational here"), probe._extract_relations(""),
+                    probe._extract_entities("")]
+    system = _ar_system(cls, [("S", ["a", "b"], [(c, "a", "b")], "sol")])
+    table["c19"] = [system.reason_by_analogy("Nothing relational here.", "T"),
+                    system.total_analogies_found, system.successful_transfers]
+
+    # famílias de propósito (AR3, AR4)
+    families = {}
+    for items in _AR_FAMILIES.values():
+        for name, fn in items.items():
+            outcomes = [bool(fn(cls, seed)) for seed in _AR_SEEDS]
+            families[name] = {"hits": sum(outcomes), "total": len(outcomes), "rate": sum(outcomes) / len(outcomes),
+                              "outcomes": outcomes}
+
+    # estatísticas, colaboradores, gaps, erros (AR5)
+    rate_system = _ar_system(cls, [("S", ["a", "b"], [(c, "a", "b")], "move a")])
+    rate_map = rate_system.find_analogy("T", ["x", "y"], [(c, "x", "y")])
+    rate_system.transfer_solution(rate_map)
+    rate_system.transfer_solution(rate_map)
+    repeated = rate_system.get_statistics()
+
+    boom_args = {"reasoning": _ArBoom(), "memory": _ArBoom(), "semantic_networks": _ArBoom()}
+    boom = _ar_system(cls, [], **boom_args)
+    boom.add_situation("S", ["Rain", "Flood"], [(c, "Rain", "Flood")], "stop Rain")
+    boom_map = boom.find_analogy("T", ["x", "y"], [(c, "x", "y")])
+    boom.transfer_solution(boom_map)
+    boom.reason_by_analogy("Storm causes Damage.", "T")
+    boom.get_statistics()
+    wired_objects = (object(), object(), object())
+    wired = _ar_system(cls, [], reasoning=wired_objects[0], memory=wired_objects[1], semantic_networks=wired_objects[2])
+    collaborators = {"untouched": True,
+                     "wired": [wired.reasoning is wired_objects[0], wired.memory is wired_objects[1],
+                               wired.semantic_networks is wired_objects[2]]}
+
+    placeholder = _ar_system(cls, [("S", ["Rain", "Flood"], [(c, "Rain", "Flood")], "stop Rain")])
+    case_domain = _ar_system(cls, [("Physics", ["a", "b"], [(c, "a", "b")], None)])
+    alias_rels, alias_ents = [(c, "a", "b")], ["a", "b"]
+    alias_system = _ar_system(cls, [])
+    alias_system.add_situation("S", alias_ents, alias_rels, None)
+    alias_rels.append((p, "a", "b"))
+    tgt_ents = ["x", "y"]
+    alias_map = _ar_system(cls, [("S", ["a", "b"], [(c, "a", "b")], None)]).find_analogy(
+        "T", tgt_ents, [(c, "x", "y")])
+    gaps = {
+        "repeated_transfer_stats": repeated,
+        "placeholder_transfer": placeholder.reason_by_analogy("Storm causes Damage.", "T"),
+        "dissimilar": [list(r) for r in probe._extract_relations("dissimilar to the rest")],
+        "counterpart": [list(r) for r in probe._extract_relations("a counterpart of b")],
+        "negation": [list(r) for r in probe._extract_relations("X never causes Y")],
+        "the_cat": probe._extract_entities("The cat causes Harm"),
+        "single_letter": probe._extract_entities("A. Bob"),
+        "domain_case_found": case_domain.find_analogy("physics", ["x", "y"], [(c, "x", "y")]) is not None,
+        "aliased_relations": alias_system.known_situations[0].relations is alias_rels
+        and len(alias_system.known_situations[0].relations) == 2,
+        "aliased_target_entities": alias_map.target_situation.entities is tgt_ents,
+    }
+
+    def mapping_with(solution):
+        src = sit_cls("s", "S", ["a"], [(c, "a", "b")], solution)
+        return map_cls("m", src, src, {"a": "x"}, 1.0)
+
+    known_one = [("S", ["a", "b"], [(c, "a", "b")], None)]
+    errors = {
+        "add_all_none": _ar_err(lambda: _ar_system(cls, []).add_situation(None, None, None)),
+        "find_rels_none_no_known": _ar_err(lambda: _ar_system(cls, []).find_analogy("T", ["x"], None)),
+        "find_rels_none_with_known": _ar_err(lambda: _ar_system(cls, known_one).find_analogy("T", ["x"], None)),
+        "find_rel_two_items": _ar_err(lambda: _ar_system(cls, known_one).find_analogy("T", ["x"], [(c, "x")])),
+        "find_rel_int": _ar_err(lambda: _ar_system(cls, known_one).find_analogy("T", ["x"], [5])),
+        "source_rels_none": _ar_err(lambda: _ar_system(cls, [("S", ["a"], None, None)]).find_analogy(
+            "T", ["x", "y"], [(c, "x", "y")])),
+        "find_no_args": _ar_err(lambda: _ar_system(cls, []).find_analogy()),
+        "transfer_none": _ar_err(lambda: _ar_system(cls, []).transfer_solution(None)),
+        "transfer_solution_int": _ar_err(lambda: _ar_system(cls, []).transfer_solution(mapping_with(5))),
+        "reason_none": _ar_err(lambda: _ar_system(cls, []).reason_by_analogy(None, "T")),
+        "reason_int": _ar_err(lambda: _ar_system(cls, []).reason_by_analogy(5, "T")),
+        "reason_empty": _ar_err(lambda: _ar_system(cls, []).reason_by_analogy("", "T")),
+        "reason_blank": _ar_err(lambda: _ar_system(cls, []).reason_by_analogy("   ", "T")),
+        "extract_entities_none": _ar_err(lambda: _ar_system(cls, [])._extract_entities(None)),
+        "construct_extra": _ar_err(lambda: cls(1, 2, 3, 4)),
+    }
+    return {
+        "clock": "none",
+        "randomness": "uuid4 ids only",
+        "init_params": list(inspect.signature(cls.__init__).parameters),
+        "banner": banner,
+        "situation_fields": list(inspect.signature(sit_cls).parameters),
+        "mapping_fields": list(inspect.signature(map_cls).parameters),
+        "fresh_stats": fresh_stats,
+        "grid": grid_info,
+        "table": table,
+        "families": families,
+        "collaborators": collaborators,
+        "gaps": gaps,
+        "errors": errors,
+    }
+
+
+def analogical_reasoning_source_text(src: str) -> str:
+    idx = src.index(_AR_MARKER)
+    line_start = src.rfind("\n", 0, idx - 1) + 1
+    end = src.index(_AR_END, idx) + len(_AR_END)
+    return src[line_start:end]
+
+
+def _analogical_reasoning_source_sha(path="core/cognitivo/analogical_reasoning.py") -> str:
+    import hashlib
+    text = (ROOT / path).read_text(encoding="utf-8")
+    return hashlib.sha256(analogical_reasoning_source_text(text).encode()).hexdigest()
+
+
+def _analogical_reasoning_standalone() -> bool:
+    """Árvore de imports: constitutional_brain, numpy ou vita no módulo extraído falha AR6."""
+    import ast
+
+    tree = ast.parse((ROOT / "core/cognitivo/analogical_reasoning.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names = [node.module]
+        for name in names:
+            root = name.split(".")[0]
+            if root in {"numpy", "vita"} or name == "core.constitutional_brain" \
+                    or name.startswith("core.constitutional_brain."):
+                return False
+    return True
+
+
+def _ar_rates(payload, ids):
+    return {name: {"hits": payload["families"][name]["hits"], "total": payload["families"][name]["total"],
+                   "rate": payload["families"][name]["rate"]} for name in ids}
+
+
+def eval_analogical_reasoning(criteria="v1"):
+    """AR1–AR6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    import core.cognitivo.analogical_reasoning as analogical_reasoning
+    import core.constitutional_brain as brain
+    import core.cognitivo as package
+
+    payload = analogical_reasoning_fingerprint(analogical_reasoning)
+    sha_module = _ms_sha(payload)
+    sha_brain = _ms_sha(analogical_reasoning_fingerprint(brain))
+    source_sha = _analogical_reasoning_source_sha()
+    standalone = _analogical_reasoning_standalone()
+    identity = all(
+        getattr(brain, name) is getattr(analogical_reasoning, name) is getattr(package, name)
+        and getattr(analogical_reasoning, name).__module__ == "core.cognitivo.analogical_reasoning"
+        for name in _AR_NAMES
+    )
+    grid = payload["grid"]
+    ar1 = (
+        grid["count"] == _AR_GRID_SIZE
+        and grid["reference_matches"] == _AR_GRID_SIZE
+        and grid["counter_matches"] == _AR_GRID_SIZE
+        and grid["mutated_inputs"] == 0
+        and grid["found_sum"] == grid["ref_found_sum"]
+        and grid["transfer_sum"] == grid["ref_transfer_sum"]
+    )
+    table = payload["table"]
+    table_hits = sum(1 for name, expected in _AR_TABLE_EXPECTED.items() if table.get(name) == expected)
+    ar2 = len(table) == len(_AR_TABLE_EXPECTED) == 19 and table_hits == 19
+    ar3_ids, ar4_ids = tuple(_AR_FAMILIES["AR3"]), tuple(_AR_FAMILIES["AR4"])
+    rates3, rates4 = _ar_rates(payload, ar3_ids), _ar_rates(payload, ar4_ids)
+    ar3 = all(item["rate"] >= _AR_LIMIT for item in rates3.values())
+    ar4 = all(item["rate"] >= _AR_LIMIT for item in rates4.values())
+    gaps = payload["gaps"]
+    gap_hits = sum(1 for name, expected in _AR_GAPS_EXPECTED.items() if gaps.get(name) == expected)
+    error_hits = sum(1 for name, expected in _AR_ERRORS_EXPECTED.items() if payload["errors"].get(name) == expected)
+    ar5 = (
+        payload["fresh_stats"] == _AR_FRESH_STATS
+        and gap_hits == len(_AR_GAPS_EXPECTED) == len(gaps)
+        and error_hits == len(_AR_ERRORS_EXPECTED) == len(payload["errors"])
+        and payload["collaborators"] == {"untouched": True, "wired": [True, True, True]}
+    )
+    ar6 = (
+        identity
+        and standalone
+        and source_sha == AR_SOURCE_SHA
+        and sha_module == sha_brain == AR_BEHAVIOR_SHA
+        and payload["clock"] == "none"
+        and payload["init_params"] == ["self", "reasoning", "memory", "semantic_networks"]
+        and payload["banner"] == _AR_BANNER
+    )
+    return [
+        _check("AR1", {"reference_matches": grid["reference_matches"], "count": grid["count"],
+                       "counter_matches": grid["counter_matches"], "mutated_inputs": grid["mutated_inputs"],
+                       "found_sum": [grid["found_sum"], grid["ref_found_sum"]],
+                       "transfer_sum": [grid["transfer_sum"], grid["ref_transfer_sum"]]},
+               ar1, "120/120 iguais à referência independente; contadores iguais; 0 entradas alteradas"),
+        _check("AR2", {"hits": table_hits, "cases": len(_AR_TABLE_EXPECTED)},
+               ar2, "19/19 casos de borda de domínio, rótulo, qualidade, empate, transferência e extração"),
+        _check("AR3", rates3, ar3, "one_to_one, injective e control_isomorphic ≥ 0.90 em 20 seeds"),
+        _check("AR4", rates4, ar4,
+               "real_entities, simultaneous, whole_word e control_plain ≥ 0.90 em 20 seeds"),
+        _check("AR5", {"fresh_stats": payload["fresh_stats"], "gap_hits": [gap_hits, len(_AR_GAPS_EXPECTED)],
+                       "error_hits": [error_hits, len(_AR_ERRORS_EXPECTED)],
+                       "collaborators": payload["collaborators"], "gaps": gaps, "errors": payload["errors"]},
+               ar5, "contadores, colaboradores, erros e gaps conforme o registrado"),
+        _check("AR6", {"source_sha": source_sha, "sha_module": sha_module, "sha_brain": sha_brain,
+                       "identity": identity, "standalone": standalone, "clock": payload["clock"],
+                       "source_golden": AR_SOURCE_SHA, "behavior_golden": AR_BEHAVIOR_SHA},
+               ar6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+    ]
+
+
 EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts,
               "causal": eval_causal, "counterfactual": eval_counterfactual,
               "working_memory": eval_working_memory,
               "attention": eval_attention,
               "incremental": eval_incremental,
               "episodic_future": eval_episodic_future,
-              "mental_simulation": eval_mental_simulation}
+              "mental_simulation": eval_mental_simulation,
+              "analogical_reasoning": eval_analogical_reasoning}
 
 
 def main(argv=None) -> int:
