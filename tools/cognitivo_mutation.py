@@ -59,6 +59,8 @@ IL = "core/cognitivo/incremental_learner.py"
 IL_TESTS = ("test_incremental_learner_contract.py",)
 EF = "core/cognitivo/episodic_future_thinking.py"
 EF_TESTS = ("test_episodic_future_thinking_contract.py",)
+MS = "core/cognitivo/mental_simulation.py"
+MS_TESTS = ("test_mental_simulation_contract.py",)
 
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
@@ -772,6 +774,70 @@ MUTATIONS = [
              ")\n"
              "RealIncrementalLearner = type(\"RealIncrementalLearner\", (_RealIncrementalLearner,), {})\n",
              tests=IL_TESTS),
+    Mutation('ms_move_substring_dropped', MS, 'if "move" in action.lower():\n            next_state["position"]', 'if False:\n            next_state["position"]', tests=MS_TESTS),
+    Mutation('ms_move_adds_two', MS, 'next_state.get("position", 0) + 1', 'next_state.get("position", 0) + 2', tests=MS_TESTS),
+    Mutation('ms_acquire_substring_dropped', MS, 'if "acquire" in action.lower():\n            next_state["resources"]', 'if False:\n            next_state["resources"]', tests=MS_TESTS),
+    Mutation('ms_build_substring_dropped', MS, 'if "build" in action.lower():', 'if False:', tests=MS_TESTS),
+    Mutation('ms_state_not_copied', MS, 'next_state = state.copy()', 'next_state = state', tests=MS_TESTS),
+    Mutation('ms_initial_state_not_copied', MS, 'current_state = scenario.initial_state.copy()', 'current_state = scenario.initial_state', tests=MS_TESTS),
+    Mutation('ms_safety_threshold_moved', MS, 'state.get("safety", 1.0) < 0.5', 'state.get("safety", 1.0) <= 0.5', tests=MS_TESTS),
+    Mutation('ms_safety_default_zero', MS, 'state.get("safety", 1.0) < 0.5', 'state.get("safety", 0.0) < 0.5', tests=MS_TESTS),
+    Mutation('ms_resource_overflow_threshold', MS, 'state.get("resources", 0) > 10', 'state.get("resources", 0) >= 10', tests=MS_TESTS),
+    Mutation('ms_invalid_position_dropped', MS, 'if next_state.get("position", 0) < 0:', 'if False:', tests=MS_TESTS),
+    Mutation('ms_resource_gain_dropped', MS, 'if next_state.get("resources", 0) > state.get("resources", 0):', 'if False:', tests=MS_TESTS),
+    Mutation('ms_structure_growth_dropped', MS, 'if next_state.get("structures", 0) > state.get("structures", 0):', 'if False:', tests=MS_TESTS),
+    Mutation('ms_resource_goal_threshold', MS, 'state.get("resources", 0) >= 5', 'state.get("resources", 0) >= 4', tests=MS_TESTS),
+    Mutation('ms_structure_goal_threshold', MS, 'state.get("structures", 0) >= 3', 'state.get("structures", 0) >= 2', tests=MS_TESTS),
+    Mutation('ms_position_goal_threshold', MS, 'state.get("position", 0) >= 10', 'state.get("position", 0) >= 11', tests=MS_TESTS),
+    Mutation('ms_goal_case_sensitive', MS, 'goal_lower = goal.lower()', 'goal_lower = goal', tests=MS_TESTS),
+    Mutation('ms_success_does_not_stop', MS, '                success = True\n                break', '                success = True', tests=MS_TESTS),
+    Mutation('ms_success_quality_changed', MS, '            return 0.9', '            return 0.8', tests=MS_TESTS),
+    Mutation('ms_base_quality_changed', MS, 'quality = 0.3', 'quality = 0.4', tests=MS_TESTS),
+    Mutation('ms_resource_credit_dropped', MS, 'quality += 0.2\n        if final_state.get("structures"', 'quality += 0.0\n        if final_state.get("structures"', tests=MS_TESTS),
+    Mutation('ms_structure_credit_dropped', MS, 'if final_state.get("structures", 0) > 0:\n            quality += 0.2', 'if final_state.get("structures", 0) > 0:\n            quality += 0.0', tests=MS_TESTS),
+    Mutation('ms_failure_utility_factor', MS, '(1.0 if success else 0.5)', '(1.0 if success else 0.6)', tests=MS_TESTS),
+    Mutation('ms_cache_write_dropped', MS, 'self.simulation_cache[scenario.scenario_id] = result\n', 'pass\n', tests=MS_TESTS),
+    Mutation('ms_counter_dropped', MS, '        self.total_simulations += 1\n', '        self.total_simulations += 0\n', tests=MS_TESTS),
+    Mutation('ms_world_model_hook_ignored', MS, "if self.world_model and hasattr(self.world_model, 'predict_next_state'):", 'if False:', tests=MS_TESTS),
+    Mutation('ms_world_model_truth_gate_dropped', MS, "if self.world_model and hasattr(self.world_model, 'predict_next_state'):", "if hasattr(self.world_model, 'predict_next_state'):", tests=MS_TESTS),
+    Mutation('ms_rollout_drops_first_action', MS, 'actions=[action] + random.choices(possible_actions, k=3)', 'actions=random.choices(possible_actions, k=3)', tests=MS_TESTS),
+    Mutation('ms_rollout_horizon_changed', MS, 'random.choices(possible_actions, k=3)', 'random.choices(possible_actions, k=2)', tests=MS_TESTS),
+    Mutation('ms_rollout_picks_worst', MS, 'best_action = max(action_utilities.items()', 'best_action = min(action_utilities.items()', tests=MS_TESTS),
+    Mutation('ms_rollout_sums_instead_of_mean', MS, 'total_utility / num_rollouts', 'total_utility', tests=MS_TESTS),
+    Mutation('ms_rollout_reuses_scenario_id', MS, 'scenario_id=str(uuid.uuid4()),', 'scenario_id="rollout",', tests=MS_TESTS),
+    Mutation('ms_counterfactual_keeps_first_action', MS, '[alternative_action] + actual_scenario.actions[1:]', '[alternative_action] + actual_scenario.actions', tests=MS_TESTS),
+    Mutation('ms_counterfactual_id_unprefixed', MS, 'f"counterfactual_{actual_scenario.scenario_id}"', 'actual_scenario.scenario_id', tests=MS_TESTS),
+    Mutation('ms_compare_tie_prefers_first', MS, 'result1.predicted_utility > result2.predicted_utility', 'result1.predicted_utility >= result2.predicted_utility', tests=MS_TESTS),
+    Mutation('ms_compare_difference_sign', MS, 'result1.predicted_utility - result2.predicted_utility', 'result2.predicted_utility - result1.predicted_utility', tests=MS_TESTS),
+    Mutation('ms_stats_cache_count_dropped', MS, '"cached_simulations": len(self.simulation_cache)', '"cached_simulations": 0', tests=MS_TESTS),
+    Mutation("ms_module_pulls_monolith", MS, "import random\n",
+             "import random\nimport core.constitutional_brain  # noqa: F401\n", tests=MS_TESTS),
+    Mutation("ms_monolith_stops_reexporting", "core/constitutional_brain.py",
+             "from core.cognitivo.mental_simulation import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    MentalScenario,\n"
+             "    MentalSimulationResult,\n"
+             "    RealMentalSimulationSystem,\n"
+             ")\n",
+             "from core.cognitivo.mental_simulation import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    MentalScenario,\n"
+             "    MentalSimulationResult,\n"
+             "    RealMentalSimulationSystem as _RealMentalSimulationSystem,\n"
+             ")\n"
+             "RealMentalSimulationSystem = type(\"RealMentalSimulationSystem\", (_RealMentalSimulationSystem,), {})\n",
+             tests=MS_TESTS),
+    Mutation("ms_package_stops_reexporting", "core/cognitivo/__init__.py",
+             "from core.cognitivo.mental_simulation import (\n"
+             "    MentalScenario,\n"
+             "    MentalSimulationResult,\n"
+             "    RealMentalSimulationSystem,\n"
+             ")\n",
+             "from core.cognitivo.mental_simulation import (\n"
+             "    MentalScenario,\n"
+             "    MentalSimulationResult,\n"
+             "    RealMentalSimulationSystem as _RealMentalSimulationSystem,\n"
+             ")\n"
+             "RealMentalSimulationSystem = type(\"RealMentalSimulationSystem\", (_RealMentalSimulationSystem,), {})\n",
+             tests=MS_TESTS),
 ]
 
 

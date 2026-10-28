@@ -6,7 +6,7 @@
     "extracted_modules": [
       {
         "path": "core/cognitivo/__init__.py",
-        "lines": 51,
+        "lines": 59,
         "classes": 0,
         "functions": 0
       },
@@ -59,6 +59,12 @@
         "functions": 19
       },
       {
+        "path": "core/cognitivo/mental_simulation.py",
+        "lines": 325,
+        "classes": 3,
+        "functions": 11
+      },
+      {
         "path": "core/cognitivo/predictive_coding.py",
         "lines": 490,
         "classes": 3,
@@ -71,9 +77,9 @@
         "functions": 25
       }
     ],
-    "core_lines": 24583,
-    "classes": 233,
-    "functions": 743,
+    "core_lines": 24289,
+    "classes": 230,
+    "functions": 732,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -109,7 +115,6 @@
       "RealKnowledgeGraph.get_statistics",
       "RealLanguageUnderstandingSystem.get_statistics",
       "RealLifelongLearningEngine.get_statistics",
-      "RealMentalSimulationSystem.get_statistics",
       "RealMetaLearningStrategies.get_meta_learning_report",
       "RealMetaLearningStrategies.get_statistics",
       "RealMetacognitionSystem.get_statistics",

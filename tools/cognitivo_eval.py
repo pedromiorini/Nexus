@@ -3313,7 +3313,7 @@ def eval_mental_simulation(criteria="v1"):
         and compare["risky"]["risk_comparison"] == {"scenario1_risks": 2, "scenario2_risks": 0}
         and compare["stats"]["total_simulations"] == 6 and compare["stats"]["cached_simulations"] == 6
         and small["total_simulations"] == 10 and small["cached_simulations"] == 10
-        and collaborators["hook_calls"] == [[{"position": 1}, "wait"]]
+        and collaborators["hook_calls"] == [({"position": 1}, "wait")]
         and collaborators["hook_state"]["final_state"] == {"position": 99}
         and collaborators["hook_state"]["success"] is True
         and collaborators["falsy_calls"] == []

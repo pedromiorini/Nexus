@@ -19,6 +19,11 @@ from core.cognitivo.incremental_learner import (
     LearningEvent,
     RealIncrementalLearner,
 )
+from core.cognitivo.mental_simulation import (
+    MentalScenario,
+    MentalSimulationResult,
+    RealMentalSimulationSystem,
+)
 from core.cognitivo.working_memory import (
     CentralExecutive,
     PhonologicalLoop,
@@ -37,11 +42,14 @@ __all__ = [
     "ConsolidationReport",
     "FutureEvent",
     "LearningEvent",
+    "MentalScenario",
+    "MentalSimulationResult",
     "PhonologicalLoop",
     "ProspectiveMemory",
     "RealAttentionSystem",
     "RealEpisodicFutureThinkingSystem",
     "RealIncrementalLearner",
+    "RealMentalSimulationSystem",
     "RealWorkingMemorySystem",
     "RehearsalEvent",
     "StimulusItem",
