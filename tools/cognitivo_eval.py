@@ -3,7 +3,7 @@
 Critérios: /workspace/nexus/cognitivo/AUDITORIA_2026-10-22.md (sha256 3d24a63d…), escritos
 antes da execução. Mede propósito, não só ausência de crash.
 
-Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,attention,incremental,episodic_future,all} [--json PATH]
+Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,attention,incremental,episodic_future,mental_simulation,all} [--json PATH]
 Saída: exit 0 se todo critério passa, 1 se algum falha, 2 para entrada ausente/vazia/desconhecida.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
-CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future")
+CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future", "mental_simulation")
 
 TOPICS = [
     ("database", "migration", "rollback"), ("network", "latency", "spike"), ("disk", "quota", "exceeded"),
@@ -349,7 +349,7 @@ def _mcts_m3_v2(depth=8):
         per_goal = {2000: [], 50: []}
         for seed in range(10):
             for iterations in (2000, 50):
-                random.seed(seed)
+                random.seed(seed)  # nosec B311 - seed fixa pré-registrada
                 plan = RealMCTSPlanner(max_depth=depth).plan(goal, max_iterations=iterations)
                 per_goal[iterations].append(_value(ref, goal, plan.best_action_sequence))
         best = max(per_goal[2000] + per_goal[50])
@@ -467,7 +467,7 @@ def _mcts_m3_v3(instances=V3_INSTANCES, seeds=V3_RUN_SEEDS, budgets=V3_BUDGETS):
     for tree in trees:
         for seed in seeds:
             for budget in budgets:
-                random.seed(seed)
+                random.seed(seed)  # nosec B311 - seed fixa pré-registrada
                 planner = _synthetic_planner(tree)
                 plan = planner.plan("synthetic", max_iterations=budget)
                 regrets[budget].append(tree.optimum - tree.value(plan.best_action_sequence))
@@ -2868,12 +2868,505 @@ def eval_episodic_future(criteria="v1"):
     ]
 
 
+MS_SOURCE_SHA = "43803b05cafb6461911aeba7b94e067e3bb83e0a0e3eb0b295b11f1306e9df67"
+MS_BEHAVIOR_SHA = "15dadf71b6aac11280a10d72533065ab7f6ffb5e7a9ce29d688eefe1273ede76"
+_MS_NAMES = ("MentalScenario", "MentalSimulationResult", "RealMentalSimulationSystem")
+_MS_MARKER = "# MÓDULO 30: MENTAL SIMULATION SYSTEM (POST 30)"
+_MS_END = '            "cached_simulations": len(self.simulation_cache)\n        }'
+_MS_VOCAB = ("move forward", "acquire resource", "build structure", "wait", "rest", "inspect")
+_MS_GOALS = ("increase position", "gather resources", "build structure", "survive")
+_MS_GRID_SEED = 2026
+_MS_GRID_SIZE = 120
+_MS_ROLLOUT_SEEDS = tuple(range(20))
+_MS_ROLLOUT_N = 100
+_MS_ROLLOUT_CASES = {
+    "reach": ({"position": 7}, ["move", "wait", "acquire"], "reach position", "move", 0.90),
+    "increase": ({"position": 0}, ["move", "wait", "acquire"], "increase position", "move", 0.80),
+    "gather": ({"resources": 3}, ["acquire resource", "wait", "build structure"], "gather resources",
+               "acquire resource", 0.90),
+}
+
+
+class _MsBoom:
+    def __getattr__(self, name):
+        raise AssertionError("called " + name)
+
+
+def _ms_err(fn):
+    try:
+        fn()
+    except Exception as exc:
+        return type(exc).__name__
+    return "no-error"
+
+
+def _ms_grid():
+    import random
+    rng = random.Random(_MS_GRID_SEED)  # nosec B311 - grade sintética de avaliação
+    rows = []
+    for i in range(_MS_GRID_SIZE):
+        state = {"position": rng.randint(0, 9), "resources": rng.randint(0, 3), "structures": rng.randint(0, 2)}
+        if rng.random() < 0.25:
+            state["safety"] = rng.choice([0.2, 0.5, 0.8])
+        actions = [rng.choice(_MS_VOCAB) for _ in range(rng.randint(1, 8))]
+        rows.append(("g%d" % i, state, actions, rng.choice(_MS_GOALS)))
+    return rows
+
+
+def _ms_reference(state, actions, goal):
+    """Referência independente, escrita só da leitura do bloco: o eval não importa a lógica medida."""
+    cur = dict(state)
+    risks, opps = [], []
+    steps, success = 0, False
+    for action in actions:
+        steps += 1
+        low = action.lower()
+        nxt = dict(cur)
+        if "move" in low:
+            nxt["position"] = nxt.get("position", 0) + 1
+        if "acquire" in low:
+            nxt["resources"] = nxt.get("resources", 0) + 1
+        if "build" in low:
+            nxt["structures"] = nxt.get("structures", 0) + 1
+        if "move" in low and cur.get("safety", 1.0) < 0.5:
+            risks.append("unsafe_movement")
+        if "acquire" in low and cur.get("resources", 0) > 10:
+            risks.append("resource_overflow")
+        if nxt.get("position", 0) < 0:
+            risks.append("invalid_position")
+        if nxt.get("resources", 0) > cur.get("resources", 0):
+            opps.append("resource_gain")
+        if nxt.get("structures", 0) > cur.get("structures", 0):
+            opps.append("infrastructure_growth")
+        cur = nxt
+        g = goal.lower()
+        if ("resource" in g and cur.get("resources", 0) >= 5) or ("structure" in g and cur.get("structures", 0) >= 3) \
+                or ("position" in g and cur.get("position", 0) >= 10):
+            success = True
+            break
+    if success:
+        quality = 0.9
+    else:
+        quality = 0.3
+        if cur.get("resources", 0) > 0:
+            quality += 0.2
+        if cur.get("structures", 0) > 0:
+            quality += 0.2
+        quality = min(1.0, quality)
+    return {"final_state": cur, "success": success, "outcome_quality": quality, "steps_taken": steps,
+            "predicted_utility": quality * (1.0 if success else 0.5), "risks": risks, "opportunities": opps}
+
+
+def _ms_view(result):
+    return {"final_state": dict(result.final_state), "success": result.success,
+            "outcome_quality": result.outcome_quality, "steps_taken": result.steps_taken,
+            "predicted_utility": result.predicted_utility, "risks": list(result.risks),
+            "opportunities": list(result.opportunities)}
+
+
+def _ms_copy_state(state):
+    return {key: value for key, value in state.items()}
+
+
+def mental_simulation_fingerprint(ns):
+    import contextlib
+    import copy
+    import inspect
+    import io
+    import math
+    import random
+    if isinstance(ns, dict):
+        cls, scenario_cls, result_cls = (ns["RealMentalSimulationSystem"], ns["MentalScenario"],
+                                         ns["MentalSimulationResult"])
+    else:
+        cls, scenario_cls, result_cls = (ns.RealMentalSimulationSystem, ns.MentalScenario,
+                                         ns.MentalSimulationResult)
+    rng_state = random.getstate()
+    try:
+        def quiet(*args, **kwargs):
+            with contextlib.redirect_stdout(io.StringIO()):
+                return cls(*args, **kwargs)
+
+        def scenario(sid, state, actions, goal, constraints=None):
+            return scenario_cls(sid, state, actions, [] if constraints is None else constraints, goal)
+
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            fresh = cls()
+        banner = buf.getvalue()
+        fresh_stats = fresh.get_statistics()
+
+        # grade de simulação
+        grid = _ms_grid()
+        system = quiet()
+        grid_rows, mutated, same_cached = [], 0, 0
+        for sid, state, actions, goal in grid:
+            before = copy.deepcopy(state)
+            result = system.simulate_scenario(scenario(sid, state, actions, goal))
+            if state != before:
+                mutated += 1
+            if system.simulation_cache.get(sid) is result:
+                same_cached += 1
+            grid_rows.append(_ms_view(result))
+        grid_stats = system.get_statistics()
+        grid_digest = _ms_sha(grid_rows)
+        reference_matches = sum(
+            _ms_view_equal(row, _ms_reference(state, actions, goal))
+            for row, (sid, state, actions, goal) in zip(grid_rows, grid))
+
+        # tabela de risco, oportunidade, qualidade
+        def one(state, actions, goal="survive"):
+            return _ms_view(quiet().simulate_scenario(scenario("t", state, actions, goal)))
+
+        table = {
+            "unsafe": one({"safety": 0.4}, ["move"]),
+            "safe_edge": one({"safety": 0.5}, ["move"]),
+            "overflow": one({"resources": 11}, ["acquire"]),
+            "no_overflow": one({"resources": 10}, ["acquire"]),
+            "invalid_once": one({"position": -1}, ["wait"]),
+            "invalid_twice": one({"position": -1}, ["wait", "wait"]),
+            "build": one({}, ["build"]),
+            "goal_position": one({"position": 9}, ["move", "move"], "position"),
+            "goal_resources": one({"resources": 4}, ["acquire", "acquire"], "RESOURCES"),
+            "goal_structures": one({"structures": 2}, ["build", "build"], "structure"),
+            "no_progress": one({"position": 0}, ["wait"]),
+            "both_partial": one({"resources": 1, "structures": 1}, ["wait"]),
+            "empty_actions": one({"position": 3}, []),
+            "unknown_goal": one({"position": 99}, ["wait"], "survive"),
+        }
+
+        # rollout com seeds explícitas
+        rollout = {}
+        for key, (state, actions, goal, _want, _limit) in _MS_ROLLOUT_CASES.items():
+            picks, totals, caches = [], [], []
+            for seed in _MS_ROLLOUT_SEEDS:
+                rollout_system = quiet()
+                random.seed(seed)  # nosec B311 - seed fixa pré-registrada
+                picks.append(rollout_system.rollout_planning(dict(state), list(actions), goal, _MS_ROLLOUT_N))
+                totals.append(rollout_system.total_simulations)
+                caches.append(len(rollout_system.simulation_cache))
+            rollout[key] = {"picks": picks, "totals": sorted(set(totals)), "caches": sorted(set(caches))}
+        small = quiet()
+        random.seed(7)
+        small_pick = small.rollout_planning({"position": 0}, ["move", "wait"], "survive", 5)
+        small_stats = small.get_statistics()
+
+        # contrafactual
+        cf_rows, cf_ok_id, cf_cache_kept, cf_inputs_kept = [], 0, 0, 0
+        cf_system = quiet()
+        alternatives = _MS_VOCAB[:3]
+        for sid, state, actions, goal in grid[:40]:
+            actual = scenario(sid, state, list(actions), goal, ["c"])
+            original = cf_system.simulate_scenario(actual)
+            for alt in alternatives:
+                result = cf_system.counterfactual_simulation(actual, alt)
+                cf_rows.append(_ms_view(result))
+                cf_ok_id += result.scenario_id == "counterfactual_" + sid
+                cf_cache_kept += cf_system.simulation_cache.get(sid) is original
+                cf_inputs_kept += actual.actions == actions and actual.initial_state == state
+        cf_reference = sum(
+            _ms_view_equal(row, _ms_reference(state, [alt] + actions[1:], goal))
+            for row, (alt, (sid, state, actions, goal)) in zip(
+                cf_rows, [(a, g) for g in grid[:40] for a in alternatives]))
+        cf_empty = quiet().counterfactual_simulation(scenario("e", {"position": 0}, [], "survive"), "move")
+
+        # comparação
+        cmp_system = quiet()
+        win = cmp_system.compare_scenarios(
+            scenario("a", {"position": 9}, ["move"], "position"), scenario("b", {}, ["wait"], "survive"))
+        tie = cmp_system.compare_scenarios(
+            scenario("c", {}, ["wait"], "survive"), scenario("d", {}, ["wait"], "survive"))
+        risky = cmp_system.compare_scenarios(
+            scenario("r", {"safety": 0.1, "position": -1}, ["move", "move"], "survive"),
+            scenario("s", {}, ["wait"], "survive"))
+        compare = {"win": win, "tie": tie, "risky": risky, "stats": cmp_system.get_statistics()}
+
+        # colaboradores
+        class Hooked:
+            def __init__(self):
+                self.calls = []
+
+            def predict_next_state(self, state, action):
+                self.calls.append((dict(state), action))
+                return {"position": 99}
+
+        class Falsy(Hooked):
+            def __len__(self):
+                return 0
+
+        hooked = Hooked()
+        hook_result = quiet(world_model=hooked).simulate_scenario(
+            scenario("h", {"position": 1}, ["wait"], "position"))
+        falsy = Falsy()
+        falsy_result = quiet(world_model=falsy).simulate_scenario(
+            scenario("f", {"position": 1}, ["move"], "survive"))
+        plain_result = quiet(world_model=object()).simulate_scenario(
+            scenario("p", {"position": 1}, ["move"], "survive"))
+        boom = quiet(planner=_MsBoom(), reasoning=_MsBoom(), causal=_MsBoom())
+        boom.simulate_scenario(scenario("b", {}, ["move"], "survive"))
+        boom.rollout_planning({}, ["move"], "survive", 2)
+        wired_world, wired_planner, wired_reasoning, wired_causal = object(), object(), object(), object()
+        wired = quiet(wired_world, wired_planner, wired_reasoning, wired_causal)
+        collaborators = {
+            "hook_calls": hooked.calls, "hook_state": _ms_view(hook_result),
+            "falsy_calls": falsy.calls, "falsy_state": _ms_view(falsy_result),
+            "plain_state": _ms_view(plain_result),
+            "untouched": True,
+            "wired": [wired.world_model is wired_world, wired.planner is wired_planner,
+                      wired.reasoning is wired_reasoning, wired.causal is wired_causal],
+        }
+
+        # gaps medidos
+        gaps = {
+            "remove_moves": one({"position": 0}, ["remove"])["final_state"],
+            "rebuild_builds": one({}, ["rebuild"])["final_state"],
+            "upper_case_move": one({}, ["MOVE"])["final_state"],
+            "bool_position": one({"position": True}, ["move"])["final_state"]["position"],
+            "nan_position_type": type(one({"position": math.nan}, ["wait"])["final_state"]["position"]).__name__,
+            "nan_stays_valid": one({"position": math.nan}, ["wait"])["risks"],
+            "goal_none_empty_actions": one({"position": 3}, [], None)["success"],
+            "stats_after_grid": grid_stats,
+            "fresh_stats": fresh_stats,
+            "rollout_small": {"pick": small_pick, "stats": small_stats},
+        }
+
+        errors = {
+            "action_int": _ms_err(lambda: quiet().simulate_scenario(scenario("x", {}, [1], "g"))),
+            "action_none": _ms_err(lambda: quiet().simulate_scenario(scenario("x", {}, [None], "g"))),
+            "state_none": _ms_err(lambda: quiet().simulate_scenario(scenario("x", None, [], "g"))),
+            "state_list": _ms_err(lambda: quiet().simulate_scenario(scenario("x", [], ["move"], "g"))),
+            "position_none": _ms_err(lambda: quiet().simulate_scenario(scenario("x", {"position": None}, ["move"], "g"))),
+            "position_str": _ms_err(lambda: quiet().simulate_scenario(scenario("x", {"position": "a"}, ["move"], "g"))),
+            "compare_position_str": _ms_err(lambda: quiet().simulate_scenario(
+                scenario("x", {"position": "a"}, ["wait"], "survive"))),
+            "actions_none": _ms_err(lambda: quiet().simulate_scenario(scenario("x", {}, None, "g"))),
+            "goal_none": _ms_err(lambda: quiet().simulate_scenario(scenario("x", {}, ["wait"], None))),
+            "goal_int": _ms_err(lambda: quiet().simulate_scenario(scenario("x", {}, ["wait"], 3))),
+            "scenario_none": _ms_err(lambda: quiet().simulate_scenario(None)),
+            "rollout_empty_actions": _ms_err(lambda: quiet().rollout_planning({}, [], "g", 3)),
+            "rollout_zero": _ms_err(lambda: quiet().rollout_planning({}, ["move"], "g", 0)),
+            "rollout_negative": _ms_err(lambda: quiet().rollout_planning({}, ["move"], "g", -1)),
+            "rollout_none_actions": _ms_err(lambda: quiet().rollout_planning({}, None, "g", 1)),
+            "rollout_state_none": _ms_err(lambda: quiet().rollout_planning(None, ["move"], "g", 1)),
+            "counterfactual_none": _ms_err(lambda: quiet().counterfactual_simulation(None, "move")),
+            "counterfactual_alt_int": _ms_err(lambda: quiet().counterfactual_simulation(
+                scenario("x", {}, ["wait"], "g"), 7)),
+            "compare_missing": _ms_err(lambda: quiet().compare_scenarios(scenario("x", {}, [], "g"), None)),
+            "construct_extra": _ms_err(lambda: cls(1, 2, 3, 4, 5)),
+        }
+        return {
+            "clock": "none",
+            "randomness": "global random.choices; uuid4 ids",
+            "init_params": list(inspect.signature(cls.__init__).parameters),
+            "banner": banner,
+            "scenario_fields": list(inspect.signature(scenario_cls).parameters),
+            "result_fields": list(inspect.signature(result_cls).parameters),
+            "grid": {"digest": grid_digest, "count": len(grid_rows), "mutated_inputs": mutated,
+                     "same_cached": same_cached, "reference_matches": reference_matches},
+            "table": table,
+            "rollout": rollout,
+            "counterfactual": {"digest": _ms_sha(cf_rows), "count": len(cf_rows), "ids": cf_ok_id,
+                               "cache_kept": cf_cache_kept, "inputs_kept": cf_inputs_kept,
+                               "reference_matches": cf_reference, "empty_actions": _ms_view(cf_empty),
+                               "empty_id": cf_empty.scenario_id},
+            "compare": compare,
+            "collaborators": collaborators,
+            "gaps": gaps,
+            "errors": errors,
+        }
+    finally:
+        random.setstate(rng_state)
+
+
+def _ms_view_equal(left, right):
+    return all(left[key] == right[key] for key in right)
+
+
+def _ms_sha(payload) -> str:
+    import hashlib
+    text = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def mental_simulation_source_text(src: str) -> str:
+    idx = src.index(_MS_MARKER)
+    line_start = src.rfind("\n", 0, idx - 1) + 1
+    end = src.index(_MS_END, idx) + len(_MS_END)
+    return src[line_start:end]
+
+
+def _mental_simulation_source_sha() -> str:
+    import hashlib
+    text = (ROOT / "core/cognitivo/mental_simulation.py").read_text(encoding="utf-8")
+    return hashlib.sha256(mental_simulation_source_text(text).encode()).hexdigest()
+
+
+def _mental_simulation_standalone() -> bool:
+    """Árvore de imports: constitutional_brain, numpy ou vita no módulo extraído falha MS6."""
+    import ast
+
+    tree = ast.parse((ROOT / "core/cognitivo/mental_simulation.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names = [node.module]
+        for name in names:
+            root = name.split(".")[0]
+            if root in {"numpy", "vita"} or name == "core.constitutional_brain" or name.startswith("core.constitutional_brain."):
+                return False
+    return True
+
+
+def _ms_close(left, right):
+    return abs(left - right) < 1e-9
+
+
+# (estado final, sucesso, passos, qualidade, utilidade, riscos, oportunidades) esperados pela leitura do bloco
+_MS_TABLE_EXPECTED = {
+    "unsafe": ({"safety": 0.4, "position": 1}, False, 1, 0.3, 0.15, ["unsafe_movement"], []),
+    "safe_edge": ({"safety": 0.5, "position": 1}, False, 1, 0.3, 0.15, [], []),
+    "overflow": ({"resources": 12}, False, 1, 0.5, 0.25, ["resource_overflow"], ["resource_gain"]),
+    "no_overflow": ({"resources": 11}, False, 1, 0.5, 0.25, [], ["resource_gain"]),
+    "invalid_once": ({"position": -1}, False, 1, 0.3, 0.15, ["invalid_position"], []),
+    "invalid_twice": ({"position": -1}, False, 2, 0.3, 0.15, ["invalid_position", "invalid_position"], []),
+    "build": ({"structures": 1}, False, 1, 0.5, 0.25, [], ["infrastructure_growth"]),
+    "goal_position": ({"position": 10}, True, 1, 0.9, 0.9, [], []),
+    "goal_resources": ({"resources": 5}, True, 1, 0.9, 0.9, [], ["resource_gain"]),
+    "goal_structures": ({"structures": 3}, True, 1, 0.9, 0.9, [], ["infrastructure_growth"]),
+    "no_progress": ({"position": 0}, False, 1, 0.3, 0.15, [], []),
+    "both_partial": ({"resources": 1, "structures": 1}, False, 1, 0.7, 0.35, [], []),
+    "empty_actions": ({"position": 3}, False, 0, 0.3, 0.15, [], []),
+    "unknown_goal": ({"position": 99}, False, 1, 0.3, 0.15, [], []),
+}
+_MS_ERRORS_EXPECTED = {
+    "action_int": "AttributeError", "action_none": "AttributeError", "state_none": "AttributeError",
+    "state_list": "AttributeError", "position_none": "TypeError", "position_str": "TypeError",
+    "compare_position_str": "TypeError", "actions_none": "TypeError", "goal_none": "AttributeError",
+    "goal_int": "AttributeError", "scenario_none": "AttributeError", "rollout_empty_actions": "ValueError",
+    "rollout_zero": "ZeroDivisionError", "rollout_negative": "no-error", "rollout_none_actions": "TypeError",
+    "rollout_state_none": "AttributeError", "counterfactual_none": "AttributeError",
+    "counterfactual_alt_int": "AttributeError", "compare_missing": "AttributeError", "construct_extra": "TypeError",
+}
+
+
+def eval_mental_simulation(criteria="v1"):
+    """MS1–MS6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    import core.cognitivo.mental_simulation as mental_simulation
+    import core.constitutional_brain as brain
+    import core.cognitivo as package
+
+    payload = mental_simulation_fingerprint(mental_simulation)
+    sha_module = _ms_sha(payload)
+    sha_brain = _ms_sha(mental_simulation_fingerprint(brain))
+    source_sha = _mental_simulation_source_sha()
+    standalone = _mental_simulation_standalone()
+    identity = all(
+        getattr(brain, name) is getattr(mental_simulation, name) is getattr(package, name)
+        and getattr(mental_simulation, name).__module__ == "core.cognitivo.mental_simulation"
+        for name in _MS_NAMES
+    )
+    grid = payload["grid"]
+    ms1 = (
+        grid["count"] == _MS_GRID_SIZE
+        and grid["reference_matches"] == _MS_GRID_SIZE
+        and grid["mutated_inputs"] == 0
+        and grid["same_cached"] == _MS_GRID_SIZE
+    )
+    table = payload["table"]
+    table_hits = 0
+    for name, (final, success, steps, quality, utility, risks, opps) in _MS_TABLE_EXPECTED.items():
+        row = table[name]
+        table_hits += (
+            row["final_state"] == final and row["success"] is success and row["steps_taken"] == steps
+            and _ms_close(row["outcome_quality"], quality) and _ms_close(row["predicted_utility"], utility)
+            and row["risks"] == risks and row["opportunities"] == opps
+        )
+    ms2 = table_hits == len(_MS_TABLE_EXPECTED) == 14
+    rates = {}
+    for name, (_state, _actions, _goal, want, limit) in _MS_ROLLOUT_CASES.items():
+        picks = payload["rollout"][name]["picks"]
+        rates[name] = {"rate": picks.count(want) / len(picks), "limit": limit, "want": want}
+    ms3 = all(len(payload["rollout"][name]["picks"]) == len(_MS_ROLLOUT_SEEDS) for name in rates) and all(
+        item["rate"] >= item["limit"] for item in rates.values())
+    cf = payload["counterfactual"]
+    empty = cf["empty_actions"]
+    ms4 = (
+        cf["count"] == 120 and cf["reference_matches"] == 120 and cf["ids"] == 120
+        and cf["cache_kept"] == 120 and cf["inputs_kept"] == 120
+        and cf["empty_id"] == "counterfactual_e" and empty["steps_taken"] == 1
+        and empty["final_state"] == {"position": 1}
+    )
+    gaps = payload["gaps"]
+    compare = payload["compare"]
+    collaborators = payload["collaborators"]
+    small = gaps["rollout_small"]["stats"]
+    ms5 = (
+        gaps["stats_after_grid"] == {"total_simulations": 120, "successful_predictions": 0,
+                                     "simulation_accuracy": 0.0, "cached_simulations": 120}
+        and gaps["fresh_stats"] == {"total_simulations": 0, "successful_predictions": 0,
+                                    "simulation_accuracy": 0.0, "cached_simulations": 0}
+        and compare["win"]["scenario1_success"] is True and compare["win"]["scenario2_success"] is False
+        and compare["win"]["preferred_scenario"] == 1 and _ms_close(compare["win"]["utility_difference"], 0.75)
+        and compare["tie"]["preferred_scenario"] == 2 and compare["tie"]["utility_difference"] == 0.0
+        and compare["risky"]["risk_comparison"] == {"scenario1_risks": 2, "scenario2_risks": 0}
+        and compare["stats"]["total_simulations"] == 6 and compare["stats"]["cached_simulations"] == 6
+        and small["total_simulations"] == 10 and small["cached_simulations"] == 10
+        and collaborators["hook_calls"] == [({"position": 1}, "wait")]
+        and collaborators["hook_state"]["final_state"] == {"position": 99}
+        and collaborators["hook_state"]["success"] is True
+        and collaborators["falsy_calls"] == []
+        and collaborators["falsy_state"]["final_state"] == {"position": 2}
+        and collaborators["plain_state"]["final_state"] == {"position": 2}
+        and collaborators["wired"] == [True, True, True, True]
+        and collaborators["untouched"] is True
+        and payload["errors"] == _MS_ERRORS_EXPECTED
+        and gaps["remove_moves"] == {"position": 1} and gaps["rebuild_builds"] == {"structures": 1}
+        and gaps["upper_case_move"] == {"position": 1} and gaps["bool_position"] == 2
+        and gaps["nan_position_type"] == "float" and gaps["nan_stays_valid"] == []
+        and gaps["goal_none_empty_actions"] is False
+    )
+    rollout_counts = {name: (payload["rollout"][name]["totals"], payload["rollout"][name]["caches"])
+                      for name in rates}
+    ms5 = ms5 and all(
+        totals == caches == [len(_MS_ROLLOUT_CASES[name][1]) * _MS_ROLLOUT_N]
+        for name, (totals, caches) in rollout_counts.items())
+    ms6 = (
+        identity
+        and standalone
+        and source_sha == MS_SOURCE_SHA
+        and sha_module == sha_brain == MS_BEHAVIOR_SHA
+        and payload["clock"] == "none"
+        and payload["init_params"] == ["self", "world_model", "planner", "reasoning", "causal"]
+        and payload["banner"].endswith("Internal scenario testing active)\n")
+    )
+    return [
+        _check("MS1", {"reference_matches": grid["reference_matches"], "count": grid["count"],
+                       "mutated_inputs": grid["mutated_inputs"], "same_cached": grid["same_cached"]},
+               ms1, "120/120 iguais à referência; entrada intacta; resultado é o objeto do cache"),
+        _check("MS2", {"hits": table_hits, "cases": len(_MS_TABLE_EXPECTED)},
+               ms2, "14/14 casos de borda de risco, oportunidade, objetivo e qualidade"),
+        _check("MS3", rates, ms3, "reach ≥ 0.90, increase ≥ 0.80, gather ≥ 0.90 em 20 seeds"),
+        _check("MS4", {"reference_matches": cf["reference_matches"], "ids": cf["ids"],
+                       "cache_kept": cf["cache_kept"], "inputs_kept": cf["inputs_kept"]},
+               ms4, "120/120 contrafactuais iguais à referência e isolados"),
+        _check("MS5", {"stats_after_grid": gaps["stats_after_grid"], "errors": payload["errors"]},
+               ms5, "contadores, colaboradores, erros e gaps conforme o fingerprint"),
+        _check("MS6", {"source_sha": source_sha, "sha_module": sha_module, "sha_brain": sha_brain,
+                       "identity": identity, "standalone": standalone, "clock": payload["clock"],
+                       "source_golden": MS_SOURCE_SHA, "behavior_golden": MS_BEHAVIOR_SHA},
+               ms6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+    ]
+
+
 EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts,
               "causal": eval_causal, "counterfactual": eval_counterfactual,
               "working_memory": eval_working_memory,
               "attention": eval_attention,
               "incremental": eval_incremental,
-              "episodic_future": eval_episodic_future}
+              "episodic_future": eval_episodic_future,
+              "mental_simulation": eval_mental_simulation}
 
 
 def main(argv=None) -> int:
