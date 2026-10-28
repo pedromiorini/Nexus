@@ -1654,3 +1654,37 @@ Não há contrato anterior destes três símbolos. O teste 25 do demo continua c
 `--capability` ausente, vazio, só espaços ou com grafia desconhecida (`analogical-reasoning`, `Analogical_Reasoning`, `analogy`, `analogical_reasoning2`) sai com **código 2** (`EXIT_USAGE`) e mensagem em `stderr`, sem imprimir relatório. Um critério que marca `scenario_invalid` sai com **código 3** (`EXIT_INVALID_SCENARIO`), diferente de 1 (critério falhou). No sistema, entrada vazia ou irresolúvel (`reason_by_analogy("")`, `reason_by_analogy("   ")`, texto sem relação, domínio sem fonte compatível) devolve `None` sem somar contadores; as entradas de tipo errado (AR5) levantam as exceções registradas, não são coerçadas. Como o move não pode alterar comportamento, o bloco **não ganha** código próprio de erro: os códigos 2 e 3 são os do harness.
 
 Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability analogical_reasoning`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados AR (depois do pré-registro `3a14895`)
+
+**Commits, em ordem:** `3a14895` pré-registro e claim; `d3b9380` harness e contrato, **RED** (módulo ausente: 16 testes, 9 passam e 7 dão erro, código de saída 1; `--capability analogical_reasoning` sai com 1); `c50dc6f` move-only (**GREEN** nos critérios que não são lacuna), com 30 mutantes novos; `f09fc03` marca `# nosec B311` nas seis seeds sintéticas do harness (a triagem de segurança continua com 131 LOW); este commit de resultados e o commit que remove o claim. A branch foi rebaseada sobre `77c1861` (merge do #120) depois do pré-registro; os SHA acima são os de depois do rebase (`f0eacfb`, `c53aee5`, `51015a3`, `7faaf8b` antes). Nenhum limite, seed, tamanho ou valor de AR1–AR6 foi alterado depois do pré-registro.
+
+**Declarações de transparência.**
+1. O SHA de comportamento (`517a4d8e…7b6b`) não podia ser congelado antes de rodar qualquer coisa; foi capturado **uma vez** no monólito antes do move e commitado no RED, e é idêntico depois do move, em 3.11 e em 3.12. O SHA da fonte (`a603eafc…1c6a`) é o do texto do bloco original.
+2. O teste de adulteração do contrato RED (`test_tampered_behavior_changes_the_fingerprint`) usava um desvio (`_map_structures` devolvendo `None`) que derrubava o próprio harness com `AttributeError` em vez de mudar o SHA. Troquei o desvio por um que altera uma estatística (`get_statistics` com `known_situations + 1`) e o teste agora verifica o que dizia verificar. Ajuste do teste, não de critério.
+
+**Comando:** `python tools/cognitivo_eval.py --capability analogical_reasoning`, Python 3.11 e 3.12. Saída: código 1, porque AR3 e AR4 falham (como previsto).
+
+| id | resultado | valor medido |
+|---|---|---|
+| AR1 | **passa** | 120/120 iguais à referência independente; contadores iguais (52 analogias, 21 transferências); 0 entradas alteradas |
+| AR2 | **passa** | 19/19 |
+| AR3 | **falha** | `one_to_one` 0/20 (0.00), `injective` 0/20 (0.00); controle isomorfo 20/20 (1.00) |
+| AR4 | **falha** | `real_entities` 0/20, `simultaneous` 0/20, `whole_word` 0/20 (0.00 nas três); controle simples 20/20 (1.00) |
+| AR5 | **passa** | sistema novo zerado; gaps 10/10; erros 15/15; colaboradores nunca lidos; `transfer_success_rate` chega a 2.0 (gap v) |
+| AR6 | **passa** | SHA da fonte igual; SHA de comportamento igual no módulo e no monólito; reexport é o mesmo objeto; importa sozinho sem o monólito |
+
+**Hipóteses.** H1, H2, H3 e H6 sustentadas. **H4 e H5 refutadas** (previstas): o mapeamento não é um-para-um nem injetivo, e a transferência de solução não usa entidades reais, substitui em sequência e por substring. Os valores medidos coincidem exatamente com os pré-registrados.
+
+**Código de entrada inválida.** O harness sai com **2** para `--capability` ausente, vazio, só espaços ou de grafia desconhecida, e com **3** para `scenario_invalid`; ambos cobertos por teste. O bloco movido não ganha código novo, porque é move-only: entradas de tipo errado continuam levantando as exceções registradas em AR5 (`TypeError`, `ValueError`, `AttributeError`), e `add_situation(None, None, None)` continua aceitando tudo.
+
+**Opções para AR3 e AR4 (decisão do dono; nada foi corrigido aqui).**
+1. Aceitar a lacuna e manter este PR em rascunho como inventário medido.
+2. PR de comportamento separado, com novo pré-registro (mapeamento um-para-um e injetivo, substituição simultânea por palavra inteira, entidades reais em `reason_by_analogy`).
+3. Um protocolo `v2` com critérios novos, mantendo o v1 como linha de base.
+
+**Efeito colateral a decidir antes de mesclar.** `--capability all` do eval passa a sair com 1 enquanto AR3/AR4 falharem; os testes existentes que usam `all` continuam verdes (685 testes OK).
+
+**Gates locais (não substituem a CI hospedada).** `ruff` limpo; `compileall`; `reality_audit` regenerado só pela ferramenta (sem diferença depois do rebase); 685 testes OK em 3.11 e em 3.12; cobertura `core/cognitivo/*` 97% (`analogical_reasoning.py` 100% com ramos) e monólito 68%; `tools/cognitivo_mutation.py` 292/292 mortos (30 novos); `tools/targeted_mutation.py` 80/80; Bandit 137→131 LOW sem alteração em `SECURITY_TRIAGE.md` (`--check` ok), zero MEDIUM/HIGH; `embedded_assert_audit` ok; `predeleg.sh HEAD origin/main` sem conflito. `git merge-tree` contra #115 e #116: já conflitam com `main` (relatórios e outros arquivos) antes desta mudança; esta mudança só acrescenta os mesmos relatórios gerados.
+
+**Não medido.** CI hospedada; efeito em cenários fora dos pré-registrados; mescla real com #79, #115 ou #116. O #120 já estava mesclado em `main` quando o rebase foi feito.
