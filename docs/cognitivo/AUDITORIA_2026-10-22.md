@@ -1484,7 +1484,7 @@ Pré-registro escrito **antes** do move, **antes** do contrato novo de extraçã
 
 **Correção de codificação no harness (declarada).** No commit RED, o MS5 comparava `hook_calls` a uma lista de listas, mas o fingerprint guarda uma lista de tuplas; o critério reprovava por tipo de contêiner, não por comportamento. O GREEN passa a comparar com `[({"position": 1}, "wait")]`. A afirmação (o `world_model` recebe `({"position": 1}, "wait")`) e o SHA comportamental não mudaram.
 
-**Opções para o MS3 (nenhuma aplicada; decisão do Pedro).**
+**Opções para o MS3 (nenhuma aplicada neste PR; decisão do Pedro registrada abaixo).**
 1. Aceitar `increase` como gap documentado e deixar o PR draft como está.
 2. PR de comportamento separado, com novo pré-registro: crédito parcial consciente do objetivo (por exemplo, progresso de `position` em direção ao limite).
 3. Mudar o cenário ou o limite do MS3 só em um novo protocolo `v2`, sem reescrever este.
@@ -1494,3 +1494,7 @@ Pré-registro escrito **antes** do move, **antes** do contrato novo de extraçã
 **Conflitos.** `git merge-tree` de `HEAD` contra #115 e #116 dá exatamente o mesmo conjunto de conflitos que `origin/main` contra cada um deles; esta rodada não cria nenhum conflito novo. `tools/cognitivo_mutation.py` auto-mescla com #116 (hunks não adjacentes). #79 e #114 foram verificados por `merge-tree` sem conflito.
 
 **Não medido.** CI hospedada; merge real com #79, #115 ou #116 (só simulação por `merge-tree`); os relatórios de auditoria precisam ser regenerados se #116 entrar antes; `planner`, `reasoning` e `causal` continuam sem uso (gap, não escopo).
+
+### Decisão do Pedro sobre o MS3 (2026-10-28, mensagem t111u: «Prossiga com a melhor opção»)
+
+O Pedro autorizou a melhor opção proposta: **aceitar a falha do MS3 (`increase` 0.00 contra 0.80) como gap documentado deste PR move-only**, mesclar o #118 como está e tratar a correção num **PR separado de comportamento (opção 2)**, com novo pré-registro (MS3-v2) e crédito parcial ciente do objetivo. O MS3 original **não** foi alterado: limite, seeds e cenário continuam os pré-registrados em `cf8f9f2`, e o resultado 0.00 permanece como o número medido da extração. O gap fica aberto até o PR de correção ser mesclado por decisão do Pedro.
