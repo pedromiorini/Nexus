@@ -2884,7 +2884,35 @@ _MS_ROLLOUT_CASES = {
     "increase": ({"position": 0}, ["move", "wait", "acquire"], "increase position", "move", 0.80),
     "gather": ({"resources": 3}, ["acquire resource", "wait", "build structure"], "gather resources",
                "acquire resource", 0.90),
+    # MS3-v2 (pré-registro 82308d0): `move` não é a primeira ação; controles iguais ao código base
+    "increase_late": ({"position": 3}, ["wait", "acquire", "move"], "increase position", "move", 0.80),
+    "survive_control": ({"position": 0}, ["move", "wait", "acquire"], "survive", "acquire", 1.00),
+    "mixed_control": ({"position": 0}, ["move", "wait", "acquire"], "increase position and gather resources",
+                      "acquire", 1.00),
 }
+# MS1-v2: SHA-256 das 93 linhas da grade que o crédito novo não pode tocar (medido no código base c856e1a)
+MS_INVARIANT_SHA = "acf3d3c2d4b7e0d3e46facfe1dc9b0e055a6232e7a936e21d8c700a3ec81dd09"
+MS_INVARIANT_ROWS = 93
+# MS7 (pré-registro 82308d0): (estado, ações, objetivo) -> (qualidade, sucesso)
+_MS_CREDIT_CASES = {
+    "pos0": ({"position": 0}, [], "increase position", 0.30, False),
+    "pos5": ({"position": 5}, [], "increase position", 0.50, False),
+    "pos9": ({"position": 9}, [], "increase position", 0.66, False),
+    "pos_negative": ({"position": -3}, [], "increase position", 0.30, False),
+    "no_resource_credit": ({"position": 0, "resources": 3, "structures": 2}, [], "increase position", 0.30, False),
+    "pos_none": ({"position": None}, [], "increase position", 0.30, False),
+    "pos_str": ({"position": "a"}, [], "increase position", 0.30, False),
+    "pos_nan": ({"position": float("nan")}, [], "increase position", 0.30, False),
+    "wait_pos5": ({"position": 5}, ["wait"], "increase position", 0.50, False),
+    "mixed_legacy": ({"resources": 1, "position": 0}, [], "increase position and gather resources", 0.50, False),
+    "survive_legacy": ({"structures": 1}, [], "survive", 0.50, False),
+    "success": ({"position": 9}, ["move"], "increase position", 0.90, True),
+}
+
+
+def _ms_position_only(goal):
+    low = goal.lower() if isinstance(goal, str) else ""
+    return "position" in low and "resource" not in low and "structure" not in low
 
 
 class _MsBoom:
@@ -2946,6 +2974,12 @@ def _ms_reference(state, actions, goal):
             break
     if success:
         quality = 0.9
+    elif _ms_position_only(goal):
+        position = cur.get("position", 0)
+        progress = 0.0
+        if isinstance(position, (int, float)) and position == position:
+            progress = min(1.0, max(0.0, position) / 10.0)
+        quality = min(1.0, 0.3 + 0.4 * progress)
     else:
         quality = 0.3
         if cur.get("resources", 0) > 0:
@@ -3010,6 +3044,8 @@ def mental_simulation_fingerprint(ns):
             grid_rows.append(_ms_view(result))
         grid_stats = system.get_statistics()
         grid_digest = _ms_sha(grid_rows)
+        invariant_rows = [row for row, (_sid, _state, _actions, goal) in zip(grid_rows, grid)
+                          if not _ms_position_only(goal) or row["success"]]
         reference_matches = sum(
             _ms_view_equal(row, _ms_reference(state, actions, goal))
             for row, (sid, state, actions, goal) in zip(grid_rows, grid))
@@ -3034,6 +3070,12 @@ def mental_simulation_fingerprint(ns):
             "empty_actions": one({"position": 3}, []),
             "unknown_goal": one({"position": 99}, ["wait"], "survive"),
         }
+
+        # MS7: crédito parcial ciente do objetivo
+        credit = {}
+        for key, (state, actions, goal, _quality, _success) in _MS_CREDIT_CASES.items():
+            credited = quiet().simulate_scenario(scenario("c", dict(state), list(actions), goal))
+            credit[key] = {"quality": credited.outcome_quality, "success": credited.success}
 
         # rollout com seeds explícitas
         rollout = {}
@@ -3162,7 +3204,9 @@ def mental_simulation_fingerprint(ns):
             "scenario_fields": list(inspect.signature(scenario_cls).parameters),
             "result_fields": list(inspect.signature(result_cls).parameters),
             "grid": {"digest": grid_digest, "count": len(grid_rows), "mutated_inputs": mutated,
-                     "same_cached": same_cached, "reference_matches": reference_matches},
+                     "same_cached": same_cached, "reference_matches": reference_matches,
+                     "invariant_rows": len(invariant_rows), "invariant_digest": _ms_sha(invariant_rows)},
+            "credit": credit,
             "table": table,
             "rollout": rollout,
             "counterfactual": {"digest": _ms_sha(cf_rows), "count": len(cf_rows), "ids": cf_ok_id,
@@ -3273,7 +3317,13 @@ def eval_mental_simulation(criteria="v1"):
         and grid["reference_matches"] == _MS_GRID_SIZE
         and grid["mutated_inputs"] == 0
         and grid["same_cached"] == _MS_GRID_SIZE
+        and grid["invariant_rows"] == MS_INVARIANT_ROWS
+        and grid["invariant_digest"] == MS_INVARIANT_SHA
     )
+    credit = payload["credit"]
+    ms7 = len(credit) == len(_MS_CREDIT_CASES) == 12 and all(
+        _ms_close(credit[name]["quality"], quality) and credit[name]["success"] is success
+        for name, (_state, _actions, _goal, quality, success) in _MS_CREDIT_CASES.items())
     table = payload["table"]
     table_hits = 0
     for name, (final, success, steps, quality, utility, risks, opps) in _MS_TABLE_EXPECTED.items():
@@ -3343,11 +3393,13 @@ def eval_mental_simulation(criteria="v1"):
     )
     return [
         _check("MS1", {"reference_matches": grid["reference_matches"], "count": grid["count"],
-                       "mutated_inputs": grid["mutated_inputs"], "same_cached": grid["same_cached"]},
-               ms1, "120/120 iguais à referência; entrada intacta; resultado é o objeto do cache"),
+                       "mutated_inputs": grid["mutated_inputs"], "same_cached": grid["same_cached"],
+                       "invariant_rows": grid["invariant_rows"], "invariant_digest": grid["invariant_digest"]},
+               ms1, "120/120 iguais à referência; entrada intacta; objeto do cache; 93 linhas invariantes com SHA do código base"),
         _check("MS2", {"hits": table_hits, "cases": len(_MS_TABLE_EXPECTED)},
                ms2, "14/14 casos de borda de risco, oportunidade, objetivo e qualidade"),
-        _check("MS3", rates, ms3, "reach ≥ 0.90, increase ≥ 0.80, gather ≥ 0.90 em 20 seeds"),
+        _check("MS3", rates, ms3,
+               "reach ≥ 0.90, increase ≥ 0.80, increase_late ≥ 0.80, gather ≥ 0.90 e controles = acquire em 20 seeds"),
         _check("MS4", {"reference_matches": cf["reference_matches"], "ids": cf["ids"],
                        "cache_kept": cf["cache_kept"], "inputs_kept": cf["inputs_kept"]},
                ms4, "120/120 contrafactuais iguais à referência e isolados"),
@@ -3357,6 +3409,7 @@ def eval_mental_simulation(criteria="v1"):
                        "identity": identity, "standalone": standalone, "clock": payload["clock"],
                        "source_golden": MS_SOURCE_SHA, "behavior_golden": MS_BEHAVIOR_SHA},
                ms6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+        _check("MS7", credit, ms7, "crédito parcial ciente do objetivo: 12 casos da tabela pré-registrada"),
     ]
 
 

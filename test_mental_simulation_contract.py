@@ -166,12 +166,13 @@ class MentalSimulationExtractionContractTests(unittest.TestCase):
         _module()
         from tools.cognitivo_eval import MS_BEHAVIOR_SHA, MS_SOURCE_SHA, eval_mental_simulation
         checks = {item["id"]: item for item in eval_mental_simulation()}
-        self.assertEqual(set(checks), {"MS1", "MS2", "MS3", "MS4", "MS5", "MS6"})
-        for cid in ("MS1", "MS2", "MS4", "MS5", "MS6"):
+        self.assertEqual(set(checks), {"MS1", "MS2", "MS3", "MS4", "MS5", "MS6", "MS7"})
+        for cid in ("MS1", "MS2", "MS3", "MS4", "MS5", "MS6", "MS7"):
             with self.subTest(cid=cid):
                 self.assertTrue(checks[cid]["passed"], checks[cid])
-        # MS3 mede o propósito do rollout; o resultado é registrado, não forçado a passar aqui.
-        self.assertEqual(set(checks["MS3"]["value"]), {"reach", "increase", "gather"})
+        # MS3-v2 (pré-registro 82308d0): casos novos e controles; o crédito ciente do objetivo corrige `increase`.
+        self.assertEqual(set(checks["MS3"]["value"]), {
+            "reach", "increase", "gather", "increase_late", "survive_control", "mixed_control"})
         for name, item in checks["MS3"]["value"].items():
             with self.subTest(case=name):
                 self.assertTrue(0.0 <= item["rate"] <= 1.0)
@@ -224,14 +225,14 @@ class MentalSimulationHarnessNegativeContractTests(unittest.TestCase):
                 self.assertEqual(code, 2)
                 self.assertIn("desconhecida", err)
 
-    def test_cli_only_ms3_may_fail_and_exit_code_matches(self):
+    def test_cli_passes_every_criterion_and_exits_zero(self):
         _module()
         from tools import cognitivo_eval
         code, out, _ = self._run(["--capability", "mental_simulation"])
         import json
         failed = json.loads(out)["failed"]
-        self.assertLessEqual(set(failed), {"MS3"})
-        self.assertEqual(code, cognitivo_eval.EXIT_FAIL if failed else cognitivo_eval.EXIT_OK)
+        self.assertEqual(failed, [])
+        self.assertEqual(code, cognitivo_eval.EXIT_OK)
 
     def test_fingerprint_restores_the_global_random_state(self):
         _module()
