@@ -6,7 +6,7 @@
     "extracted_modules": [
       {
         "path": "core/cognitivo/__init__.py",
-        "lines": 59,
+        "lines": 67,
         "classes": 0,
         "functions": 0
       },
@@ -15,6 +15,12 @@
         "lines": 39,
         "classes": 0,
         "functions": 1
+      },
+      {
+        "path": "core/cognitivo/analogical_reasoning.py",
+        "lines": 253,
+        "classes": 3,
+        "functions": 9
       },
       {
         "path": "core/cognitivo/attention.py",
@@ -77,9 +83,9 @@
         "functions": 25
       }
     ],
-    "core_lines": 24289,
-    "classes": 230,
-    "functions": 732,
+    "core_lines": 24064,
+    "classes": 227,
+    "functions": 723,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -92,7 +98,6 @@
       "EthicsGuard.get_statistics",
       "RealAdversarialRobustnessLayer.get_robustness_report",
       "RealAdversarialRobustnessLayer.get_statistics",
-      "RealAnalogicalReasoningSystem.get_statistics",
       "RealAttentionRoutingSystem.get_statistics",
       "RealCognitiveBudgetEnforcer.get_status",
       "RealCollaborativeIntelligenceEngine.get_statistics",

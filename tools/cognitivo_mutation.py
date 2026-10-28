@@ -61,6 +61,8 @@ EF = "core/cognitivo/episodic_future_thinking.py"
 EF_TESTS = ("test_episodic_future_thinking_contract.py",)
 MS = "core/cognitivo/mental_simulation.py"
 MS_TESTS = ("test_mental_simulation_contract.py", "test_mental_simulation_goal_credit.py")
+AR = "core/cognitivo/analogical_reasoning.py"
+AR_TESTS = ("test_analogical_reasoning_contract.py",)
 
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
@@ -853,6 +855,61 @@ MUTATIONS = [
              ")\n"
              "RealMentalSimulationSystem = type(\"RealMentalSimulationSystem\", (_RealMentalSimulationSystem,), {})\n",
              tests=MS_TESTS),
+    Mutation('ar_same_domain_not_skipped', AR, 'if source.domain == target_domain:\n                continue', 'if False:\n                continue', tests=AR_TESTS),
+    Mutation('ar_domain_case_insensitive', AR, 'if source.domain == target_domain:', 'if source.domain.lower() == target_domain.lower():', tests=AR_TESTS),
+    Mutation('ar_tie_prefers_later', AR, 'mapping.quality_score > best_score', 'mapping.quality_score >= best_score', tests=AR_TESTS),
+    Mutation('ar_quality_denominator_min', AR, 'max(len(source.relations), len(target.relations))', 'min(len(source.relations), len(target.relations))', tests=AR_TESTS),
+    Mutation('ar_mapping_no_break', AR, 'matched_relations += 1\n                    break', 'matched_relations += 1', tests=AR_TESTS),
+    Mutation('ar_matched_counter_dropped', AR, 'matched_relations += 1', 'matched_relations += 0', tests=AR_TESTS),
+    Mutation('ar_unmatched_returns_mapping', AR, 'if matched_relations == 0:\n            return None', 'if False:\n            return None', tests=AR_TESTS),
+    Mutation('ar_target_id_changed', AR, 'situation_id="target",', 'situation_id="t",', tests=AR_TESTS),
+    Mutation('ar_target_entities_copied', AR, 'entities=target_entities,', 'entities=list(target_entities),', tests=AR_TESTS),
+    Mutation('ar_known_relations_copied', AR, 'domain=domain,\n            entities=entities,\n            relations=relations,', 'domain=domain,\n            entities=entities,\n            relations=list(relations),', tests=AR_TESTS),
+    Mutation('ar_known_situation_not_stored', AR, 'self.known_situations.append(situation)', 'pass', tests=AR_TESTS),
+    Mutation('ar_analogy_counter_dropped', AR, 'self.total_analogies_found += 1', 'self.total_analogies_found += 0', tests=AR_TESTS),
+    Mutation('ar_transfer_guard_dropped', AR, 'if not mapping.source_situation.solution:\n            return None', 'if False:\n            return None', tests=AR_TESTS),
+    Mutation('ar_transfer_counter_dropped', AR, 'self.successful_transfers += 1', 'self.successful_transfers += 0', tests=AR_TESTS),
+    Mutation('ar_transfer_skips_replace', AR, 'adapted_solution = adapted_solution.replace(source_entity, target_entity)', 'pass', tests=AR_TESTS),
+    Mutation('ar_reason_skips_transfer', AR, 'solution = self.transfer_solution(mapping)', 'solution = None', tests=AR_TESTS),
+    Mutation('ar_reason_returns_none_early', AR, 'if not mapping:\n            return None\n\n        # Transferir', 'if True:\n            return None\n\n        # Transferir', tests=AR_TESTS),
+    Mutation('ar_entities_limit_changed', AR, 'return entities[:5]', 'return entities[:4]', tests=AR_TESTS),
+    Mutation('ar_entities_strip_dropped', AR, "w.strip('.,!?')", 'w', tests=AR_TESTS),
+    Mutation('ar_entities_len_guard_dropped', AR, 'and len(w) > 1', 'and len(w) > 0', tests=AR_TESTS),
+    Mutation('ar_relation_similar_dropped', AR, 'if "similar to" in text.lower():', 'if False:', tests=AR_TESTS),
+    Mutation('ar_relation_causes_dropped', AR, 'if "causes" in text.lower():', 'if False:', tests=AR_TESTS),
+    Mutation('ar_relation_part_of_dropped', AR, 'if "part of" in text.lower():', 'if False:', tests=AR_TESTS),
+    Mutation('ar_relations_case_sensitive', AR, 'if "causes" in text.lower():', 'if "causes" in text:', tests=AR_TESTS),
+    Mutation('ar_stats_rate_divisor_unguarded', AR, 'max(1, self.total_analogies_found)', 'self.total_analogies_found', tests=AR_TESTS),
+    Mutation('ar_stats_known_dropped', AR, '"known_situations": len(self.known_situations)', '"known_situations": 0', tests=AR_TESTS),
+    Mutation('ar_collaborator_not_stored', AR, 'self.memory = memory', 'self.memory = None', tests=AR_TESTS),
+    Mutation("ar_module_pulls_monolith", AR, "import uuid\n",
+             "import uuid\nimport core.constitutional_brain  # noqa: F401\n", tests=AR_TESTS),
+    Mutation("ar_monolith_stops_reexporting", "core/constitutional_brain.py",
+             "from core.cognitivo.analogical_reasoning import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    AnalogyMapping,\n"
+             "    AnalogySituation,\n"
+             "    RealAnalogicalReasoningSystem,\n"
+             ")\n",
+             "from core.cognitivo.analogical_reasoning import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    AnalogyMapping,\n"
+             "    AnalogySituation,\n"
+             "    RealAnalogicalReasoningSystem as _RealAnalogicalReasoningSystem,\n"
+             ")\n"
+             "RealAnalogicalReasoningSystem = type(\"RealAnalogicalReasoningSystem\", (_RealAnalogicalReasoningSystem,), {})\n",
+             tests=AR_TESTS),
+    Mutation("ar_package_stops_reexporting", "core/cognitivo/__init__.py",
+             "from core.cognitivo.analogical_reasoning import (\n"
+             "    AnalogyMapping,\n"
+             "    AnalogySituation,\n"
+             "    RealAnalogicalReasoningSystem,\n"
+             ")\n",
+             "from core.cognitivo.analogical_reasoning import (\n"
+             "    AnalogyMapping,\n"
+             "    AnalogySituation,\n"
+             "    RealAnalogicalReasoningSystem as _RealAnalogicalReasoningSystem,\n"
+             ")\n"
+             "RealAnalogicalReasoningSystem = type(\"RealAnalogicalReasoningSystem\", (_RealAnalogicalReasoningSystem,), {})\n",
+             tests=AR_TESTS),
 ]
 
 

@@ -198,8 +198,10 @@ class AnalogicalReasoningHarnessNegativeContractTests(unittest.TestCase):
         from tools import cognitivo_eval
 
         class Tampered(brain.RealAnalogicalReasoningSystem):
-            def _map_structures(self, source, target):
-                return None
+            def get_statistics(self):
+                stats = super().get_statistics()
+                stats["known_situations"] += 1
+                return stats
 
         ns = {"RealAnalogicalReasoningSystem": Tampered, "AnalogySituation": brain.AnalogySituation,
               "AnalogyMapping": brain.AnalogyMapping}
