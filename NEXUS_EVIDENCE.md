@@ -7,6 +7,10 @@ tests: CURRENT_TESTS
 bandit_low: 131
 -->
 
+## Auditor de declarações de correção — validação local 2026-10-28
+
+Base `c856e1a899121c1b68be8162f86ec873202816ed`, branch `cursor/correction-claim-audit-0eb5`. O contrato `test_correction_claim_audit_contract.py` falhou por ausência do módulo (1 teste, exit 1) e, com `tools/correction_claim_audit.py`, passou 18 testes. No corpus versionado o auditor devolveu `pass`: 2 declarações não checáveis em `CONTINUATION.md` e 7 lições sem medição de reincidência. Existência de caminho ou símbolo não é correção. Comandos, versões e limites estão na rodada de 2026-10-28 de `CONTINUATION.md`. Isto é evidência de contrato local, não de capacidade cognitiva nem de CI hospedado.
+
 ## Duplicatas terminais no resumo integrado — validação local 2026-10-20
 
 Base `d435083bb4c893a58128cee6cfa00f65bba7fe02`, branch `fix/integrated-summary-duplicates-20261020`: regressões reproduziram PASS/PASS e SKIP/SKIP indevidamente aprovados antes do patch. O tally agora expõe `duplicates` e falha com resultados terminais repetidos, preservando stream e categorias existentes. Após a correção: 10 contratos focados aprovados; suíte completa executada duas vezes (com cobertura e `tools/test_summary.py`), 307 executados/305 aprovados/2 skips opcionais/0 falhas; integração real 30 passes/1 skip e nenhuma duplicata. Gates de cobertura, Ruff, compilação, auditorias e 58 mutações preexistentes aprovados; Bandit 131 LOW e nenhum MEDIUM/HIGH. Comandos, limitações e proveniência estão na seção correspondente de `CONTINUATION.md`.
