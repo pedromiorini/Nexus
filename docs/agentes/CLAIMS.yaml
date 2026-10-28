@@ -1,19 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "Mental Simulation: crédito parcial ciente do objetivo (MS3-v2, MS7), PR de comportamento draft"
-    arquivos:
-      - core/cognitivo/mental_simulation.py
-      - test_mental_simulation_contract.py
-      - test_mental_simulation_goal_credit.py
-      - tools/cognitivo_eval.py
-      - tools/cognitivo_mutation.py
-      - docs/cognitivo/AUDITORIA_2026-10-22.md
-      - docs/agentes/CLAIMS.yaml
-      - AUDIT_REALITY_REPORT.md
-      - audit_reality.json
-      - SECURITY_TRIAGE.md
-    expira_em: "2026-10-29T00:00:00Z"
-
+claims: []

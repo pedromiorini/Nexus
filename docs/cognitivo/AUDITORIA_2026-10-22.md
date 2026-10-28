@@ -1541,3 +1541,25 @@ Comando: `python tools/cognitivo_eval.py --capability mental_simulation`. Seeds 
 
 PRs abertos: #38–#50, #60, #77, #79, #115, #116. Nenhum edita `core/cognitivo/mental_simulation.py`, `tools/cognitivo_eval.py` nem `test_mental_simulation_*`. **Sobreposição declarada:** #116 (Axis, em pausa) altera `tools/cognitivo_mutation.py` e os relatórios de realidade; #79 altera a linha 1 de `docs/agentes/CLAIMS.yaml`; #115 e #50 alteram `SECURITY_TRIAGE.md`. Este PR não toca neles; se algum entrar antes, os relatórios são regenerados pelas ferramentas, nunca à mão. Claim `grok-bot`, prazo `2026-10-29T00:00:00Z` (≈ 6 h), removido no último commit.
 
+### Resultados MS-v2 (depois do pré-registro `82308d0`)
+
+**Commits, em ordem:** `82308d0` pré-registro e claim; `24ad165` harness e testes, **RED** (18 falhas em 3.11 e em 3.12 sobre o código base; os controles do código base passam, como fixado); `88618ae` mudança (**GREEN**) com os SHA do MS6 re-fixados e 15 mutantes novos; este commit de resultados, que remove o claim. Nenhum limite, seed, tamanho ou valor de MS1–MS7 foi alterado depois do pré-registro.
+
+**Comando:** `python tools/cognitivo_eval.py --capability mental_simulation`, Python 3.11 e 3.12. Na primeira execução com o comportamento novo, **só o MS6 falhou**, porque os SHA ainda eram os do move-only (re-pin declarado no pré-registro). Depois de re-fixar os dois SHA (fonte `4b2356be…4c26`, comportamento `c8d6f43d…48b4`, completos em `tools/cognitivo_eval.py`; iguais em 3.11 e 3.12), saída: código **0**, `failed: []`.
+
+| id | resultado | valor medido |
+|---|---|---|
+| MS1 | **passa** | 120/120 iguais à referência nova; 93 linhas invariantes com SHA `acf3d3c2…dd09`, o valor medido no código base |
+| MS2 | **passa** | 14/14 |
+| MS3-v2 | **passa** | `reach` 1.00, **`increase` 1.00** (limite 0.80), **`increase_late` 1.00** (limite 0.80), `gather` 1.00; controles `survive_control` e `mixed_control` 1.00 em `acquire`, iguais ao código base |
+| MS4 | **passa** | 120/120 contrafactuais |
+| MS5 | **passa** | contadores, erros e gaps iguais; `successful_predictions == 0` e `simulation_accuracy == 0.0` (gap H6 permanece) |
+| MS6 | **passa** (após o re-pin declarado) | reexport idêntico, módulo sem monólito/numpy/vita |
+| MS7 | **passa** | 12/12: 0.30, 0.50, 0.66, 0.30, 0.30 (sem crédito de recursos), 0.30, 0.30, 0.30, 0.50, 0.50, 0.50, 0.90 |
+
+**Hipótese H-MS3v2 sustentada.** O gap do #118 (`increase` 0.00) passa a 1.00, e a previsão registrada (1.00 nos dois casos) se confirmou. O efeito é restrito a objetivos só de posição: objetivos `survive` e mistos continuam escolhendo `acquire` (gap residual conhecido e declarado: o crédito de recursos sozinho ainda não distingue ações para esses objetivos).
+
+**Gates locais (não substituem a CI hospedada).** `ruff` limpo; `compileall`; `reality_audit` regenerado só pela ferramenta (única mudança: 4059 → 4079 linhas dos módulos extraídos); 669 testes OK; cobertura `core/cognitivo/*` 97% (`mental_simulation.py` 100% com ramos) e monólito 68%; `tools/cognitivo_mutation.py` 262/262 mortos (15 novos); Bandit 131 LOW, zero MEDIUM/HIGH, `security_triage --check` verde sem mudança em `SECURITY_TRIAGE.md`; `validar_registro.py`.
+
+**Não medido.** CI hospedada; efeito em cenários fora dos pré-registrados; mescla real com #79, #115 ou #116.
+
