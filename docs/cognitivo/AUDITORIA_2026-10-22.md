@@ -1462,3 +1462,35 @@ Hipótese de trabalho, não vinculante além da tabela: H1, H2, H3, H5 se susten
 Não há contrato anterior destes três símbolos. A suíte embutida 26 do demo continua chamando `MentalScenario`, `simulate_scenario`, `rollout_planning(num_rollouts=3)`, `counterfactual_simulation` e `get_statistics` pelo reexport, e o construtor do orquestrador continua instanciando `RealMentalSimulationSystem(world_model, planner, reasoning, causal)`. O eval dos outros capabilities não é alvo de mudança de critério.
 
 Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability mental_simulation`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+## Resultados MS (após o pré-registro `cf8f9f2`)
+
+**Commits desta rodada, em ordem:** `cf8f9f2` pré-registro (critérios, SHAs e claim); `32bd8e7` harness e contrato novo, **RED** (7 erros `ModuleNotFoundError` antes do move; 10 testes de caracterização já passavam); o commit de extração move-only (GREEN); este commit de resultados. Nenhum limite, alvo ou seed de MS1–MS6 foi alterado depois do pré-registro. Uma correção de **codificação** no harness está declarada mais abaixo.
+
+**Comando:** `python tools/cognitivo_eval.py --capability mental_simulation` em Python 3.12.15 e 3.11.17, sobre a árvore pós-move. Saída: código **1**, `failed: ["MS3"]`.
+
+| id | resultado | valor medido |
+|---|---|---|
+| MS1 | **passa** | 120/120 iguais à referência independente; nenhuma entrada alterada; 120/120 resultados são o objeto do cache |
+| MS2 | **passa** | 14/14 casos de borda |
+| MS3 | **FALHA** (como previsto) | `reach` 1.00 (limite 0.90) passa; `gather` 1.00 (limite 0.90) passa; **`increase` 0.00 (limite 0.80) falha**: nas 20 seeds `rollout_planning` devolveu `acquire`, nunca `move` |
+| MS4 | **passa** | 120/120 contrafactuais iguais à referência; ids prefixados; cache e entradas intactos |
+| MS5 | **passa** | após 120 simulações `total_simulations == 120`, `cached_simulations == 120`, `successful_predictions == 0`, `simulation_accuracy == 0.0` (gap H6 medido); 20 contratos de erro idênticos ao registrado; rollout soma `len(actions) * N` = 300 por caso; colaboradores só leem `world_model.predict_next_state` quando verdadeiro |
+| MS6 | **passa** | SHA de fonte `43803b05…9df67` e SHA comportamental `15dadf71…de76`, iguais nos dois lados e nas duas versões de Python; as três classes reexportadas são o mesmo objeto; o módulo não importa `numpy`, `vita` nem o monólito |
+
+**Hipóteses.** H1 sustentada (move-only: fonte e comportamento idênticos). H2, H3 e H5 sustentadas. **H4 falsificada** no caso `increase`. H6 confirmada como gap (as estatísticas não medem previsão).
+
+**Por que `increase` falha (inferência confirmada pelo número, não por análise nova).** O objetivo `increase position` só dá sucesso com `position ≥ 10`; saindo de 0, quatro passos nunca chegam lá. O crédito parcial só premia `resources` e `structures`, então `acquire` (+0.2 de qualidade) rende mais utilidade que `move` (0). O rollout não enxerga o progresso rumo ao objetivo declarado. Isto é um gap de **comportamento do bloco**, que a rodada move-only não corrige.
+
+**Correção de codificação no harness (declarada).** No commit RED, o MS5 comparava `hook_calls` a uma lista de listas, mas o fingerprint guarda uma lista de tuplas; o critério reprovava por tipo de contêiner, não por comportamento. O GREEN passa a comparar com `[({"position": 1}, "wait")]`. A afirmação (o `world_model` recebe `({"position": 1}, "wait")`) e o SHA comportamental não mudaram.
+
+**Opções para o MS3 (nenhuma aplicada; decisão do Pedro).**
+1. Aceitar `increase` como gap documentado e deixar o PR draft como está.
+2. PR de comportamento separado, com novo pré-registro: crédito parcial consciente do objetivo (por exemplo, progresso de `position` em direção ao limite).
+3. Mudar o cenário ou o limite do MS3 só em um novo protocolo `v2`, sem reescrever este.
+
+**Gates locais (não substituem a CI hospedada).** `ruff` limpo; `compileall`; `reality_audit` regenerado só pela ferramenta; 658 testes OK em 3.11 e em 3.12; demo do monólito; cobertura `core/cognitivo/*` 97% (`mental_simulation.py` 100%, com ramos) e monólito 68% (mínimos 90 e 62); `tools/targeted_mutation.py` 80/80 mortos; `tools/cognitivo_mutation.py` 247/247 mortos (37 novos); Bandit 131 LOW, igual a `main`, zero MEDIUM/HIGH; `security_triage --check` verde depois de regenerar `SECURITY_TRIAGE.md` pela ferramenta (a linha B311 de `rollout_planning` trocou de arquivo); `validar_registro.py --expirados aviso`; `predeleg.sh HEAD origin/main`: sem conflito.
+
+**Conflitos.** `git merge-tree` de `HEAD` contra #115 e #116 dá exatamente o mesmo conjunto de conflitos que `origin/main` contra cada um deles; esta rodada não cria nenhum conflito novo. `tools/cognitivo_mutation.py` auto-mescla com #116 (hunks não adjacentes). #79 e #114 foram verificados por `merge-tree` sem conflito.
+
+**Não medido.** CI hospedada; merge real com #79, #115 ou #116 (só simulação por `merge-tree`); os relatórios de auditoria precisam ser regenerados se #116 entrar antes; `planner`, `reasoning` e `causal` continuam sem uso (gap, não escopo).
