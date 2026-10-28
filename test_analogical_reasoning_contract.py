@@ -379,6 +379,18 @@ class AnalogicalReasoningMappingContractTests(unittest.TestCase):
         self.assertEqual(rels, [(_C, "x", "y"), (_C, "x", "z")])
         self.assertEqual(system.known_situations[0].relations, [(_C, "a", "b"), (_C, "c", "d")])
 
+    def test_a_rejected_relation_leaves_no_partial_pairs_behind(self):
+        # (c→w) seria novo e válido, mas (a→z) contradiz a→x: nenhum dos dois pares entra.
+        mapping = _map([("S", [], [(_C, "a", "b"), (_P, "c", "a")], None)], [(_C, "x", "y"), (_P, "w", "z")])
+        self.assertEqual(mapping.entity_mappings, {"a": "x", "b": "y"})
+        self.assertEqual(mapping.quality_score, 0.5)
+
+    def test_one_contradicting_pair_rejects_the_relation_even_if_the_other_agrees(self):
+        # (b→w) contradiz b→y; (a→x) concorda com a→x: a relação continua rejeitada.
+        mapping = _map([("S", [], [(_C, "a", "b"), (_P, "b", "a")], None)], [(_C, "x", "y"), (_P, "w", "x")])
+        self.assertEqual(mapping.entity_mappings, {"a": "x", "b": "y"})
+        self.assertEqual(mapping.quality_score, 0.5)
+
     def test_malformed_relations_still_fail_loudly(self):
         with self.assertRaises(ValueError):
             _with(_ONE).find_analogy("T", [], [(_C, "x")])
@@ -401,6 +413,24 @@ class AnalogicalReasoningTransferContractTests(unittest.TestCase):
         self.assertEqual(_transfer({"sun": "alpha"}, "Sun sun")[0], "Sun alpha")
         self.assertEqual(_transfer({"a.b": "x"}, "a.b and axb")[0], "x and axb")
         self.assertEqual(_transfer({"C++": "Rust"}, "use C++ now, C++11 later")[0], "use Rust now, C++11 later")
+
+    def test_a_longer_key_that_starts_with_a_shorter_one_wins(self):
+        self.assertEqual(_transfer({"New": "A", "New York": "B"}, "New York and New")[0], "B and A")
+        self.assertEqual(_transfer({"New": "A", "New York": "B"}, "New York")[0], "B")
+
+    def test_an_empty_key_never_matches_between_separators(self):
+        self.assertEqual(_transfer({"": "x", "a": "b"}, ". a .")[0], ". b .")
+        self.assertEqual(_transfer({"": "x"}, " . ")[0], " . ")
+
+    def test_real_names_in_extracted_relations_are_not_overwritten(self):
+        class Fixed(RealAnalogicalReasoningSystem):
+            def _extract_relations(self, text):
+                return [("CAUSES", "Rain", "Flood")]
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            system = Fixed()
+        system.add_situation("S", ["Rain", "Flood"], [("CAUSES", "Rain", "Flood")], "stop Rain")
+        self.assertEqual(system.reason_by_analogy("Storm causes Damage.", "T"), "stop Rain")
 
     def test_the_longest_key_wins_and_multiword_keys_work(self):
         self.assertEqual(_transfer({"Rain": "X", "Rainfall": "Y"}, "Rainfall and Rain")[0], "Y and X")
@@ -465,10 +495,10 @@ class AnalogicalReasoningRegressionContractTests(unittest.TestCase):
         self.assertTrue({"AR1", "AR3", "AR7"} <= set(report["failed"]), report["failed"])
         self.assertNotIn("AR10", report["failed"])
 
-    def test_sequential_substring_transfer_fails_ar1_ar4_ar8(self):
+    def test_sequential_substring_transfer_fails_ar4_ar8(self):
         code, report = self._failed_with("transfer_solution", _legacy_transfer_solution)
         self.assertEqual(code, 1)
-        self.assertTrue({"AR4", "AR8", "AR9"} <= set(report["failed"]), report["failed"])
+        self.assertTrue({"AR4", "AR8"} <= set(report["failed"]), report["failed"])
 
     def test_reason_without_extracted_entities_fails_ar4_ar9(self):
         code, report = self._failed_with("reason_by_analogy", _legacy_reason_by_analogy)

@@ -1,11 +1,15 @@
 """Analogical reasoning (POST27) extraído de core/constitutional_brain.py.
 
-Extração strangler: o código abaixo foi movido sem alteração de comportamento;
+Extração strangler: o código foi movido do monólito (#121, move-only);
 core.constitutional_brain reexporta as classes no ponto original.
+Correção de comportamento (AR3, AR4, AR7–AR10): o mapeamento é um-para-um e
+injetivo, a transferência é simultânea e por palavra inteira, e
+reason_by_analogy usa as entidades extraídas.
 Não há relógio nem aleatoriedade além de uuid.uuid4() para situation_id e
 mapping_id. reasoning, memory e semantic_networks só são armazenados, nunca lidos.
 """
 
+import re
 import uuid
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
@@ -140,17 +144,30 @@ class RealAnalogicalReasoningSystem:
     def _map_structures(self, source: AnalogySituation, 
                        target: AnalogySituation) -> Optional[AnalogyMapping]:
         """Structure mapping entre source e target"""
-        # Simplificado: mapear entidades por posição nas relações
+        # Simplificado: mapear entidades por posição nas relações, um-para-um e injetivo
         entity_mappings = {}
+        used_relations = set()
         matched_relations = 0
 
-        # Tentar mapear cada relação do target para source
+        # Tentar mapear cada relação do target para uma relação ainda não usada do source
         for t_rel, t_e1, t_e2 in target.relations:
-            for s_rel, s_e1, s_e2 in source.relations:
-                if t_rel == s_rel:  # Mesma relação
-                    # Mapear entidades
-                    entity_mappings[s_e1] = t_e1
-                    entity_mappings[s_e2] = t_e2
+            for index, (s_rel, s_e1, s_e2) in enumerate(source.relations):
+                if index in used_relations or t_rel != s_rel:  # Mesma relação, usada uma só vez
+                    continue
+                tentative = dict(entity_mappings)
+                consistent = True
+                for s_entity, t_entity in ((s_e1, t_e1), (s_e2, t_e2)):
+                    if s_entity in tentative:
+                        consistent = tentative[s_entity] == t_entity
+                    elif any(image == t_entity for image in tentative.values()):
+                        consistent = False  # dois do source não podem ir ao mesmo do target
+                    else:
+                        tentative[s_entity] = t_entity
+                    if not consistent:
+                        break
+                if consistent:
+                    entity_mappings = tentative
+                    used_relations.add(index)
                     matched_relations += 1
                     break
 
@@ -186,10 +203,15 @@ class RealAnalogicalReasoningSystem:
         # Adaptar solução para target domain
         source_solution = mapping.source_situation.solution
 
-        # Substituir entidades mapeadas
+        # Substituir entidades mapeadas: uma só passagem, palavra inteira, chave mais longa primeiro
         adapted_solution = source_solution
-        for source_entity, target_entity in mapping.entity_mappings.items():
-            adapted_solution = adapted_solution.replace(source_entity, target_entity)
+        keys = [key for key in mapping.entity_mappings if key]
+        if mapping.entity_mappings and not isinstance(source_solution, str):
+            raise AttributeError("transfer_solution requer solução str quando há entidades mapeadas")
+        if keys:
+            keys.sort(key=len, reverse=True)
+            pattern = re.compile(r"(?<!\w)(?:" + "|".join(re.escape(key) for key in keys) + r")(?!\w)")
+            adapted_solution = pattern.sub(lambda found: mapping.entity_mappings[found.group(0)], source_solution)
 
         self.successful_transfers += 1
 
@@ -210,6 +232,9 @@ class RealAnalogicalReasoningSystem:
         # Extrair estrutura do problema (simplificado)
         entities = self._extract_entities(problem_description)
         relations = self._extract_relations(problem_description)
+        if len(entities) >= 2:
+            names = {"entity1": entities[0], "entity2": entities[1]}
+            relations = [(rel, names.get(e1, e1), names.get(e2, e2)) for rel, e1, e2 in relations]
 
         # Buscar analogia
         mapping = self.find_analogy(target_domain, entities, relations)

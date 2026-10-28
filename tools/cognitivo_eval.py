@@ -3419,8 +3419,8 @@ def eval_mental_simulation(criteria="v1"):
 
 # ── Analogical Reasoning (POST27) ───────────────────────────────────────────
 
-AR_SOURCE_SHA = "a603eafc39db384ac6670c6cdba0b490155b46f9e1a38ea79a00202f24741c6a"
-AR_BEHAVIOR_SHA = "517a4d8e2b52d8159e0445d3440a3b1c30cb553b9eb6a7f01ec6a40f07617b6b"  # capturado no monólito antes do move (RED), 3.12 e 3.11
+AR_SOURCE_SHA = "64e1bd060e3cf267970165829bc71515d7ab232e888f24118804215f142966e1"
+AR_BEHAVIOR_SHA = "997c1e59edbbce92e292c8c10b3f789c026c70bee039064241d9ff3ceff94201"  # re-fixado após o GREEN (detector; igual a MS6 em #119); 3.12 e 3.11
 _AR_NAMES = ("AnalogySituation", "AnalogyMapping", "RealAnalogicalReasoningSystem")
 _AR_MARKER = "# MÓDULO 27: ANALOGICAL REASONING SYSTEM (POST 27)"
 _AR_END = '            "transfer_success_rate": self.successful_transfers / max(1, self.total_analogies_found)\n        }'
