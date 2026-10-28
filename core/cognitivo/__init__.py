@@ -9,6 +9,11 @@ from core.cognitivo.attention import (
     StimulusItem,
     TopDownAttention,
 )
+from core.cognitivo.episodic_future_thinking import (
+    FutureEvent,
+    ProspectiveMemory,
+    RealEpisodicFutureThinkingSystem,
+)
 from core.cognitivo.incremental_learner import (
     ConsolidationReport,
     LearningEvent,
@@ -30,9 +35,12 @@ __all__ = [
     "BottomUpAttention",
     "CentralExecutive",
     "ConsolidationReport",
+    "FutureEvent",
     "LearningEvent",
     "PhonologicalLoop",
+    "ProspectiveMemory",
     "RealAttentionSystem",
+    "RealEpisodicFutureThinkingSystem",
     "RealIncrementalLearner",
     "RealWorkingMemorySystem",
     "RehearsalEvent",
