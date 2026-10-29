@@ -63,6 +63,8 @@ MS = "core/cognitivo/mental_simulation.py"
 MS_TESTS = ("test_mental_simulation_contract.py", "test_mental_simulation_goal_credit.py")
 AR = "core/cognitivo/analogical_reasoning.py"
 AR_TESTS = ("test_analogical_reasoning_contract.py",)
+CM = "core/cognitivo/contextual_memory.py"
+CM_TESTS = ("test_contextual_memory_contract.py",)
 
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
@@ -931,6 +933,91 @@ MUTATIONS = [
              ")\n"
              "RealAnalogicalReasoningSystem = type(\"RealAnalogicalReasoningSystem\", (_RealAnalogicalReasoningSystem,), {})\n",
              tests=AR_TESTS),
+    Mutation('cm_dimension_dropped', CM, '            "social"       # Contexto social\n', '            # Contexto social\n', tests=CM_TESTS),
+    Mutation('cm_dimension_order_swapped', CM, '"location",    # Onde\n            "time",        # Quando', '"time",        # Quando\n            "location",    # Onde', tests=CM_TESTS),
+    Mutation('cm_missing_value_not_unknown', CM, 'context.get(dim, "unknown")', 'context.get(dim, "")', tests=CM_TESTS),
+    Mutation('cm_hash_modulus_changed', CM, '% 100 / 100.0', '% 101 / 100.0', tests=CM_TESTS),
+    Mutation('cm_hash_of_repr', CM, 'hash(str(value))', 'hash(repr(value))', tests=CM_TESTS),
+    Mutation('cm_similarity_empty_guard_dropped', CM, 'if not vec1 or not vec2:\n            return 0.0', 'if False:\n            return 0.0', tests=CM_TESTS),
+    Mutation('cm_similarity_one_empty_only', CM, 'if not vec1 or not vec2:', 'if not vec1 and not vec2:', tests=CM_TESTS),
+    Mutation('cm_similarity_not_normalised', CM, 'return dot_product / (mag1 * mag2)', 'return dot_product', tests=CM_TESTS),
+    Mutation('cm_similarity_zero_guard_dropped', CM, 'if mag1 == 0 or mag2 == 0:', 'if False:', tests=CM_TESTS),
+    Mutation('cm_similarity_zero_guard_and', CM, 'if mag1 == 0 or mag2 == 0:', 'if mag1 == 0 and mag2 == 0:', tests=CM_TESTS),
+    Mutation('cm_similarity_dot_wrong', CM, 'a * b for a, b in zip(vec1, vec2)', 'a + b for a, b in zip(vec1, vec2)', tests=CM_TESTS),
+    Mutation('cm_set_context_vector_dropped', CM, 'self.current_context_vector = self.context_encoder.encode_context(context)', 'pass', tests=CM_TESTS),
+    Mutation('cm_set_context_copied', CM, 'self.current_context = context\n', 'self.current_context = dict(context)\n', tests=CM_TESTS),
+    Mutation('cm_store_ignores_current_context', CM, 'if context is None:\n            context = self.current_context\n\n        # Codificar contexto\n', 'if context is None:\n            context = {}\n\n        # Codificar contexto\n', tests=CM_TESTS),
+    Mutation('cm_store_context_copied', CM, '            context=context,\n            context_vector', '            context=dict(context),\n            context_vector', tests=CM_TESTS),
+    Mutation('cm_store_not_appended', CM, 'self.contextual_memories.append(memory)', 'pass', tests=CM_TESTS),
+    Mutation('cm_encoding_counter_dropped', CM, 'self.total_encodings += 1', 'self.total_encodings += 0', tests=CM_TESTS),
+    Mutation('cm_ltm_always_called', CM, 'if self.ltm:', 'if True:', tests=CM_TESTS),
+    Mutation('cm_ltm_content_not_str', CM, 'str(content),\n                "contextual"', 'content,\n                "contextual"', tests=CM_TESTS),
+    Mutation('cm_ltm_importance_changed', CM, 'importance=0.7', 'importance=0.5', tests=CM_TESTS),
+    Mutation('cm_ltm_kind_changed', CM, '"contextual",\n                importance', '"context",\n                importance', tests=CM_TESTS),
+    Mutation('cm_retrieval_ranked_ascending', CM, 'matches.sort(key=lambda m: m.match_score, reverse=True)', 'matches.sort(key=lambda m: m.match_score)', tests=CM_TESTS),
+    Mutation('cm_retrieval_unsorted', CM, 'matches.sort(key=lambda m: m.match_score, reverse=True)', 'pass', tests=CM_TESTS),
+    Mutation('cm_threshold_strict', CM, 'if match_score >= threshold:', 'if match_score > threshold:', tests=CM_TESTS),
+    Mutation('cm_default_threshold_changed', CM, 'threshold: float = 0.5)', 'threshold: float = 0.6)', tests=CM_TESTS),
+    Mutation('cm_score_not_averaged', CM, '(similarity + content_match) / 2.0', 'similarity + content_match', tests=CM_TESTS),
+    Mutation('cm_score_ignores_content', CM, '(similarity + content_match) / 2.0', 'similarity', tests=CM_TESTS),
+    Mutation('cm_query_mismatch_weight_changed', CM, 'else 0.3', 'else 0.2', tests=CM_TESTS),
+    Mutation('cm_query_case_sensitive', CM, 'query_lower = str(query).lower()', 'query_lower = str(query)', tests=CM_TESTS),
+    Mutation('cm_content_case_sensitive', CM, 'content_lower = str(memory.content).lower()', 'content_lower = str(memory.content)', tests=CM_TESTS),
+    Mutation('cm_query_ignored', CM, '            if query:\n                query_lower', '            if False:\n                query_lower', tests=CM_TESTS),
+    Mutation('cm_retrieval_count_dropped', CM, 'memory.retrieval_count += 1', 'pass', tests=CM_TESTS),
+    Mutation('cm_retrieval_count_always', CM, '                # Incrementar retrieval count\n                memory.retrieval_count += 1', '                pass\n            memory.retrieval_count += 1', tests=CM_TESTS),
+    Mutation('cm_retrieval_counter_dropped', CM, 'self.total_retrievals += 1\n', 'self.total_retrievals += 0\n', tests=CM_TESTS),
+    Mutation('cm_matched_counter_always', CM, 'if matches:\n            self.context_matched_retrievals += 1', 'self.context_matched_retrievals += 1', tests=CM_TESTS),
+    Mutation('cm_retrieval_ignores_current_context', CM, '            context = self.current_context\n\n        # Codificar contexto de retrieval', '            context = {}\n\n        # Codificar contexto de retrieval', tests=CM_TESTS),
+    Mutation('cm_features_equality_dropped', CM, 'if encoding_context[key] == retrieval_context[key]:', 'if True:', tests=CM_TESTS),
+    Mutation('cm_features_membership_dropped', CM, 'if key in retrieval_context:\n                if', 'if True:\n                if', tests=CM_TESTS),
+    Mutation('cm_features_iterates_retrieval', CM, 'for key in encoding_context:', 'for key in retrieval_context:', tests=CM_TESTS),
+    Mutation('cm_reinstate_missing_raises', CM, 'if not memory:\n            return None', 'if not memory:\n            raise KeyError(memory_id)', tests=CM_TESTS),
+    Mutation('cm_reinstate_does_not_set_context', CM, 'self.set_current_context(memory.context)', 'pass', tests=CM_TESTS),
+    Mutation('cm_reinstate_returns_none', CM, 'return memory.context\n', 'return None\n', tests=CM_TESTS),
+    Mutation('cm_cues_format_changed', CM, 'f"{key}={value}"', 'f"{key}:{value}"', tests=CM_TESTS),
+    Mutation('cm_cues_values_only', CM, 'f"{key}={value}"', 'f"{value}"', tests=CM_TESTS),
+    Mutation('cm_specificity_threshold_raised', CM, 'threshold=0.0)', 'threshold=0.5)', tests=CM_TESTS),
+    Mutation('cm_specificity_missing_returns_one', CM, '        return 0.0\n\n    def get_statistics', '        return 1.0\n\n    def get_statistics', tests=CM_TESTS),
+    Mutation('cm_specificity_wrong_context', CM, 'self.retrieve_by_context(content, retrieval_context', 'self.retrieve_by_context(content, encoding_context', tests=CM_TESTS),
+    Mutation('cm_stats_rate_unguarded', CM, 'max(1, self.total_retrievals)', 'self.total_retrievals', tests=CM_TESTS),
+    Mutation('cm_stats_rate_always_computed', CM, 'if self.total_retrievals > 0\n            else 0.0', 'if True\n            else 0.0', tests=CM_TESTS),
+    Mutation('cm_stats_dimensions_dropped', CM, '"current_context_dimensions": len(self.current_context)', '"current_context_dimensions": 0', tests=CM_TESTS),
+    Mutation('cm_stats_stored_dropped', CM, '"stored_memories": len(self.contextual_memories)', '"stored_memories": self.total_encodings', tests=CM_TESTS),
+    Mutation('cm_collaborator_not_stored', CM, 'self.wm = working_memory', 'self.wm = None', tests=CM_TESTS),
+    Mutation('cm_banner_dropped', CM, 'print("🧠🔍 POST 14', 'pass  # print("🧠🔍 POST 14', tests=CM_TESTS),
+    Mutation("cm_module_pulls_monolith", CM, "import uuid\n",
+             "import uuid\nimport core.constitutional_brain  # noqa: F401\n", tests=CM_TESTS),
+    Mutation("cm_monolith_stops_reexporting", "core/constitutional_brain.py",
+             "from core.cognitivo.contextual_memory import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    ContextEncoder,\n"
+             "    ContextMatch,\n"
+             "    ContextualMemory,\n"
+             "    RealContextualMemorySystem,\n"
+             ")\n",
+             "from core.cognitivo.contextual_memory import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    ContextEncoder,\n"
+             "    ContextMatch,\n"
+             "    ContextualMemory,\n"
+             "    RealContextualMemorySystem as _RealContextualMemorySystem,\n"
+             ")\n"
+             "RealContextualMemorySystem = type(\"RealContextualMemorySystem\", (_RealContextualMemorySystem,), {})\n",
+             tests=CM_TESTS),
+    Mutation("cm_package_stops_reexporting", "core/cognitivo/__init__.py",
+             "from core.cognitivo.contextual_memory import (\n"
+             "    ContextEncoder,\n"
+             "    ContextMatch,\n"
+             "    ContextualMemory,\n"
+             "    RealContextualMemorySystem,\n"
+             ")\n",
+             "from core.cognitivo.contextual_memory import (\n"
+             "    ContextEncoder,\n"
+             "    ContextMatch,\n"
+             "    ContextualMemory,\n"
+             "    RealContextualMemorySystem as _RealContextualMemorySystem,\n"
+             ")\n"
+             "RealContextualMemorySystem = type(\"RealContextualMemorySystem\", (_RealContextualMemorySystem,), {})\n",
+             tests=CM_TESTS),
 ]
 
 
