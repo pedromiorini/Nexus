@@ -6,10 +6,13 @@ reexporta as classes no ponto original.
 Dependências: apenas a biblioteca padrão. O relógio é time.time() (timestamp de
 cada peso). memory_system é armazenado e nunca lido; emotion_system só é lido
 por emotional_states (opcional). emotional_decay_rate é declarado e nunca usado.
-Lacunas registradas, fora desta extração (pré-registro EW1–EW6 em
-docs/cognitivo/AUDITORIA_2026-10-22.md): EW3 (nenhum limite sobre valência e
-ativação: intensidade acima de 1 e reforço negativo) e EW4 (memória sem rótulo
-recebe prioridade 1.0, acima da emocional moderada).
+Correção de EW3 e EW4 (pré-registro EW7–EW9 em docs/cognitivo/AUDITORIA_2026-10-22.md):
+valência e ativação são limitadas ao domínio declarado (valência em [-1, 1], ativação em
+[0, 1]) depois do estado do agente, e a memória sem rótulo pontua 0.0 em prioritize_recall
+(a emocional com intensidade positiva fica na frente). Valor dentro do domínio volta como o
+mesmo objeto. Lacunas residuais declaradas, fora do escopo: NaN passa sem validação; a
+valência da consulta e o alvo de retrieve_by_valence não são limitados; a memória neutra e
+a sem rótulo empatam em 0.0 (a ordem de entrada decide).
 """
 
 import math
@@ -72,6 +75,15 @@ class RealEmotionalMemoryWeighting:
     - LaBar & Cabeza's Emotional Memory Systems (2006)
     """
     
+    @staticmethod
+    def _clamp_to_domain(value, low, high):
+        """Limita ao domínio; dentro dele devolve o mesmo objeto (NaN passa; não numérico levanta TypeError)."""
+        if value < low:
+            return low
+        if value > high:
+            return high
+        return value
+
     def __init__(self, memory_system=None, emotion_system=None):
         self.memory = memory_system
         self.emotion = emotion_system
@@ -113,7 +125,11 @@ class RealEmotionalMemoryWeighting:
                 state = self.emotion.emotional_states[agent_id]
                 valence = state.pleasure
                 arousal = state.arousal
-        
+
+        # Limitar ao domínio declarado (valência -1 a +1, arousal 0 a 1)
+        valence = self._clamp_to_domain(valence, -1.0, 1.0)
+        arousal = self._clamp_to_domain(arousal, 0.0, 1.0)
+
         # Calcular intensidade emocional (distância da neutralidade)
         emotional_intensity = math.sqrt(valence**2 + arousal**2) / math.sqrt(2)
         
@@ -196,8 +212,8 @@ class RealEmotionalMemoryWeighting:
                 
                 scored_memories.append((mem_id, score))
             else:
-                # Memória sem peso emocional - score base
-                scored_memories.append((mem_id, base_score))
+                # Memória sem peso emocional: 0.0, atrás de qualquer memória emocional com intensidade
+                scored_memories.append((mem_id, 0.0))
         
         # Ordenar por score descendente
         scored_memories.sort(key=lambda x: x[1], reverse=True)

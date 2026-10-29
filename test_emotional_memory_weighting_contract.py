@@ -37,7 +37,7 @@ sys.meta_path.insert(0, _Block())
 import core.cognitivo.emotional_memory_weighting as mod
 system = mod.RealEmotionalMemoryWeighting()
 system.tag_memory_emotionally(1, {"valence": 0.5, "arousal": 0.5})
-assert system.prioritize_recall([1, 2])[0][0] == 2
+assert system.prioritize_recall([1, 2])[0][0] == 1
 assert system.retrieve_by_valence(0.5) == [1]
 leaked = sorted(n for n in sys.modules if n.split(".")[0] in {"numpy", "vita"} or n == "core.constitutional_brain")
 print("LEAKED=" + ",".join(leaked))

@@ -5221,8 +5221,8 @@ def eval_contextual_memory(criteria="v1"):
 
 # ── Emotional Memory Weighting (POST56) ─────────────────────────────────────
 
-EW_SOURCE_SHA = "76ba3041a49369e068104ba60a76669660916934f2bc986bbd8c053228f9bc04"
-EW_BEHAVIOR_SHA = "ddc969ef52f3b486a2bd8e01b9c53a7666982cff6519ce9a4468c5e83a6163b0"  # capturado uma única vez no monólito antes do move; 3.11 e 3.12
+EW_SOURCE_SHA = "b681dd368992ac41a5ed1b02911e1f661a1ce27b69a41c47015b47fe7299efe9"
+EW_BEHAVIOR_SHA = "530d76ffdd5af82af9f08d2c7673ee69fadb1aedc5f4bd9035514408b9a2161f"  # re-fixado uma única vez na correção de EW3/EW4 (3.11 e 3.12 idênticos); o do move era ddc969ef…63b0
 _EW_NAMES = ("EmotionalMemoryWeight", "RealEmotionalMemoryWeighting")
 _EW_MARKER = "# MÓDULO 56: EMOTIONAL MEMORY WEIGHTING (POST 56)"
 _EW_END = '            "weighted_memories": len(self.emotional_weights)\n        }'
