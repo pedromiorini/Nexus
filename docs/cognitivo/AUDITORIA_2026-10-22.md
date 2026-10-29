@@ -2174,3 +2174,32 @@ Pré-registro escrito **antes** do move, **antes** do contrato novo de extraçã
 ### Errata E1 ao pré-registro EW1–EW6 (escrita antes do contrato RED, antes do move e antes de qualquer resultado de pass/fail ser usado)
 
 Ao escrever o harness, a primeira execução do fingerprint **no monólito** (única instância existente do bloco) mostrou que a **precondição de EW2** (`scenario_invalid`: intensidades, `arousal`s e `|valence|` distintos por ≥ `1e-3`) falhava em **2 das 20 seeds** com um único sorteio de 10 memórias por seed (a chance de um par próximo entre 10 valores uniformes é ≈ 4,5 % por atributo). Isto é um defeito do **protocolo de sorteio** (como o de um cenário mal construído), não do bloco. Em todas as 20 seeds (inclusive as 2 inválidas) a medida de EW2 deu 20/20; nenhum limite, seed, grade ou valor esperado mudou. Correção do protocolo, sem alterar o limiar de nenhum critério: em cada seed, se a precondição falha, sorteia-se **de novo na mesma sequência** de `random.Random(seed)` (até 50 vezes; passar disso volta a ser `scenario_invalid`, saída 3). As 18 seeds válidas no primeiro sorteio não mudam; as 2 restantes usam o sorteio seguinte (3 redraws no total). A medida de EW3 e EW4 (0/20 e 0/20 na primeira execução, como previsto) e todos os valores de EW5 (idênticos aos registrados, sem exceção) não dependem deste ponto. Registrado aqui para que o limiar e o número de seeds fiquem congelados como antes.
+
+### Resultados da extração de Emotional Memory Weighting (depois do pré-registro `2bc92d8` e da errata E1)
+
+Sequência no branch `grok/emotional-memory-weighting-20261029`: pré-registro `2bc92d8` → errata E1 `6941f63` → contrato RED `fc398d3` → move-only `56153ad`. Nota sobre a errata E1: o título dela diz "antes de qualquer resultado de pass/fail ser usado", mas a primeira captura no monólito, que revelou a precondição de EW2, também mostrou EW3 0/20 e EW4 0/20 (já previstos pelos itens (i) e (ii) da leitura). A errata só trata da precondição de EW2 (redraw); limiares, seeds e esperados não mudaram.
+
+**RED (antes do move):** `python -m unittest test_emotional_memory_weighting_contract` → 14 testes, 6 erros (`ModuleNotFoundError: core.cognitivo.emotional_memory_weighting`), 8 passam (caracterização do monólito); `tools/cognitivo_eval.py --capability emotional_memory` → exit 1 pelo mesmo motivo.
+
+**Move:** `EmotionalMemoryWeight` e `RealEmotionalMemoryWeighting` movidos byte a byte (SHA-256 da fonte `76ba3041…bc04`, igual ao pré-registrado) para `core/cognitivo/emotional_memory_weighting.py`; o monólito e `core/cognitivo/__init__.py` reexportam (objetos idênticos). Fingerprint de comportamento `ddc969ef…63b0` capturado uma vez no monólito (3.11 e 3.12) e idêntico depois do move.
+
+| Critério | Resultado | Valor |
+|---|---|---|
+| EW1 grade de 120 instâncias vs referência independente | **passa** | 120/120; 0 entradas alteradas |
+| EW2 monotonia (seeds 0..19) | **passa** | 20/20 (rate 1.0); 3 redraws (errata E1); 0 inválidas |
+| EW3 limites com entrada fora do domínio | **FALHA (previsto)** | 0/20; controle dentro do domínio 0 violações |
+| EW4 memórias emocionais moderadas antes das sem rótulo | **FALHA (previsto)** | 0/20 |
+| EW5 valores exatos (contadores, colaboradores, categorias, perfil, prioridade, gaps, erros) | **passa** | todas as tabelas iguais |
+| EW6 SHA da fonte, SHA de comportamento, identidade, isolamento (AST) | **passa** | fonte `76ba3041…`, comportamento `ddc969ef…`, relógio `time.time` |
+
+Harness: exit 1 (EW3 e EW4), idêntico em 3.11 e 3.12. EW3 e EW4 **não** foram corrigidos (lacunas de comportamento, fora de escopo do move).
+
+**Negativos (códigos de saída do harness):** capability ausente, vazia, `"   "`, `emotional-memory`, `Emotional_Memory`, `emotional`, `emotional_memory2` → exit 2; `scenario_invalid` → exit 3 (teste com avaliador forçado); golden de comportamento ou de fonte errado → EW6 falha e exit 1.
+
+**Gates locais (todos por código de saída, `set -o pipefail`):**
+- Suíte completa: 790 testes OK em Python 3.11 e em 3.12 (14 novos).
+- ruff e compileall: OK. `reality_audit` + `git diff --exit-code`: OK. `validar_registro`: OK.
+- Cobertura: `core/cognitivo/*` 98 % (limite 90; `emotional_memory_weighting.py` 99 %); `constitutional_brain.py` 68 % (limite 62).
+- `cognitivo_mutation`: 459 declarados, 459 mortos, 0 sobreviventes, 0 não aplicados (+68 de EW: 65 de comportamento, 3 de reexport/isolamento).
+- Bandit: 131 achados, 0 MEDIUM/HIGH; `security_triage --check`, `embedded_assert_audit`, `implementation_gap_audit`: OK.
+- `targeted_mutation`: 80 declarados, 80 mortos, 0 sobreviventes (score 100 %); `tools/targeted_mutation.py` não foi tocado.
