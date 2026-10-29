@@ -5232,6 +5232,133 @@ _EW_GRID_SIZE = 120
 _EW_SEEDS = tuple(range(20))
 _EW_LIMIT = 0.90
 _EW_MAX_REDRAWS = 50
+_EW_SECTIONS = ("prios", "rets", "consol", "profiles", "stats")
+_EW_MIN_UNAFFECTED = 400
+_EW_BASE_ROWS_SHA = "0e323b7b504eac408f5487eb89b7a491ef9cfafa1418f2aee2b9d27c297b6878"
+# resumo (8 hex por seção, 5 seções por linha) de cada linha da grade de EW1 no código base d15b50e, capturado antes
+# da correção (EW9)
+_EW_BASE_ROWS = (
+    "310b333397f869b26ee3f8c52157d07326c7cab1",
+    "2e55727f9817b1a50cb6f828d0625f3e4ff86801",
+    "7840331b84a676689f1d9c906f87a4900d932f05",
+    "12d299c08e50007105765ab81ba55e6091ce034a",
+    "e7591f52cf1cbb66fe12b4d58b4a5aa9fb8be5e7",
+    "a7686e6814247c562867bfff9db09534cf67ce79",
+    "a17eb3603112210d03f8947e8065761d05130c66",
+    "6f93281ca68309608c0c8732336cfefaa4ffd322",
+    "e5b8bc28f865256cbf8ed4931b972bedd63ba871",
+    "3dfa6dab70928d64b75ebe97934c5bdee8908c10",
+    "4ef6427e5fd6c8f18f2c07711a58e847e92798d3",
+    "389f0741905330ca01c205533288717107ac2a97",
+    "e19c84c07f9f38237c5dd321a3c0c60b4efd09cf",
+    "75ee87d3f865256c08638f79d517f26578fd8f50",
+    "cf1cbb663be7674e9b39f2ef72de4f521790646b",
+    "d01b0c84cf1cbb662109031f0a1538c2b07f0cce",
+    "5d2f7f51cf1cbb669275917dc05e7f5fdb5adfc6",
+    "5eb1423dfc857875379c7462e4fd1d8e2d8719eb",
+    "e9202632f865256cc647af9d0c4fcc7f7a6ca987",
+    "297abf5ccf1cbb6608638f79d517f26578fd8f50",
+    "3b7531067f6ffda92954c9930626c2d71f8e0dac",
+    "3d73f6fd434f7043652ab2bab7a5b9be4cc03081",
+    "7dc46205cf1cbb6608638f79d517f26578fd8f50",
+    "7b267b74ddbbb049c8b43d2b103fdbd6f11f5474",
+    "9f9dc9b2b2025860f88055c4eda43325f8f94a78",
+    "88c45b758fcf05ca250627117291bb6584dbe90a",
+    "bb43a6af8156f43054891ebd8349783ff5b94250",
+    "a02ab543cf1cbb66775ffb392bcb4782cf23835b",
+    "f9a523a3cf1cbb6608638f79d517f26578fd8f50",
+    "38a2ec10db407f113a6430a4f2905455f480f3a5",
+    "0826fa0a875ec84e62b8e49099749447fc91bf8f",
+    "d910db1df865256c08638f79d517f26578fd8f50",
+    "86baa1bad03a873ad6f44536616b4fd4ff433992",
+    "c660c66ccf1cbb6685b34efaf76ddb4cd638baaa",
+    "a6e13b07f865256c08638f79d517f26578fd8f50",
+    "688f3c6ca683096008638f79d517f26578fd8f50",
+    "81cab8d60c0a7021a808d63697e9012bbb95399b",
+    "3e9f9ecc259ca59fb25dc3576efe852bab833336",
+    "b52c7a4acf1cbb666108436283276f3e133460a8",
+    "0c9288f1f865256c9853c979a908bd8a7231d4f4",
+    "d9f268da8bd7863ae96b1d16a2938185603cd11a",
+    "1c0f50c4dad158ef15d1ab65a238944ca29b5a36",
+    "2d7e2980a683096064c746bf83d7d95d72e1b501",
+    "9e97316438f63fe9c55828b6599bc5d9e4cff36d",
+    "2fc1c1a7a683096039d67de126b45ca86ce08ded",
+    "0de00f25043f347c0047e39a6b93418c5ccdb557",
+    "9e3c669ce7fa30b8c6334da69cdf2654d440642f",
+    "9c7aa1e4f865256c08638f79d517f26578fd8f50",
+    "d68618c8f865256c9ff484d5f5c22f81aac0dade",
+    "01734e122da1c4107bcf4c89d574bb8ea0a94a88",
+    "6ff67aefcf1cbb66a392da952ab022d8b4cfeec6",
+    "b01fa93ecf1cbb660070ee5854cde796eb8c19ba",
+    "fdc73ab9db407f1105a925357cd627655e15bf68",
+    "aec57156cf1cbb6608638f79d517f26578fd8f50",
+    "7fecc19c77471ebef4823fbf936b28a4b04e4e34",
+    "3258c7b0a683096008638f79d517f26578fd8f50",
+    "05afe40bcf1cbb6676ad43a82d8feca09f5a7828",
+    "adf8e514cf1cbb6628be47f9612b48e21ad2751d",
+    "a0f27b3ef865256c47adc79c914c8c41cfa48377",
+    "61c0f019cf1cbb6684e91e77feb075278c372a82",
+    "cf1cbb660c1ec314a0898d8f73a42bd828bbfaf6",
+    "41e90367b3ccb99ed92a7e519b729322111f47dc",
+    "b16e6d202422702880c4bf58a3bdd5990f67e318",
+    "0ad6ca8c64b19b28045395dcc5f6fe3721e8c670",
+    "7fcbe29fcf1cbb66af071c30983d12228323c7b1",
+    "69e096b4c65527ebef7fea0968fba584fd79a684",
+    "09e263e1a56c100faa0e9d9f58cb8d6828186e86",
+    "319a4ac0cf1cbb664c2dcf3292363a2dae6880d7",
+    "3fd7a19559c84230bea7b724ea776c0997b93033",
+    "dbc20977cf1cbb6634bb1822ad8f8807d632c8f0",
+    "559117a8ccba43379329049f7a662f21a5b16de5",
+    "d54a2de7938773f43099e90fd88b9eeffa96f981",
+    "bb128edc77471ebe43d37dd681676d6b8488185c",
+    "0cbcc3a2dd01449c172926a209e562342d36eddb",
+    "2dc5fa073b7a0ff338908ce12db8ecd454b7203f",
+    "11786d46cf1cbb6608638f79d517f26578fd8f50",
+    "664bb1dc21240bf60c86a2eeafc4b7b9f5504d04",
+    "6292a718cf1cbb6608638f797deeaf0287f15abd",
+    "ffd9608dcf1cbb6608638f79bbc3922a12e33313",
+    "a2b65f630da37cb9edbb904eaf5614fc382042fb",
+    "f1de00ecf865256c777a314eb46fc6b1e444938e",
+    "4fd6dba594d37cdb75ddd1359a38affacc5006e6",
+    "383fbca8043f347c49c76dbf7fba0b22f85fe06a",
+    "74941c9f262b6c5b8cc6d1b56f70ccd562a28a1d",
+    "5e6e415fcf1cbb666a06ca8343c347778eece3ff",
+    "ee22c4201d7b6be7dd8ad2b965bd5e49fb3ca192",
+    "7a6d90b8cf1cbb66f7e30373a678cc64ef1e9166",
+    "090712adcd237dbf3d86db963047538c4c2abb5f",
+    "17bde1cca6830960149a2fb54050ebc1a925d42a",
+    "5feb4d29cf1cbb66cc0e0d05ebefd5e9d25dff6f",
+    "b070afe8cf1cbb662965afa29d4e0b6e3a0303e1",
+    "20acfedda6830960c467336f028dac033109a527",
+    "bbddb71053e4390aeb3debd28977623a5c057bb7",
+    "83c9688ba6830960f7ac372b7fb689f8348d6250",
+    "729b9293cf1cbb662dc6b0a118e2c0363e9f50b1",
+    "998a5aca31a66888d6d925ed76d91d6e509bff8b",
+    "033d8e14cf1cbb665fce015dd410d52067ca32c8",
+    "cf1cbb66a683096008638f79d517f26578fd8f50",
+    "b9c7b118cf1cbb66ba73e798608d79ff0330ca07",
+    "5cf80023f2972d0f4b05eaad60c0ab746a59d7e5",
+    "4bfb9b2fcf1cbb66afd51c7e754194dac67ad184",
+    "09c02a01a683096008638f79d517f26578fd8f50",
+    "87855a05cf1cbb662fe3780d7774340e374f995f",
+    "1a54a026cf1cbb66a6b15a6429876f60238c2265",
+    "cf1cbb66bc6dfec5411fe8dc407175e4c9ac04db",
+    "8b46696ca683096008638f79d517f26578fd8f50",
+    "a8579fe48201ae1b0bb819f3f1530cdd419ba808",
+    "a6830960f865256cb1f0d684d9b1c0c0e75253f1",
+    "1dd77fcef865256c08638f79d517f26578fd8f50",
+    "272864e3196f20904ad781f01f237d2b37101343",
+    "6ecce220cf1cbb66a99cc3086daac50a6b49f3d0",
+    "c362b227119b714d0daa4055851d4362512ee6fc",
+    "05c6120ba683096008638f79d517f26578fd8f50",
+    "62cb4f6576671660e3042f80b76c9bc19c18770e",
+    "0d86873107a74bb15a50805370489016ff91945a",
+    "d48662411a349c12dc933bf1287ef4832d9677e1",
+    "25f17e628201ae1bef4ddf166b0bf4311a25140c",
+    "cf1cbb66d663b1630158050572ca380f7a31884d",
+    "cf1cbb66a68309602a6d65a8c53731ac062ae789",
+    "a0671241cf1cbb66cd785f60d9ca558cc8be1c1a",
+)
 
 
 def _ew_spread(values):
@@ -5265,21 +5392,23 @@ _EW_PROFILE_EXPECTED = {
              "emotional_category"],
 }
 _EW_PRIORITY_EXPECTED = {
-    "mixed": {"order": [10, 11, 12], "scores": [1.0, 0.6, 0.0]},
-    "duplicates": [[5, 1.0], [5, 1.0]],
+    "mixed": {"order": [11, 10, 12], "scores": [0.6, 0.0, 0.0]},
+    "duplicates": [[5, 0.0], [5, 0.0]],
     "stable_ties": [3, 1, 2],
     "query": {"none": 0.828402076, "same_valence": 1.491123737, "mid_valence": 1.159762907,
               "opposite_valence": 0.828402076, "arousal_only": 0.828402076},
 }
 _EW_GAPS_EXPECTED = {
-    "out_of_range": {"intensity": 2.549509757, "boost": 5.0, "priority": 3.824264635},
-    "negative_arousal": {"boost": -1.0, "intensity": 0.707106781},
+    "out_of_range": {"intensity": 1.0, "boost": 3.0, "priority": 1.5},
+    "negative_arousal": {"boost": 1.0, "intensity": 0.0},
     "nan_accepted": True,
     "bool_accepted": {"intensity": 1.0, "boost": 3.0},
     "retag": {"total": 2, "weighted": 1, "high_arousal": 2},
     "decay_rate_occurrences": 1,
     "retrieve_limits": {"negative_limit": [1, 2], "zero_limit": [], "negative_threshold": [],
                         "threshold_inclusive": [1, 2]},
+    "query_valence_unclamped": -2.1,
+    "neutral_ties_unlabeled": {"unlabeled_first": [10, 12], "neutral_first": [12, 10]},
 }
 _EW_ERRORS_EXPECTED = {
     "tag_no_args": "TypeError", "tag_no_context": "TypeError", "tag_valence_str": "TypeError",
@@ -5293,6 +5422,43 @@ _EW_ERRORS_EXPECTED = {
     "prioritize_query_str_untagged": "no-error", "prioritize_query_int_untagged": "no-error",
     "retrieve_target_str_empty": "no-error", "retrieve_limit_none": "no-error",
     "profile_none": "no-error", "consolidate_none": "no-error",
+}
+
+
+_EW_B = [-1.0, 0.0, 0.707106781, 1.0, 1.060660172]
+_EW_CLAMP_EXPECTED = {
+    "i1": [1.0, 1.0, 1.0, 3.0, 1.5], "i2": [-1.0, 1.0, 1.0, 3.0, 1.5], "i3": [0.0, 0.0, 0.0, 1.0, 0.0],
+    "i4": _EW_B, "i5": [1.0, 0.5, 0.790569415, 2.0, 1.185854123], "i6": [0.5, 1.0, 0.790569415, 3.0, 1.185854123],
+    "i7": [1.0, 1.0, 1.0, 3.0, 1.5], "i8": _EW_B, "i9": [0.3, 0.4, 0.353553391, 1.8, 0.530330086],
+    "i10": [1.0, 0.0, 0.707106781, 1.0, 1.060660172], "i11": [-1.0, 1.0, 1.0, 3.0, 1.5],
+    "i12": {"weight": _EW_B, "high": 0},
+    "i13": {"weight": [0.4, 1.0, 0.761577311, 3.0, 1.142365966], "high": 1},
+    "i14": {"over_int": ["float", "float", 1.0, 1.0], "edge_int": ["int", "int", 1, 1],
+            "edge_int_low": ["int", "int", -1, 0], "bool": ["bool", "bool", 1, 1]},
+    "i15": {"nan_valence": {"weight": ["nan", 0.5, "nan", 2.0, "nan"], "error": "no-error"},
+            "nan_arousal": {"weight": [0.2, "nan", "nan", "nan", "nan"], "error": "no-error"}},
+    "i16": True,
+    "i17": {"stats": {"total_emotional_memories": 2, "avg_emotional_intensity": 0.5, "high_arousal_count": 1,
+                      "weighted_memories": 2}, "boost": [3.0, 1.0]},
+    "i18": {"p1": ["excited_positive", 1.0, 1.0], "p2": ["sad_negative", -1.0, 0.0]},
+    "i19": {"up": [1], "down": [1]},
+    "i20": [["TypeError", True]] * 4,
+    "i21": [0.0, 0.0, 0.0, 1.0, 0.0],
+}
+_EW_RANK_EXPECTED = {
+    "r1": [[3, 0.0], [1, 0.0], [2, 0.0]],
+    "r2": [[11, 0.6], [10, 0.0], [12, 0.0]],
+    "r3": [[[12, 0.0], [10, 0.0]], [[10, 0.0], [12, 0.0]]],
+    "r4": [[5, 0.0], [5, 0.0]],
+    "r5": [[20, 1.159762907], [21, 0.0]],
+    "r6": [[31, 0.015], [30, 0.0]],
+    "r7": [[4, 0.75], [3, 0.679153885], [2, 0.382426464], [1, 0.237170825], [0, 0.15],
+           [5, 0.0], [6, 0.0], [7, 0.0], [8, 0.0], [9, 0.0]],
+    "r8": [[40, 0.3], [41, 0.0]],
+    "r9": [[[41, 0.0]]] * 4,
+    "r10": {"no_weights": True, "counters_same": True, "input_same": True},
+    "r11": [],
+    "r12": [[50, 1.5], [51, 0.0]],
 }
 
 
@@ -5358,13 +5524,16 @@ def _ew_ref_category(v, a):
             ("mid", "pos"): "pleasant", ("mid", "neg"): "unpleasant", ("mid", "zero"): "neutral"}[(band, side)]
 
 
-def _ew_reference(row):
+def _ew_reference(row, legacy=False):
+    """Referência independente. `legacy=True` é a v1 (sem limite do domínio, sem rótulo = 1.0), usada só em EW9."""
     emo, tags, prios, rets = row
     weights, total, high = {}, 0, 0
     for mid, ctx in tags:
         v, a = ctx.get("valence", 0.0), ctx.get("arousal", 0.0)
         if emo is not None and ctx.get("agent_id") in emo:
             v, a = emo[ctx["agent_id"]]
+        if not legacy:
+            v, a = max(-1.0, min(1.0, v)), max(0.0, min(1.0, a))
         inten = (v ** 2 + a ** 2) ** 0.5 / 2 ** 0.5
         weights[mid] = {"valence": v, "arousal": a, "intensity": inten, "boost": 1 + 2 * a, "priority": 1.5 * inten}
         total += 1
@@ -5375,7 +5544,7 @@ def _ew_reference(row):
         for mid in ids:
             w = weights.get(mid)
             if w is None:
-                scored.append((mid, 1.0))
+                scored.append((mid, 1.0 if legacy else 0.0))
                 continue
             score = w["priority"]
             if query and "valence" in query:
@@ -5448,6 +5617,122 @@ def _ew_row_digest(view):
         "consol": [r(x) for x in view["consol"]],
         "profiles": [{k: r(v) for k, v in p.items()} for p in view["profiles"]],
         "stats": {k: r(v) for k, v in view["stats"].items()}})
+
+
+def _ew_sections(view):
+    def r(value):
+        return round(value, 12) if isinstance(value, float) else value
+    return {"prios": [[(i, r(s)) for i, s in rows] for rows in view["prios"]], "rets": view["rets"],
+            "consol": [r(x) for x in view["consol"]],
+            "profiles": [{k: r(v) for k, v in p.items()} for p in view["profiles"]],
+            "stats": {k: r(v) for k, v in view["stats"].items()}}
+
+
+def _ew_num(value):
+    return "nan" if value != value else round(value, 9)
+
+
+def _ew_weight(weight):
+    return [_ew_num(weight.valence), _ew_num(weight.arousal), _ew_num(weight.emotional_intensity),
+            _ew_num(weight.consolidation_boost), _ew_num(weight.recall_priority)]
+
+
+def _ew_tag(cls, valence, arousal, mid=1, **kwargs):
+    system = _ew_system(cls, **kwargs)
+    return system, system.tag_memory_emotionally(mid, {"valence": valence, "arousal": arousal})
+
+
+def _ew_clamp_items(cls):
+    """EW7: limite do domínio (21 itens pré-registrados)."""
+    from types import SimpleNamespace
+    inf, nan = float("inf"), float("nan")
+    out = {}
+    pairs = {"i1": (3.0, 2.0), "i2": (-3.0, 2.0), "i3": (0.0, -1.0), "i4": (-5.0, -5.0), "i5": (1.5, 0.5),
+             "i6": (0.5, 1.5), "i7": (1.0, 1.0), "i8": (-1.0, 0.0), "i9": (0.3, 0.4), "i10": (inf, -inf),
+             "i11": (-inf, inf)}
+    for key, (v, a) in pairs.items():
+        out[key] = _ew_weight(_ew_tag(cls, v, a)[1])
+    for key, (pleasure, arousal) in (("i12", (-2.0, -0.6)), ("i13", (0.4, 1.7))):
+        system = _ew_system(cls, emotion_system=SimpleNamespace(
+            emotional_states={"a1": SimpleNamespace(pleasure=pleasure, arousal=arousal)}))
+        weight = system.tag_memory_emotionally(1, {"valence": 0.2, "arousal": 0.1, "agent_id": "a1"})
+        out[key] = {"weight": _ew_weight(weight), "high": system.high_arousal_count}
+
+    def kinds(v, a):
+        weight = _ew_tag(cls, v, a)[1]
+        return [type(weight.valence).__name__, type(weight.arousal).__name__, _ew_num(weight.valence),
+                _ew_num(weight.arousal)]
+
+    out["i14"] = {"over_int": kinds(2, 2), "edge_int": kinds(1, 1), "edge_int_low": kinds(-1, 0),
+                  "bool": kinds(True, True)}
+    nan_v, nan_a = _ew_system(cls), _ew_system(cls)
+    err_v = _ew_err(lambda: nan_v.tag_memory_emotionally(1, {"valence": nan, "arousal": 0.5}))
+    err_a = _ew_err(lambda: nan_a.tag_memory_emotionally(1, {"valence": 0.2, "arousal": nan}))
+    out["i15"] = {"nan_valence": {"weight": _ew_weight(nan_v.emotional_weights[1]), "error": err_v},
+                  "nan_arousal": {"weight": _ew_weight(nan_a.emotional_weights[1]), "error": err_a}}
+    ctx = {"valence": 3.0, "arousal": 2.0}
+    _ew_system(cls).tag_memory_emotionally(1, ctx)
+    out["i16"] = ctx == {"valence": 3.0, "arousal": 2.0}
+    system = _ew_system(cls)
+    system.tag_memory_emotionally(1, {"valence": 3.0, "arousal": 2.0})
+    system.tag_memory_emotionally(2, {"valence": 0.0, "arousal": -1.0})
+    out["i17"] = {"stats": {k: _ew_num(v) for k, v in system.get_statistics().items()},
+                  "boost": [system.consolidate_emotional_memory(1), system.consolidate_emotional_memory(2)]}
+    system = _ew_system(cls)
+    system.tag_memory_emotionally(1, {"valence": 3.0, "arousal": 2.0})
+    system.tag_memory_emotionally(2, {"valence": -3.0, "arousal": -2.0})
+    p1, p2 = system.get_emotional_profile(1), system.get_emotional_profile(2)
+    out["i18"] = {"p1": [p1["emotional_category"], _ew_num(p1["valence"]), _ew_num(p1["arousal"])],
+                  "p2": [p2["emotional_category"], _ew_num(p2["valence"]), _ew_num(p2["arousal"])]}
+    up, down = _ew_tag(cls, 3.0, 0.0)[0], _ew_tag(cls, -3.0, 0.0)[0]
+    out["i19"] = {"up": up.retrieve_by_valence(1.0, threshold=0.0),
+                  "down": down.retrieve_by_valence(-1.0, threshold=0.0)}
+    errors = []
+    for bad in ({"valence": "a"}, {"valence": None}, {"valence": [1]}, {"arousal": "a"}):
+        system = _ew_system(cls)
+        errors.append([_ew_err(lambda: system.tag_memory_emotionally(1, bad)),
+                       system.emotional_weights == {} and system.total_emotional_memories == 0])
+    out["i20"] = errors
+    out["i21"] = _ew_weight(_ew_system(cls).tag_memory_emotionally(1, {}))
+    return out
+
+
+def _ew_rank_items(cls):
+    """EW8: pontuação da memória sem rótulo e ordem (12 itens pré-registrados)."""
+    def pr(system, ids, query=None):
+        return [[mid, _ew_num(score)] for mid, score in system.prioritize_recall(ids, query)]
+
+    def tagged(*specs):
+        system = _ew_system(cls)
+        for mid, v, a in specs:
+            system.tag_memory_emotionally(mid, {"valence": v, "arousal": a})
+        return system
+
+    out = {"r1": pr(_ew_system(cls), [3, 1, 2])}
+    mixed = tagged((11, 0.4, 0.4), (12, 0.0, 0.0))
+    out["r2"] = pr(mixed, [10, 11, 12])
+    out["r3"] = [pr(mixed, [12, 10]), pr(mixed, [10, 12])]
+    out["r4"] = pr(_ew_system(cls), [5, 5])
+    out["r5"] = pr(tagged((20, 0.5, 0.6)), [21, 20], {"valence": 0.0})
+    out["r6"] = pr(tagged((31, 0.01, 0.01)), [30, 31])
+    pairs = ((0.1, 0.1), (0.2, 0.1), (0.3, 0.2), (0.4, 0.5), (0.5, 0.5))
+    out["r7"] = pr(tagged(*[(m, v, a) for m, (v, a) in enumerate(pairs)]), list(range(10)))
+    out["r8"] = pr(tagged((40, -1.0, 1.0)), [41, 40], {"valence": 1.0})
+    fresh = _ew_system(cls)
+    out["r9"] = [pr(fresh, [41], query) for query in (None, {}, {"valence": 0.5}, {"arousal": 0.9})]
+    system = tagged((1, 0.3, 0.3))
+    ids = [7, 8, 1]
+    before = (dict(system.emotional_weights), system.total_emotional_memories, system.avg_emotional_intensity,
+              system.high_arousal_count)
+    ids_copy = list(ids)
+    system.prioritize_recall(ids, {"valence": 0.2})
+    after = (dict(system.emotional_weights), system.total_emotional_memories, system.avg_emotional_intensity,
+             system.high_arousal_count)
+    out["r10"] = {"no_weights": set(system.emotional_weights) == {1}, "counters_same": before == after,
+                  "input_same": ids == ids_copy}
+    out["r11"] = pr(_ew_system(cls), [])
+    out["r12"] = pr(tagged((50, 3.0, 2.0)), [51, 50])
+    return out
 
 
 def _ew_in_bounds(weight):
@@ -5530,7 +5815,7 @@ def _ew_fingerprint_body(cls, weight_cls, copy, inspect):
 
     # grade (EW1)
     matches = mutated = meta_bad = 0
-    digests = []
+    digests, section_digests, unaffected = [], [], []
     for row in _ew_grid():
         snapshot = copy.deepcopy(row)
         view, meta_ok = _ew_run(cls, row)
@@ -5538,8 +5823,13 @@ def _ew_fingerprint_body(cls, weight_cls, copy, inspect):
         mutated += row != snapshot
         meta_bad += not meta_ok
         digests.append(_ew_row_digest(view))
+        sections = _ew_sections(view)
+        section_digests.append("".join(_ms_sha(sections[name])[:8] for name in _EW_SECTIONS))
+        old, new = _ew_sections(_ew_reference(row, legacy=True)), _ew_sections(_ew_reference(row))
+        unaffected.append([_ms_sha(old[name]) == _ms_sha(new[name]) for name in _EW_SECTIONS])
     grid_info = {"count": len(digests), "reference_matches": matches, "mutated_inputs": mutated,
-                 "meta_bad": meta_bad, "rows_sha": _ms_sha(digests)}
+                 "meta_bad": meta_bad, "rows_sha": _ms_sha(digests),
+                 "section_digests": section_digests, "unaffected": unaffected}
     families = _ew_families(cls)
 
     # contadores
@@ -5641,6 +5931,10 @@ def _ew_fingerprint_body(cls, weight_cls, copy, inspect):
     rv_sys = _ew_system(cls)
     for mid, valence in ((1, 0.0), (2, 0.1), (3, 0.2)):
         rv_sys.tag_memory_emotionally(mid, {"valence": valence, "arousal": 0.0})
+    q_gap_sys = _ew_system(cls)
+    q_gap_sys.tag_memory_emotionally(1, {"valence": -1.0, "arousal": 1.0})
+    tie_sys = _ew_system(cls)
+    tie_sys.tag_memory_emotionally(12, {"valence": 0.0, "arousal": 0.0})
     gaps = {
         "out_of_range": {"intensity": round(over.emotional_intensity, 9), "boost": over.consolidation_boost,
                          "priority": round(over.recall_priority, 9)},
@@ -5654,6 +5948,9 @@ def _ew_fingerprint_body(cls, weight_cls, copy, inspect):
                             "zero_limit": rv_sys.retrieve_by_valence(0.0, threshold=0.3, limit=0),
                             "negative_threshold": rv_sys.retrieve_by_valence(0.0, threshold=-0.1),
                             "threshold_inclusive": rv_sys.retrieve_by_valence(0.0, threshold=0.1)},
+        "query_valence_unclamped": round(q_gap_sys.prioritize_recall([1], {"valence": 3.0})[0][1], 9),
+        "neutral_ties_unlabeled": {"unlabeled_first": [m for m, _s in tie_sys.prioritize_recall([10, 12])],
+                                   "neutral_first": [m for m, _s in tie_sys.prioritize_recall([12, 10])]},
     }
 
     def tagged():
@@ -5709,6 +6006,8 @@ def _ew_fingerprint_body(cls, weight_cls, copy, inspect):
         "priority": priority,
         "gaps": gaps,
         "errors": errors,
+        "clamp": _ew_clamp_items(cls),
+        "ranking": _ew_rank_items(cls),
     }
 
 
@@ -5745,7 +6044,7 @@ def _emotional_memory_standalone() -> bool:
 
 
 def eval_emotional_memory(criteria="v1"):
-    """EW1–EW6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    """EW1–EW9. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
     import core.cognitivo.emotional_memory_weighting as emotional_memory
     import core.constitutional_brain as brain
     import core.cognitivo as package
@@ -5785,6 +6084,16 @@ def eval_emotional_memory(criteria="v1"):
         and gap_hits == len(_EW_GAPS_EXPECTED) == len(gaps)
         and error_hits == len(_EW_ERRORS_EXPECTED) == len(errors)
     )
+    ew7 = payload["clamp"] == _EW_CLAMP_EXPECTED
+    ew8 = payload["ranking"] == _EW_RANK_EXPECTED
+    base_ok = (len(_EW_BASE_ROWS) == _EW_GRID_SIZE == len(grid["section_digests"])
+               and all(len(row) == 40 for row in _EW_BASE_ROWS)
+               and _ms_sha(list(_EW_BASE_ROWS)) == _EW_BASE_ROWS_SHA)
+    free = [(i, k) for i, flags in enumerate(grid["unaffected"]) for k, flag in enumerate(flags) if flag]
+    drift = [(i, k) for i, k in free if base_ok and grid["section_digests"][i][8 * k:8 * k + 8]
+             != _EW_BASE_ROWS[i][8 * k:8 * k + 8]]
+    ew9_invalid = not base_ok or len(free) < _EW_MIN_UNAFFECTED
+    ew9 = not ew9_invalid and not drift
     ew6 = (
         identity and standalone and source_sha == EW_SOURCE_SHA
         and sha_module == sha_brain == EW_BEHAVIOR_SHA
@@ -5814,6 +6123,16 @@ def eval_emotional_memory(criteria="v1"):
                        "identity": identity, "standalone": standalone, "clock": payload["clock"],
                        "source_golden": EW_SOURCE_SHA, "behavior_golden": EW_BEHAVIOR_SHA},
                ew6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+        _check("EW7", {"hits": sum(payload["clamp"].get(k) == v for k, v in _EW_CLAMP_EXPECTED.items()),
+                       "total": len(_EW_CLAMP_EXPECTED), "clamp": payload["clamp"]},
+               ew7, "21/21 itens do limite do domínio de valência e ativação"),
+        _check("EW8", {"hits": sum(payload["ranking"].get(k) == v for k, v in _EW_RANK_EXPECTED.items()),
+                       "total": len(_EW_RANK_EXPECTED), "ranking": payload["ranking"]},
+               ew8, "12/12 itens da pontuação da memória sem rótulo e da ordem"),
+        _check("EW9", {"unaffected_sections": len(free), "minimum": _EW_MIN_UNAFFECTED, "drift": len(drift),
+                       "base_list_ok": base_ok},
+               ew9, "seções não afetadas idênticas ao código base (resumo por seção das 120 instâncias)",
+               **({"scenario_invalid": True} if ew9_invalid else {})),
     ]
 
 
