@@ -2203,3 +2203,120 @@ Harness: exit 1 (EW3 e EW4), idêntico em 3.11 e 3.12. EW3 e EW4 **não** foram 
 - `cognitivo_mutation`: 459 declarados, 459 mortos, 0 sobreviventes, 0 não aplicados (+68 de EW: 65 de comportamento, 3 de reexport/isolamento).
 - Bandit: 131 achados, 0 MEDIUM/HIGH; `security_triage --check`, `embedded_assert_audit`, `implementation_gap_audit`: OK.
 - `targeted_mutation`: 80 declarados, 80 mortos, 0 sobreviventes (score 100 %); `tools/targeted_mutation.py` não foi tocado.
+
+## Emotional Memory Weighting — correção de EW3 e EW4 (pré-registro EW7–EW9)
+
+**Autorização:** Pedro, mensagem pt126u (2026-10-29, «Prossiga»), depois da mescla do #128 (`main` em `d15b50e`): PR de comportamento separado, com novo pré-registro, corrigindo EW3 (limitar valência e ativação ao domínio válido) e EW4 (normalizar a pontuação da memória sem rótulo para que uma memória emocional moderada fique acima dela). Este PR é **draft e não será mesclado sem nova autorização**.
+
+**Regra desta rodada (declarada pelo Pedro): sem errata depois de rodar.** Se algum critério ou protocolo falhar (inclusive precondição, grade ou cenário inválido), o trabalho para e o relatório traz as opções; nada é ajustado depois da primeira execução. Por isso, **tudo o que depende de sorteio ou de contagem foi conferido antes do commit deste pré-registro**, só com aritmética pura e sem importar o módulo (ver «Únicas execuções prévias»).
+
+**Pré-registro escrito antes** do contrato RED, antes de qualquer mudança em `core/cognitivo/emotional_memory_weighting.py` e antes de executar o harness com o comportamento novo. **Únicas execuções prévias (declaradas):** (1) o código base inalterado (`d15b50e`), executado só para congelar o controle de não regressão de EW9 (resumo por seção das 120 instâncias da grade de EW1, repetido com `PYTHONHASHSEED` 1 e 77: mesma lista, SHA-256 `0e323b7b504eac408f5487eb89b7a491ef9cfafa1418f2aee2b9d27c297b6878`); (2) as referências independentes (`v1` = a atual; `v2` = a nova, escrita à parte no harness e **sem** chamar o módulo) aplicadas só à grade de entradas, para contar as seções não afetadas; (3) aritmética pura (`math`), sem importar o módulo, para calcular os valores de EW7 e EW8. Nenhum resultado de EW3/EW4 com comportamento novo foi lido. As medidas base de EW1–EW6 são as do #128 (EW1 120/120, EW2 20/20, EW3 0/20, EW4 0/20, EW5 todos os itens, EW6 6/6 com os SHA `76ba3041…bc04` e `ddc969ef…63b0`).
+
+### Hipóteses
+
+- **H-EW3v2:** o bloco aceita qualquer número em `valence`/`arousal`, e por isso `intensity > 1`, `recall_priority > 1.5` e `consolidation_boost` fora de `[1, 3]`. Se, **depois** da sobreposição pelo estado do agente e **antes** de qualquer cálculo ou gravação, `valence` for limitada a `[-1.0, 1.0]` e `arousal` a `[0.0, 1.0]` (os domínios que o próprio `EmotionalMemoryWeight` documenta), os três limites passam a valer para qualquer entrada numérica: ≥ 0.90 das 20 seeds de EW3, controle em 20/20.
+- **H-EW4v2:** uma memória sem rótulo vale `1.0` e uma emocional moderada vale `intensidade × 1.5 < 1.0`. Se a memória sem rótulo valer `0.0` (a mesma pontuação de uma memória marcada como neutra, intensidade `0`), toda memória marcada com intensidade `> 0` (e fator de consulta `> 0`) fica acima da sem rótulo: ≥ 0.90 das 20 seeds de EW4.
+- **Falsificação:** qualquer família de EW3/EW4 abaixo do alvo; qualquer critério EW7–EW9 fora do alvo; qualquer controle de não regressão diferente do congelado abaixo.
+- **Previsão (registrada, não vinculante):** todos os critérios passam (EW6 só depois do re-fixar declarado), o harness sai com 0. **No RED** (código de `main`): EW1, EW3, EW4, EW5, EW6, EW7 e EW8 falham; EW2 e EW9 passam; o harness sai com 1.
+
+### As mudanças (as únicas permitidas, só em `core/cognitivo/emotional_memory_weighting.py`)
+
+1. **Limite do domínio.** Novo método estático `RealEmotionalMemoryWeighting._clamp_to_domain(value, low, high)`: `low` se `value < low`; `high` se `value > high`; senão devolve o **próprio** `value` (mesmo objeto e mesmo tipo: `int` e `bool` dentro do domínio ficam como estão). Consequências **declaradas**: `NaN` passa **sem mudança** (as duas comparações dão falso); `±inf` vira o limite; `str`, `None`, lista etc. continuam levantando `TypeError` (a comparação com `float` levanta; sem peso gravado e sem contador alterado). Em `tag_memory_emotionally`, depois do bloco do estado do agente: `valence = self._clamp_to_domain(valence, -1.0, 1.0)` e `arousal = self._clamp_to_domain(arousal, 0.0, 1.0)`. O resto (fórmulas, `if arousal > 0.7`, contadores, `weight`) usa os valores limitados e não muda. O dicionário recebido **não** é alterado.
+2. **Pontuação da memória sem rótulo.** Em `prioritize_recall`, o ramo sem peso grava `(mem_id, 0.0)` em vez de `(mem_id, base_score)`. `base_score = 1.0` continua sendo o multiplicador do ramo com peso (nada muda ali), a consulta não afeta a memória sem rótulo, a ordenação (`sort(..., reverse=True)`, estável) e o retorno de **todos** os ids (repetidos inclusive) não mudam.
+3. **Docstring do módulo:** registra o que foi corrigido e os gaps que restam (o texto entra no SHA de fonte de EW6, re-fixado depois do GREEN).
+
+**Decisão sobre o domínio da ativação (declarada antes de ver qualquer número).** `arousal` é limitada a `[0.0, 1.0]`, como o comentário do dataclass diz (`0 (calmo) a 1 (excitado)`). O `EmotionalState` real usa PAD em `[-1, 1]`; um `arousal` PAD negativo vira `0.0` (reforço `1.0`, sem reforço negativo). Alternativa **descartada**: reescalar o PAD `(a + 1) / 2`, porque mudaria valores dentro do domínio (p.ex. `arousal 0.9` do estado do agente viraria `0.95`) e quebraria o contrato de EW5 e a não regressão de EW9.
+
+**Não escopo:** validar ou rejeitar `NaN` (passa; vira gap residual declarado); limitar a `valence` da **consulta** de `prioritize_recall` ou o `target_valence` de `retrieve_by_valence` (consulta fora de `[-1, 1]` ainda pode dar pontuação negativa; gap residual); fazer a memória neutra ficar acima da sem rótulo (empate `0.0` por ordem de entrada; gap residual); contagem dupla ao remarcar, `emotional_decay_rate` sem uso, `memory_system` nunca lido, contexto do agente sobrescrevendo o explícito, `limit` negativo e demais gaps de EW5 (**não mudam**); o chamador no orquestrador (`core/constitutional_brain.py` só reexporta e **não** é tocado; hoje usa só o conjunto de ids devolvido por `prioritize_recall`, não a pontuação); Axis, `tools/targeted_mutation.py`, testes do Axis e qualquer `versao_aceita`; #79, #115, #116 e os arquivos que eles alteram, exceto os relatórios de realidade gerados por `tools/reality_audit.py`; state docs; PRs congelados #38–#50, #60, #77.
+
+### Critérios (protocolo EW-v2; ids de EW1–EW6 mantidos; EW7–EW9 novos)
+
+Comando: `python tools/cognitivo_eval.py --capability emotional_memory`. Alvo: todos passam, código 0. **Não mudam:** a grade de EW1 (`Random(2056)`, 120 instâncias), as seeds `0..19` e as famílias de EW2–EW4 (inclusive o sorteio repetido de EW2 que já está em `main`), os limites 0.90, a tolerância `1e-12` e `_EW_MAX_REDRAWS = 50`. **Não há seed nova:** EW7 e EW8 são tabelas determinísticas; EW9 reutiliza a grade `Random(2056)`.
+
+| id | mudança declarada | critério |
+|---|---|---|
+| EW1 | a referência independente ganha as regras 2 e 3 abaixo (a antiga fica no harness como `v1`, usada só em EW9): (r2) `v`/`a` limitados com `max(-1.0, min(1.0, v))` e `max(0.0, min(1.0, a))` depois da sobreposição do agente; (r3) memória sem rótulo vale `0.0` | 120/120 iguais à referência nova; 0 entradas alteradas; timestamps válidos |
+| EW2 | **nenhuma** (não regressão) | ≥ 0.90 das 20 seeds, sem precondição inválida |
+| EW3 | **nenhuma no protocolo** (famílias A, B e controle, seeds `0..19`, os três limites) | ≥ 0.90 das 20 seeds; controle em 20/20 (senão `scenario_invalid`, saída 3) |
+| EW4 | **nenhuma no protocolo** (5 marcadas com `U(0.1, 0.5)`, 5 sem rótulo, as 5 primeiras posições são as marcadas; precondição: as 5 intensidades `> 0`) | ≥ 0.90 das 20 seeds |
+| EW5 | muda **só** o que está abaixo; os demais itens (contadores, colaboradores, categorias, perfil, `query`, 26 erros) **não mudam** | todos os itens |
+| EW6 | **os SHA de fonte e de comportamento são recalculados e re-fixados uma única vez, depois do GREEN** (declarado aqui; são detectores de mudança, não limites de hipótese). Valores base: fonte `76ba3041…bc04`, comportamento `ddc969ef…63b0` | reexport idêntico (mesmo objeto no monólito, em `core.cognitivo` e no módulo); módulo sem monólito/numpy/vita; SHA igual em 3.11 e 3.12; `time.time`, aleatoriedade, construtor, campos e banner iguais |
+| EW7 | novo: limite do domínio | 21 itens (abaixo), valores exatos (float arredondado em 9 casas). Alvo: 21/21 |
+| EW8 | novo: pontuação da memória sem rótulo e ordem | 12 itens (abaixo), valores exatos. Alvo: 12/12 |
+| EW9 | novo: não regressão contra o código base congelado | em cada uma das 120 linhas da grade, para cada uma das 5 seções (`prios`, `rets`, `consol`, `profiles`, `stats`) em que `v1` e `v2` dão o mesmo resultado (seção «não afetada»), o resumo da seção (`_ms_sha` do valor com floats em 12 casas, 8 primeiros hex) é igual ao do código base `d15b50e`; a lista dos 120 resumos (40 hex por linha, na ordem das seções) tem SHA-256 `0e323b7b504eac408f5487eb89b7a491ef9cfafa1418f2aee2b9d27c297b6878` (`json.dumps(lista).encode()`), que o harness confere antes de usá-la. **Guarda de validade:** pelo menos **400** seções não afetadas (contagem medida só nas referências: `prios` 9, `rets` 120, `consol` 100, `profiles` 100, `stats` 100 = 429); se houver menos ou o SHA da lista não bater, `scenario_invalid` (código 3). Alvo: 0 diferenças |
+
+**EW5 — o que muda.** `priority.mixed` (`10` sem rótulo, `11` `{0.4, 0.4}`, `12` `{0.0, 0.0}`; `prioritize_recall([10, 11, 12])`): ordem `[11, 10, 12]`, pontuações `[0.6, 0.0, 0.0]`; `priority.duplicates` `[[5, 0.0], [5, 0.0]]`; `priority.stable_ties` continua `[3, 1, 2]`. Gaps: `out_of_range` (`{3.0, 2.0}`) passa a `{intensity 1.0, boost 3.0, priority 1.5}`; `negative_arousal` (`{0.0, -1.0}`) passa a `{boost 1.0, intensity 0.0}`; `nan_accepted` `True`, `bool_accepted` `{1.0, 3.0}`, `retag`, `decay_rate_occurrences` `1` (o texto novo da classe **não** pode repetir o nome do atributo) e `retrieve_limits` **não mudam**; entram **dois gaps residuais**: `query_valence_unclamped` = `-2.1` (id marcado `{-1.0, 1.0}` e consulta `{"valence": 3.0}`: `1.5 × (1 + (1 − 4) × 0.8)`) e `neutral_ties_unlabeled` = `{"unlabeled_first": [10, 12], "neutral_first": [12, 10]}` (`10` sem rótulo, `12` marcado neutro, ambos `0.0`: a ordem de entrada decide).
+
+**EW7 — os 21 itens** (sistema novo por item, salvo nota; `(v, a)` = contexto; resultado = `(valence, arousal, intensity, boost, priority)`, com `boost = 1 + 2a`, `intensity = √(v²+a²)/√2`, `priority = 1.5 × intensity`):
+
+| # | entrada | esperado |
+|---|---|---|
+| 1 | `(3.0, 2.0)` | `(1.0, 1.0, 1.0, 3.0, 1.5)` |
+| 2 | `(-3.0, 2.0)` | `(-1.0, 1.0, 1.0, 3.0, 1.5)` |
+| 3 | `(0.0, -1.0)` | `(0.0, 0.0, 0.0, 1.0, 0.0)` |
+| 4 | `(-5.0, -5.0)` | `(-1.0, 0.0, 0.707106781, 1.0, 1.060660172)` |
+| 5 | `(1.5, 0.5)` | `(1.0, 0.5, 0.790569415, 2.0, 1.185854123)` |
+| 6 | `(0.5, 1.5)` | `(0.5, 1.0, 0.790569415, 3.0, 1.185854123)` |
+| 7 | `(1.0, 1.0)` (limites exatos) | `(1.0, 1.0, 1.0, 3.0, 1.5)` |
+| 8 | `(-1.0, 0.0)` (limites exatos) | `(-1.0, 0.0, 0.707106781, 1.0, 1.060660172)` |
+| 9 | `(0.3, 0.4)` (dentro do domínio) | `(0.3, 0.4, 0.353553391, 1.8, 0.530330086)` |
+| 10 | `(inf, -inf)` | `(1.0, 0.0, 0.707106781, 1.0, 1.060660172)` |
+| 11 | `(-inf, inf)` | `(-1.0, 1.0, 1.0, 3.0, 1.5)` |
+| 12 | estado do agente `a1` com `pleasure -2.0`, `arousal -0.6`; contexto `{0.2, 0.1, agent_id a1}` | `(-1.0, 0.0, 0.707106781, 1.0, 1.060660172)` e `high_arousal_count 0` (o limite vale **depois** da sobreposição) |
+| 13 | estado do agente `a1` com `pleasure 0.4`, `arousal 1.7` | `(0.4, 1.0, 0.761577311, 3.0, 1.142365966)` e `high_arousal_count 1` |
+| 14 | tipos: `(2, 2)` → valores `1.0`, `1.0` e tipos `float`; `(1, 1)` e `(-1, 0)` → valores iguais aos de entrada e tipos `int`; `(True, True)` → `valence is True` e tipo `bool` | todos como descrito (fora do domínio vira o limite `float`; dentro do domínio devolve o mesmo objeto) |
+| 15 | `NaN`: `(nan, 0.5)` → `valence` `NaN`, `arousal 0.5`, `intensity` `NaN`, `boost 2.0`; `(0.2, nan)` → `valence 0.2`, `arousal` `NaN`, `boost` `NaN`; nenhuma levanta erro | como descrito (política declarada: `NaN` passa) |
+| 16 | o dicionário `{valence: 3.0, arousal: 2.0}` passado | igual depois da chamada (sem mutação) |
+| 17 | `1` `(3.0, 2.0)`, `2` `(0.0, -1.0)`: `get_statistics`, `consolidate_emotional_memory` | `total 2`, `weighted 2`, `avg_emotional_intensity 0.5`, `high_arousal_count 1`; reforço do `1` = `3.0`, do `2` = `1.0` |
+| 18 | `get_emotional_profile`: `(3.0, 2.0)` e `(-3.0, -2.0)` | `excited_positive` com `valence 1.0`, `arousal 1.0`; `sad_negative` com `valence -1.0`, `arousal 0.0` |
+| 19 | `retrieve_by_valence(1.0, threshold=0.0)` após marcar `(3.0, 0.0)`; `retrieve_by_valence(-1.0, threshold=0.0)` após marcar `(-3.0, 0.0)` | `[id]` em ambos (a valência gravada é a limitada) |
+| 20 | erros: `valence` `"a"`, `None`, `[1]` e `arousal` `"a"` | `TypeError` nos quatro, e depois de cada um `emotional_weights == {}` e `total_emotional_memories == 0` |
+| 21 | contexto `{}` | `(0.0, 0.0, 0.0, 1.0, 0.0)` |
+
+**EW8 — os 12 itens** (pontuações arredondadas em 9 casas):
+
+| # | cenário | esperado |
+|---|---|---|
+| 1 | nenhum rótulo, `prioritize_recall([3, 1, 2])` | `[(3, 0.0), (1, 0.0), (2, 0.0)]` |
+| 2 | `11` `{0.4, 0.4}`, `12` `{0.0, 0.0}`, `10` sem rótulo; `[10, 11, 12]` | `[(11, 0.6), (10, 0.0), (12, 0.0)]` |
+| 3 | mesmo sistema; `[12, 10]` e `[10, 12]` | `[(12, 0.0), (10, 0.0)]` e `[(10, 0.0), (12, 0.0)]` (empate estável) |
+| 4 | `[5, 5]` sem rótulo | `[(5, 0.0), (5, 0.0)]` |
+| 5 | `20` `{0.5, 0.6}` marcado, `21` sem rótulo; consulta `{"valence": 0.0}`; `[21, 20]` | `[(20, 1.159762907), (21, 0.0)]` |
+| 6 | `31` `{0.01, 0.01}` marcado, `30` sem rótulo; `[30, 31]` | `[(31, 0.015), (30, 0.0)]` |
+| 7 | `0..4` marcados `(0.1, 0.1)`, `(0.2, 0.1)`, `(0.3, 0.2)`, `(0.4, 0.5)`, `(0.5, 0.5)`; `5..9` sem rótulo; `prioritize_recall([0, 1, …, 9])` | ordem `[4, 3, 2, 1, 0, 5, 6, 7, 8, 9]`; pontuações `[0.75, 0.679153885, 0.382426464, 0.237170825, 0.15, 0, 0, 0, 0, 0]` |
+| 8 | `40` `{-1.0, 1.0}` marcado, `41` sem rótulo; consulta `{"valence": 1.0}` (fator mínimo `0.2`); `[41, 40]` | `[(40, 0.3), (41, 0.0)]` |
+| 9 | `41` sem rótulo com consulta `None`, `{}`, `{"valence": 0.5}`, `{"arousal": 0.9}` | `[(41, 0.0)]` em todas |
+| 10 | `prioritize_recall` não cria peso nem muda contadores; a lista de ids de entrada não é alterada | `emotional_weights` e contadores iguais antes e depois; lista igual |
+| 11 | `prioritize_recall([])` | `[]` |
+| 12 | `50` marcado `(3.0, 2.0)`, `51` sem rótulo; `[51, 50]` | `[(50, 1.5), (51, 0.0)]` |
+
+**Regra:** nenhum limite, seed, tamanho, caso ou valor acima é alterado depois da primeira execução. A **única** coisa re-fixada é o par de SHA de EW6, e só depois do GREEN, como declarado. Se algum critério falhar (ou a guarda de EW9 ou a precondição de EW3/EW4 der `scenario_invalid`), o PR continua draft e as opções vão para o relatório, sem ajuste.
+
+### Regressão exigida e teste negativo
+
+EW1 (referência nova), EW2, EW3, EW4, EW5 (só o que a seção acima lista), EW7, EW8 e EW9 são a não regressão. O teste de integração do orquestrador (que só usa o conjunto de ids) e a suíte integrada continuam verdes.
+**Entrada inválida:** os 26 erros de EW5 não mudam de classe; EW7 item 20 acrescenta 4 `TypeError` sem efeito colateral. O harness continua saindo com **2** (`--capability` ausente, vazio ou desconhecido) e **3** (`scenario_invalid`: guarda ou lista base de EW9, precondição de EW2, EW3 ou EW4); um comportamento regredido (sem limite, sem fator, `1.0` para a memória sem rótulo) reprova EW1/EW3/EW4/EW5/EW7/EW8 e sai com **1**; um golden errado de EW6 sai com **1**. Cada caminho tem teste.
+
+### Varredura §7.2 (2026-10-29, `gh pr list --state open`)
+
+PRs abertos: #38–#50, #60, #77, #79, #115, #116. Nenhum edita `core/cognitivo/emotional_memory_weighting.py`, `test_emotional_memory_weighting_contract.py`, `tools/cognitivo_eval.py` nem este arquivo. **Sobreposições declaradas, de outros agentes em pausa:** #116 (Axis) altera `tools/cognitivo_mutation.py`, `AUDIT_REALITY_REPORT.md` e `audit_reality.json`; #79 altera `docs/agentes/CLAIMS.yaml`; #38–#49 alteram os relatórios gerados (os congelados já documentados). Este PR não toca nem rebaseia nenhum deles; se algum entrar antes, os relatórios são regenerados pela ferramenta, nunca à mão. Claim `grok-bot`, prazo `2026-10-30T12:00:00Z`, removido no último commit (`claims: []`).
+
+Pré-registro escrito **antes** do contrato RED e antes de rodar o harness com o comportamento novo. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados da correção de EW3 e EW4 (depois do pré-registro `d034ee1`)
+
+Nenhum critério, seed, limite ou protocolo foi alterado depois de rodar: **sem errata**. Commits: `d034ee1` (pré-registro) → `a17425c` (RED: harness + contrato, produção intacta) → `fad93a3` (GREEN + um único re-fixar dos goldens) → este (resultados + `claims: []`).
+
+**RED (`a17425c`, código de `main`, saída 1):** EW1 FAIL (9/120 referências), EW2 PASS 20/20, EW3 FAIL 0/20, EW4 FAIL 0/20, EW5 FAIL (lacunas 6/9), EW6 FAIL, EW7 FAIL 7/21, EW8 FAIL 2/12, EW9 PASS (429 seções não afetadas, deriva 0). Exatamente a previsão registrada (falham EW1, EW3, EW4, EW5, EW6, EW7, EW8; passam EW2 e EW9).
+
+**GREEN (`fad93a3`, saída 0, Python 3.11 e 3.12 idênticos):** EW1 120/120, EW2 20/20, EW3 20/20, EW4 20/20, EW5 9/9 lacunas e 26/26 erros, EW6 (identidade e standalone), EW7 21/21, EW8 12/12, EW9 429 seções não afetadas com deriva 0 e lista base igual ao SHA `0e323b7b…6878`.
+
+**Mudança (só `core/cognitivo/emotional_memory_weighting.py`):** `_clamp_to_domain` (valência em [-1, 1], arousal em [0, 1], depois do override do agente; valor no domínio devolve o mesmo objeto/tipo; ±inf vira o limite; NaN segue passando; não numérico levanta `TypeError`); a memória sem rótulo pontua `0.0` em vez de `1.0`, então uma memória emocional moderada vence uma sem rótulo.
+
+**Re-fixar dos goldens (uma única vez), justificativa:** o comportamento mudou de propósito (EW3/EW4). `EW_SOURCE_SHA` `76ba3041…bc04` → `b681dd36…efe9`; `EW_BEHAVIOR_SHA` `ddc969ef…63b0` → `530d76ff…2161f`. Medidos em 3.11 e 3.12 (iguais) e iguais para o módulo e a reexportação do monólito. Um teste do #128 (`prioritize_recall([1, 2])[0][0] == 2`, que fixava a ordem antiga com a memória sem rótulo na frente) passou a `== 1`; é a mesma mudança de comportamento declarada.
+
+**Lacunas residuais, declaradas e inalteradas:** NaN passa; valência da consulta/alvo não é limitada (caso `-2.1`); memórias neutra e sem rótulo empatam em 0.0.
+
+**Gates (3.11 e 3.12):** suíte completa 800 testes OK; ruff, compileall e `reality_audit` + `git diff --exit-code` limpos (relatórios só via `tools/reality_audit.py`); `validar_registro` OK. Cobertura: `core/cognitivo/*` 98% (módulo 99%, ≥ 90), brain 68% (≥ 62). `cognitivo_mutation` 483/483 mortos (459 + 24 novos mutantes de limite/pontuação; o de `ew_untagged_dropped` teve a agulha atualizada); `targeted_mutation` 80/80 (não editado). Bandit sem MEDIUM/HIGH; `security_triage --check`, `embedded_assert_audit` e `implementation_gap_audit` OK.
+
+`docs/agentes/CLAIMS.yaml` volta a `claims: []` neste commit.

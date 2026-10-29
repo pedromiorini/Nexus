@@ -48,9 +48,9 @@
       },
       {
         "path": "core/cognitivo/emotional_memory_weighting.py",
-        "lines": 284,
+        "lines": 300,
         "classes": 2,
-        "functions": 9
+        "functions": 10
       },
       {
         "path": "core/cognitivo/episodic_future_thinking.py",

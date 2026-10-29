@@ -1,10 +1,10 @@
 """Contrato da ponderação emocional de memória: entradas inválidas, harness EW e extração strangler.
 
-Critérios EW1–EW6 pré-registrados em docs/cognitivo/AUDITORIA_2026-10-22.md
-(commit 2bc92d8, com a errata E1) antes do harness, do contrato e do move. O harness é
-tools/cognitivo_eval.py --capability emotional_memory. EW3 e EW4 falham como
-pré-registrado (nenhum limite sobre valência e ativação; memória sem rótulo
-com prioridade-base maior que a emocional moderada): o move não os corrige.
+Critérios EW1–EW6 pré-registrados em docs/cognitivo/AUDITORIA_2026-10-22.md (commit 2bc92d8, com a
+errata E1) antes do harness, do contrato e do move; EW7–EW9 pré-registrados no commit d034ee1, antes do
+contrato RED e da correção. O harness é tools/cognitivo_eval.py --capability emotional_memory. Depois da
+correção de EW3 (limite do domínio de valência e ativação) e de EW4 (memória sem rótulo pontua 0.0, não
+1.0), os nove critérios passam e o harness sai com 0.
 """
 
 import contextlib
@@ -24,8 +24,7 @@ from core.constitutional_brain import EmotionalMemoryWeight, RealEmotionalMemory
 
 ROOT = Path(__file__).resolve().parent
 _NAMES = ("EmotionalMemoryWeight", "RealEmotionalMemoryWeighting")
-_ALL = ("EW1", "EW2", "EW3", "EW4", "EW5", "EW6")
-_GAPS = {"EW3", "EW4"}
+_ALL = ("EW1", "EW2", "EW3", "EW4", "EW5", "EW6", "EW7", "EW8", "EW9")
 _BLOCKER = r"""
 import sys
 class _Block:
@@ -38,7 +37,7 @@ sys.meta_path.insert(0, _Block())
 import core.cognitivo.emotional_memory_weighting as mod
 system = mod.RealEmotionalMemoryWeighting()
 system.tag_memory_emotionally(1, {"valence": 0.5, "arousal": 0.5})
-assert system.prioritize_recall([1, 2])[0][0] == 2
+assert system.prioritize_recall([1, 2])[0][0] == 1
 assert system.retrieve_by_valence(0.5) == [1]
 leaked = sorted(n for n in sys.modules if n.split(".")[0] in {"numpy", "vita"} or n == "core.constitutional_brain")
 print("LEAKED=" + ",".join(leaked))
@@ -104,8 +103,8 @@ class EmotionalMemoryWeightingInvalidInputContractTests(unittest.TestCase):
 
     def test_bad_query_arguments_only_fail_when_there_is_something_to_compare(self):
         empty = _quiet()
-        self.assertEqual(empty.prioritize_recall([1], "valence"), [(1, 1.0)])
-        self.assertEqual(empty.prioritize_recall([1], 5), [(1, 1.0)])
+        self.assertEqual(empty.prioritize_recall([1], "valence"), [(1, 0.0)])
+        self.assertEqual(empty.prioritize_recall([1], 5), [(1, 0.0)])
         self.assertEqual(empty.retrieve_by_valence("a"), [])
         self.assertEqual(empty.get_emotional_profile(None), {"has_emotional_weight": False})
         self.assertEqual(empty.consolidate_emotional_memory(None), 1.0)
@@ -148,29 +147,117 @@ class EmotionalMemoryWeightingInvalidInputContractTests(unittest.TestCase):
         weight = system.tag_memory_emotionally(8, {"valence": 0.2, "arousal": 0.1, "agent_id": "zz"})
         self.assertEqual((weight.valence, weight.arousal), (0.2, 0.1))
 
-    def test_current_behavior_is_recorded_as_gaps(self):
-        # Gaps medidos (EW3/EW4/EW5), registrados e fora desta extração.
+    def test_valence_and_arousal_are_clamped_to_the_valid_domain(self):
         system = _quiet()
         over = system.tag_memory_emotionally(1, {"valence": 3.0, "arousal": 2.0})
-        self.assertGreater(over.emotional_intensity, 1.0)
-        self.assertEqual(over.consolidation_boost, 5.0)
-        self.assertAlmostEqual(over.recall_priority, 3.824264635, places=9)
+        self.assertEqual((over.valence, over.arousal, over.emotional_intensity), (1.0, 1.0, 1.0))
+        self.assertEqual((over.consolidation_boost, over.recall_priority), (3.0, 1.5))
         neg = system.tag_memory_emotionally(2, {"valence": 0.0, "arousal": -1.0})
-        self.assertEqual(neg.consolidation_boost, -1.0)
-        nan = system.tag_memory_emotionally(3, {"valence": float("nan"), "arousal": 0.0})
-        self.assertTrue(math.isnan(nan.emotional_intensity))
+        self.assertEqual((neg.arousal, neg.consolidation_boost, neg.emotional_intensity, neg.recall_priority),
+                         (0.0, 1.0, 0.0, 0.0))
+        low = system.tag_memory_emotionally(3, {"valence": -5.0, "arousal": -5.0})
+        self.assertEqual((low.valence, low.arousal), (-1.0, 0.0))
+        self.assertAlmostEqual(low.emotional_intensity, 0.707106781, places=9)
+        wide = system.tag_memory_emotionally(4, {"valence": float("inf"), "arousal": float("-inf")})
+        self.assertEqual((wide.valence, wide.arousal), (1.0, 0.0))
+        for weight in (over, neg, low, wide):
+            self.assertTrue(-1.0 <= weight.valence <= 1.0 and 0.0 <= weight.arousal <= 1.0)
+            self.assertTrue(0.0 <= weight.emotional_intensity <= 1.0 and 1.0 <= weight.consolidation_boost <= 3.0)
+            self.assertLessEqual(weight.recall_priority, 1.5)
+        stats = system.get_statistics()
+        self.assertEqual((stats["total_emotional_memories"], stats["high_arousal_count"], stats["weighted_memories"]),
+                         (4, 1, 4))
+        self.assertAlmostEqual(stats["avg_emotional_intensity"], (1.0 + 0.0 + 2 * 0.707106781) / 4, places=8)
+        self.assertEqual(system.consolidate_emotional_memory(1), 3.0)
+        self.assertEqual(system.consolidate_emotional_memory(2), 1.0)
+        self.assertEqual(system.get_emotional_profile(1)["emotional_category"], "excited_positive")
+        self.assertEqual(system.get_emotional_profile(3)["emotional_category"], "sad_negative")
+
+    def test_in_domain_values_are_returned_unchanged_with_their_types(self):
+        system = _quiet()
+        for mid, (v, a, kinds) in enumerate(((1, 1, (int, int)), (-1, 0, (int, int)), (True, True, (bool, bool)),
+                                             (0.3, 0.4, (float, float)))):
+            weight = system.tag_memory_emotionally(mid, {"valence": v, "arousal": a})
+            self.assertEqual((type(weight.valence), type(weight.arousal)), kinds)
+            self.assertEqual((weight.valence, weight.arousal), (v, a))
+        over = system.tag_memory_emotionally(9, {"valence": 2, "arousal": 2})
+        self.assertEqual((type(over.valence), over.valence, over.arousal), (float, 1.0, 1.0))
+        ctx = {"valence": 3.0, "arousal": 2.0}
+        system.tag_memory_emotionally(10, ctx)
+        self.assertEqual(ctx, {"valence": 3.0, "arousal": 2.0})
+        default = system.tag_memory_emotionally(11, {})
+        self.assertEqual((default.valence, default.arousal, default.consolidation_boost), (0.0, 0.0, 1.0))
+
+    def test_the_agent_state_override_is_clamped_too(self):
+        low = SimpleNamespace(emotional_states={"a1": SimpleNamespace(pleasure=-2.0, arousal=-0.6)})
+        system = _quiet(emotion_system=low)
+        weight = system.tag_memory_emotionally(1, {"valence": 0.2, "arousal": 0.1, "agent_id": "a1"})
+        self.assertEqual((weight.valence, weight.arousal, weight.consolidation_boost), (-1.0, 0.0, 1.0))
+        self.assertEqual(system.get_statistics()["high_arousal_count"], 0)
+        high = SimpleNamespace(emotional_states={"a1": SimpleNamespace(pleasure=0.4, arousal=1.7)})
+        system = _quiet(emotion_system=high)
+        weight = system.tag_memory_emotionally(1, {"agent_id": "a1"})
+        self.assertEqual((weight.valence, weight.arousal, weight.consolidation_boost), (0.4, 1.0, 3.0))
+        self.assertEqual(system.get_statistics()["high_arousal_count"], 1)
+
+    def test_a_moderate_emotional_memory_outranks_an_unlabeled_one(self):
         system = _quiet()
         system.tag_memory_emotionally(11, {"valence": 0.4, "arousal": 0.4})
         system.tag_memory_emotionally(12, {"valence": 0.0, "arousal": 0.0})
-        self.assertEqual([m for m, _s in system.prioritize_recall([10, 11, 12])], [10, 11, 12])
+        ranked = system.prioritize_recall([10, 11, 12])
+        self.assertEqual([m for m, _s in ranked], [11, 10, 12])
+        self.assertAlmostEqual(ranked[0][1], 0.6, places=9)
+        self.assertEqual([s for _m, s in ranked[1:]], [0.0, 0.0])
+        self.assertEqual(_quiet().prioritize_recall([5, 5]), [(5, 0.0), (5, 0.0)])
+        small = _quiet()
+        small.tag_memory_emotionally(31, {"valence": 0.01, "arousal": 0.01})
+        self.assertEqual([m for m, _s in small.prioritize_recall([30, 31])], [31, 30])
+        extreme = _quiet()
+        extreme.tag_memory_emotionally(50, {"valence": 3.0, "arousal": 2.0})
+        self.assertEqual(extreme.prioritize_recall([51, 50]), [(50, 1.5), (51, 0.0)])
+        query = _quiet()
+        query.tag_memory_emotionally(40, {"valence": -1.0, "arousal": 1.0})
+        self.assertAlmostEqual(query.prioritize_recall([41, 40], {"valence": 1.0})[0][1], 0.3, places=9)
+        self.assertEqual(query.prioritize_recall([41], {"valence": 0.5}), [(41, 0.0)])
+
+    def test_prioritizing_does_not_tag_or_change_the_counters(self):
+        system = _quiet()
+        system.tag_memory_emotionally(1, {"valence": 0.3, "arousal": 0.3})
+        before = (dict(system.emotional_weights), system.get_statistics())
+        ids = [7, 8, 1]
+        system.prioritize_recall(ids, {"valence": 0.2})
+        self.assertEqual((dict(system.emotional_weights), system.get_statistics()), before)
+        self.assertEqual(ids, [7, 8, 1])
+        self.assertEqual(_quiet().prioritize_recall([]), [])
+
+    def test_residual_gaps_are_recorded_and_were_not_widened(self):
+        # Fora do escopo desta correção (pré-registro d034ee1): continuam como estão.
+        nan = _quiet().tag_memory_emotionally(3, {"valence": float("nan"), "arousal": 0.0})
+        self.assertTrue(math.isnan(nan.emotional_intensity))
+        query = _quiet()
+        query.tag_memory_emotionally(1, {"valence": -1.0, "arousal": 1.0})
+        self.assertAlmostEqual(query.prioritize_recall([1], {"valence": 3.0})[0][1], -2.1, places=9)
+        tie = _quiet()
+        tie.tag_memory_emotionally(12, {"valence": 0.0, "arousal": 0.0})
+        self.assertEqual(tie.prioritize_recall([10, 12]), [(10, 0.0), (12, 0.0)])
+        self.assertEqual(tie.prioritize_recall([12, 10]), [(12, 0.0), (10, 0.0)])
         retag = _quiet()
         for _ in range(2):
             retag.tag_memory_emotionally(1, {"valence": 0.9, "arousal": 0.9})
         stats = retag.get_statistics()
         self.assertEqual((stats["total_emotional_memories"], stats["weighted_memories"], stats["high_arousal_count"]),
                          (2, 1, 2))
-        self.assertIsInstance(over, EmotionalMemoryWeight)
-        self.assertEqual(system.emotional_decay_rate, 0.95)
+        self.assertEqual(_quiet().emotional_decay_rate, 0.95)
+        import inspect
+        self.assertEqual(inspect.getsource(RealEmotionalMemoryWeighting).count("emotional_decay_rate"), 1)
+        self.assertIsInstance(nan, EmotionalMemoryWeight)
+
+    def test_invalid_types_still_raise_without_touching_the_state(self):
+        for ctx in ({"valence": "a"}, {"valence": None}, {"valence": [1]}, {"arousal": "a"}, {"arousal": None}):
+            system = _quiet()
+            with self.subTest(ctx=ctx), self.assertRaises(TypeError):
+                system.tag_memory_emotionally(1, ctx)
+            self.assertEqual((system.emotional_weights, system.total_emotional_memories), ({}, 0))
 
 
 class EmotionalMemoryWeightingExtractionContractTests(unittest.TestCase):
@@ -199,12 +286,16 @@ class EmotionalMemoryWeightingExtractionContractTests(unittest.TestCase):
         self.assertEqual(set(checks), set(_ALL))
         for cid in _ALL:
             with self.subTest(cid=cid):
-                self.assertEqual(checks[cid]["passed"], cid not in _GAPS, checks[cid])
+                self.assertTrue(checks[cid]["passed"], checks[cid])
         self.assertEqual(checks["EW1"]["value"]["reference_matches"], 120)
         self.assertEqual(checks["EW2"]["value"]["rate"], 1.0)
-        self.assertEqual(checks["EW3"]["value"]["rate"], 0.0)
+        self.assertEqual(checks["EW3"]["value"]["rate"], 1.0)
         self.assertEqual(checks["EW3"]["value"]["control_bad"], 0)
-        self.assertEqual(checks["EW4"]["value"]["rate"], 0.0)
+        self.assertEqual(checks["EW4"]["value"]["rate"], 1.0)
+        self.assertEqual((checks["EW7"]["value"]["hits"], checks["EW7"]["value"]["total"]), (21, 21))
+        self.assertEqual((checks["EW8"]["value"]["hits"], checks["EW8"]["value"]["total"]), (12, 12))
+        self.assertEqual(checks["EW9"]["value"]["drift"], 0)
+        self.assertGreaterEqual(checks["EW9"]["value"]["unaffected_sections"], 400)
         self.assertEqual(checks["EW6"]["value"]["sha_module"], EW_BEHAVIOR_SHA)
         self.assertEqual(checks["EW6"]["value"]["sha_brain"], EW_BEHAVIOR_SHA)
         self.assertEqual(checks["EW6"]["value"]["source_sha"], EW_SOURCE_SHA)
@@ -275,13 +366,78 @@ class EmotionalMemoryWeightingHarnessNegativeContractTests(unittest.TestCase):
         self.assertEqual(code, cognitivo_eval.EXIT_INVALID_SCENARIO)
         self.assertNotEqual(cognitivo_eval.EXIT_INVALID_SCENARIO, cognitivo_eval.EXIT_FAIL)
 
-    def test_cli_reports_only_the_registered_gaps_and_exits_1(self):
+    def test_cli_passes_all_nine_criteria_and_exits_0(self):
+        _module()
+        code, out, _ = self._run(["--capability", "emotional_memory"])
+        report = json.loads(out)
+        self.assertEqual(report["failed"], [])
+        self.assertEqual([item["id"] for item in report["emotional_memory"]], list(_ALL))
+        self.assertEqual(code, 0)
+
+    def test_regressed_unlabeled_score_fails_ew8_and_exits_1(self):
+        _module()
+        import core.constitutional_brain as brain
+        from tools import cognitivo_eval
+
+        class Legacy(brain.RealEmotionalMemoryWeighting):
+            def prioritize_recall(self, memory_ids, query=None):
+                ranked = super().prioritize_recall(memory_ids, query)
+                return sorted(((m, s if m in self.emotional_weights else 1.0) for m, s in ranked),
+                              key=lambda item: item[1], reverse=True)
+
+        self.assertNotEqual(cognitivo_eval._ew_rank_items(Legacy), cognitivo_eval._EW_RANK_EXPECTED)
+        self.assertEqual(cognitivo_eval._ew_rank_items(brain.RealEmotionalMemoryWeighting),
+                         cognitivo_eval._EW_RANK_EXPECTED)
+
+    def test_unclamped_weights_fail_ew7(self):
+        _module()
+        import core.constitutional_brain as brain
+        from tools import cognitivo_eval
+
+        class Raw(brain.RealEmotionalMemoryWeighting):
+            @staticmethod
+            def _clamp_to_domain(value, low, high):
+                return value
+
+        self.assertEqual(cognitivo_eval._ew_clamp_items(brain.RealEmotionalMemoryWeighting),
+                         cognitivo_eval._EW_CLAMP_EXPECTED)
+        self.assertNotEqual(cognitivo_eval._ew_clamp_items(Raw), cognitivo_eval._EW_CLAMP_EXPECTED)
+        with mock.patch.dict(cognitivo_eval._EW_CLAMP_EXPECTED, {"i1": [3.0, 2.0, 1.0, 5.0, 1.5]}):
+            checks = {i["id"]: i for i in cognitivo_eval.eval_emotional_memory()}
+            code, out, _ = self._run(["--capability", "emotional_memory"])
+        self.assertFalse(checks["EW7"]["passed"])
+        self.assertEqual(code, cognitivo_eval.EXIT_FAIL)
+        self.assertEqual(json.loads(out)["failed"], ["EW7"])
+
+    def test_drift_in_an_unaffected_section_fails_ew9_and_exits_1(self):
         _module()
         from tools import cognitivo_eval
-        code, out, _ = self._run(["--capability", "emotional_memory"])
-        failed = json.loads(out)["failed"]
-        self.assertEqual(set(failed), _GAPS)
+        rows = tuple("f" * 40 for _ in cognitivo_eval._EW_BASE_ROWS)
+        sha = cognitivo_eval._ms_sha(list(rows))
+        with mock.patch.object(cognitivo_eval, "_EW_BASE_ROWS", rows), \
+                mock.patch.object(cognitivo_eval, "_EW_BASE_ROWS_SHA", sha):
+            checks = {i["id"]: i for i in cognitivo_eval.eval_emotional_memory()}
+            code, out, _ = self._run(["--capability", "emotional_memory"])
+        self.assertFalse(checks["EW9"]["passed"])
+        self.assertNotIn("scenario_invalid", checks["EW9"])
+        self.assertGreater(checks["EW9"]["value"]["drift"], 0)
         self.assertEqual(code, cognitivo_eval.EXIT_FAIL)
+        self.assertIn("EW9", json.loads(out)["failed"])
+
+    def test_altered_base_list_or_too_few_unaffected_sections_is_an_invalid_scenario(self):
+        _module()
+        from tools import cognitivo_eval
+        with mock.patch.object(cognitivo_eval, "_EW_BASE_ROWS_SHA", "0" * 64):
+            checks = {i["id"]: i for i in cognitivo_eval.eval_emotional_memory()}
+            code, _, _ = self._run(["--capability", "emotional_memory"])
+        self.assertFalse(checks["EW9"]["passed"])
+        self.assertTrue(checks["EW9"]["scenario_invalid"])
+        self.assertEqual(code, cognitivo_eval.EXIT_INVALID_SCENARIO)
+        with mock.patch.object(cognitivo_eval, "_EW_MIN_UNAFFECTED", 10_000):
+            checks = {i["id"]: i for i in cognitivo_eval.eval_emotional_memory()}
+            code, _, _ = self._run(["--capability", "emotional_memory"])
+        self.assertTrue(checks["EW9"]["scenario_invalid"])
+        self.assertEqual(code, cognitivo_eval.EXIT_INVALID_SCENARIO)
 
     def test_source_text_requires_the_marker(self):
         from tools import cognitivo_eval
