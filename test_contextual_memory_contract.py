@@ -1,10 +1,11 @@
-"""Contrato da memória contextual: entradas inválidas, harness CM e extração strangler.
+"""Contrato da memória contextual: entradas inválidas, harness CM, extração strangler e correção de CM3/CM4.
 
 Critérios CM1–CM6 pré-registrados em docs/cognitivo/AUDITORIA_2026-10-22.md
-(commit c8ca267) antes do harness, do contrato e do move. O harness é
-tools/cognitivo_eval.py --capability contextual_memory. CM3 e CM4 falham como
-pré-registrado (limiar padrão não seletivo; hash() dependente de PYTHONHASHSEED):
-o move não os corrige.
+(commit c8ca267) e CM7–CM9 no pré-registro da correção (commit 022706f), antes
+do contrato e da mudança de comportamento. O harness é
+tools/cognitivo_eval.py --capability contextual_memory. Depois da correção
+todos os critérios passam: CM3 (seletividade com o limiar padrão: dimensões
+consultadas que coincidem) e CM4 (sha256 em vez de hash()).
 """
 
 import contextlib
@@ -27,8 +28,7 @@ from core.constitutional_brain import (
 
 ROOT = Path(__file__).resolve().parent
 _NAMES = ("ContextualMemory", "ContextMatch", "ContextEncoder", "RealContextualMemorySystem")
-_ALL = ("CM1", "CM2", "CM3", "CM4", "CM5", "CM6")
-_GAPS = {"CM3", "CM4"}
+_ALL = ("CM1", "CM2", "CM3", "CM4", "CM5", "CM6", "CM7", "CM8", "CM9")
 _BLOCKER = r"""
 import sys
 class _Block:
@@ -141,11 +141,11 @@ class ContextualMemoryInvalidInputContractTests(unittest.TestCase):
         self.assertEqual((stats["stored_memories"], stats["total_encodings"]), (1, 1))
 
     def test_current_behavior_is_recorded_as_gaps(self):
-        # Gaps medidos (CM3/CM5), registrados e fora desta extração.
+        # Gaps residuais (CM5), registrados e fora da correção de CM3/CM4.
         system = _quiet()
         for i, ctx in enumerate(({"location": "a"}, {"time": "c"}, {"social": "e"})):
             system.store_with_context(f"x{i}", ctx)
-        self.assertEqual(len(system.retrieve_by_context(context={"location": "zzz"})), 3)
+        self.assertEqual(len(system.retrieve_by_context(context={"location": "zzz"})), 0)
         encoder = ContextEncoder()
         self.assertEqual(encoder.encode_context({"weather": "rain"}), encoder.encode_context({"weather": "sun"}))
         ctx = {"location": "office"}
@@ -157,6 +157,141 @@ class ContextualMemoryInvalidInputContractTests(unittest.TestCase):
         self.assertEqual(memory.context_vector, encoder.encode_context({"location": "office"}))
         self.assertIsInstance(memory, ContextualMemory)
         self.assertIsInstance(system.retrieve_by_context(threshold=0.0)[0], ContextMatch)
+
+
+@functools.lru_cache(maxsize=1)
+def _fingerprint_grid():
+    _module()
+    import core.cognitivo.contextual_memory as module
+    from tools import cognitivo_eval
+    with mock.patch.object(cognitivo_eval, "_cm_determinism", return_value=_checks()["CM4"]["value"]):
+        return cognitivo_eval.contextual_memory_fingerprint(module)["grid"]
+
+
+class ContextualMemoryFixContractTests(unittest.TestCase):
+    """CM3 (seletividade com o limiar padrão) e CM4 (vetor estável), pré-registro 022706f."""
+
+    def test_default_threshold_keeps_only_matching_contexts(self):
+        full = {"location": "office", "time": "morning", "mood": "calm", "task": "reading", "social": "alone"}
+        swaps = (("location", "home"), ("time", "noon"), ("mood", "focused"), ("task", "review"),
+                 ("social", "team"))
+        system = _quiet()
+        for count in range(6):
+            ctx = dict(full)
+            ctx.update(dict(swaps[:count]))
+            system.store_with_context(f"d{count}", ctx)
+        found = system.retrieve_by_context(context=full)
+        self.assertEqual([m.memory.content for m in found], ["d0", "d1", "d2"])
+        self.assertEqual([round(m.match_score, 6) for m in found], [1.0, 0.8, 0.6])
+        self.assertEqual([len(m.matched_features) for m in found], [5, 4, 3])
+        self.assertEqual(len(system.retrieve_by_context(context=full, threshold=0.0)), 6)
+
+    def test_only_cued_dimensions_count_and_no_cue_matches_everything(self):
+        system = _quiet()
+        system.store_with_context("x", {"location": "office", "mood": "calm"})
+        scores = {}
+        for name, ctx in (("partial", {"location": "office"}), ("none", {"weather": "rain"}),
+                          ("miss", {"location": "home"}), ("half", {"location": "office", "mood": "focused"})):
+            scores[name] = system.retrieve_by_context(context=ctx, threshold=0.0)[0].match_score
+        self.assertEqual(scores, {"partial": 1.0, "none": 1.0, "miss": 0.0, "half": 0.5})
+
+    def test_text_query_keeps_the_additive_formula(self):
+        system = _quiet()
+        system.store_with_context("alpha beta", {"location": "office"})
+        hit = system.retrieve_by_context(query="ALPHA", context={"location": "home"})
+        miss = system.retrieve_by_context(query="zzz", context={"location": "office"})
+        self.assertEqual([m.match_score for m in hit], [0.5])
+        self.assertEqual([round(m.match_score, 9) for m in miss], [0.65])
+        self.assertEqual(system.retrieve_by_context(query="zzz", context={"location": "home"}), [])
+
+    def test_compute_match_edges(self):
+        encoder = ContextEncoder()
+        self.assertEqual(encoder.compute_match([0.1, 0.2], [0.1, 0.3]), 0.5)
+        self.assertEqual(encoder.compute_match([], [1.0]), 0.0)
+        self.assertEqual(encoder.compute_match([1.0], []), 0.0)
+        self.assertEqual(encoder.compute_match(None, [1.0]), 0.0)
+        self.assertEqual(encoder.compute_match([1.0], [1.0], []), 1.0)
+        self.assertEqual(encoder.compute_match([0.1, 0.2, 0.3], [0.1]), 1.0)
+        self.assertEqual(encoder.compute_match([0.1, 0.2], [0.1, 0.3], [1]), 0.0)
+        self.assertEqual(encoder.compute_match([0.1, 0.2], [0.1, 0.3], [0]), 1.0)
+        with self.assertRaises(IndexError):
+            encoder.compute_match([1.0], [1.0], [3])
+        self.assertAlmostEqual(encoder.compute_similarity([0.5, 0.5], [0.5, 0.5]), 1.0)  # cosseno intocado
+
+    def test_encoder_is_stable_and_never_calls_builtin_hash(self):
+        import builtins
+        golden = {"location": "office", "time": "morning", "mood": "calm", "task": "reading", "social": "alone"}
+
+        def boom(*_args, **_kwargs):
+            raise AssertionError("hash() chamado")
+
+        encoder = ContextEncoder()
+        with mock.patch.object(builtins, "hash", boom):
+            self.assertEqual(encoder.encode_context(golden), [0.2, 0.32, 0.37, 0.78, 0.2])
+            self.assertEqual(encoder.encode_context({"mood": "\ud800"}), [0.04, 0.04, 0.05, 0.04, 0.04])
+            self.assertEqual(encoder.encode_context({"location": 1}), encoder.encode_context({"location": "1"}))
+
+    def test_vector_is_identical_across_hash_seeds(self):
+        code = ("import json; from core.cognitivo.contextual_memory import ContextEncoder as E; "
+                "print(json.dumps(E().encode_context({'location': 'lab', 'mood': 'x'})))")
+        outs = set()
+        for seed in ("1", "2", "random"):
+            env = dict(os.environ, PYTHONPATH=str(ROOT), PYTHONHASHSEED=seed)
+            proc = subprocess.run([sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True,
+                                  text=True, timeout=60)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            outs.add(proc.stdout.strip())
+        self.assertEqual(len(outs), 1)
+
+    def test_regressed_encoder_or_score_fails_cm7_and_cm8(self):
+        from tools import cognitivo_eval
+        import core.constitutional_brain as brain
+
+        class HashEncoder(ContextEncoder):
+            def encode_context(self, context):
+                return [hash(str(context.get(dim, "unknown"))) % 100 / 100.0 for dim in self.context_dimensions]
+
+        class WideEncoder(ContextEncoder):
+            def encode_context(self, context):
+                vector = super().encode_context(context)
+                return [v + 0.001 for v in vector]
+
+        class AllDimsEncoder(ContextEncoder):
+            def compute_match(self, vec1, vec2, cue_indexes=None):
+                return super().compute_match(vec1, vec2)
+
+        class Cosine(ContextEncoder):
+            def compute_match(self, vec1, vec2, cue_indexes=None):
+                return self.compute_similarity(vec1, vec2)
+
+        for enc_cls in (HashEncoder, WideEncoder):
+            with self.subTest(encoder=enc_cls.__name__):
+                stab = cognitivo_eval._cm_stability(enc_cls)
+                self.assertLess(stab["golden"], stab["golden_total"])
+                self.assertLess(stab["grid_ok"], stab["grid_total"])
+        self.assertLess(cognitivo_eval._cm_stability(HashEncoder)["no_hash"], 7)
+        for enc_cls in (AllDimsEncoder, Cosine):
+            with self.subTest(match=enc_cls.__name__):
+                class System(brain.RealContextualMemorySystem):
+                    def __init__(self, *args, **kwargs):
+                        super().__init__(*args, **kwargs)
+                        self.context_encoder = enc_cls()
+
+                with cognitivo_eval._cm_det_hash():
+                    scores = cognitivo_eval._cm_scores(System, enc_cls)
+                expected = {name: value for name, _m, _q, _r, value in cognitivo_eval._CM8_SCORES}
+                expected["b1"] = cognitivo_eval._CM8_BANDS
+                expected.update({name: value for name, _args, value in cognitivo_eval._CM8_MATCH})
+                hits = sum(1 for name, value in expected.items() if scores[name] == value)
+                self.assertLess(hits, 26)
+
+    def test_scores_match_the_registered_table(self):
+        scores = _checks()["CM8"]["value"]["scores"]
+        self.assertEqual(len(scores), 26)
+        self.assertEqual((scores["a1"], scores["a6"], scores["a15"], scores["a17"]), (1.0, 0.0, 0.65, 0.15))
+        self.assertEqual(_checks()["CM8"]["value"]["hits"], [26, 26])
+        self.assertEqual(_checks()["CM7"]["value"]["no_hash"], 7)
+        self.assertGreaterEqual(_checks()["CM9"]["value"]["unaffected"], 12)
 
 
 class ContextualMemoryExtractionContractTests(unittest.TestCase):
@@ -184,11 +319,12 @@ class ContextualMemoryExtractionContractTests(unittest.TestCase):
         self.assertEqual(set(checks), set(_ALL))
         for cid in _ALL:
             with self.subTest(cid=cid):
-                self.assertEqual(checks[cid]["passed"], cid not in _GAPS, checks[cid])
-        self.assertEqual(checks["CM3"]["value"]["rate"], 0.0)
-        self.assertEqual(set(checks["CM3"]["value"]["returned"]), {30})
+                self.assertTrue(checks[cid]["passed"], checks[cid])
+        self.assertEqual(checks["CM3"]["value"]["rate"], 1.0)
+        self.assertEqual(set(checks["CM3"]["value"]["returned"]), {6})
+        self.assertEqual(checks["CM3"]["value"]["recall_hits"], 20)
         self.assertEqual(checks["CM4"]["value"]["control_same"], 20)
-        self.assertEqual(checks["CM4"]["value"]["cross_rate"], 0.0)
+        self.assertEqual(checks["CM4"]["value"]["cross_rate"], 1.0)
         self.assertEqual(checks["CM2"]["value"]["rate"], 1.0)
         self.assertEqual(checks["CM6"]["value"]["sha_module"], CM_BEHAVIOR_SHA)
         self.assertEqual(checks["CM6"]["value"]["sha_brain"], CM_BEHAVIOR_SHA)
@@ -265,14 +401,39 @@ class ContextualMemoryHarnessNegativeContractTests(unittest.TestCase):
         self.assertEqual(code, cognitivo_eval.EXIT_INVALID_SCENARIO)
         self.assertNotEqual(cognitivo_eval.EXIT_INVALID_SCENARIO, cognitivo_eval.EXIT_FAIL)
 
-    def test_cli_reports_only_the_registered_gaps_and_exits_1(self):
+    def test_cli_passes_and_exits_0(self):
         _module()
         from tools import cognitivo_eval
         with mock.patch.object(cognitivo_eval, "_cm_determinism", return_value=_checks()["CM4"]["value"]):
             code, out, _ = self._run(["--capability", "contextual_memory"])
-        failed = json.loads(out)["failed"]
-        self.assertTrue(set(failed) <= _GAPS, failed)
-        self.assertEqual(code, cognitivo_eval.EXIT_FAIL if failed else cognitivo_eval.EXIT_OK)
+        self.assertEqual(json.loads(out)["failed"], [])
+        self.assertEqual(code, cognitivo_eval.EXIT_OK)
+
+    def test_cm9_guard_and_frozen_digests_fail_closed(self):
+        _module()
+        from tools import cognitivo_eval
+        cached = _checks()["CM4"]["value"]
+        with mock.patch.object(cognitivo_eval, "_cm_determinism", return_value=cached), \
+                mock.patch.object(cognitivo_eval, "_CM_MIN_UNAFFECTED", 999):
+            code, out, _ = self._run(["--capability", "contextual_memory"])
+        self.assertEqual(code, cognitivo_eval.EXIT_INVALID_SCENARIO)
+        self.assertIn('"CM9"', out)
+        with mock.patch.object(cognitivo_eval, "_cm_determinism", return_value=cached), \
+                mock.patch.object(cognitivo_eval, "_CM_BASE_ROWS_SHA", "0" * 64):
+            checks = {item["id"]: item for item in cognitivo_eval.eval_contextual_memory()}
+        self.assertFalse(checks["CM9"]["passed"])
+        self.assertFalse(checks["CM9"]["value"]["base_rows_sha_ok"])
+        rows = list(cognitivo_eval._CM_BASE_ROWS)
+        first = next(i for i, flag in enumerate(_fingerprint_grid()["unaffected"]) if flag)
+        rows[first] = "0" * 16
+        with mock.patch.object(cognitivo_eval, "_cm_determinism", return_value=cached), \
+                mock.patch.object(cognitivo_eval, "_CM_BASE_ROWS", tuple(rows)), \
+                mock.patch.object(cognitivo_eval, "_CM_BASE_ROWS_SHA",
+                                  __import__("hashlib").sha256(json.dumps(rows).encode()).hexdigest()):
+            checks = {item["id"]: item for item in cognitivo_eval.eval_contextual_memory()}
+        self.assertFalse(checks["CM9"]["passed"])
+        self.assertEqual(checks["CM9"]["value"]["diffs"], [first])
+        self.assertNotIn("scenario_invalid", checks["CM9"])
 
     def test_deterministic_hash_is_restored_after_the_fingerprint(self):
         _module()

@@ -1909,3 +1909,129 @@ Pré-registro escrito **antes** do move, **antes** do contrato novo de extraçã
 **Gates locais (não substituem a CI hospedada).** `ruff` limpo; `compileall`; `reality_audit` regenerado só pela ferramenta; 751 testes OK em 3.11 e em 3.12; cobertura `core/cognitivo/*` 97% (`contextual_memory.py` 99% com ramos, 1 linha e 1 ramo sem cobrir) e monólito 68%; `tools/cognitivo_mutation.py` 369/369 mortos em 3.11 e em 3.12 (56 novos); `tools/targeted_mutation.py` 80/80; Bandit sem MEDIUM/HIGH (131 LOW) e `SECURITY_TRIAGE.md` conferido (`--check` ok).
 
 **Não medido.** CI hospedada; efeito em cenários fora dos pré-registrados; mescla real com #79, #115 ou #116 (esta mudança só acrescenta os mesmos relatórios gerados e linhas em `tools/cognitivo_mutation.py`, que o #116 também toca).
+
+## Contextual Memory — correção de CM3 e CM4 (pré-registro CM7–CM9)
+
+**Autorização:** Pedro, mensagem pt119u (2026-10-29, «Autorizado»), depois da mescla do #124 (`main` em `0627ca4`) e da opção 2/3 do relatório do #122/#124: PR de comportamento separado, com novo pré-registro, corrigindo CM3 (seletividade com o limiar padrão) e CM4 (`hash()` dependente de `PYTHONHASHSEED`). Este PR é **draft e não será mesclado sem nova autorização**.
+
+**Pré-registro escrito antes** do contrato RED, antes de qualquer mudança em `core/cognitivo/contextual_memory.py` e antes de executar qualquer harness, referência ou instância com o comportamento novo. **Únicas execuções prévias** (declaradas): (1) o código base inalterado (`0627ca4`), só para congelar o controle de não regressão de CM9 (resumo por linha das 120 instâncias da grade de CM1, repetido com `PYTHONHASHSEED` 1 e 77: mesmo SHA) e contar as linhas sem memória (só leitura das entradas da grade); (2) aritmética de `hashlib` pura (sem importar o módulo nem o harness) para calcular os vetores dourados de CM7 e conferir colisões de balde nos valores das tabelas de CM8. Nenhum resultado de CM3/CM4 com comportamento novo foi lido. Os valores base de CM1–CM6 são os já medidos no #122 (CM1 120/120, CM2 20/20, CM3 0.00 com as 30 memórias devolvidas em todas as seeds, CM4 controle 20/20 e medida 0.00, CM5 14/14 gaps e 16/16 erros, CM6 com os SHA `02b7fc0b…8a64` e `91c32679…6ad2`).
+
+### Hipóteses
+
+- **H-CM3v2:** com o limiar padrão `0.5` nada é filtrado porque (a) o cosseno de vetores não negativos de baldes de `hash % 100` quase não discrimina contextos e (b) sem consulta de texto `content_match = 1.0` empurra todo `score` para ≥ 0.5. Se a similaridade de contexto passar a ser a **fração de dimensões consultadas cujo balde coincide** e, sem consulta de texto, o score for **só** essa fração, o limiar padrão deixa de devolver memórias de outros contextos: precisão ≥ 0.80 em ≥ 0.90 das 20 seeds, com o controle de revocação (todas as 6 memórias do contexto consultado devolvidas) em 1.00.
+- **H-CM4v2:** o vetor depende de `hash(str)`, que muda a cada processo. Se `encode_context` usar `int(sha256(str(valor).encode("utf-8", "surrogatepass")).hexdigest()[:8], 16) % 100 / 100.0` (a mesma fórmula que o harness já usava como substituto determinístico), o vetor passa a ser o mesmo entre `PYTHONHASHSEED` diferentes (101 × 202 idêntico em ≥ 0.90 dos 20 contextos), sem chamar `builtins.hash` e sem levantar erro com `str` com substitutos solitários.
+- **Falsificação:** qualquer família de CM3/CM4 abaixo do alvo; qualquer critério CM7–CM9 fora do alvo; qualquer controle de não regressão diferente do fixado abaixo.
+- **Previsão (registrada, não vinculante):** todos os critérios passam (CM6 só depois do re-fixar declarado); o harness sai com 0. **No RED** (código de `main`): CM1, CM3, CM4, CM5, CM6, CM7 e CM8 falham; CM2 e CM9 passam; o harness sai com 1.
+
+### As mudanças (as únicas permitidas, só em `core/cognitivo/contextual_memory.py`)
+
+1. **`ContextEncoder.encode_context`.** `hash(str(valor))` → `int(hashlib.sha256(str(valor).encode("utf-8", "surrogatepass")).hexdigest()[:8], 16)`, e o resto igual (`% 100 / 100.0`, cinco dimensões na mesma ordem, `context.get(dim, "unknown")`, `AttributeError` para entrada que não é dicionário). Novo `import hashlib` (stdlib).
+2. **`ContextEncoder.compute_match(vec1, vec2, cue_indexes=None)`** (método novo; `compute_similarity` **não muda**). `0.0` se algum vetor for vazio (ou `None`); índices = `range(min(len(vec1), len(vec2)))` se `cue_indexes is None`, senão `cue_indexes` (índice fora do vetor levanta `IndexError`); sem índices → `1.0`; senão fração dos índices em que `vec1[i] == vec2[i]`.
+3. **`RealContextualMemorySystem.retrieve_by_context`.** O contexto de recuperação (o argumento ou, se falso, o atual, como hoje) é codificado primeiro; as dimensões **consultadas** são as cinco dimensões cuja chave **está** nesse contexto (`dim in context`); `similarity = compute_match(memory.context_vector, retrieval_vector, consultadas)`. **Sem consulta de texto** (`None`, `""`) o `match_score` é a própria `similarity` (o `content_match = 1.0` fixo sai). **Com consulta** continua `(similarity + content_match) / 2.0` (`1.0` se a consulta estiver contida no conteúdo, `0.3` se não). O resto (limiar `>=`, `ContextMatch`, `matched_features`, `retrieval_count`, ordenação estável por `match_score`, estatísticas) não muda.
+4. **Docstring do módulo:** passa a registrar o que foi corrigido e os gaps que restam (os textos entram no SHA de fonte de CM6, re-fixado depois do GREEN).
+
+**Não escopo:** chaves fora das cinco dimensões, `1` × `"1"`, aliasing do contexto e vetor obsoleto, consulta vazia, efeitos colaterais de `test_encoding_specificity`, validação de entradas, estado alterado quando `set_current_context` falha, `ltm.store` depois do append, colisões de balde (`% 100`), cosseno de `compute_similarity` (continua exportado e intocado), o caminho **com consulta** (a fórmula aditiva fica; ver gaps residuais abaixo), persistência dos vetores (nada os persiste hoje; se houver dados guardados com `hash()`, precisam ser recodificados), `working_memory`/`attention`, o construtor do orquestrador e o teste 23 do demo; Axis, `tools/targeted_mutation.py` e testes do Axis (mutantes só em `tools/cognitivo_mutation.py`); #79, #115, #116 e os arquivos que eles alteram, exceto os relatórios de realidade gerados por `tools/reality_audit.py`; state docs; PRs congelados #38–#50, #60, #77.
+
+### Critérios (protocolo CM-v2; ids de CM1–CM6 mantidos; CM7–CM9 novos)
+
+Comando: `python tools/cognitivo_eval.py --capability contextual_memory`. A grade (`Random(2014)`, 120 instâncias), as seeds `0..19`, os contextos de CM4 (`Random(4014)`) e os limites 0.90 / 0.80 **não mudam**. Alvo: todos passam, código 0. O substituto determinístico de `builtins.hash` do harness continua nas famílias (inofensivo com o código novo); CM7 mede à parte que o módulo **não chama** `hash()`.
+
+| id | mudança declarada | critério |
+|---|---|---|
+| CM1 | a referência independente ganha as regras 2 e 3 (a antiga fica no harness como `v1`) | 120/120 iguais à referência nova; 0 entradas alteradas; ids e timestamps válidos |
+| CM2 | **nenhuma** (não regressão) | 20/20 seeds: as 6 primeiras posições são as memórias do contexto 0, com limiar `0.0` |
+| CM3 | **nenhuma no protocolo da precisão** (cenários, seeds, limiar padrão, ≥ 0.80 por seed, ≥ 0.90 das seeds); **entra um controle de revocação**: com o limiar padrão, as 6 memórias do contexto 0 são devolvidas | precisão ≥ 0.80 em ≥ 0.90 das 20 seeds **e** controle de revocação em 20/20 |
+| CM4 | **nenhuma no protocolo** (20 contextos, subprocessos com `PYTHONHASHSEED` 101, 101 e 202, `hash()` real, sem substituto) | controle 101 × 101 em 20/20 **e** medida 101 × 202 ≥ 0.90 |
+| CM5 | só **dois** gaps mudam: `default_threshold_returns_all` passa de `3` para `0` e `empty_query.nonmatching_lowers` de `True` para `False` (consulta ausente vale a similaridade pura, 0.0 aqui; consulta sem acerto vale `(0.0 + 0.3) / 2 = 0.15`); entram **quatro gaps residuais** e **dois erros** (abaixo). Os outros 12 gaps e os 16 erros **não mudam** | gaps 18/18, erros 18/18, contadores `{2, 2, 1, 0.5, 2, 1}`, colaboradores e estatísticas de sistema novo iguais ao registrado |
+| CM6 | **os SHA de fonte e de comportamento são recalculados e re-fixados uma única vez, depois do GREEN** (declarado aqui; são detectores de mudança, não limites de hipótese). Valores base: fonte `02b7fc0b…8a64`, comportamento `91c32679…6ad2` | reexport idêntico; módulo sem monólito/numpy/vita (`hashlib` é stdlib); SHA igual no módulo e no monólito e em 3.11/3.12; relógio, aleatoriedade, construtor e banner iguais |
+| CM7 | novo: o vetor de contexto é estável | (a) 7 contextos com vetores dourados (abaixo), igualdade exata; (b) os mesmos 7 com `builtins.hash` trocado por uma função que **levanta**: mesmos vetores; (c) grade `Random(4016)`, 200 contextos com 0–5 dimensões e valores de tipos variados (`str`, `int`, `float`, `None`, `tuple`, texto com acento, emoji e substitutos solitários) e chaves fora das dimensões: vetor igual à referência de `hashlib` do harness, 5 componentes em `[0, 1)`, 0 entradas alteradas. Alvo: 7/7, 7/7 e 200/200 |
+| CM8 | novo: score e seletividade | tabela de 26 itens (abaixo), valores exatos (scores arredondados em 6 casas). Alvo: 26/26 |
+| CM9 | novo: não regressão contra o código base congelado | nas linhas da grade de CM1 em que a referência nova e a `v1` dão o mesmo resultado, o resumo por linha (`_cm_row_digest` truncado em 16 hex, hash do fingerprint com o substituto determinístico) é igual ao do código base (`0627ca4`); a lista dos 120 resumos base tem SHA-256 `580f978aae9c432701d3ff36aeac39377dca8815ce37c05d40e22ecc4c5cd728` (`json.dumps(lista).encode()`), que o harness confere antes de usá-la. **Guarda de validade:** pelo menos **12** linhas «não afetadas» (as 12 linhas sem memória da grade não são afetadas por construção: sem memórias a recuperação devolve `[]` e reinstatement, cues e contadores não leem o vetor); se houver menos, `scenario_invalid` (código 3). Alvo: 0 diferenças |
+
+**CM5 — o que entra.** Gaps residuais (valores esperados): `cue_subset_is_enough` = `1.0` (memória `{location: office, mood: calm, task: reading}` recuperada por `{location: office}` com o limiar padrão: score `1.0`; as dimensões extras da memória não contam); `query_hit_other_context_passes_default` = `[1, 0.5]` (memória `"alpha beta"` em `{location: office}`; consulta `"alpha"` com contexto `{location: home}`, limiar padrão: devolve 1 com score `0.5`); `query_miss_same_context_passes_default` = `[1, 0.65]` (mesma memória; consulta `"zzz"` com `{location: office}`: 1 com `0.65`); `bucket_collision` = `True` (`encode({time: noon}) == encode({time: evening})`, balde 17). Erros: `match_none` → `no-error` (`compute_match(None, [1.0])` → `0.0`); `match_cue_out_of_range` → `IndexError` (`compute_match([1.0], [1.0], [3])`).
+
+**CM7(a) — os 7 vetores dourados** (calculados com `hashlib` antes do código; `unknown` = 0.04):
+
+| # | contexto | vetor (`location, time, mood, task, social`) |
+|---|---|---|
+| 1 | `{}` | `[0.04, 0.04, 0.04, 0.04, 0.04]` |
+| 2 | `{location: office}` | `[0.2, 0.04, 0.04, 0.04, 0.04]` |
+| 3 | `{location: office, time: morning, mood: calm, task: reading, social: alone}` | `[0.2, 0.32, 0.37, 0.78, 0.2]` |
+| 4 | `{mood: focused, task: review}` | `[0.04, 0.04, 0.25, 0.2, 0.04]` |
+| 5 | `{location: 1}` | `[0.19, 0.04, 0.04, 0.04, 0.04]` |
+| 6 | `{social: team, weather: rain}` | `[0.04, 0.04, 0.04, 0.04, 0.48]` |
+| 7 | `{mood: "\ud800"}` (substituto solitário) | `[0.04, 0.04, 0.05, 0.04, 0.04]` |
+
+**CM8 — os 26 itens.** `M` = `{location: office, time: morning, mood: calm, task: reading, social: alone}` armazenada sozinha; recuperação com limiar `0.0`; valor = score do único resultado (baldes: `office` 20, `home` 16, `morning` 32, `noon` 17, `calm` 37, `focused` 25, `reading` 78, `review` 20, `alone` 20, `team` 48, `unknown` 4, `"1"` 19; nenhum par trocado colide).
+
+| # | recuperação | esperado |
+|---|---|---|
+| a1 | contexto = `M` | 1.0 |
+| a2 | `M` com `location: home` | 0.8 |
+| a3 | a2 e `time: noon` | 0.6 |
+| a4 | a3 e `mood: focused` | 0.4 |
+| a5 | a4 e `task: review` | 0.2 |
+| a6 | a5 e `social: team` (as cinco diferentes) | 0.0 |
+| a7 | `{location: office}` | 1.0 (consulta parcial) |
+| a8 | `{location: office, mood: focused}` | 0.5 |
+| a9 | `{}` (sem contexto atual) | 1.0 (sem dimensão consultada) |
+| a10 | `{weather: rain}` | 1.0 (chave fora das dimensões) |
+| a11 | memória `{}`, consulta `{location: office}` | 0.0 |
+| a12 | memória `{}`, consulta `{location: "unknown"}` | 1.0 |
+| a13 | memória `{mood: 1}`, consulta `{mood: "1"}` | 1.0 |
+| a14 | consulta de texto com acerto (`"alpha"` em `"alpha beta"`), contexto `M` | 1.0 |
+| a15 | consulta de texto sem acerto (`"zzz"`), contexto `M` | 0.65 |
+| a16 | consulta com acerto, as cinco diferentes (a6) | 0.5 |
+| a17 | consulta sem acerto, as cinco diferentes | 0.15 |
+| a18 | consulta `""` com `location: home` (a2) | 0.8 (igual a sem consulta) |
+| b1 | seis memórias de `M` com 0, 1, 2, 3, 4 e 5 dimensões trocadas (as de a1–a6), conteúdos distintos, contexto de recuperação `M`, limiar **padrão** | devolve exatamente as de 0, 1 e 2 trocas, nesta ordem, com scores `[1.0, 0.8, 0.6]` e `len(matched_features)` `[5, 4, 3]`; `total_retrievals == 1` |
+| c1 | `compute_match([0.1, 0.2], [0.1, 0.3])` | 0.5 |
+| c2 | `compute_match([], [1.0])` | 0.0 |
+| c3 | `compute_match(None, [1.0])` | 0.0 |
+| c4 | `compute_match([1.0], [1.0], [])` | 1.0 |
+| c5 | `compute_match([0.1, 0.2, 0.3], [0.1])` | 1.0 (compara só o prefixo comum) |
+| c6 | `compute_match([0.1, 0.2], [0.1, 0.3], [1])` | 0.0 |
+| c7 | `compute_match([0.1, 0.2], [0.1, 0.3], [0])` | 1.0 |
+
+**Regra:** nenhum limite, seed, tamanho, caso ou valor acima é alterado depois da primeira execução. A **única** coisa re-fixada é o par de SHA de CM6, e só depois do GREEN, como declarado. Se algum critério falhar, o PR continua draft e as opções vão para o relatório, sem ajuste.
+
+### Regressão exigida e teste negativo
+
+Não há outro contrato dos quatro símbolos além de CM1–CM6; CM1 (referência nova), CM2 (idêntico), CM3 (precisão e controle de revocação), CM4 (controle 101 × 101 e medida), CM5 (dois gaps atualizados, quatro residuais novos) e CM9 são a não regressão. O teste 23 do demo continua chamando `store_with_context`, `retrieve_by_context` e `get_statistics`, e a suíte integrada continua verde.
+**Entrada inválida:** os 16 erros de CM5 não mudam de classe (`AttributeError`, `TypeError`, `RuntimeError`, ou sem erro), e os dois novos são `no-error` e `IndexError`; `str` com substituto solitário **não** levanta (CM7). O harness continua saindo com **2** (`--capability` ausente, vazio ou desconhecido) e **3** (`scenario_invalid`, p. ex. a guarda de CM9 ou a precondição de CM2); um comportamento regredido (voltar a `hash()`, cosseno no lugar de `compute_match`, `content_match` fixo sem consulta) reprova CM1/CM3/CM4/CM7/CM8 e sai com **1**. Cada caminho tem teste.
+
+### Varredura §7.2 (2026-10-29, `gh pr list --state open`)
+
+PRs abertos: #38–#50, #60, #77, #79, #115, #116. Nenhum edita `core/cognitivo/contextual_memory.py`, `test_contextual_memory_contract.py`, `tools/cognitivo_eval.py` nem este arquivo. **Sobreposição declarada, de outro agente em pausa:** #116 (Axis) altera `tools/cognitivo_mutation.py` e `AUDIT_REALITY_REPORT.md`; #79 altera `docs/agentes/CLAIMS.yaml`; #115 altera `core/temporal_facts.py`, que esta rodada não toca. Este PR não toca nem rebaseia nenhum deles; se algum entrar antes, os relatórios são regenerados pelas ferramentas, nunca à mão. Claim `grok-bot`, prazo `2026-10-30T12:00:00Z`, removido no último commit (`claims: []`).
+
+Pré-registro escrito **antes** do contrato RED e antes de rodar o harness com o comportamento novo. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados da correção CM3/CM4 (depois do pré-registro `022706f`)
+
+**Commits, em ordem:** `022706f` pré-registro e claim; `fe1c931` **RED** (contrato e harness CM7–CM9; `--capability contextual_memory` sai com 1, código de produção inalterado); `4fb42da` **GREEN** (a correção mínima em `core/cognitivo/contextual_memory.py`, mutantes, SHAs de CM6 re-fixados, relatórios regenerados por `tools/reality_audit.py`); este commit de resultados (esta seção e `docs/agentes/CLAIMS.yaml` de volta a `claims: []`).
+
+**Valores no RED (código de `main` em `0627ca4`) e no GREEN** — nenhum limite, seed, tamanho, caso ou valor foi alterado depois da primeira execução:
+
+| id | RED | GREEN |
+|---|---|---|
+| CM1 | falha: 34/120 iguais à referência v2 | **passa**: 120/120; 0 entradas alteradas; ids e timestamps válidos |
+| CM2 | passa 20/20 | **passa** 20/20 |
+| CM3 | falha: precisão 0/20 (30 retornadas em cada seed); controle de revocação 20/20 | **passa**: precisão 20/20 (6 retornadas, as 6 memórias do contexto 0); revocação 20/20 |
+| CM4 | falha: controle 101×101 20/20; cruzado 101×202 0/20 | **passa**: controle 20/20; cruzado 20/20 (taxa 1.00) |
+| CM5 | falha: gaps 14/18; erros 16/18 (o pré-registro muda dois gaps e acrescenta quatro gaps e dois erros) | **passa**: gaps 18/18; erros 18/18; colaboradores nunca lidos |
+| CM6 | falha (SHAs ainda dos valores de `0627ca4`) | **passa** após o re-fixar dos detectores (declaração 1) |
+| CM7 | falha: dourados 0/7; sem `builtins.hash` 0/7; grade 0/200 | **passa**: 7/7, 7/7 e 200/200; 0 entradas alteradas |
+| CM8 | falha: 5/26 itens | **passa**: 26/26 |
+| CM9 | passa: 34 ≥ 12 linhas não afetadas, 0 diferenças | **passa**: 34 ≥ 12 linhas não afetadas, 0 diferenças |
+
+Saída do harness: RED `exit 1` (falhas CM1, CM3–CM8); GREEN `exit 0`.
+
+**Declarações de transparência.**
+1. Os SHAs de CM6 (fonte `79fe6842…fd88`, comportamento `c2153356…3e3d`) são detectores: o pré-registro declarou que mudam com o GREEN. Foram re-fixados uma única vez no commit GREEN, depois de todos os outros critérios passarem. Valores anteriores: fonte `02b7fc0b…8a64`, comportamento `91c32679…6ad2`. São iguais em 3.11 e 3.12.
+2. O harness chama `hash()` real só em CM4 (subprocessos) e em CM7; no restante o `hash` é o substituto determinístico `_cm_hash`, que equivale ao novo código. Por isso a base só falha em CM4 e CM7 por esse caminho, e CM1/CM3/CM5/CM8 falham pela mudança do score.
+3. Mutantes: dois mutantes antigos de `compute_similarity` (`cm_similarity_empty_guard_dropped`, `cm_similarity_one_empty_only`) perderam a unicidade da agulha porque `compute_match` repete o guard; as agulhas foram estendidas, sem mudar o que cada mutante faz. Há 19 mutantes novos (menos o `cm_hash_of_repr` removido) para `compute_match`, o sha256 e a seleção de dimensões consultadas.
+4. Testes extras no contrato (bordas de `compute_match`, hash sem `hash()`, vetor igual entre `PYTHONHASHSEED`, regressões de score e de codificação, guarda e resumos do CM9) existem para matar mutantes que sobreviveriam; não mudam critérios.
+
+**Lacunas residuais (mantidas em CM5 ou fora de escopo; nada disto foi tocado).** Com query, o score continua aditivo `(contexto + conteúdo) / 2`: uma query que acerta passa o limiar padrão mesmo com contexto diferente (0.5) e uma que erra passa com contexto igual (0.65). Subconjunto de dimensões consultadas basta (`cue_subset_is_enough` = 1.0). Colisões de balde (`% 100`; por exemplo `noon` e `evening`) tornam valores diferentes iguais (`bucket_collision`). `compute_similarity` (cosseno) continua e não é mais usada na recuperação. `working_memory` e `attention` seguem armazenados e nunca lidos; `long_term_memory` só recebe escrita; entradas não validadas; `nonmatching_lowers` agora é falso (contexto diferente dá 0.0, query errada dá 0.15), mudança declarada no pré-registro.
+
+**Opções se algo for recusado na revisão.** (a) Manter em rascunho como inventário medido; (b) PR separado para o score com query (multiplicativo ou duas etapas) com novo pré-registro; (c) trocar o balde `% 100` por vetor de igualdade exata do valor, com novo protocolo.

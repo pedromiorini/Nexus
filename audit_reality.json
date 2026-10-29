@@ -36,9 +36,9 @@
       },
       {
         "path": "core/cognitivo/contextual_memory.py",
-        "lines": 367,
+        "lines": 385,
         "classes": 4,
-        "functions": 12
+        "functions": 13
       },
       {
         "path": "core/cognitivo/counterfactual.py",
