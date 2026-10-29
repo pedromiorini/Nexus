@@ -13,6 +13,7 @@ import contextlib
 import io
 import itertools
 import json
+import os
 import random
 import sys
 import tempfile
@@ -23,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
-CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future", "mental_simulation", "analogical_reasoning")
+CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future", "mental_simulation", "analogical_reasoning", "contextual_memory")
 
 TOPICS = [
     ("database", "migration", "rollback"), ("network", "latency", "spike"), ("disk", "quota", "exceeded"),
@@ -4292,6 +4293,619 @@ def eval_analogical_reasoning(criteria="v1"):
     ]
 
 
+# ── Contextual Memory (POST14) ──────────────────────────────────────────────
+
+CM_SOURCE_SHA = "02b7fc0b23a6fed4a56ab9584524a7f87498e7ed21c5210ad41c673a2c5d8a64"
+CM_BEHAVIOR_SHA = "91c326795ff80049b0c3b2f802227d5391d7076f3de3e84e31c30bb604a56ad2"  # capturado uma única vez no monólito antes do move; 3.11 e 3.12
+_CM_NAMES = ("ContextualMemory", "ContextMatch", "ContextEncoder", "RealContextualMemorySystem")
+_CM_MARKER = "# MÓDULO 14: CONTEXTUAL MEMORY SYSTEM (POST 14)"
+_CM_END = '            "current_context_dimensions": len(self.current_context)\n        }'
+_CM_BANNER = "🧠🔍 POST 14 - RealContextualMemorySystem initialized (Context-dependent recall active)\n"
+_CM_POOLS = {
+    "location": ("office", "home", "lab", "cafe", "gym", "park", "library", "train"),
+    "time": ("morning", "noon", "evening", "night", "dawn", "weekend"),
+    "mood": ("calm", "focused", "tense", "happy", "sad", "bored"),
+    "task": ("coding", "reading", "review", "cooking", "running", "writing"),
+    "social": ("alone", "team", "family", "friends", "client"),
+}
+_CM_WEATHER = ("rain", "sun", "fog")
+_CM_WORDS = ("alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel")
+_CM_THRESHOLDS = (0.0, 0.3, 0.5, 0.7, 0.9, 1.0)
+_CM_GRID_SEED = 2014
+_CM_GRID_SIZE = 120
+_CM_SEEDS = tuple(range(20))
+_CM_LIMIT = 0.90
+_CM_PRECISION = 0.80
+_CM_CTX_SEED = 4014
+_CM_HASH_SEEDS = (101, 101, 202)
+_CM_FRESH_STATS = {"total_encodings": 0, "total_retrievals": 0, "context_matched_retrievals": 0,
+                   "context_match_rate": 0.0, "stored_memories": 0, "current_context_dimensions": 0}
+_CM_COUNTERS_EXPECTED = {
+    "stats": {"total_encodings": 2, "total_retrievals": 2, "context_matched_retrievals": 1,
+              "context_match_rate": 0.5, "stored_memories": 2, "current_context_dimensions": 1},
+    "retrieval_counts": [1, 1],
+}
+_CM_COLLAB_EXPECTED = {"ltm_calls": [["c", "contextual", 0.7], ["5", "contextual", 0.7]],
+                       "falsy_ltm_untouched": True, "wm_attention_untouched": True}
+_CM_GAPS_EXPECTED = {
+    "default_threshold_returns_all": 3,
+    "unlisted_keys_ignored": True,
+    "aliased_current_context": {"aliased": True, "stale_vector": True},
+    "empty_query": {"same_score_as_none": True, "nonmatching_lowers": True},
+    "specificity_side_effects": {"score": 1.0, "encodings": 2, "retrievals": 1, "stored": 2,
+                                 "prior_retrieval_count": 1},
+    "reinstate": {"unknown_none": True, "unknown_keeps_context": True, "known_same_object": True,
+                  "vector_updated": True},
+    "matched_features": ["mood", "location", "task"],
+    "cues": ["location=office", "mood=focused"],
+    "similarity_edges": {"empty": 0.0, "zero_vector": 0.0, "orthogonal": 0.0, "same": 1.0,
+                         "length_mismatch": 0.447213595},
+    "encode_defaults": {"dims": ["location", "time", "mood", "task", "social"], "all_unknown_equal": True},
+    "str_coerced_values": True,
+    "key_order_independent": True,
+    "failed_set_leaves_none": True,
+    "ltm_failure_after_append": {"stored": 1, "encodings": 1},
+}
+_CM_ERRORS_EXPECTED = {
+    "set_ctx_none": "AttributeError", "set_ctx_list": "AttributeError", "store_ctx_int": "AttributeError",
+    "retrieve_ctx_str": "AttributeError", "encode_none": "AttributeError", "cues_none": "AttributeError",
+    "retrieve_threshold_str_with_memory": "TypeError", "retrieve_threshold_none_with_memory": "TypeError",
+    "store_no_args": "TypeError", "construct_extra": "TypeError", "similarity_str": "TypeError",
+    "store_ltm_raises": "RuntimeError",
+    "retrieve_threshold_str_empty": "no-error", "retrieve_query_int": "no-error",
+    "reinstate_none": "no-error", "similarity_none": "no-error",
+}
+_CM_PROC_SCRIPT = (
+    "import json, sys\n"
+    "from {source} import ContextEncoder\n"
+    "enc = ContextEncoder()\n"
+    "ctxs = json.loads(sys.stdin.read())\n"
+    "print('CMVEC:' + json.dumps([enc.encode_context(c) for c in ctxs]))\n"
+)
+
+
+def _cm_hash(value):
+    import hashlib
+    return int(hashlib.sha256(str(value).encode()).hexdigest()[:8], 16)
+
+
+class _cm_det_hash:
+    """Troca builtins.hash por uma função determinística (a original depende de PYTHONHASHSEED)."""
+
+    def __enter__(self):
+        import builtins
+        self._original = builtins.hash
+        builtins.hash = _cm_hash
+
+    def __exit__(self, *exc):
+        import builtins
+        builtins.hash = self._original
+        return False
+
+
+def _cm_err(fn):
+    try:
+        fn()
+    except Exception as exc:
+        return type(exc).__name__
+    return "no-error"
+
+
+def _cm_ctx(rng):
+    ctx = {}
+    for dim, pool in _CM_POOLS.items():
+        if rng.random() < 0.7:
+            ctx[dim] = rng.choice(pool)
+    if rng.random() < 0.3:
+        ctx["weather"] = rng.choice(_CM_WEATHER)
+    return ctx
+
+
+def _cm_grid():
+    rng = random.Random(_CM_GRID_SEED)  # nosec B311 - dados sintéticos de avaliação
+    rows = []
+    for _ in range(_CM_GRID_SIZE):
+        set_ctx = _cm_ctx(rng) if rng.random() < 0.6 else None
+        memories = []
+        for j in range(rng.randint(0, 8)):
+            content = f"{rng.choice(_CM_WORDS)} {rng.choice(_CM_WORDS)} {j}"
+            memories.append((content, _cm_ctx(rng) if rng.random() < 0.8 else None))
+        retrievals = []
+        for _r in range(rng.randint(1, 3)):
+            query = rng.choice([None, "", rng.choice(_CM_WORDS), "zzz-none"])
+            context = None if rng.random() < 0.3 else _cm_ctx(rng)
+            retrievals.append((query, context, rng.choice(_CM_THRESHOLDS)))
+        reinstate = rng.randrange(len(memories)) if memories and rng.random() < 0.8 else None
+        rows.append((set_ctx, memories, retrievals, reinstate))
+    return rows
+
+
+def _cm_ref_vec(ctx):
+    return [_cm_hash(ctx.get(dim, "unknown")) % 100 / 100.0 for dim in _CM_POOLS]
+
+
+def _cm_ref_cos(left, right):
+    if not left or not right:
+        return 0.0
+    dot = sum(a * b for a, b in zip(left, right))
+    norm_l = sum(a * a for a in left) ** 0.5
+    norm_r = sum(b * b for b in right) ** 0.5
+    if norm_l == 0 or norm_r == 0:
+        return 0.0
+    return dot / (norm_l * norm_r)
+
+
+def _cm_reference(row):
+    set_ctx, memories, retrievals, reinstate = row
+    current = set_ctx if set_ctx is not None else {}
+    stored = []
+    for content, ctx in memories:
+        ctx = current if ctx is None else ctx
+        stored.append({"content": content, "ctx": ctx, "vec": _cm_ref_vec(ctx), "n": 0})
+    retrieved, matched_calls = [], 0
+    for query, ctx, threshold in retrievals:
+        ctx = current if ctx is None else ctx
+        vec = _cm_ref_vec(ctx)
+        found = []
+        for item in stored:
+            content_match = 1.0
+            if query:
+                content_match = 1.0 if str(query).lower() in str(item["content"]).lower() else 0.3
+            score = (_cm_ref_cos(item["vec"], vec) + content_match) / 2.0
+            if score >= threshold:
+                item["n"] += 1
+                feats = [k for k in item["ctx"] if k in ctx and item["ctx"][k] == ctx[k]]
+                found.append((item["content"], score, feats, item["n"]))
+        found = sorted(found, key=lambda t: t[1], reverse=True)
+        matched_calls += 1 if found else 0
+        retrieved.append(found)
+    reinstated = None
+    if reinstate is not None:
+        reinstated = stored[reinstate]["ctx"]
+        current = reinstated
+    total = len(retrievals)
+    return {
+        "contents": [item["content"] for item in stored],
+        "retrieved": retrieved,
+        "reinstated": reinstated,
+        "current": current,
+        "cues": [f"{k}={v}" for k, v in stored[0]["ctx"].items()] if stored else None,
+        "stats": {"total_encodings": len(stored), "total_retrievals": total,
+                  "context_matched_retrievals": matched_calls,
+                  "context_match_rate": matched_calls / total if total > 0 else 0.0,
+                  "stored_memories": len(stored), "current_context_dimensions": len(current)},
+    }
+
+
+def _cm_system(cls, **kwargs):
+    import contextlib
+    import io
+    with contextlib.redirect_stdout(io.StringIO()):
+        return cls(**kwargs)
+
+
+def _cm_run(cls, row):
+    set_ctx, memories, retrievals, reinstate = row
+    system = _cm_system(cls)
+    if set_ctx is not None:
+        system.set_current_context(set_ctx)
+    before = time.time()
+    stored = [system.store_with_context(content, ctx) for content, ctx in memories]
+    after = time.time()
+    retrieved = []
+    for query, ctx, threshold in retrievals:
+        found = system.retrieve_by_context(query=query, context=ctx, threshold=threshold)
+        retrieved.append([(m.memory.content, m.match_score, list(m.matched_features), m.memory.retrieval_count)
+                          for m in found])
+    reinstated = system.reinstate_context(stored[reinstate].memory_id if reinstate is not None else "missing")
+    ids = [m.memory_id for m in stored]
+    meta_ok = (
+        len(set(ids)) == len(ids) and all(isinstance(i, str) and len(i) == 36 for i in ids)
+        and all(isinstance(m.timestamp, float) and before <= m.timestamp <= after for m in stored)
+    )
+    return {
+        "contents": [m.content for m in stored],
+        "retrieved": retrieved,
+        "reinstated": reinstated,
+        "current": system.current_context,
+        "cues": system.get_context_dependent_cues(stored[0]) if stored else None,
+        "stats": system.get_statistics(),
+    }, meta_ok
+
+
+def _cm_same(view, ref):
+    if view["contents"] != ref["contents"] or len(view["retrieved"]) != len(ref["retrieved"]):
+        return False
+    for got, want in zip(view["retrieved"], ref["retrieved"]):
+        if len(got) != len(want):
+            return False
+        for (c1, s1, f1, n1), (c2, s2, f2, n2) in zip(got, want):
+            if c1 != c2 or abs(s1 - s2) > 1e-12 or f1 != f2 or n1 != n2:
+                return False
+    stats_got, stats_want = view["stats"], ref["stats"]
+    return (
+        view["reinstated"] == ref["reinstated"] and view["current"] == ref["current"] and view["cues"] == ref["cues"]
+        and set(stats_got) == set(stats_want)
+        and all(abs(stats_got[k] - stats_want[k]) < 1e-12 for k in stats_want)
+    )
+
+
+def _cm_row_digest(view):
+    rounded = [[(c, round(s, 12), f, n) for c, s, f, n in rows] for rows in view["retrieved"]]
+    return _ms_sha({"contents": view["contents"], "retrieved": rounded, "reinstated": view["reinstated"],
+                    "current": view["current"], "cues": view["cues"], "stats": view["stats"]})
+
+
+def _cm_scenario(cls, seed):
+    rng = random.Random(seed)  # nosec B311 - dados sintéticos de avaliação
+    picks = {dim: rng.sample(pool, 5) for dim, pool in _CM_POOLS.items()}
+    ctxs = [{dim: picks[dim][c] for dim in _CM_POOLS} for c in range(5)]
+    system = _cm_system(cls)
+    for c, ctx in enumerate(ctxs):
+        for k in range(6):
+            system.store_with_context(f"m{seed}_{c}_{k}", dict(ctx))
+    vecs = [_cm_ref_vec(ctx) for ctx in ctxs]
+    valid = len({tuple(v) for v in vecs}) == 5 and all(_cm_ref_cos(vecs[0], v) < 1 - 1e-9 for v in vecs[1:])
+    return system, ctxs, valid
+
+
+def _cm_selectivity_families(cls):
+    ranked = precise = invalid = 0
+    returned = []
+    for seed in _CM_SEEDS:
+        system, ctxs, valid = _cm_scenario(cls, seed)
+        invalid += 0 if valid else 1
+        want = {f"m{seed}_0_{k}" for k in range(6)}
+        top = system.retrieve_by_context(context=ctxs[0], threshold=0.0)
+        ranked += {m.memory.content for m in top[:6]} == want
+        default = system.retrieve_by_context(context=ctxs[0])
+        hits = sum(1 for m in default if m.memory.content in want)
+        returned.append(len(default))
+        precise += bool(default) and hits / len(default) >= _CM_PRECISION
+    total = len(_CM_SEEDS)
+    return {"CM2": {"hits": ranked, "total": total, "rate": ranked / total, "invalid": invalid},
+            "CM3": {"hits": precise, "total": total, "rate": precise / total, "returned": returned}}
+
+
+def _cm_process_vectors(source, ctxs, hash_seed):
+    import subprocess
+    env = {**os.environ, "PYTHONHASHSEED": str(hash_seed), "PYTHONPATH": str(ROOT)}
+    proc = subprocess.run(  # nosec B603 - interpretador atual e script fixo do harness
+        [sys.executable, "-c", _CM_PROC_SCRIPT.format(source=source)],
+        input=json.dumps(ctxs), capture_output=True, text=True, env=env, cwd=str(ROOT), timeout=300, check=False)
+    lines = [line for line in proc.stdout.splitlines() if line.startswith("CMVEC:")]
+    if proc.returncode != 0 or not lines:
+        raise RuntimeError(f"subprocesso falhou ({source}, seed {hash_seed}): {proc.stderr[-400:]}")
+    return json.loads(lines[-1][len("CMVEC:"):])
+
+
+def _cm_determinism(source):
+    rng = random.Random(_CM_CTX_SEED)  # nosec B311 - dados sintéticos de avaliação
+    ctxs = [{dim: rng.choice(pool) for dim, pool in _CM_POOLS.items()} for _ in range(20)]
+    first, again, other = (_cm_process_vectors(source, ctxs, seed) for seed in _CM_HASH_SEEDS)
+    control = sum(1 for a, b in zip(first, again) if a == b)
+    cross = sum(1 for a, b in zip(first, other) if a == b)
+    return {"contexts": len(ctxs), "control_same": control, "cross_same": cross,
+            "control_rate": control / len(ctxs), "cross_rate": cross / len(ctxs)}
+
+
+def contextual_memory_fingerprint(ns):
+    import copy
+    import inspect
+    if isinstance(ns, dict):
+        get, source = ns.__getitem__, "core.constitutional_brain"
+    else:
+        def get(name):
+            return getattr(ns, name)
+        source = ns.__name__
+    cls, mem_cls, match_cls, enc_cls = (get(name) for name in
+                                        ("RealContextualMemorySystem", "ContextualMemory", "ContextMatch",
+                                         "ContextEncoder"))
+    with _cm_det_hash():
+        return _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect)
+
+
+def _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect):
+    import contextlib
+    import io
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        fresh = cls()
+    banner = buf.getvalue()
+    fresh_stats = fresh.get_statistics()
+
+    # grade (CM1)
+    matches = mutated = meta_bad = 0
+    digests = []
+    for row in _cm_grid():
+        snapshot = copy.deepcopy(row)
+        view, meta_ok = _cm_run(cls, row)
+        ref = _cm_reference(row)
+        matches += bool(_cm_same(view, ref))
+        mutated += row != snapshot
+        meta_bad += not meta_ok
+        digests.append(_cm_row_digest(view))
+    grid_info = {"count": len(digests), "reference_matches": matches, "mutated_inputs": mutated,
+                 "meta_bad": meta_bad, "rows_sha": _ms_sha(digests)}
+
+    families = _cm_selectivity_families(cls)
+    determinism = _cm_determinism(source)
+
+    # contadores
+    counter_sys = _cm_system(cls)
+    counter_sys.set_current_context({"location": "office"})
+    counter_sys.store_with_context("alpha")
+    counter_sys.store_with_context("beta", {"location": "home"})
+    counter_sys.retrieve_by_context(threshold=2.0)
+    counter_sys.retrieve_by_context(threshold=0.0)
+    counters = {"stats": counter_sys.get_statistics(),
+                "retrieval_counts": [m.retrieval_count for m in counter_sys.contextual_memories]}
+
+    # colaboradores
+    class Spy:
+        def __init__(self):
+            self.calls = []
+
+        def store(self, *args, **kwargs):
+            self.calls.append([args[0], args[1], kwargs.get("importance")])
+
+    class Falsy:
+        calls = 0
+
+        def __bool__(self):
+            return False
+
+        def store(self, *args, **kwargs):
+            Falsy.calls += 1
+
+    class Boom:
+        def __getattribute__(self, name):
+            raise AssertionError(f"leitura de {name}")
+
+    spy, falsy, boom = Spy(), Falsy(), Boom()
+    spy_sys = _cm_system(cls, long_term_memory=spy, working_memory=boom, attention=boom)
+    spy_sys.store_with_context("c", {"mood": "x"})
+    spy_sys.store_with_context(5, {"mood": "y"})
+    spy_sys.retrieve_by_context(context={"mood": "x"})
+    spy_sys.get_statistics()
+    falsy_sys = _cm_system(cls, long_term_memory=falsy)
+    falsy_sys.store_with_context("z", {})
+    collaborators = {"ltm_calls": spy.calls, "falsy_ltm_untouched": Falsy.calls == 0,
+                     "wm_attention_untouched": spy_sys.wm is boom and spy_sys.attention is boom}
+
+    # gaps
+    enc = enc_cls()
+    sys1 = _cm_system(cls)
+    for i, ctx in enumerate(({"location": "a", "mood": "b"}, {"time": "c", "task": "d"},
+                             {"social": "e", "location": "f"})):
+        sys1.store_with_context(f"x{i}", ctx)
+    default_returns = len(sys1.retrieve_by_context(context={"location": "zzz", "task": "q"}))
+
+    alias_ctx = {"location": "office"}
+    alias_sys = _cm_system(cls)
+    alias_sys.set_current_context(alias_ctx)
+    alias_mem = alias_sys.store_with_context("x")
+    alias_ctx["location"] = "home"
+    aliased = {
+        "aliased": alias_mem.context is alias_ctx and alias_mem.context["location"] == "home"
+        and alias_sys.current_context is alias_ctx,
+        "stale_vector": alias_mem.context_vector == enc.encode_context({"location": "office"})
+        and alias_mem.context_vector != enc.encode_context(alias_ctx),
+    }
+
+    q_sys = _cm_system(cls)
+    q_sys.store_with_context("alpha", {"location": "a"})
+    score_none = q_sys.retrieve_by_context(context={"location": "b"}, threshold=0.0)[0].match_score
+    score_empty = q_sys.retrieve_by_context(query="", context={"location": "b"}, threshold=0.0)[0].match_score
+    score_miss = q_sys.retrieve_by_context(query="zzz", context={"location": "b"}, threshold=0.0)[0].match_score
+
+    spec_sys = _cm_system(cls)
+    spec_sys.store_with_context("prior", {"location": "home"})
+    spec_ctx = {"location": "lab", "task": "research"}
+    spec_score = spec_sys.test_encoding_specificity("Python programming", dict(spec_ctx), dict(spec_ctx))
+    spec_stats = spec_sys.get_statistics()
+
+    re_sys = _cm_system(cls)
+    re_mem = re_sys.store_with_context("x", {"location": "lab"})
+    re_sys.set_current_context({"mood": "calm"})
+    re_current = re_sys.current_context
+    re_unknown = re_sys.reinstate_context("nope")
+    re_keeps = re_sys.current_context is re_current
+    re_known = re_sys.reinstate_context(re_mem.memory_id)
+    reinstate = {
+        "unknown_none": re_unknown is None, "unknown_keeps_context": re_keeps,
+        "known_same_object": re_known is re_mem.context and re_sys.current_context is re_mem.context,
+        "vector_updated": re_sys.current_context_vector == enc.encode_context({"location": "lab"}),
+    }
+
+    feat_sys = _cm_system(cls)
+    feat_sys.store_with_context("x", {"mood": "x", "location": "a", "task": "t"})
+    matched = feat_sys.retrieve_by_context(
+        context={"location": "a", "task": "t", "mood": "x"}, threshold=0.0)[0].matched_features
+
+    cue_sys = _cm_system(cls)
+    cues = cue_sys.get_context_dependent_cues(cue_sys.store_with_context("x", {"location": "office", "mood": "focused"}))
+
+    none_sys = _cm_system(cls)
+    try:
+        none_sys.set_current_context(None)
+    except Exception:  # noqa: BLE001 - o registro do erro está em `errors`
+        pass
+
+    class Raising:
+        def store(self, *args, **kwargs):
+            raise RuntimeError("ltm")
+
+    ltm_sys = _cm_system(cls, long_term_memory=Raising())
+    try:
+        ltm_sys.store_with_context("x", {})
+    except RuntimeError:
+        pass
+
+    gaps = {
+        "default_threshold_returns_all": default_returns,
+        "unlisted_keys_ignored": enc.encode_context({"weather": "rain"}) == enc.encode_context({"weather": "sun"})
+        == enc.encode_context({}),
+        "aliased_current_context": aliased,
+        "empty_query": {"same_score_as_none": score_empty == score_none, "nonmatching_lowers": score_miss < score_none},
+        "specificity_side_effects": {
+            "score": round(spec_score, 9), "encodings": spec_stats["total_encodings"],
+            "retrievals": spec_stats["total_retrievals"], "stored": spec_stats["stored_memories"],
+            "prior_retrieval_count": spec_sys.contextual_memories[0].retrieval_count},
+        "reinstate": reinstate,
+        "matched_features": matched,
+        "cues": cues,
+        "similarity_edges": {
+            "empty": enc.compute_similarity([], [1.0]), "zero_vector": enc.compute_similarity([0.0, 0.0], [1.0, 1.0]),
+            "orthogonal": enc.compute_similarity([1.0, 0.0], [0.0, 1.0]),
+            "same": round(enc.compute_similarity([0.5, 0.5], [0.5, 0.5]), 9),
+            "length_mismatch": round(enc.compute_similarity([1.0, 2.0], [1.0]), 9)},
+        "encode_defaults": {"dims": list(enc.context_dimensions),
+                            "all_unknown_equal": len(set(enc.encode_context({}))) == 1},
+        "str_coerced_values": enc.encode_context({"mood": 1}) == enc.encode_context({"mood": "1"}),
+        "key_order_independent": enc.encode_context({"mood": "a", "task": "b"})
+        == enc.encode_context({"task": "b", "mood": "a"}),
+        "failed_set_leaves_none": none_sys.current_context is None,
+        "ltm_failure_after_append": {"stored": len(ltm_sys.contextual_memories), "encodings": ltm_sys.total_encodings},
+    }
+
+    def loaded(threshold):
+        system = _cm_system(cls)
+        system.store_with_context("x", {})
+        return system.retrieve_by_context(threshold=threshold)
+
+    errors = {
+        "set_ctx_none": _cm_err(lambda: _cm_system(cls).set_current_context(None)),
+        "set_ctx_list": _cm_err(lambda: _cm_system(cls).set_current_context([])),
+        "store_ctx_int": _cm_err(lambda: _cm_system(cls).store_with_context("x", 5)),
+        "retrieve_ctx_str": _cm_err(lambda: _cm_system(cls).retrieve_by_context(context="a")),
+        "encode_none": _cm_err(lambda: enc_cls().encode_context(None)),
+        "cues_none": _cm_err(lambda: _cm_system(cls).get_context_dependent_cues(None)),
+        "retrieve_threshold_str_with_memory": _cm_err(lambda: loaded("a")),
+        "retrieve_threshold_none_with_memory": _cm_err(lambda: loaded(None)),
+        "store_no_args": _cm_err(lambda: _cm_system(cls).store_with_context()),
+        "construct_extra": _cm_err(lambda: cls(1, 2, 3, 4)),
+        "similarity_str": _cm_err(lambda: enc_cls().compute_similarity("ab", "cd")),
+        "store_ltm_raises": _cm_err(lambda: _cm_system(cls, long_term_memory=Raising()).store_with_context("x", {})),
+        "retrieve_threshold_str_empty": _cm_err(lambda: _cm_system(cls).retrieve_by_context(threshold="a")),
+        "retrieve_query_int": _cm_err(lambda: _cm_system(cls).retrieve_by_context(query=5)),
+        "reinstate_none": _cm_err(lambda: _cm_system(cls).reinstate_context(None)),
+        "similarity_none": _cm_err(lambda: enc_cls().compute_similarity(None, [1.0])),
+    }
+    return {
+        "clock": "time.time",
+        "randomness": "uuid4 ids; hash() determinístico no harness",
+        "init_params": list(inspect.signature(cls.__init__).parameters),
+        "banner": banner,
+        "memory_fields": list(inspect.signature(mem_cls).parameters),
+        "match_fields": list(inspect.signature(match_cls).parameters),
+        "fresh_stats": fresh_stats,
+        "grid": grid_info,
+        "families": families,
+        "determinism": determinism,
+        "counters": counters,
+        "collaborators": collaborators,
+        "gaps": gaps,
+        "errors": errors,
+    }
+
+
+def contextual_memory_source_text(src: str) -> str:
+    idx = src.index(_CM_MARKER)
+    line_start = src.rfind("\n", 0, idx - 1) + 1
+    end = src.index(_CM_END, idx) + len(_CM_END)
+    return src[line_start:end]
+
+
+def _contextual_memory_source_sha(path="core/cognitivo/contextual_memory.py") -> str:
+    import hashlib
+    text = (ROOT / path).read_text(encoding="utf-8")
+    return hashlib.sha256(contextual_memory_source_text(text).encode()).hexdigest()
+
+
+def _contextual_memory_standalone() -> bool:
+    """Árvore de imports: constitutional_brain, numpy ou vita no módulo extraído falha CM6."""
+    import ast
+
+    tree = ast.parse((ROOT / "core/cognitivo/contextual_memory.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names = [node.module]
+        for name in names:
+            root = name.split(".")[0]
+            if root in {"numpy", "vita"} or name == "core.constitutional_brain" \
+                    or name.startswith("core.constitutional_brain."):
+                return False
+    return True
+
+
+def eval_contextual_memory(criteria="v1"):
+    """CM1–CM6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    import core.cognitivo.contextual_memory as contextual_memory
+    import core.constitutional_brain as brain
+    import core.cognitivo as package
+
+    payload = contextual_memory_fingerprint(contextual_memory)
+    sha_module = _ms_sha(payload)
+    sha_brain = _ms_sha(contextual_memory_fingerprint(brain))
+    source_sha = _contextual_memory_source_sha()
+    standalone = _contextual_memory_standalone()
+    identity = all(
+        getattr(brain, name) is getattr(contextual_memory, name) is getattr(package, name)
+        and getattr(contextual_memory, name).__module__ == "core.cognitivo.contextual_memory"
+        for name in _CM_NAMES
+    )
+    grid = payload["grid"]
+    cm1 = (
+        grid["count"] == _CM_GRID_SIZE and grid["reference_matches"] == _CM_GRID_SIZE
+        and grid["mutated_inputs"] == 0 and grid["meta_bad"] == 0
+    )
+    fam2, fam3 = payload["families"]["CM2"], payload["families"]["CM3"]
+    cm2_invalid = fam2["invalid"] > 0
+    cm2 = not cm2_invalid and fam2["rate"] >= _CM_LIMIT
+    cm3 = fam3["rate"] >= _CM_LIMIT
+    det = payload["determinism"]
+    cm4 = det["control_same"] == det["contexts"] and det["cross_rate"] >= _CM_LIMIT
+    gaps = payload["gaps"]
+    gap_hits = sum(1 for name, expected in _CM_GAPS_EXPECTED.items() if gaps.get(name) == expected)
+    error_hits = sum(1 for name, expected in _CM_ERRORS_EXPECTED.items() if payload["errors"].get(name) == expected)
+    cm5 = (
+        payload["fresh_stats"] == _CM_FRESH_STATS
+        and payload["counters"] == _CM_COUNTERS_EXPECTED
+        and payload["collaborators"] == _CM_COLLAB_EXPECTED
+        and gap_hits == len(_CM_GAPS_EXPECTED) == len(gaps)
+        and error_hits == len(_CM_ERRORS_EXPECTED) == len(payload["errors"])
+    )
+    cm6 = (
+        identity and standalone and source_sha == CM_SOURCE_SHA
+        and sha_module == sha_brain == CM_BEHAVIOR_SHA
+        and payload["clock"] == "time.time"
+        and payload["init_params"] == ["self", "long_term_memory", "working_memory", "attention"]
+        and payload["banner"] == _CM_BANNER
+    )
+    return [
+        _check("CM1", {"reference_matches": grid["reference_matches"], "count": grid["count"],
+                       "mutated_inputs": grid["mutated_inputs"], "meta_bad": grid["meta_bad"]},
+               cm1, "120/120 iguais à referência independente; 0 entradas alteradas; ids e timestamps válidos"),
+        _check("CM2", fam2, cm2, "contexto consultado ocupa as 6 primeiras posições em ≥ 0.90 das 20 seeds",
+               **({"scenario_invalid": True} if cm2_invalid else {})),
+        _check("CM3", fam3, cm3, "precisão ≥ 0.80 com o limiar padrão em ≥ 0.90 das 20 seeds"),
+        _check("CM4", det, cm4, "controle 20/20 e vetor igual entre PYTHONHASHSEED 101 e 202 em ≥ 0.90 dos 20 contextos"),
+        _check("CM5", {"fresh_stats": payload["fresh_stats"], "counters": payload["counters"],
+                       "collaborators": payload["collaborators"], "gap_hits": [gap_hits, len(_CM_GAPS_EXPECTED)],
+                       "error_hits": [error_hits, len(_CM_ERRORS_EXPECTED)], "gaps": gaps,
+                       "errors": payload["errors"]},
+               cm5, "contadores, colaboradores, erros e gaps conforme o registrado"),
+        _check("CM6", {"source_sha": source_sha, "sha_module": sha_module, "sha_brain": sha_brain,
+                       "identity": identity, "standalone": standalone, "clock": payload["clock"],
+                       "source_golden": CM_SOURCE_SHA, "behavior_golden": CM_BEHAVIOR_SHA},
+               cm6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+    ]
+
+
 EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts,
               "causal": eval_causal, "counterfactual": eval_counterfactual,
               "working_memory": eval_working_memory,
@@ -4299,7 +4913,8 @@ EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": 
               "incremental": eval_incremental,
               "episodic_future": eval_episodic_future,
               "mental_simulation": eval_mental_simulation,
-              "analogical_reasoning": eval_analogical_reasoning}
+              "analogical_reasoning": eval_analogical_reasoning,
+              "contextual_memory": eval_contextual_memory}
 
 
 def main(argv=None) -> int:
