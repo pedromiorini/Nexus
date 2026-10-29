@@ -1871,3 +1871,41 @@ Antes e depois do move: `python -m unittest discover` sem falhas novas, `python 
 O harness sai com **2** para `--capability` ausente, vazia ou desconhecida (`contextual-memory`, `Contextual_Memory`, `contextual`, `contextual_memory2`) e com **3** quando um critério marca `scenario_invalid` (a precondição de CM2 falha), nunca com 1. Um comportamento adulterado muda o SHA do fingerprint, e um golden errado reprova CM6 com saída 1. Como o move não pode alterar comportamento, o bloco **não ganha** código próprio de erro: os códigos 2 e 3 são os do harness, e as entradas inválidas do bloco são caracterizadas em CM5 (`Errors`).
 
 Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability contextual_memory`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados CM (depois do pré-registro `c8ca267`)
+
+**Commits, em ordem:** `c8ca267` pré-registro e claim; `d65df36` harness e contrato, **RED** (módulo ausente: 17 testes, 10 passam e 7 dão erro com `ModuleNotFoundError`, código de saída 1; `--capability contextual_memory` sai com 1 pelo mesmo motivo); `3e52963` move-only (**GREEN** nos critérios que não são lacuna), com 56 mutantes novos e `# nosec B404/B110` no harness; este commit de resultados e o commit que remove o claim. Nenhum limite, seed, tamanho ou valor de CM1–CM6 foi alterado depois do pré-registro.
+
+**Declarações de transparência.**
+1. O SHA de comportamento (`91c32679…6ad2`) foi capturado **uma vez** no monólito antes do move, no commit RED, e é idêntico depois do move, em 3.11 e em 3.12 e sob `PYTHONHASHSEED` aleatório (o fingerprint troca `builtins.hash` por uma função determinística; CM4 é o critério que mede o `hash()` real). O SHA da fonte (`02b7fc0b…8a64`) é o do texto do bloco original e é igual ao do pré-registro.
+2. O harness e o contrato foram escritos depois do pré-registro e antes de qualquer execução do eval. Uma sonda no monólito, feita só para capturar o SHA, mostrou os valores pré-registrados (grade 120/120, famílias, determinismo, gaps e erros) sem que eu mudasse nenhum critério. Um import faltava no harness (`import os`) e foi corrigido antes do RED; não é critério.
+3. Para manter o contrato rápido, os testes negativos que só precisam do fingerprint substituem `_cm_determinism` pelo resultado já medido (só o teste do SHA congelado e a execução do CLI de `--capability contextual_memory` acima usam o fingerprint real).
+
+**Comando:** `python tools/cognitivo_eval.py --capability contextual_memory`, Python 3.11 e 3.12. Saída: código 1, porque CM3 e CM4 falham (como previsto).
+
+| id | resultado | valor medido |
+|---|---|---|
+| CM1 | **passa** | 120/120 iguais à referência independente; 0 entradas alteradas; ids e timestamps válidos |
+| CM2 | **passa** | 20/20 seeds (1.00), 0 cenários inválidos |
+| CM3 | **falha** | precisão ≥ 0.80 em 0/20 seeds (0.00); o limiar padrão `0.5` devolveu as 30 memórias em todas as 20 seeds |
+| CM4 | **falha** | controle (101 × 101) 20/20; medida (101 × 202) 0/20 (0.00) |
+| CM5 | **passa** | sistema novo zerado; contadores `{2, 2, 1, 0.5, 2, 1}`; colaboradores conforme o registrado; 14/14 gaps e 16/16 erros iguais ao esperado |
+| CM6 | **passa** | SHA da fonte igual; SHA de comportamento igual no módulo e no monólito; reexport é o mesmo objeto nas quatro classes; importa sozinho sem o monólito, `numpy` e `vita`; relógio `time.time`; banner igual |
+
+**Hipóteses.** H1, H2, H3 e H6 sustentadas. **H4 e H5 refutadas** (previstas): com o limiar padrão a recuperação por contexto não filtra nada (os vetores são não negativos e `content_match` vale 1.0 sem consulta, então `(cos + 1) / 2 ≥ 0.5` sempre), e o vetor de contexto depende de `hash()`, que muda a cada processo, de modo que a mesma memória não é recuperável por um contexto igual em outro processo. Os valores medidos coincidem com os pré-registrados.
+
+**Código de entrada inválida.** O harness sai com **2** para `--capability` ausente, vazio, só espaços ou de grafia desconhecida, e com **3** para `scenario_invalid`; ambos cobertos por teste. O bloco movido não ganha código novo, porque é move-only: entradas de tipo errado continuam levantando as exceções registradas em CM5 (`AttributeError`, `TypeError`, `RuntimeError` do LTM), e entradas leves (`reinstate_context(None)`, consulta não textual) continuam devolvendo valores neutros.
+
+**Opções para CM3 e CM4 (decisão do dono; nada foi corrigido aqui).**
+1. Aceitar a lacuna e manter este PR em rascunho como inventário medido.
+2. PR de comportamento separado para CM3, com novo pré-registro: limiar padrão mais alto ou score normalizado (por exemplo, descontar o `content_match` fixo quando não há consulta) e centralização dos vetores.
+3. PR de comportamento separado para CM4, com novo pré-registro: trocar `hash()` por um hash estável (`hashlib.sha256` do texto) para que o vetor seja o mesmo entre processos; a mudança altera os vetores e os scores guardados hoje, então os dados persistidos, se houver, precisam ser recodificados.
+4. Um protocolo `v2` com critérios novos, mantendo o v1 como linha de base.
+
+**Efeito colateral a decidir antes de mesclar.** `--capability all` do eval passa a sair com 1 enquanto CM3 e CM4 falharem; os testes existentes que usam `all` continuam verdes.
+
+**Duração da suíte.** `unittest discover` (751 testes): 27.8 s em 3.11 e 26.1 s em 3.12 sem cobertura; 79 s em 3.11 com `coverage run --branch` (mais `core/constitutional_brain.py` anexado, 80 s no total). Os gates de mutação dominam o tempo do job de CI: `tools/cognitivo_mutation.py` 559 s (3.11) e `tools/targeted_mutation.py` 110 s (3.11). Soma local dos passos pesados ≈ 750 s, abaixo do limite de 20 min do job (1200 s), com folga de ≈ 450 s antes das instalações e demais etapas da CI hospedada, que não medi.
+
+**Gates locais (não substituem a CI hospedada).** `ruff` limpo; `compileall`; `reality_audit` regenerado só pela ferramenta; 751 testes OK em 3.11 e em 3.12; cobertura `core/cognitivo/*` 97% (`contextual_memory.py` 99% com ramos, 1 linha e 1 ramo sem cobrir) e monólito 68%; `tools/cognitivo_mutation.py` 369/369 mortos (56 novos); `tools/targeted_mutation.py` 80/80; Bandit sem MEDIUM/HIGH (131 LOW) e `SECURITY_TRIAGE.md` conferido (`--check` ok).
+
+**Não medido.** CI hospedada; efeito em cenários fora dos pré-registrados; mescla real com #79, #115 ou #116 (esta mudança só acrescenta os mesmos relatórios gerados e linhas em `tools/cognitivo_mutation.py`, que o #116 também toca).
