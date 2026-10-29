@@ -2302,3 +2302,21 @@ EW1 (referência nova), EW2, EW3, EW4, EW5 (só o que a seção acima lista), EW
 PRs abertos: #38–#50, #60, #77, #79, #115, #116. Nenhum edita `core/cognitivo/emotional_memory_weighting.py`, `test_emotional_memory_weighting_contract.py`, `tools/cognitivo_eval.py` nem este arquivo. **Sobreposições declaradas, de outros agentes em pausa:** #116 (Axis) altera `tools/cognitivo_mutation.py`, `AUDIT_REALITY_REPORT.md` e `audit_reality.json`; #79 altera `docs/agentes/CLAIMS.yaml`; #38–#49 alteram os relatórios gerados (os congelados já documentados). Este PR não toca nem rebaseia nenhum deles; se algum entrar antes, os relatórios são regenerados pela ferramenta, nunca à mão. Claim `grok-bot`, prazo `2026-10-30T12:00:00Z`, removido no último commit (`claims: []`).
 
 Pré-registro escrito **antes** do contrato RED e antes de rodar o harness com o comportamento novo. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados da correção de EW3 e EW4 (depois do pré-registro `d034ee1`)
+
+Nenhum critério, seed, limite ou protocolo foi alterado depois de rodar: **sem errata**. Commits: `d034ee1` (pré-registro) → `a17425c` (RED: harness + contrato, produção intacta) → `fad93a3` (GREEN + um único re-fixar dos goldens) → este (resultados + `claims: []`).
+
+**RED (`a17425c`, código de `main`, saída 1):** EW1 FAIL (9/120 referências), EW2 PASS 20/20, EW3 FAIL 0/20, EW4 FAIL 0/20, EW5 FAIL (lacunas 6/9), EW6 FAIL, EW7 FAIL 7/21, EW8 FAIL 2/12, EW9 PASS (429 seções não afetadas, deriva 0). Exatamente a previsão registrada (falham EW1, EW3, EW4, EW5, EW6, EW7, EW8; passam EW2 e EW9).
+
+**GREEN (`fad93a3`, saída 0, Python 3.11 e 3.12 idênticos):** EW1 120/120, EW2 20/20, EW3 20/20, EW4 20/20, EW5 9/9 lacunas e 26/26 erros, EW6 (identidade e standalone), EW7 21/21, EW8 12/12, EW9 429 seções não afetadas com deriva 0 e lista base igual ao SHA `0e323b7b…6878`.
+
+**Mudança (só `core/cognitivo/emotional_memory_weighting.py`):** `_clamp_to_domain` (valência em [-1, 1], arousal em [0, 1], depois do override do agente; valor no domínio devolve o mesmo objeto/tipo; ±inf vira o limite; NaN segue passando; não numérico levanta `TypeError`); a memória sem rótulo pontua `0.0` em vez de `1.0`, então uma memória emocional moderada vence uma sem rótulo.
+
+**Re-fixar dos goldens (uma única vez), justificativa:** o comportamento mudou de propósito (EW3/EW4). `EW_SOURCE_SHA` `76ba3041…bc04` → `b681dd36…efe9`; `EW_BEHAVIOR_SHA` `ddc969ef…63b0` → `530d76ff…2161f`. Medidos em 3.11 e 3.12 (iguais) e iguais para o módulo e a reexportação do monólito. Um teste do #128 (`prioritize_recall([1, 2])[0][0] == 2`, que fixava a ordem antiga com a memória sem rótulo na frente) passou a `== 1`; é a mesma mudança de comportamento declarada.
+
+**Lacunas residuais, declaradas e inalteradas:** NaN passa; valência da consulta/alvo não é limitada (caso `-2.1`); memórias neutra e sem rótulo empatam em 0.0.
+
+**Gates (3.11 e 3.12):** suíte completa 800 testes OK; ruff, compileall e `reality_audit` + `git diff --exit-code` limpos (relatórios só via `tools/reality_audit.py`); `validar_registro` OK. Cobertura: `core/cognitivo/*` 98% (módulo 99%, ≥ 90), brain 68% (≥ 62). `cognitivo_mutation` 483/483 mortos (459 + 24 novos mutantes de limite/pontuação; o de `ew_untagged_dropped` teve a agulha atualizada); `targeted_mutation` 80/80 (não editado). Bandit sem MEDIUM/HIGH; `security_triage --check`, `embedded_assert_audit` e `implementation_gap_audit` OK.
+
+`docs/agentes/CLAIMS.yaml` volta a `claims: []` neste commit.
