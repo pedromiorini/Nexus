@@ -1,4 +1,16 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "Corrigir EW3 (limite do domínio) e EW4 (pontuação da memória sem rótulo) do Emotional Memory Weighting com critérios pré-registrados EW7–EW9"
+    arquivos:
+      - core/cognitivo/emotional_memory_weighting.py
+      - test_emotional_memory_weighting_contract.py
+      - tools/cognitivo_eval.py
+      - tools/cognitivo_mutation.py
+      - docs/cognitivo/AUDITORIA_2026-10-22.md
+      - docs/agentes/CLAIMS.yaml
+      - AUDIT_REALITY_REPORT.md
+      - audit_reality.json
+    expira_em: "2026-10-30T12:00:00Z"
