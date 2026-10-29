@@ -2081,3 +2081,26 @@ Cenário base do arquivo (já existente): 7 episódios fechados (`100%`, `plain`
 PRs abertos: #38–#50, #60, #77, #79, #115, #116. Nenhum edita `core/cognitivo/episodic_memory.py`, `test_episodic_like_literal_contract.py` nem este arquivo. Sobreposição declarada: #116 (Axis) altera `tools/cognitivo_mutation.py`, `AUDIT_REALITY_REPORT.md`, `audit_reality.json` e `CONTINUATION.md`; #79 altera `docs/agentes/CLAIMS.yaml`; #49 e #50 e #115 tocam `CONTINUATION.md`/relatórios gerados. Conflitos de linha possíveis, resolvidos só quando outro for mesclado.
 
 Pré-registro escrito **antes** do contrato RED. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados da correção `limit == 0` e barra invertida (depois do pré-registro `1874de4`)
+
+**RED** (commit `a165a9e`, produção intacta em `4215c4e`): `python -m unittest -v test_episodic_like_literal_contract.py` → 16 testes, 8 falhas, exit 1. Falharam: EL1 (nove consultas inválidas com `limit=0` devolviam `[]`), EL3 (só a parte «o erro da query vem primeiro»; a parte dos erros de `limit` passava), EL4 (`a\b` e `a\` listavam `a_b`, `a b`, `ab`, `axb` por tokens do FTS; `\` e `p\q` já passavam) e EL7 (`zero_empty`, `zero_false`, `zero_bytes` saíam 0 em vez de 2; `backslash` saía 1). Passaram no RED: EL2, EL5 (controle com `_fts_enabled = False`, confirma H-BS) e os 10 testes herdados. **Desvio da previsão registrada:** previ que só EL1, EL4 e EL5 falhassem; EL3 também falhou (a regra de precedência «query primeiro» é parte do critério, então não era possível passar sem a mudança) e EL5 não falhou (é o controle). Nenhum critério foi alterado.
+
+**GREEN** (commit `1ae2a60`): o mesmo arquivo → 16/16, exit 0; junto com `test_episodic_memory_search_limits_contract.py`, `test_episodic_retrieval_contract.py` e `test_episodic_memory_extraction_contract.py` → 32/32, exit 0. Códigos de saída por processo (sem pipe): inválidos 2, válidos 0, resultado errado 1, modo desconhecido 9, conforme EL7.
+
+| id | resultado |
+|---|---|
+| EL1 | 9/9 (`""` → `ValueError`; `False`, `True`, `0`, `1`, `1.5`, `b"%"`, `bytearray`, `()` → `TypeError`), `statements == []` |
+| EL2 | 4/4 |
+| EL3 | 6/6 |
+| EL4 | 4/4 com FTS ligado |
+| EL5 | 4/4 com FTS desligado |
+| EL6 | 14/14 inalterados; `tools/cognitivo_eval.py --capability episodic` coberto pela suíte e pelo contrato de recuperação (EM1 ranqueado intacto) |
+| EL7 | 8/8 |
+| EL8 | ver gates abaixo |
+
+**Gates locais (não substituem a CI hospedada).** `ruff` limpo; `compileall` exit 0; `reality_audit` regenerado só pela ferramenta e `git diff --exit-code` limpo; suíte **776 testes** OK em 3.11 e em 3.12 (770 + 6 novos); cobertura `core/cognitivo/*` **97%** (`episodic_memory.py` 92% com ramos), `--fail-under=90` exit 0; `tools/cognitivo_mutation.py` **391/391** mortos em 3.11 (387 + 4 novos; `not_applied` 0); `tools/targeted_mutation.py` **80/80** sem edição; Bandit 131 LOW, 0 MEDIUM/HIGH, 0 achados novos sobre a baseline de `origin/main`; `security_triage.py --check` exit 0; `validar_registro.py --expirados aviso` exit 0.
+
+**Notas honestas.** (1) O primeiro `cognitivo_mutation` deixou 1 mutante `not_applied` por erro de escape no texto do needle (a barra invertida) — corrigido no commit seguinte, sem mudar critério, e rodado de novo inteiro (391/391). (2) O pacote `coverage` do venv local estava vazio e foi reinstalado do `requirements-ci.lock` com hashes; nada no repositório muda. (3) O erro da `query` agora precede o do `limit` quando os dois são inválidos (declarado em EL3). (4) Consultas com termos e `_` (p.ex. `a_b`) continuam casando `a b` por tokenização do FTS5; não era escopo.
+
+**Não medido.** CI hospedada; efeito em cenários fora dos pré-registrados; mescla real com #79, #115 ou #116 (o #116 também toca `tools/cognitivo_mutation.py` e os relatórios gerados).
