@@ -7,7 +7,11 @@ Exit 0 só se todo mutante declarado for aplicável e morto.
 """
 from __future__ import annotations
 
+import concurrent.futures
 import json
+import os
+import queue
+import re
 import shutil
 import sys
 import tempfile
@@ -1168,42 +1172,124 @@ MUTATIONS = [
 ]
 
 
-def main() -> int:
-    results = []
+MAX_JOBS = 32
+DEFAULT_MAX_JOBS = 8
+USAGE = "uso: python tools/cognitivo_mutation.py [--jobs N]  (N: inteiro de 1 a 32; padrão: núcleos, no máximo 8)"
+
+
+def parse_jobs(argv: list[str]) -> int:
+    """Lê `--jobs N`/`--jobs=N`; qualquer outra entrada sai com 2 sem executar nada."""
+
+    def invalid(reason: str) -> SystemExit:
+        print(f"entrada inválida: {reason}\n{USAGE}", file=sys.stderr)
+        return SystemExit(2)
+
+    jobs = None
+    args = list(argv)
+    while args:
+        arg = args.pop(0)
+        if arg == "--jobs":
+            if jobs is not None:
+                raise invalid("--jobs repetido")
+            if not args:
+                raise invalid("--jobs sem valor")
+            value = args.pop(0)
+        elif arg.startswith("--jobs="):
+            if jobs is not None:
+                raise invalid("--jobs repetido")
+            value = arg[len("--jobs="):]
+        else:
+            raise invalid(f"argumento não reconhecido: {arg!r}")
+        if re.fullmatch(r"[1-9][0-9]{0,1}", value) is None or not 1 <= int(value) <= MAX_JOBS:
+            raise invalid(f"--jobs deve ser inteiro de 1 a {MAX_JOBS}, recebi {value!r}")
+        jobs = int(value)
+    if jobs is None:
+        jobs = max(1, min(os.cpu_count() or 1, DEFAULT_MAX_JOBS))
+    return jobs
+
+
+def evaluate_mutation(workdir: Path, m: Mutation) -> dict:
+    """Aplica o mutante na cópia `workdir`, roda seus testes e restaura o arquivo."""
+    target = workdir / m.target
+    original = target.read_text(encoding="utf-8")
+    matches = original.count(m.needle)
+    if matches != 1:
+        return {"name": m.name, "target": m.target, "status": "not_applied", "matches": matches}
+    target.write_text(original.replace(m.needle, m.replacement, 1), encoding="utf-8")
+    started = time.time()
+    try:
+        code, output = run_tests(workdir, m.tests)
+    finally:
+        target.write_text(original, encoding="utf-8")
+    return {
+        "name": m.name,
+        "target": m.target,
+        "tests": list(m.tests),
+        "status": "killed" if code != 0 else "survived",
+        "exit_code": code,
+        "duration_seconds": round(time.time() - started, 3),
+        "output_tail": output,
+    }
+
+
+def run_catalog(mutations: list[Mutation], root: Path, jobs: int, skip_baseline: bool = False) -> list[dict]:
+    """Roda a linha de base e os mutantes com `jobs` trabalhadores, cada um com a sua cópia de `root`.
+
+    Os resultados voltam na ordem de `mutations`, qualquer que seja a ordem de término.
+    """
+    workers = max(1, min(jobs, max(len(mutations), 1)))
     with tempfile.TemporaryDirectory(prefix="nexus-cognitivo-mutation-") as scratch:
-        workdir = Path(scratch) / "repo"
-        shutil.copytree(ROOT, workdir, ignore=COPY_IGNORE)
-        for tests in dict.fromkeys(m.tests for m in MUTATIONS):
-            code, output = run_tests(workdir, tests)
-            if code != 0:
-                raise SystemExit(f"Baseline failed before mutation ({', '.join(tests)}):\n{output}")
-        for m in MUTATIONS:
-            target = workdir / m.target
-            original = target.read_text(encoding="utf-8")
-            matches = original.count(m.needle)
-            if matches != 1:
-                results.append({"name": m.name, "target": m.target, "status": "not_applied", "matches": matches})
-                continue
-            target.write_text(original.replace(m.needle, m.replacement, 1), encoding="utf-8")
-            started = time.time()
+        free: queue.Queue[Path] = queue.Queue()
+
+        def make_copy(index: int) -> Path:
+            workdir = Path(scratch) / f"repo{index}"
+            shutil.copytree(root, workdir, ignore=COPY_IGNORE)
+            return workdir
+
+        def with_copy(fn, *args):
+            workdir = free.get()
             try:
-                code, output = run_tests(workdir, m.tests)
+                return fn(workdir, *args)
             finally:
-                target.write_text(original, encoding="utf-8")
-            results.append({"name": m.name, "target": m.target, "tests": list(m.tests),
-                            "status": "killed" if code != 0 else "survived", "exit_code": code,
-                            "duration_seconds": round(time.time() - started, 3), "output_tail": output})
+                free.put(workdir)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            for workdir in pool.map(make_copy, range(workers)):
+                free.put(workdir)
+            if not skip_baseline:
+                suites = list(dict.fromkeys(m.tests for m in mutations))
+                outcomes = list(pool.map(lambda tests: with_copy(run_tests, tests), suites))
+                for tests, (code, output) in zip(suites, outcomes):
+                    if code != 0:
+                        raise SystemExit(f"Baseline failed before mutation ({', '.join(tests)}):\n{output}")
+            return list(pool.map(lambda m: with_copy(evaluate_mutation, m), mutations))
+
+
+def main(argv: list[str] | None = None, *, mutations: list[Mutation] | None = None,
+         root: Path = ROOT, report: Path = REPORT) -> int:
+    try:
+        jobs = parse_jobs(sys.argv[1:] if argv is None else argv)
+    except SystemExit as exc:
+        return int(exc.code)
+    catalog = MUTATIONS if mutations is None else mutations
+    results = run_catalog(catalog, root, jobs)
     killed = sum(r["status"] == "killed" for r in results)
-    summary = {"declared": len(MUTATIONS), "killed": killed,
-               "survived": sum(r["status"] == "survived" for r in results),
-               "not_applied": sum(r["status"] == "not_applied" for r in results)}
-    REPORT.write_text(json.dumps({"tool": "nexus-cognitivo-mutation", "mutations": results, "summary": summary},
-                                 indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    summary = {
+        "declared": len(catalog),
+        "killed": killed,
+        "survived": sum(r["status"] == "survived" for r in results),
+        "not_applied": sum(r["status"] == "not_applied" for r in results),
+    }
+    report.write_text(
+        json.dumps({"tool": "nexus-cognitivo-mutation", "mutations": results, "summary": summary},
+                   indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
     print(json.dumps(summary, ensure_ascii=False))
     for r in results:
         if r["status"] != "killed":
             print(f"  {r['status']}: {r['name']} ({r['target']})", file=sys.stderr)
-    return 0 if killed == len(MUTATIONS) else 1
+    return 0 if killed == len(catalog) else 1
 
 
 if __name__ == "__main__":
