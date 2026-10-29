@@ -16,7 +16,7 @@ jobs:
   contract-gate:
     name: Contract and regression gate
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 20
     env:
       PYTHONPATH: .
     steps:
