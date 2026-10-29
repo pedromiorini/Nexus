@@ -66,6 +66,8 @@ AR = "core/cognitivo/analogical_reasoning.py"
 AR_TESTS = ("test_analogical_reasoning_contract.py",)
 CM = "core/cognitivo/contextual_memory.py"
 CM_TESTS = ("test_contextual_memory_contract.py",)
+EW = "core/cognitivo/emotional_memory_weighting.py"
+EW_TESTS = ("test_emotional_memory_weighting_contract.py",)
 
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
@@ -1050,6 +1052,95 @@ MUTATIONS = [
              ")\n"
              "RealContextualMemorySystem = type(\"RealContextualMemorySystem\", (_RealContextualMemorySystem,), {})\n",
              tests=CM_TESTS),
+    Mutation('ew_valence_default_changed', EW, "emotional_context.get('valence', 0.0)", "emotional_context.get('valence', 0.1)", tests=EW_TESTS),
+    Mutation('ew_arousal_default_changed', EW, "emotional_context.get('arousal', 0.0)", "emotional_context.get('arousal', 0.1)", tests=EW_TESTS),
+    Mutation('ew_emotion_guard_dropped', EW, "if self.emotion and 'agent_id' in emotional_context:", "if 'agent_id' in emotional_context:", tests=EW_TESTS),
+    Mutation('ew_agent_guard_dropped', EW, "if self.emotion and 'agent_id' in emotional_context:", 'if self.emotion:', tests=EW_TESTS),
+    Mutation('ew_agent_membership_dropped', EW, 'if agent_id in self.emotion.emotional_states:', 'if True:', tests=EW_TESTS),
+    Mutation('ew_state_valence_not_used', EW, 'valence = state.pleasure', 'pass', tests=EW_TESTS),
+    Mutation('ew_state_arousal_not_used', EW, 'arousal = state.arousal', 'pass', tests=EW_TESTS),
+    Mutation('ew_state_valence_from_arousal', EW, 'valence = state.pleasure', 'valence = state.arousal', tests=EW_TESTS),
+    Mutation('ew_intensity_not_normalised', EW, 'math.sqrt(valence**2 + arousal**2) / math.sqrt(2)', 'math.sqrt(valence**2 + arousal**2)', tests=EW_TESTS),
+    Mutation('ew_intensity_sum_not_euclidean', EW, 'math.sqrt(valence**2 + arousal**2)', 'abs(valence) + abs(arousal)', tests=EW_TESTS),
+    Mutation('ew_intensity_ignores_valence', EW, 'math.sqrt(valence**2 + arousal**2)', 'math.sqrt(arousal**2)', tests=EW_TESTS),
+    Mutation('ew_intensity_ignores_arousal', EW, 'math.sqrt(valence**2 + arousal**2)', 'math.sqrt(valence**2)', tests=EW_TESTS),
+    Mutation('ew_boost_base_changed', EW, 'consolidation_boost = 1.0 + (arousal', 'consolidation_boost = 0.0 + (arousal', tests=EW_TESTS),
+    Mutation('ew_boost_ignores_factor', EW, '(arousal * self.arousal_consolidation_factor)', 'arousal', tests=EW_TESTS),
+    Mutation('ew_boost_factor_changed', EW, 'self.arousal_consolidation_factor = 2.0', 'self.arousal_consolidation_factor = 1.0', tests=EW_TESTS),
+    Mutation('ew_priority_factor_changed', EW, 'emotional_intensity * 1.5', 'emotional_intensity * 1.0', tests=EW_TESTS),
+    Mutation('ew_weight_not_stored', EW, 'self.emotional_weights[memory_id] = weight', 'pass', tests=EW_TESTS),
+    Mutation('ew_counter_dropped', EW, 'self.total_emotional_memories += 1', 'self.total_emotional_memories += 0', tests=EW_TESTS),
+    Mutation('ew_stats_update_dropped', EW, '        # Update statistics\n        self._update_statistics()\n', '        # Update statistics\n', tests=EW_TESTS),
+    Mutation('ew_high_arousal_strict_changed', EW, 'if arousal > 0.7:', 'if arousal >= 0.7:', tests=EW_TESTS),
+    Mutation('ew_high_arousal_threshold_changed', EW, 'if arousal > 0.7:', 'if arousal > 0.8:', tests=EW_TESTS),
+    Mutation('ew_high_arousal_counter_dropped', EW, 'self.high_arousal_count += 1', 'self.high_arousal_count += 0', tests=EW_TESTS),
+    Mutation('ew_average_not_divided', EW, 'sum(intensities) / len(intensities)', 'sum(intensities)', tests=EW_TESTS),
+    Mutation('ew_average_guard_dropped', EW, 'if self.emotional_weights:\n            intensities', 'if True:\n            intensities', tests=EW_TESTS),
+    Mutation('ew_unknown_consolidation_changed', EW, 'return 1.0  # Sem boost', 'return 0.0  # Sem boost', tests=EW_TESTS),
+    Mutation('ew_consolidation_returns_priority', EW, 'return weight.consolidation_boost', 'return weight.recall_priority', tests=EW_TESTS),
+    Mutation('ew_base_score_changed', EW, 'base_score = 1.0', 'base_score = 0.5', tests=EW_TESTS),
+    Mutation('ew_untagged_dropped', EW, 'scored_memories.append((mem_id, base_score))', 'pass', tests=EW_TESTS),
+    Mutation('ew_priority_not_multiplied', EW, 'score = base_score * weight.recall_priority', 'score = weight.recall_priority + base_score', tests=EW_TESTS),
+    Mutation('ew_query_guard_dropped', EW, "if emotional_query and 'valence' in emotional_query:", 'if emotional_query:', tests=EW_TESTS),
+    Mutation('ew_query_ignored', EW, "if emotional_query and 'valence' in emotional_query:", 'if False:', tests=EW_TESTS),
+    Mutation('ew_similarity_not_inverted', EW, 'valence_similarity = 1.0 - abs(query_valence - weight.valence)', 'valence_similarity = abs(query_valence - weight.valence)', tests=EW_TESTS),
+    Mutation('ew_similarity_signed', EW, '1.0 - abs(query_valence - weight.valence)', '1.0 - (query_valence - weight.valence)', tests=EW_TESTS),
+    Mutation('ew_valence_sensitivity_ignored', EW, '(1.0 + valence_similarity * self.valence_sensitivity)', '(1.0 + valence_similarity)', tests=EW_TESTS),
+    Mutation('ew_valence_sensitivity_changed', EW, 'self.valence_sensitivity = 0.8', 'self.valence_sensitivity = 0.5', tests=EW_TESTS),
+    Mutation('ew_score_added_not_multiplied', EW, 'score *= (1.0 + valence_similarity', 'score += (1.0 + valence_similarity', tests=EW_TESTS),
+    Mutation('ew_recall_sorted_ascending', EW, 'scored_memories.sort(key=lambda x: x[1], reverse=True)', 'scored_memories.sort(key=lambda x: x[1])', tests=EW_TESTS),
+    Mutation('ew_recall_unsorted', EW, 'scored_memories.sort(key=lambda x: x[1], reverse=True)', 'pass', tests=EW_TESTS),
+    Mutation('ew_valence_threshold_strict', EW, 'if valence_diff <= threshold:', 'if valence_diff < threshold:', tests=EW_TESTS),
+    Mutation('ew_valence_default_threshold_changed', EW, 'threshold: float = 0.3,', 'threshold: float = 0.4,', tests=EW_TESTS),
+    Mutation('ew_valence_default_limit_changed', EW, 'limit: int = 10)', 'limit: int = 5)', tests=EW_TESTS),
+    Mutation('ew_valence_similarity_changed', EW, 'similarity = 1.0 - valence_diff', 'similarity = valence_diff', tests=EW_TESTS),
+    Mutation('ew_valence_unsorted', EW, 'candidates.sort(key=lambda x: x[1], reverse=True)', 'pass', tests=EW_TESTS),
+    Mutation('ew_valence_sorted_ascending', EW, 'candidates.sort(key=lambda x: x[1], reverse=True)', 'candidates.sort(key=lambda x: x[1])', tests=EW_TESTS),
+    Mutation('ew_valence_limit_ignored', EW, 'candidates[:limit]', 'candidates', tests=EW_TESTS),
+    Mutation('ew_valence_diff_signed', EW, 'valence_diff = abs(target_valence - weight.valence)', 'valence_diff = target_valence - weight.valence', tests=EW_TESTS),
+    Mutation('ew_profile_missing_flag_changed', EW, 'return {"has_emotional_weight": False}', 'return {"has_emotional_weight": True}', tests=EW_TESTS),
+    Mutation('ew_profile_category_dropped', EW, '"emotional_category": self._categorize_emotion(weight.valence, weight.arousal)', '"emotional_category": "neutral"', tests=EW_TESTS),
+    Mutation('ew_profile_intensity_key_changed', EW, '"intensity": weight.emotional_intensity', '"intensity": weight.recall_priority', tests=EW_TESTS),
+    Mutation('ew_category_arousal_high_changed', EW, 'if arousal > 0.6:', 'if arousal >= 0.6:', tests=EW_TESTS),
+    Mutation('ew_category_arousal_low_changed', EW, 'elif arousal < 0.3:', 'elif arousal <= 0.3:', tests=EW_TESTS),
+    Mutation('ew_category_positive_strict_changed', EW, 'if valence > 0.3:\n                return "excited_positive"', 'if valence >= 0.3:\n                return "excited_positive"', tests=EW_TESTS),
+    Mutation('ew_category_negative_changed', EW, 'elif valence < -0.3:\n                return "distressed_negative"', 'elif valence < -0.2:\n                return "distressed_negative"', tests=EW_TESTS),
+    Mutation('ew_category_high_neutral_renamed', EW, 'return "high_arousal_neutral"', 'return "neutral"', tests=EW_TESTS),
+    Mutation('ew_category_calm_swapped', EW, 'return "calm_positive"', 'return "sad_negative"', tests=EW_TESTS),
+    Mutation('ew_category_sad_swapped', EW, 'return "sad_negative"', 'return "calm_positive"', tests=EW_TESTS),
+    Mutation('ew_category_low_neutral_renamed', EW, 'return "low_arousal_neutral"', 'return "neutral"', tests=EW_TESTS),
+    Mutation('ew_category_pleasant_swapped', EW, 'return "pleasant"', 'return "unpleasant"', tests=EW_TESTS),
+    Mutation('ew_category_unpleasant_swapped', EW, 'return "unpleasant"', 'return "pleasant"', tests=EW_TESTS),
+    Mutation('ew_stats_weighted_dropped', EW, '"weighted_memories": len(self.emotional_weights)', '"weighted_memories": self.total_emotional_memories', tests=EW_TESTS),
+    Mutation('ew_stats_high_arousal_dropped', EW, '"high_arousal_count": self.high_arousal_count', '"high_arousal_count": 0', tests=EW_TESTS),
+    Mutation('ew_collaborator_not_stored', EW, 'self.memory = memory_system', 'self.memory = None', tests=EW_TESTS),
+    Mutation('ew_emotion_not_stored', EW, 'self.emotion = emotion_system', 'self.emotion = None', tests=EW_TESTS),
+    Mutation('ew_timestamp_constant', EW, 'timestamp=time.time()', 'timestamp=0.0', tests=EW_TESTS),
+    Mutation('ew_banner_dropped', EW, 'print("💗📝 POST 56', 'pass  # print("💗📝 POST 56', tests=EW_TESTS),
+    Mutation("ew_module_pulls_monolith", EW, "import math\n",
+             "import math\nimport core.constitutional_brain  # noqa: F401\n", tests=EW_TESTS),
+    Mutation("ew_monolith_stops_reexporting", "core/constitutional_brain.py",
+             "from core.cognitivo.emotional_memory_weighting import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    EmotionalMemoryWeight,\n"
+             "    RealEmotionalMemoryWeighting,\n"
+             ")\n",
+             "from core.cognitivo.emotional_memory_weighting import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    EmotionalMemoryWeight,\n"
+             "    RealEmotionalMemoryWeighting as _RealEmotionalMemoryWeighting,\n"
+             ")\n"
+             "RealEmotionalMemoryWeighting = type(\"RealEmotionalMemoryWeighting\", (_RealEmotionalMemoryWeighting,), {})\n",
+             tests=EW_TESTS),
+    Mutation("ew_package_stops_reexporting", "core/cognitivo/__init__.py",
+             "from core.cognitivo.emotional_memory_weighting import (\n"
+             "    EmotionalMemoryWeight,\n"
+             "    RealEmotionalMemoryWeighting,\n"
+             ")\n",
+             "from core.cognitivo.emotional_memory_weighting import (\n"
+             "    EmotionalMemoryWeight,\n"
+             "    RealEmotionalMemoryWeighting as _RealEmotionalMemoryWeighting,\n"
+             ")\n"
+             "RealEmotionalMemoryWeighting = type(\"RealEmotionalMemoryWeighting\", (_RealEmotionalMemoryWeighting,), {})\n",
+             tests=EW_TESTS),
 ]
 
 

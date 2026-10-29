@@ -6,7 +6,7 @@
     "extracted_modules": [
       {
         "path": "core/cognitivo/__init__.py",
-        "lines": 77,
+        "lines": 83,
         "classes": 0,
         "functions": 0
       },
@@ -45,6 +45,12 @@
         "lines": 581,
         "classes": 4,
         "functions": 26
+      },
+      {
+        "path": "core/cognitivo/emotional_memory_weighting.py",
+        "lines": 284,
+        "classes": 2,
+        "functions": 9
       },
       {
         "path": "core/cognitivo/episodic_future_thinking.py",
@@ -89,9 +95,9 @@
         "functions": 25
       }
     ],
-    "core_lines": 23732,
-    "classes": 223,
-    "functions": 711,
+    "core_lines": 23481,
+    "classes": 221,
+    "functions": 702,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -115,7 +121,6 @@
       "RealDistributedConsensusProtocol.get_statistics",
       "RealEmbodiedCognitionSystem.get_statistics",
       "RealEmotionSystem.get_statistics",
-      "RealEmotionalMemoryWeighting.get_statistics",
       "RealEmpathySystem.get_statistics",
       "RealEthicalReasoningEngine.get_statistics",
       "RealExplainabilityEngine.get_statistics",
