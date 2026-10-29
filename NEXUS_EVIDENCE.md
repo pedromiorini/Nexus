@@ -7,6 +7,10 @@ tests: CURRENT_TESTS
 bandit_low: 131
 -->
 
+## LIKE literal na busca episódica — validação local 2026-10-29
+
+Base `616a9b2217bace790aeb39bf08e3bb717d7d4318`, branch `cursor/episodic-like-literal-2c0b`. O contrato `test_episodic_like_literal_contract.py` falhou na produção intacta (10 testes, 17 falhas, exit 1) e, com o fallback `LIKE ... ESCAPE '\'` e a rejeição de query vazia ou não-string, passou 10/10 (exit 0). A ausência documentada continua sendo `None`. Descoberta: 770 testes, exit 0. Bandit não acrescentou achado sobre a baseline de 131 LOW. Comandos e limites estão na rodada de 2026-10-29 de `CONTINUATION.md`. Isto é evidência de contrato local, não de capacidade de memória nem de CI hospedado.
+
 ## Auditor de declarações de correção — validação local 2026-10-28
 
 Base `c856e1a899121c1b68be8162f86ec873202816ed`, branch `cursor/correction-claim-audit-0eb5`. O contrato `test_correction_claim_audit_contract.py` falhou por ausência do módulo (1 teste, exit 1) e, com `tools/correction_claim_audit.py`, passou 18 testes. No corpus versionado o auditor devolveu `pass`: 2 declarações não checáveis em `CONTINUATION.md` e 7 lições sem medição de reincidência. Existência de caminho ou símbolo não é correção. Comandos, versões e limites estão na rodada de 2026-10-28 de `CONTINUATION.md`. Isto é evidência de contrato local, não de capacidade cognitiva nem de CI hospedado.

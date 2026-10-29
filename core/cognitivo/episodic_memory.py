@@ -189,36 +189,36 @@ class RealEpisodicMemory:
             raise ValueError("limit must be non-negative")
         if limit == 0:
             return []
-
+        if query is not None and not isinstance(query, str):
+            raise TypeError("query must be a string")
+        if query == "":
+            raise ValueError("query must be non-empty")
         with self.db_lock:
             cursor = self.conn.cursor()
 
             if query:
                 return self._ranked_search(cursor, query, status, limit)
-            cursor.execute("""
-                SELECT episode_id, title, start_timestamp, end_timestamp,
-                       trigger_query, importance, status
-                FROM episodic_memories
-                WHERE status = ?
-                ORDER BY start_timestamp DESC LIMIT ?
-            """, (status, limit))
+            cursor.execute(
+                "SELECT episode_id, title, start_timestamp, end_timestamp, "
+                "trigger_query, importance, status FROM episodic_memories "
+                "WHERE status = ? ORDER BY start_timestamp DESC LIMIT ?",
+                (status, limit),
+            )
             rows = cursor.fetchall()
         return [Episode(*row) for row in rows]
 
     def _ranked_search(self, cursor, query: str, status: str, limit: int) -> List[Episode]:
         """Termos em OR ranqueados por bm25 (FTS5), depois substring LIKE por recência."""
-        rows = []
+        rows, literal = [], query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         terms = re.findall(r"\w+", query)
         if self._fts_enabled and terms:
             match = " OR ".join('"' + t + '"' for t in terms)
             try:
-                cursor.execute("""
-                    SELECT m.episode_id, m.title, m.start_timestamp, m.end_timestamp,
-                           m.trigger_query, m.importance, m.status FROM episodic_fts f
-                    JOIN episodic_memories m ON m.episode_id = f.episode_id
-                    WHERE episodic_fts MATCH ? AND m.status = ?
-                    ORDER BY bm25(episodic_fts), m.start_timestamp DESC LIMIT ?
-                """, (match, status, limit))
+                cursor.execute(
+                    "SELECT m.episode_id, m.title, m.start_timestamp, m.end_timestamp, m.trigger_query, m.importance, m.status "
+                    "FROM episodic_fts f JOIN episodic_memories m ON m.episode_id = f.episode_id "
+                    "WHERE episodic_fts MATCH ? AND m.status = ? ORDER BY bm25(episodic_fts), m.start_timestamp DESC LIMIT ?",
+                    (match, status, limit))
                 rows = cursor.fetchall()
             except sqlite3.OperationalError:
                 rows = []
@@ -227,9 +227,9 @@ class RealEpisodicMemory:
             cursor.execute("""
                 SELECT m.episode_id, m.title, m.start_timestamp, m.end_timestamp,
                        m.trigger_query, m.importance, m.status FROM episodic_memories m
-                WHERE (m.title LIKE ? OR m.trigger_query LIKE ?) AND m.status = ?
+                WHERE (m.title LIKE ? ESCAPE '\\' OR m.trigger_query LIKE ? ESCAPE '\\') AND m.status = ?
                 ORDER BY m.start_timestamp DESC LIMIT ?
-            """, (f"%{query}%", f"%{query}%", status, limit))
+            """, (f"%{literal}%", f"%{literal}%", status, limit))
             rows += [row for row in cursor.fetchall() if row[0] not in seen][:limit - len(rows)]
         return [Episode(*row) for row in rows]
 
