@@ -1,18 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "Extrair Contextual Memory POST14 (move-only) e auditar CM1–CM6 com critérios pré-registrados"
-    arquivos:
-      - core/cognitivo/contextual_memory.py
-      - core/cognitivo/__init__.py
-      - core/constitutional_brain.py
-      - test_contextual_memory_contract.py
-      - tools/cognitivo_eval.py
-      - tools/cognitivo_mutation.py
-      - docs/cognitivo/AUDITORIA_2026-10-22.md
-      - docs/agentes/CLAIMS.yaml
-      - AUDIT_REALITY_REPORT.md
-      - audit_reality.json
-    expira_em: "2026-10-30T12:00:00Z"
+claims: []
