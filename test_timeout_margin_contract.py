@@ -129,7 +129,15 @@ class GuardInvalidInputTests(unittest.TestCase):
 
 class ReplayIntegrationTests(unittest.TestCase):
     def test_default_table_includes_timeout_cases_and_passes(self):
-        r = subprocess.run(["bash", str(REPLAY)], cwd=ROOT, capture_output=True, text=True, timeout=120)
+        # So os casos `tmo` da tabela padrao: os demais exigem historico git completo (o checkout do
+        # contract-gate e raso); a tabela inteira roda no job `Agent guard replay` (fetch-depth: 0).
+        rows = [ln for ln in (ROOT / "tools/agente/replay/casos.tsv").read_text().splitlines()
+                if ln.split("\t")[1:2] == ["tmo"]]
+        self.assertEqual(len(rows), 6)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "casos.tsv"
+            path.write_text("\n".join(rows) + "\n")
+            r = subprocess.run(["bash", str(REPLAY), str(path)], cwd=ROOT, capture_output=True, text=True, timeout=120)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         for case in ("T-origem rc=6", "T-anterior rc=0", "T-incompat-ausente rc=3",
                      "T-incompat-vazio rc=3", "T-incompat-texto rc=3", "T-incompat-timeout rc=3"):

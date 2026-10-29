@@ -81,3 +81,6 @@ A guarda é um limiar determinístico; a retroprojeção mede recall nos inciden
 
 ### Efeito colateral nos contadores de estado
 O avaliador chama `subprocess` (`gh` e a guarda), o que acrescenta 7 achados LOW ao Bandit (B404 ×1, B603 ×3, B607 ×3): 131 → 138. Os achados não foram suprimidos (`# nosec`); a triagem foi regenerada (`SECURITY_TRIAGE.md`, `--check` ok) e o contador `bandit_low` foi sincronizado em `NEXUS_KNOWLEDGE.md`, `NEXUS_EVIDENCE.md`, `CONTINUATION.md`, `SECURITY_TRIAGE.md` e na fixture de `test_state_stray_marker_contract.py` (131 → 138), senão o gate de consistência de estado do CI hospedado falharia.
+
+### Falha do CI hospedado na 1ª tentativa (erro de teste meu, não de critério)
+Na 1ª execução hospedada (run 40935534453) o `contract-gate` falhou: `test_default_table_includes_timeout_cases_and_passes` rodava a tabela padrão inteira do replay, cujos casos antigos (`A1-origem` etc.) exigem histórico git completo, e o checkout do `contract-gate` é raso. O job `Agent guard replay` (`fetch-depth: 0`) passou. Correção: o teste agora executa só as 6 linhas `tmo` (verificado também em clone `--depth 1`). Nenhum critério, limiar ou dado foi alterado.
