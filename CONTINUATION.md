@@ -9,6 +9,13 @@ bandit_low: 131
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
+## Rodada — `limit==0` e barra invertida na busca episódica — 2026-10-29
+
+- **Base:** `4215c4e` (`origin/main` depois do #126). Branch `grok/episodic-limit0-backslash-20261029`. Código novo só em `core/cognitivo/episodic_memory.py`, `test_episodic_like_literal_contract.py` e `tools/cognitivo_mutation.py`; `tools/targeted_mutation.py` e os testes do Axis intactos. Pré-registro EL1–EL8 em `docs/cognitivo/AUDITORIA_2026-10-22.md` (commit `1874de4`, antes do RED). O claim foi aberto no pré-registro e removido no último commit; `CLAIMS.yaml` volta a `claims: []`.
+- **Causa:** `limit == 0` devolvia `[]` antes de validar a query. `a\b` listava `a_b` porque o ramo FTS5 usa os termos `\w+` (`a`, `b`) em OR e o tokenizador também parte `a_b`; o `LIKE ... ESCAPE` já era literal. Correção: validar a query num `search_episodes` que delega a `_search_validated` (texto do atalho de limite intacto) e pular o FTS quando a consulta tem `\`.
+- **RED→GREEN:** 16 testes, 8 falhas, exit 1 (`a165a9e`) → 16/16, exit 0 (`1ae2a60`). Suíte 776 testes em 3.11 e 3.12; cobertura `core/cognitivo` 97%; mutação 391/391 e 80/80; Bandit sem achado novo.
+- **Limites:** CI hospedada não medida; `a_b` ainda casa `a b` pelo FTS.
+
 ## Rodada — LIKE literal na busca episódica — 2026-10-29
 
 - **Base:** `616a9b2217bace790aeb39bf08e3bb717d7d4318` (`origin/main`). Branch `cursor/episodic-like-literal-2c0b`. Código novo só em `core/cognitivo/episodic_memory.py` e `test_episodic_like_literal_contract.py`. O bloco `NEXUS-CURRENT-STATE` não foi reescrito. PRs abertos conferidos com `gh pr list`: #38–#50, #60, #77, #79, #115, #116. Nenhum edita esses dois arquivos. `#116` edita `tools/cognitivo_mutation.py`; `#38`, `#43`, `#44`, `#46`, `#48` e `#49` editam `tools/targeted_mutation.py`. Não foram alterados. `#79` edita `CLAIMS.yaml` no branch dela; o claim deste PR foi aberto e removido no último commit, e o arquivo final volta a `claims: []`.

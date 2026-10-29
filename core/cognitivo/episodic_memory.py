@@ -182,6 +182,18 @@ class RealEpisodicMemory:
 
     def search_episodes(self, query: Optional[str] = None, 
                        status: str = "closed", limit: int = 10) -> List[Episode]:
+        """Valida a query (None = ausência documentada) e delega a busca.
+
+        A validação vem antes do atalho de ``limit == 0``: query vazia ou que não
+        é ``str`` levanta mesmo com limite zero, em vez de imitar sucesso.
+        """
+        if query is not None and not isinstance(query, str):
+            raise TypeError("query must be a string")
+        if query == "":
+            raise ValueError("query must be non-empty")
+        return self._search_validated(query, status, limit)
+
+    def _search_validated(self, query: Optional[str], status: str, limit: int) -> List[Episode]:
         """Buscar episódios"""
         if isinstance(limit, bool) or not isinstance(limit, int):
             raise TypeError("limit must be an integer")
@@ -189,10 +201,6 @@ class RealEpisodicMemory:
             raise ValueError("limit must be non-negative")
         if limit == 0:
             return []
-        if query is not None and not isinstance(query, str):
-            raise TypeError("query must be a string")
-        if query == "":
-            raise ValueError("query must be non-empty")
         with self.db_lock:
             cursor = self.conn.cursor()
 
@@ -210,7 +218,9 @@ class RealEpisodicMemory:
     def _ranked_search(self, cursor, query: str, status: str, limit: int) -> List[Episode]:
         """Termos em OR ranqueados por bm25 (FTS5), depois substring LIKE por recência."""
         rows, literal = [], query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        terms = re.findall(r"\w+", query)
+        # A barra invertida é literal: os termos \w+ a descartariam e a união OR
+        # de tokens (a, b) casaria "a_b"; com ela, só vale a substring LIKE ESCAPE.
+        terms = [] if "\\" in query else re.findall(r"\w+", query)
         if self._fts_enabled and terms:
             match = " OR ".join('"' + t + '"' for t in terms)
             try:

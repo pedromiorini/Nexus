@@ -23,6 +23,7 @@ REPORT = ROOT / "cognitivo_mutation_report.json"
 EPISODIC = "core/cognitivo/episodic_memory.py"
 EXTRACTION = ("test_episodic_memory_extraction_contract.py",)
 LIMITS = ("test_episodic_memory_search_limits_contract.py", "test_episodic_memory_extraction_contract.py")
+LIKE_LITERAL = ("test_episodic_like_literal_contract.py",)
 STATS = ("test_episodic_memory_statistics_contract.py", "test_episodic_memory_extraction_contract.py")
 PREDICTIVE = "core/cognitivo/predictive_coding.py"
 POMDP = ("test_predictive_coding_extraction_contract.py", "test_pomdp_belief_filter_contract.py")
@@ -75,6 +76,19 @@ MUTATIONS = [
              "            if False:\n                cursor.execute(", tests=RETRIEVAL),
     Mutation("episodic_like_fallback_keeps_substrings", EPISODIC, "        if len(rows) < limit:", "        if False:",
              tests=RETRIEVAL),
+    Mutation("episodic_search_rejects_non_string_query", EPISODIC,
+             'if query is not None and not isinstance(query, str):\n            raise TypeError("query must be a string")',
+             'if False:\n            raise TypeError("query must be a string")', tests=LIKE_LITERAL),
+    Mutation("episodic_search_rejects_empty_query", EPISODIC,
+             'if query == "":\n            raise ValueError("query must be non-empty")',
+             'if False:\n            raise ValueError("query must be non-empty")', tests=LIKE_LITERAL),
+    Mutation("episodic_search_validates_query_before_zero_limit", EPISODIC,
+             'if query == "":\n            raise ValueError("query must be non-empty")',
+             'if query == "" and limit != 0:\n            raise ValueError("query must be non-empty")',
+             tests=LIKE_LITERAL),
+    Mutation("episodic_search_backslash_query_skips_fts", EPISODIC,
+             'terms = [] if "\\\\" in query else re.findall(r"\\w+", query)',
+             'terms = re.findall(r"\\w+", query)', tests=LIKE_LITERAL),
     Mutation("predictive_level0_uses_learned_argmax", PREDICTIVE,
              "max(self._sensory_distribution.items(), key=lambda item: item[1])",
              "min(self._sensory_distribution.items(), key=lambda item: item[1])", tests=PC_LEARNING),
