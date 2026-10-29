@@ -134,5 +134,144 @@ with RealEpisodicMemory(":memory:") as mem:
                 self.assertEqual(completed.returncode, code)
 
 
+class EpisodicZeroLimitValidationContractTests(unittest.TestCase):
+    """EL1–EL3: a query inválida não é escondida pelo atalho de limit == 0."""
+
+    def setUp(self):
+        self.memory = RealEpisodicMemory(":memory:")
+        self.addCleanup(self.memory.close)
+        episode_id = self.memory.start_episode("needle")
+        self.memory.close_episode(episode_id)
+        self.statements = []
+        self.memory.conn.set_trace_callback(self.statements.append)
+
+    def test_el1_invalid_query_with_zero_limit_raises_before_sql(self):
+        with self.assertRaisesRegex(ValueError, "non-empty"):
+            self.memory.search_episodes("", limit=0)
+        for query in (False, True, 0, 1, 1.5, b"%", bytearray(b"a"), ()):
+            with self.subTest(query=query):
+                with self.assertRaisesRegex(TypeError, "query must be a string"):
+                    self.memory.search_episodes(query, limit=0)
+        self.assertEqual(self.statements, [])
+
+    def test_el2_valid_query_with_zero_limit_stays_empty_without_sql(self):
+        for query in (None, "needle", "%", "a\\b"):
+            with self.subTest(query=query):
+                self.assertEqual(self.memory.search_episodes(query, limit=0), [])
+        self.assertEqual(self.statements, [])
+
+    def test_el3_limit_errors_are_preserved_and_query_error_wins_when_both_invalid(self):
+        with self.assertRaisesRegex(ValueError, "non-negative"):
+            self.memory.search_episodes("needle", limit=-1)
+        for limit in (True, 1.5, "1", None):
+            with self.subTest(limit=limit):
+                with self.assertRaisesRegex(TypeError, "integer"):
+                    self.memory.search_episodes("needle", limit=limit)
+        with self.assertRaisesRegex(ValueError, "non-empty"):
+            self.memory.search_episodes("", limit=-1)
+        self.assertEqual(self.statements, [])
+
+
+class EpisodicBackslashLiteralContractTests(unittest.TestCase):
+    """EL4–EL5: barra invertida na consulta é literal, com e sem FTS."""
+
+    TITLES = ("a_b", "a\\b", "axb", "a b", "ab", "xa\\y", "\\\\", "a\\")
+
+    def _memory(self, fts):
+        memory = RealEpisodicMemory(":memory:")
+        self.addCleanup(memory.close)
+        memory._fts_enabled = fts
+        for title in self.TITLES:
+            memory.close_episode(memory.start_episode(title))
+        memory.close_episode(memory.start_episode("note2", trigger_query="p\\q"))
+        return memory
+
+    def _expected(self):
+        return {
+            "a\\b": ["a\\b"],
+            "a\\": ["a\\b", "xa\\y", "a\\"],
+            "\\": ["a\\b", "xa\\y", "\\\\", "a\\", "note2"],
+            "p\\q": ["note2"],
+        }
+
+    def _check(self, fts):
+        memory = self._memory(fts)
+        for query, titles in self._expected().items():
+            with self.subTest(query=query, fts=fts):
+                found = [episode.title for episode in memory.search_episodes(query, limit=20)]
+                self.assertCountEqual(found, titles)
+
+    def test_el4_backslash_is_literal_with_fts_enabled(self):
+        self.assertTrue(self._memory(True)._fts_enabled)
+        self._check(True)
+
+    def test_el5_backslash_is_literal_with_fts_disabled(self):
+        self._check(False)
+
+
+class EpisodicExitCodeContractTests(unittest.TestCase):
+    """EL7: o código de saída decide; 2 = entrada inválida, 0 = sucesso, 1 = resultado errado."""
+
+    SCRIPT = r"""
+import sys
+from core.cognitivo.episodic_memory import RealEpisodicMemory
+
+kind = sys.argv[1]
+with RealEpisodicMemory(":memory:") as mem:
+    for title in ("a_b", "a\\b", "plain"):
+        mem.close_episode(mem.start_episode(title))
+    try:
+        if kind == "zero_empty":
+            mem.search_episodes("", limit=0)
+        elif kind == "zero_false":
+            mem.search_episodes(False, limit=0)
+        elif kind == "zero_bytes":
+            mem.search_episodes(b"%", limit=0)
+        elif kind == "limit_negative":
+            mem.search_episodes("plain", limit=-1)
+        elif kind == "limit_text":
+            mem.search_episodes("plain", limit="1")
+        elif kind == "zero_valid":
+            sys.exit(0 if mem.search_episodes("plain", limit=0) == [] else 1)
+        elif kind == "absent":
+            sys.exit(0 if len(mem.search_episodes(None)) == 3 else 1)
+        elif kind == "backslash":
+            titles = [e.title for e in mem.search_episodes("a\\b")]
+            sys.exit(0 if titles == ["a\\b"] else 1)
+        else:
+            sys.exit(9)
+    except (ValueError, TypeError):
+        sys.exit(2)
+    else:
+        sys.exit(0)
+"""
+
+    def test_el7_exit_codes(self):
+        expected = {
+            "zero_empty": 2,
+            "zero_false": 2,
+            "zero_bytes": 2,
+            "limit_negative": 2,
+            "limit_text": 2,
+            "zero_valid": 0,
+            "absent": 0,
+            "backslash": 0,
+            "unknown": 9,
+        }
+        for kind, code in expected.items():
+            with self.subTest(kind=kind):
+                completed = subprocess.run(
+                    [sys.executable, "-c", self.SCRIPT, kind],
+                    cwd=ROOT,
+                    env={
+                        "PATH": os.environ.get("PATH", ""),
+                        "PYTHONPATH": str(ROOT),
+                        "PYTHONDONTWRITEBYTECODE": "1",
+                    },
+                    check=False,
+                )
+                self.assertEqual(completed.returncode, code)
+
+
 if __name__ == "__main__":
     unittest.main()
