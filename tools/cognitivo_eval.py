@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
-CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future", "mental_simulation", "analogical_reasoning", "contextual_memory")
+CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future", "mental_simulation", "analogical_reasoning", "contextual_memory", "emotional_memory")
 
 TOPICS = [
     ("database", "migration", "rollback"), ("network", "latency", "spike"), ("disk", "quota", "exceeded"),
@@ -5219,6 +5219,604 @@ def eval_contextual_memory(criteria="v1"):
     ]
 
 
+# ── Emotional Memory Weighting (POST56) ─────────────────────────────────────
+
+EW_SOURCE_SHA = "76ba3041a49369e068104ba60a76669660916934f2bc986bbd8c053228f9bc04"
+EW_BEHAVIOR_SHA = "ddc969ef52f3b486a2bd8e01b9c53a7666982cff6519ce9a4468c5e83a6163b0"  # capturado uma única vez no monólito antes do move; 3.11 e 3.12
+_EW_NAMES = ("EmotionalMemoryWeight", "RealEmotionalMemoryWeighting")
+_EW_MARKER = "# MÓDULO 56: EMOTIONAL MEMORY WEIGHTING (POST 56)"
+_EW_END = '            "weighted_memories": len(self.emotional_weights)\n        }'
+_EW_BANNER = "💗📝 POST 56 - RealEmotionalMemoryWeighting initialized (Emotion-enhanced memory active)\n"
+_EW_GRID_SEED = 2056
+_EW_GRID_SIZE = 120
+_EW_SEEDS = tuple(range(20))
+_EW_LIMIT = 0.90
+_EW_MAX_REDRAWS = 50
+
+
+def _ew_spread(values):
+    ordered = sorted(values)
+    return all(b - a >= 1e-3 for a, b in zip(ordered, ordered[1:]))
+_EW_AGENTS = ("a1", "a2", "zz")
+_EW_THRESHOLDS = (0.0, 0.1, 0.3, 0.6, 1.0, 2.0)
+_EW_LIMITS = (0, 1, 3, 10)
+_EW_FRESH_STATS = {"total_emotional_memories": 0, "avg_emotional_intensity": 0.0, "high_arousal_count": 0,
+                   "weighted_memories": 0}
+_EW_COUNTERS_EXPECTED = {
+    "stats": {"total_emotional_memories": 3, "avg_emotional_intensity": 0.176776695, "high_arousal_count": 1,
+              "weighted_memories": 2},
+    "retag_weight": {"consolidation_boost": 1.0, "recall_priority": 0.0},
+}
+_EW_COLLAB_EXPECTED = {
+    "memory_untouched": True, "agent_override": {"valence": -0.5, "arousal": 0.9},
+    "unknown_agent_keeps_context": True, "no_emotion_keeps_context": True, "falsy_emotion_untouched": True,
+    "high_arousal_count": 1,
+}
+_EW_CATEGORIES_EXPECTED = {
+    "0.9,0.9": "excited_positive", "-0.9,0.9": "distressed_negative", "0.0,0.9": "high_arousal_neutral",
+    "0.9,0.1": "calm_positive", "-0.9,0.1": "sad_negative", "0.0,0.1": "low_arousal_neutral",
+    "0.9,0.5": "pleasant", "-0.9,0.5": "unpleasant", "0.0,0.5": "neutral",
+    "0.9,0.6": "pleasant", "0.9,0.3": "pleasant", "0.3,0.9": "high_arousal_neutral",
+    "-0.3,0.1": "low_arousal_neutral",
+}
+_EW_PROFILE_EXPECTED = {
+    "untagged": {"has_emotional_weight": False}, "consolidate_untagged": 1.0,
+    "keys": ["has_emotional_weight", "valence", "arousal", "intensity", "consolidation_boost", "recall_priority",
+             "emotional_category"],
+}
+_EW_PRIORITY_EXPECTED = {
+    "mixed": {"order": [10, 11, 12], "scores": [1.0, 0.6, 0.0]},
+    "duplicates": [[5, 1.0], [5, 1.0]],
+    "stable_ties": [3, 1, 2],
+    "query": {"none": 0.828402076, "same_valence": 1.491123737, "mid_valence": 1.159762907,
+              "opposite_valence": 0.828402076, "arousal_only": 0.828402076},
+}
+_EW_GAPS_EXPECTED = {
+    "out_of_range": {"intensity": 2.549509757, "boost": 5.0, "priority": 3.824264635},
+    "negative_arousal": {"boost": -1.0, "intensity": 0.707106781},
+    "nan_accepted": True,
+    "bool_accepted": {"intensity": 1.0, "boost": 3.0},
+    "retag": {"total": 2, "weighted": 1, "high_arousal": 2},
+    "decay_rate_occurrences": 1,
+    "retrieve_limits": {"negative_limit": [1, 2], "zero_limit": [], "negative_threshold": [],
+                        "threshold_inclusive": [1, 2]},
+}
+_EW_ERRORS_EXPECTED = {
+    "tag_no_args": "TypeError", "tag_no_context": "TypeError", "tag_valence_str": "TypeError",
+    "tag_valence_none": "TypeError", "tag_arousal_str": "TypeError", "tag_unhashable_agent": "TypeError",
+    "prioritize_none": "TypeError", "prioritize_unhashable_id": "TypeError",
+    "prioritize_query_str_tagged": "TypeError", "prioritize_query_int_tagged": "TypeError",
+    "retrieve_target_str_tagged": "TypeError", "retrieve_threshold_str_tagged": "TypeError",
+    "retrieve_limit_str_empty": "TypeError", "retrieve_limit_float": "TypeError",
+    "consolidate_unhashable": "TypeError", "profile_unhashable": "TypeError", "construct_extra": "TypeError",
+    "tag_ctx_none": "AttributeError", "tag_ctx_list": "AttributeError", "tag_ctx_str": "AttributeError",
+    "prioritize_query_str_untagged": "no-error", "prioritize_query_int_untagged": "no-error",
+    "retrieve_target_str_empty": "no-error", "retrieve_limit_none": "no-error",
+    "profile_none": "no-error", "consolidate_none": "no-error",
+}
+
+
+def _ew_err(fn):
+    try:
+        fn()
+    except Exception as exc:
+        return type(exc).__name__
+    return "no-error"
+
+
+def _ew_system(cls, **kwargs):
+    import contextlib
+    import io
+    with contextlib.redirect_stdout(io.StringIO()):
+        return cls(**kwargs)
+
+
+def _ew_emotion(spec):
+    from types import SimpleNamespace
+    if spec is None:
+        return None
+    return SimpleNamespace(emotional_states={name: SimpleNamespace(pleasure=p, arousal=a)
+                                             for name, (p, a) in spec.items()})
+
+
+def _ew_ctx(rng):
+    ctx = {}
+    if rng.random() < 0.8:
+        ctx["valence"] = round(rng.uniform(-1, 1), 3)
+    if rng.random() < 0.8:
+        ctx["arousal"] = round(rng.uniform(0, 1), 3)
+    if rng.random() < 0.3:
+        ctx["agent_id"] = rng.choice(_EW_AGENTS)
+    return ctx
+
+
+def _ew_grid():
+    rng = random.Random(_EW_GRID_SEED)  # nosec B311 - dados sintéticos de avaliação
+    rows = []
+    for _ in range(_EW_GRID_SIZE):
+        emo = None
+        if rng.random() < 0.5:
+            emo = {name: (round(rng.uniform(-1, 1), 3), round(rng.uniform(-1, 1), 3)) for name in ("a1", "a2")}
+        tags = [(rng.randrange(12), _ew_ctx(rng)) for _ in range(rng.randint(0, 8))]
+        prios = []
+        for _p in range(rng.randint(1, 3)):
+            ids = [rng.randrange(14) for _ in range(rng.randint(0, 8))]
+            query = rng.choice([None, {"valence": round(rng.uniform(-1, 1), 3)}, {"arousal": round(rng.random(), 3)}])
+            prios.append((ids, query))
+        rets = [(round(rng.uniform(-1, 1), 3), rng.choice(_EW_THRESHOLDS), rng.choice(_EW_LIMITS))
+                for _r in range(rng.randint(1, 3))]
+        rows.append((emo, tags, prios, rets))
+    return rows
+
+
+def _ew_ref_category(v, a):
+    band = "high" if a > 0.6 else ("low" if a < 0.3 else "mid")
+    side = "pos" if v > 0.3 else ("neg" if v < -0.3 else "zero")
+    return {("high", "pos"): "excited_positive", ("high", "neg"): "distressed_negative",
+            ("high", "zero"): "high_arousal_neutral", ("low", "pos"): "calm_positive",
+            ("low", "neg"): "sad_negative", ("low", "zero"): "low_arousal_neutral",
+            ("mid", "pos"): "pleasant", ("mid", "neg"): "unpleasant", ("mid", "zero"): "neutral"}[(band, side)]
+
+
+def _ew_reference(row):
+    emo, tags, prios, rets = row
+    weights, total, high = {}, 0, 0
+    for mid, ctx in tags:
+        v, a = ctx.get("valence", 0.0), ctx.get("arousal", 0.0)
+        if emo is not None and ctx.get("agent_id") in emo:
+            v, a = emo[ctx["agent_id"]]
+        inten = (v ** 2 + a ** 2) ** 0.5 / 2 ** 0.5
+        weights[mid] = {"valence": v, "arousal": a, "intensity": inten, "boost": 1 + 2 * a, "priority": 1.5 * inten}
+        total += 1
+        high += 1 if a > 0.7 else 0
+    out_prios = []
+    for ids, query in prios:
+        scored = []
+        for mid in ids:
+            w = weights.get(mid)
+            if w is None:
+                scored.append((mid, 1.0))
+                continue
+            score = w["priority"]
+            if query and "valence" in query:
+                score *= 1 + (1 - abs(query["valence"] - w["valence"])) * 0.8
+            scored.append((mid, score))
+        out_prios.append(sorted(scored, key=lambda t: -t[1]))
+    out_rets = []
+    for target, threshold, limit in rets:
+        near = [(mid, 1 - abs(w["valence"] - target)) for mid, w in weights.items()
+                if abs(w["valence"] - target) <= threshold]
+        out_rets.append([mid for mid, _s in sorted(near, key=lambda t: -t[1])][:limit])
+    profiles = []
+    for mid in range(14):
+        w = weights.get(mid)
+        profiles.append({"has_emotional_weight": False} if w is None else {
+            "has_emotional_weight": True, "valence": w["valence"], "arousal": w["arousal"],
+            "intensity": w["intensity"], "consolidation_boost": w["boost"], "recall_priority": w["priority"],
+            "emotional_category": _ew_ref_category(w["valence"], w["arousal"])})
+    avg = sum(w["intensity"] for w in weights.values()) / len(weights) if weights else 0.0
+    return {"prios": out_prios, "rets": out_rets, "consol": [weights[m]["boost"] if m in weights else 1.0
+                                                             for m in range(14)],
+            "profiles": profiles,
+            "stats": {"total_emotional_memories": total, "avg_emotional_intensity": avg,
+                      "high_arousal_count": high, "weighted_memories": len(weights)}}
+
+
+def _ew_run(cls, row):
+    emo, tags, prios, rets = row
+    system = _ew_system(cls, emotion_system=_ew_emotion(emo))
+    before = time.time()
+    made = [system.tag_memory_emotionally(mid, ctx) for mid, ctx in tags]
+    after = time.time()
+    meta_ok = all(isinstance(w.timestamp, float) and before <= w.timestamp <= after for w in made)
+    view = {
+        "prios": [system.prioritize_recall(ids, query) for ids, query in prios],
+        "rets": [system.retrieve_by_valence(t, threshold=th, limit=lim) for t, th, lim in rets],
+        "consol": [system.consolidate_emotional_memory(m) for m in range(14)],
+        "profiles": [system.get_emotional_profile(m) for m in range(14)],
+        "stats": system.get_statistics(),
+    }
+    return view, meta_ok
+
+
+def _ew_same(view, ref):
+    if view["rets"] != ref["rets"] or len(view["prios"]) != len(ref["prios"]):
+        return False
+    for got, want in zip(view["prios"], ref["prios"]):
+        if len(got) != len(want) or any(g[0] != w[0] or abs(g[1] - w[1]) > 1e-12 for g, w in zip(got, want)):
+            return False
+    if any(abs(g - w) > 1e-12 for g, w in zip(view["consol"], ref["consol"])):
+        return False
+    for got, want in zip(view["profiles"], ref["profiles"]):
+        if set(got) != set(want):
+            return False
+        for key, value in want.items():
+            if isinstance(value, float):
+                if abs(got[key] - value) > 1e-12:
+                    return False
+            elif got[key] != value:
+                return False
+    stats_got, stats_want = view["stats"], ref["stats"]
+    return set(stats_got) == set(stats_want) and all(abs(stats_got[k] - stats_want[k]) < 1e-12 for k in stats_want)
+
+
+def _ew_row_digest(view):
+    def r(value):
+        return round(value, 12) if isinstance(value, float) else value
+    return _ms_sha({
+        "prios": [[(i, r(s)) for i, s in rows] for rows in view["prios"]], "rets": view["rets"],
+        "consol": [r(x) for x in view["consol"]],
+        "profiles": [{k: r(v) for k, v in p.items()} for p in view["profiles"]],
+        "stats": {k: r(v) for k, v in view["stats"].items()}})
+
+
+def _ew_in_bounds(weight):
+    return (0.0 <= weight.emotional_intensity <= 1.0 and weight.recall_priority <= 1.5
+            and 1.0 <= weight.consolidation_boost <= 3.0)
+
+
+def _ew_families(cls):
+    total = len(_EW_SEEDS)
+    mono = invalid2 = bounded = control_bad = tagged_first = invalid4 = redraws = 0
+    for seed in _EW_SEEDS:
+        # EW2: monotonia dentro do domínio (errata E1: sorteio repetido, na mesma sequência, até a precondição valer)
+        rng = random.Random(seed)  # nosec B311 - dados sintéticos de avaliação
+        valid = False
+        for _attempt in range(_EW_MAX_REDRAWS + 1):
+            items = [(m, rng.uniform(-1, 1), rng.uniform(0, 1)) for m in range(10)]
+            inten = {m: (v * v + a * a) ** 0.5 / 2 ** 0.5 for m, v, a in items}
+            if _ew_spread(inten.values()) and _ew_spread(a for _m, _v, a in items) \
+                    and _ew_spread(abs(v) for _m, v, _a in items):
+                valid = True
+                break
+            redraws += 1
+        invalid2 += not valid
+        system = _ew_system(cls)
+        for m, v, a in items:
+            system.tag_memory_emotionally(m, {"valence": v, "arousal": a})
+        order_a = [m for m, _s in system.prioritize_recall(list(range(10)))]
+        want_a = sorted(range(10), key=lambda m: -inten[m])
+        by_arousal = sorted(items, key=lambda t: t[2])
+        boosts = [system.consolidate_emotional_memory(m) for m, _v, _a in by_arousal]
+        order_c = system.retrieve_by_valence(0.0, threshold=2.0, limit=10)
+        want_c = [m for m, v, _a in sorted(items, key=lambda t: abs(t[1]))]
+        mono += order_a == want_a and all(x < y for x, y in zip(boosts, boosts[1:])) and order_c == want_c
+        # EW3: limites
+        rng = random.Random(seed)  # nosec B311 - dados sintéticos de avaliação
+        sys_a, sys_b, sys_c = _ew_system(cls), _ew_system(cls), _ew_system(cls)
+        wa = sys_a.tag_memory_emotionally(0, {"valence": rng.choice((-1, 1)) * rng.uniform(1.2, 3.0),
+                                              "arousal": rng.uniform(1.2, 3.0)})
+        wb = sys_b.tag_memory_emotionally(0, {"valence": rng.uniform(-1, 1), "arousal": rng.uniform(-1.0, -0.1)})
+        wc = sys_c.tag_memory_emotionally(0, {"valence": rng.uniform(-1, 1), "arousal": rng.uniform(0, 1)})
+        control_bad += not _ew_in_bounds(wc)
+        bounded += _ew_in_bounds(wa) and _ew_in_bounds(wb)
+        # EW4: carga emocional moderada antes da sem rótulo
+        rng = random.Random(seed)  # nosec B311 - dados sintéticos de avaliação
+        system = _ew_system(cls)
+        weights = [system.tag_memory_emotionally(m, {"valence": rng.uniform(0.1, 0.5), "arousal": rng.uniform(0.1, 0.5)})
+                   for m in range(5)]
+        invalid4 += not all(w.emotional_intensity > 0 for w in weights)
+        top = {m for m, _s in system.prioritize_recall(list(range(10)))[:5]}
+        tagged_first += top == set(range(5))
+    return {
+        "EW2": {"hits": mono, "total": total, "rate": mono / total, "invalid": invalid2, "redraws": redraws},
+        "EW3": {"hits": bounded, "total": total, "rate": bounded / total, "control_bad": control_bad},
+        "EW4": {"hits": tagged_first, "total": total, "rate": tagged_first / total, "invalid": invalid4},
+    }
+
+
+def emotional_memory_fingerprint(ns):
+    import copy
+    import inspect
+    if isinstance(ns, dict):
+        def get(name):
+            return ns[name]
+    else:
+        def get(name):
+            return getattr(ns, name)
+    cls, weight_cls = get("RealEmotionalMemoryWeighting"), get("EmotionalMemoryWeight")
+    return _ew_fingerprint_body(cls, weight_cls, copy, inspect)
+
+
+def _ew_fingerprint_body(cls, weight_cls, copy, inspect):
+    import contextlib
+    import io
+    from types import SimpleNamespace
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        fresh = cls()
+    banner = buf.getvalue()
+    fresh_stats = fresh.get_statistics()
+
+    # grade (EW1)
+    matches = mutated = meta_bad = 0
+    digests = []
+    for row in _ew_grid():
+        snapshot = copy.deepcopy(row)
+        view, meta_ok = _ew_run(cls, row)
+        matches += bool(_ew_same(view, _ew_reference(row)))
+        mutated += row != snapshot
+        meta_bad += not meta_ok
+        digests.append(_ew_row_digest(view))
+    grid_info = {"count": len(digests), "reference_matches": matches, "mutated_inputs": mutated,
+                 "meta_bad": meta_bad, "rows_sha": _ms_sha(digests)}
+    families = _ew_families(cls)
+
+    # contadores
+    counter_sys = _ew_system(cls)
+    counter_sys.tag_memory_emotionally(1, {"valence": 0.6, "arousal": 0.8})
+    counter_sys.tag_memory_emotionally(2, {"valence": -0.3, "arousal": 0.4})
+    counter_sys.tag_memory_emotionally(1, {"valence": 0.0, "arousal": 0.0})
+    stats = counter_sys.get_statistics()
+    stats["avg_emotional_intensity"] = round(stats["avg_emotional_intensity"], 9)
+    counters = {"stats": stats,
+                "retag_weight": {"consolidation_boost": counter_sys.emotional_weights[1].consolidation_boost,
+                                 "recall_priority": counter_sys.emotional_weights[1].recall_priority}}
+
+    # colaboradores
+    class Boom:
+        def __getattribute__(self, name):
+            raise AssertionError(f"leitura de {name}")
+
+    class FalsyEmotion:
+        def __bool__(self):
+            return False
+
+        @property
+        def emotional_states(self):
+            raise AssertionError("leitura de emotional_states")
+
+    boom = Boom()
+    mem_sys = _ew_system(cls, memory_system=boom)
+    mem_sys.tag_memory_emotionally(1, {"valence": 0.1, "arousal": 0.2})
+    mem_sys.prioritize_recall([1, 2], {"valence": 0.0})
+    mem_sys.retrieve_by_valence(0.0)
+    mem_sys.get_emotional_profile(1)
+    mem_sys.consolidate_emotional_memory(1)
+    mem_sys.get_statistics()
+    emo_sys = _ew_system(cls, emotion_system=SimpleNamespace(
+        emotional_states={"a1": SimpleNamespace(pleasure=-0.5, arousal=0.9)}))
+    w7 = emo_sys.tag_memory_emotionally(7, {"valence": 0.2, "arousal": 0.1, "agent_id": "a1"})
+    w8 = emo_sys.tag_memory_emotionally(8, {"valence": 0.2, "arousal": 0.1, "agent_id": "zz"})
+    plain = _ew_system(cls)
+    w9 = plain.tag_memory_emotionally(9, {"valence": 0.2, "arousal": 0.1, "agent_id": "a1"})
+    falsy_sys = _ew_system(cls, emotion_system=FalsyEmotion())
+    try:
+        wf = falsy_sys.tag_memory_emotionally(3, {"valence": 0.2, "arousal": 0.1, "agent_id": "a1"})
+        falsy_ok = (wf.valence, wf.arousal) == (0.2, 0.1)
+    except AssertionError:
+        falsy_ok = False
+    collaborators = {
+        "memory_untouched": mem_sys.memory is boom,
+        "agent_override": {"valence": w7.valence, "arousal": w7.arousal},
+        "unknown_agent_keeps_context": (w8.valence, w8.arousal) == (0.2, 0.1),
+        "no_emotion_keeps_context": (w9.valence, w9.arousal) == (0.2, 0.1),
+        "falsy_emotion_untouched": falsy_ok,
+        "high_arousal_count": emo_sys.high_arousal_count,
+    }
+
+    # categorias e perfil
+    cat_sys = _ew_system(cls)
+    categories = {f"{v},{a}": cat_sys._categorize_emotion(v, a) for v, a in (
+        (0.9, 0.9), (-0.9, 0.9), (0.0, 0.9), (0.9, 0.1), (-0.9, 0.1), (0.0, 0.1), (0.9, 0.5), (-0.9, 0.5),
+        (0.0, 0.5), (0.9, 0.6), (0.9, 0.3), (0.3, 0.9), (-0.3, 0.1))}
+    prof_sys = _ew_system(cls)
+    prof_sys.tag_memory_emotionally(1, {"valence": 0.5, "arousal": 0.5})
+    profile = {"untagged": prof_sys.get_emotional_profile(99),
+               "consolidate_untagged": prof_sys.consolidate_emotional_memory(99),
+               "keys": list(prof_sys.get_emotional_profile(1))}
+
+    # prioridade
+    pri_sys = _ew_system(cls)
+    pri_sys.tag_memory_emotionally(11, {"valence": 0.4, "arousal": 0.4})
+    pri_sys.tag_memory_emotionally(12, {"valence": 0.0, "arousal": 0.0})
+    mixed = pri_sys.prioritize_recall([10, 11, 12])
+    q_sys = _ew_system(cls)
+    q_sys.tag_memory_emotionally(20, {"valence": 0.5, "arousal": 0.6})
+
+    def q_score(query):
+        return round(q_sys.prioritize_recall([20], query)[0][1], 9)
+
+    priority = {
+        "mixed": {"order": [m for m, _s in mixed], "scores": [round(s, 9) for _m, s in mixed]},
+        "duplicates": [[m, s] for m, s in _ew_system(cls).prioritize_recall([5, 5])],
+        "stable_ties": [m for m, _s in _ew_system(cls).prioritize_recall([3, 1, 2])],
+        "query": {"none": q_score(None), "same_valence": q_score({"valence": 0.5}),
+                  "mid_valence": q_score({"valence": 0.0}), "opposite_valence": q_score({"valence": -0.5}),
+                  "arousal_only": q_score({"arousal": 0.9})},
+    }
+
+    # gaps
+    g_sys = _ew_system(cls)
+    over = g_sys.tag_memory_emotionally(1, {"valence": 3.0, "arousal": 2.0})
+    neg = g_sys.tag_memory_emotionally(2, {"valence": 0.0, "arousal": -1.0})
+    nan_sys = _ew_system(cls)
+    nan_ok = _ew_err(lambda: nan_sys.tag_memory_emotionally(1, {"valence": float("nan"), "arousal": 0.0})) == "no-error" \
+        and nan_sys.emotional_weights[1].emotional_intensity != nan_sys.emotional_weights[1].emotional_intensity
+    bool_w = _ew_system(cls).tag_memory_emotionally(2, {"valence": True, "arousal": True})
+    rt_sys = _ew_system(cls)
+    rt_sys.tag_memory_emotionally(1, {"valence": 0.9, "arousal": 0.9})
+    rt_sys.tag_memory_emotionally(1, {"valence": 0.9, "arousal": 0.9})
+    rt_stats = rt_sys.get_statistics()
+    rv_sys = _ew_system(cls)
+    for mid, valence in ((1, 0.0), (2, 0.1), (3, 0.2)):
+        rv_sys.tag_memory_emotionally(mid, {"valence": valence, "arousal": 0.0})
+    gaps = {
+        "out_of_range": {"intensity": round(over.emotional_intensity, 9), "boost": over.consolidation_boost,
+                         "priority": round(over.recall_priority, 9)},
+        "negative_arousal": {"boost": neg.consolidation_boost, "intensity": round(neg.emotional_intensity, 9)},
+        "nan_accepted": nan_ok,
+        "bool_accepted": {"intensity": round(bool_w.emotional_intensity, 9), "boost": bool_w.consolidation_boost},
+        "retag": {"total": rt_stats["total_emotional_memories"], "weighted": rt_stats["weighted_memories"],
+                  "high_arousal": rt_stats["high_arousal_count"]},
+        "decay_rate_occurrences": inspect.getsource(cls).count("emotional_decay_rate"),
+        "retrieve_limits": {"negative_limit": rv_sys.retrieve_by_valence(0.0, threshold=0.3, limit=-1),
+                            "zero_limit": rv_sys.retrieve_by_valence(0.0, threshold=0.3, limit=0),
+                            "negative_threshold": rv_sys.retrieve_by_valence(0.0, threshold=-0.1),
+                            "threshold_inclusive": rv_sys.retrieve_by_valence(0.0, threshold=0.1)},
+    }
+
+    def tagged():
+        system = _ew_system(cls)
+        system.tag_memory_emotionally(1, {"valence": 0.1, "arousal": 0.1})
+        return system
+
+    unhashable_agent = _ew_system(cls, emotion_system=SimpleNamespace(emotional_states={}))
+    errors = {
+        "tag_no_args": _ew_err(lambda: _ew_system(cls).tag_memory_emotionally()),
+        "tag_no_context": _ew_err(lambda: _ew_system(cls).tag_memory_emotionally(1)),
+        "tag_valence_str": _ew_err(lambda: _ew_system(cls).tag_memory_emotionally(1, {"valence": "a"})),
+        "tag_valence_none": _ew_err(lambda: _ew_system(cls).tag_memory_emotionally(1, {"valence": None})),
+        "tag_arousal_str": _ew_err(lambda: _ew_system(cls).tag_memory_emotionally(1, {"arousal": "a"})),
+        "tag_unhashable_agent": _ew_err(lambda: unhashable_agent.tag_memory_emotionally(1, {"agent_id": [1]})),
+        "prioritize_none": _ew_err(lambda: _ew_system(cls).prioritize_recall(None)),
+        "prioritize_unhashable_id": _ew_err(lambda: _ew_system(cls).prioritize_recall([[1]])),
+        "prioritize_query_str_tagged": _ew_err(lambda: tagged().prioritize_recall([1], "valence")),
+        "prioritize_query_int_tagged": _ew_err(lambda: tagged().prioritize_recall([1], 5)),
+        "retrieve_target_str_tagged": _ew_err(lambda: tagged().retrieve_by_valence("a")),
+        "retrieve_threshold_str_tagged": _ew_err(lambda: tagged().retrieve_by_valence(0.0, threshold="a")),
+        "retrieve_limit_str_empty": _ew_err(lambda: _ew_system(cls).retrieve_by_valence(0.0, limit="a")),
+        "retrieve_limit_float": _ew_err(lambda: tagged().retrieve_by_valence(0.0, limit=1.5)),
+        "consolidate_unhashable": _ew_err(lambda: _ew_system(cls).consolidate_emotional_memory([1])),
+        "profile_unhashable": _ew_err(lambda: _ew_system(cls).get_emotional_profile([1])),
+        "construct_extra": _ew_err(lambda: cls(1, 2, 3)),
+        "tag_ctx_none": _ew_err(lambda: _ew_system(cls).tag_memory_emotionally(1, None)),
+        "tag_ctx_list": _ew_err(lambda: _ew_system(cls).tag_memory_emotionally(1, [])),
+        "tag_ctx_str": _ew_err(lambda: _ew_system(cls).tag_memory_emotionally(1, "x")),
+        "prioritize_query_str_untagged": _ew_err(lambda: _ew_system(cls).prioritize_recall([1], "valence")),
+        "prioritize_query_int_untagged": _ew_err(lambda: _ew_system(cls).prioritize_recall([1], 5)),
+        "retrieve_target_str_empty": _ew_err(lambda: _ew_system(cls).retrieve_by_valence("a")),
+        "retrieve_limit_none": _ew_err(lambda: tagged().retrieve_by_valence(0.0, limit=None)),
+        "profile_none": _ew_err(lambda: _ew_system(cls).get_emotional_profile(None)),
+        "consolidate_none": _ew_err(lambda: _ew_system(cls).consolidate_emotional_memory(None)),
+    }
+    defaults = {k: getattr(fresh, k) for k in ("arousal_consolidation_factor", "valence_sensitivity",
+                                              "emotional_decay_rate")}
+    return {
+        "clock": "time.time",
+        "randomness": "nenhuma",
+        "init_params": list(inspect.signature(cls.__init__).parameters),
+        "banner": banner,
+        "weight_fields": list(inspect.signature(weight_cls).parameters),
+        "defaults": defaults,
+        "fresh_stats": fresh_stats,
+        "grid": grid_info,
+        "families": families,
+        "counters": counters,
+        "collaborators": collaborators,
+        "categories": categories,
+        "profile": profile,
+        "priority": priority,
+        "gaps": gaps,
+        "errors": errors,
+    }
+
+
+def emotional_memory_source_text(src: str) -> str:
+    idx = src.index(_EW_MARKER)
+    line_start = src.rfind("\n", 0, idx - 1) + 1
+    end = src.index(_EW_END, idx) + len(_EW_END)
+    return src[line_start:end]
+
+
+def _emotional_memory_source_sha(path="core/cognitivo/emotional_memory_weighting.py") -> str:
+    import hashlib
+    text = (ROOT / path).read_text(encoding="utf-8")
+    return hashlib.sha256(emotional_memory_source_text(text).encode()).hexdigest()
+
+
+def _emotional_memory_standalone() -> bool:
+    """Árvore de imports: constitutional_brain, numpy ou vita no módulo extraído falha EW6."""
+    import ast
+
+    tree = ast.parse((ROOT / "core/cognitivo/emotional_memory_weighting.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names = [node.module]
+        for name in names:
+            root = name.split(".")[0]
+            if root in {"numpy", "vita"} or name == "core.constitutional_brain" \
+                    or name.startswith("core.constitutional_brain."):
+                return False
+    return True
+
+
+def eval_emotional_memory(criteria="v1"):
+    """EW1–EW6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    import core.cognitivo.emotional_memory_weighting as emotional_memory
+    import core.constitutional_brain as brain
+    import core.cognitivo as package
+
+    payload = emotional_memory_fingerprint(emotional_memory)
+    sha_module = _ms_sha(payload)
+    sha_brain = _ms_sha(emotional_memory_fingerprint(brain))
+    source_sha = _emotional_memory_source_sha()
+    standalone = _emotional_memory_standalone()
+    identity = all(
+        getattr(brain, name) is getattr(emotional_memory, name) is getattr(package, name)
+        and getattr(emotional_memory, name).__module__ == "core.cognitivo.emotional_memory_weighting"
+        for name in _EW_NAMES
+    )
+    grid = payload["grid"]
+    ew1 = (
+        grid["count"] == _EW_GRID_SIZE and grid["reference_matches"] == _EW_GRID_SIZE
+        and grid["mutated_inputs"] == 0 and grid["meta_bad"] == 0
+    )
+    fam2, fam3, fam4 = payload["families"]["EW2"], payload["families"]["EW3"], payload["families"]["EW4"]
+    ew2_invalid, ew3_invalid, ew4_invalid = fam2["invalid"] > 0, fam3["control_bad"] > 0, fam4["invalid"] > 0
+    ew2 = not ew2_invalid and fam2["rate"] >= _EW_LIMIT
+    ew3 = not ew3_invalid and fam3["rate"] >= _EW_LIMIT
+    ew4 = not ew4_invalid and fam4["rate"] >= _EW_LIMIT
+    gaps, errors = payload["gaps"], payload["errors"]
+    gap_hits = sum(1 for name, expected in _EW_GAPS_EXPECTED.items() if gaps.get(name) == expected)
+    error_hits = sum(1 for name, expected in _EW_ERRORS_EXPECTED.items() if errors.get(name) == expected)
+    ew5 = (
+        payload["fresh_stats"] == _EW_FRESH_STATS
+        and payload["defaults"] == {"arousal_consolidation_factor": 2.0, "valence_sensitivity": 0.8,
+                                    "emotional_decay_rate": 0.95}
+        and payload["counters"] == _EW_COUNTERS_EXPECTED
+        and payload["collaborators"] == _EW_COLLAB_EXPECTED
+        and payload["categories"] == _EW_CATEGORIES_EXPECTED
+        and payload["profile"] == _EW_PROFILE_EXPECTED
+        and payload["priority"] == _EW_PRIORITY_EXPECTED
+        and gap_hits == len(_EW_GAPS_EXPECTED) == len(gaps)
+        and error_hits == len(_EW_ERRORS_EXPECTED) == len(errors)
+    )
+    ew6 = (
+        identity and standalone and source_sha == EW_SOURCE_SHA
+        and sha_module == sha_brain == EW_BEHAVIOR_SHA
+        and payload["clock"] == "time.time"
+        and payload["init_params"] == ["self", "memory_system", "emotion_system"]
+        and payload["banner"] == _EW_BANNER
+        and payload["weight_fields"] == ["memory_id", "valence", "arousal", "emotional_intensity",
+                                         "consolidation_boost", "recall_priority", "timestamp"]
+    )
+    return [
+        _check("EW1", {"reference_matches": grid["reference_matches"], "count": grid["count"],
+                       "mutated_inputs": grid["mutated_inputs"], "meta_bad": grid["meta_bad"]},
+               ew1, "120/120 iguais à referência independente; 0 entradas alteradas; timestamps válidos"),
+        _check("EW2", fam2, ew2, "ordem de prioridade, boost e recuperação por valência monótonos em ≥ 0.90 das 20 seeds",
+               **({"scenario_invalid": True} if ew2_invalid else {})),
+        _check("EW3", fam3, ew3, "limites de intensidade, prioridade e boost com entrada fora do domínio em ≥ 0.90 das 20 seeds",
+               **({"scenario_invalid": True} if ew3_invalid else {})),
+        _check("EW4", fam4, ew4, "as 5 memórias emocionais ocupam as 5 primeiras posições em ≥ 0.90 das 20 seeds",
+               **({"scenario_invalid": True} if ew4_invalid else {})),
+        _check("EW5", {"fresh_stats": payload["fresh_stats"], "defaults": payload["defaults"],
+                       "counters": payload["counters"], "collaborators": payload["collaborators"],
+                       "categories": payload["categories"], "profile": payload["profile"],
+                       "priority": payload["priority"], "gap_hits": [gap_hits, len(_EW_GAPS_EXPECTED)],
+                       "error_hits": [error_hits, len(_EW_ERRORS_EXPECTED)], "gaps": gaps, "errors": errors},
+               ew5, "contadores, colaboradores, categorias, erros e gaps conforme o registrado"),
+        _check("EW6", {"source_sha": source_sha, "sha_module": sha_module, "sha_brain": sha_brain,
+                       "identity": identity, "standalone": standalone, "clock": payload["clock"],
+                       "source_golden": EW_SOURCE_SHA, "behavior_golden": EW_BEHAVIOR_SHA},
+               ew6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+    ]
+
+
 EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts,
               "causal": eval_causal, "counterfactual": eval_counterfactual,
               "working_memory": eval_working_memory,
@@ -5227,7 +5825,8 @@ EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": 
               "episodic_future": eval_episodic_future,
               "mental_simulation": eval_mental_simulation,
               "analogical_reasoning": eval_analogical_reasoning,
-              "contextual_memory": eval_contextual_memory}
+              "contextual_memory": eval_contextual_memory,
+              "emotional_memory": eval_emotional_memory}
 
 
 def main(argv=None) -> int:
