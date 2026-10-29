@@ -39,6 +39,11 @@ from core.cognitivo.mental_simulation import (
     MentalSimulationResult,
     RealMentalSimulationSystem,
 )
+from core.cognitivo.semantic_networks import (
+    ConceptNode,
+    RealSemanticNetworksSystem,
+    SemanticRelation,
+)
 from core.cognitivo.working_memory import (
     CentralExecutive,
     PhonologicalLoop,
@@ -56,6 +61,7 @@ __all__ = [
     "AttentionalSpotlight",
     "BottomUpAttention",
     "CentralExecutive",
+    "ConceptNode",
     "ConsolidationReport",
     "ContextEncoder",
     "ContextMatch",
@@ -74,8 +80,10 @@ __all__ = [
     "RealEpisodicFutureThinkingSystem",
     "RealIncrementalLearner",
     "RealMentalSimulationSystem",
+    "RealSemanticNetworksSystem",
     "RealWorkingMemorySystem",
     "RehearsalEvent",
+    "SemanticRelation",
     "StimulusItem",
     "TopDownAttention",
     "VisuospatialSketchpad",

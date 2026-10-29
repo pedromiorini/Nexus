@@ -36,8 +36,8 @@ class _Block:
 sys.meta_path.insert(0, _Block())
 import core.cognitivo.semantic_networks as mod
 system = mod.RealSemanticNetworksSystem()
-system.add_relation("Cat", "IS-A", "Animal")
 system.add_concept("Animal", {"alive": True})
+system.add_relation("Cat", "IS-A", "Animal")
 assert system.verify_hierarchy("Cat", "animal")
 assert system.inherit_properties("Cat") == {"alive": True}
 leaked = sorted(n for n in sys.modules if n.split(".")[0] in {"numpy", "vita"} or n == "core.constitutional_brain")
