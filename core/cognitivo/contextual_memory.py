@@ -6,10 +6,15 @@ reexporta as classes no ponto original.
 Dependências: apenas a biblioteca padrão. O relógio é time.time() (timestamp de
 cada memória) e os ids vêm de uuid.uuid4(). long_term_memory é só escrita
 (store); working_memory e attention são armazenados e nunca lidos.
-Lacunas registradas, não corrigidas aqui: limiar padrão não seletivo (CM3) e
-vetor de contexto dependente de hash() por processo (CM4).
+CM3 e CM4 corrigidos (pré-registro CM7–CM9 em docs/cognitivo/AUDITORIA_2026-10-22.md):
+o vetor de contexto usa sha256 (estável entre processos, sem hash()) e o score de
+contexto é a fração das dimensões consultadas cujo balde coincide, o que torna o
+limiar padrão seletivo. Lacunas residuais registradas em CM5: o score com query
+continua aditivo ((contexto + conteúdo) / 2) e colisões de balde (% 100) tornam
+valores distintos iguais.
 """
 
+import hashlib
 import time
 import uuid
 from dataclasses import dataclass
@@ -77,9 +82,9 @@ class ContextEncoder:
 
         for dim in self.context_dimensions:
             value = context.get(dim, "unknown")
-            # Hash simples para valor
-            encoded = hash(str(value)) % 100 / 100.0
-            vector.append(encoded)
+            # sha256 estável entre processos (hash() depende de PYTHONHASHSEED)
+            digest = hashlib.sha256(str(value).encode("utf-8", "surrogatepass")).hexdigest()
+            vector.append(int(digest[:8], 16) % 100 / 100.0)
 
         return vector
 
@@ -97,6 +102,18 @@ class ContextEncoder:
             return 0.0
 
         return dot_product / (mag1 * mag2)
+
+    def compute_match(self, vec1: List[float], vec2: List[float],
+                      cue_indexes: List[int] | None = None) -> float:
+        """Fração das posições consultadas cujo balde coincide (1.0 sem posições)."""
+        if not vec1 or not vec2:
+            return 0.0
+
+        indexes = range(min(len(vec1), len(vec2))) if cue_indexes is None else cue_indexes
+        if not indexes:
+            return 1.0
+
+        return sum(1 for i in indexes if vec1[i] == vec2[i]) / len(indexes)
 
 
 class RealContextualMemorySystem:
@@ -224,25 +241,26 @@ class RealContextualMemorySystem:
         # Codificar contexto de retrieval
         retrieval_vector = self.context_encoder.encode_context(context)
 
+        cued = [i for i, dim in enumerate(self.context_encoder.context_dimensions) if dim in context]
+
         # Buscar memórias com contexto similar
         matches = []
 
         for memory in self.contextual_memories:
-            # Computar similaridade de contexto
-            similarity = self.context_encoder.compute_similarity(
+            # Similaridade de contexto: só contam as dimensões presentes na consulta
+            similarity = self.context_encoder.compute_match(
                 memory.context_vector,
-                retrieval_vector
+                retrieval_vector,
+                cued
             )
 
             # Se query fornecida, considerar também match de conteúdo
-            content_match = 1.0
+            match_score = similarity
             if query:
                 query_lower = str(query).lower()
                 content_lower = str(memory.content).lower()
                 content_match = 1.0 if query_lower in content_lower else 0.3
-
-            # Score combinado
-            match_score = (similarity + content_match) / 2.0
+                match_score = (similarity + content_match) / 2.0
 
             if match_score >= threshold:
                 # Identificar features matched

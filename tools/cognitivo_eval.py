@@ -4295,8 +4295,8 @@ def eval_analogical_reasoning(criteria="v1"):
 
 # ── Contextual Memory (POST14) ──────────────────────────────────────────────
 
-CM_SOURCE_SHA = "02b7fc0b23a6fed4a56ab9584524a7f87498e7ed21c5210ad41c673a2c5d8a64"
-CM_BEHAVIOR_SHA = "91c326795ff80049b0c3b2f802227d5391d7076f3de3e84e31c30bb604a56ad2"  # capturado uma única vez no monólito antes do move; 3.11 e 3.12
+CM_SOURCE_SHA = "79fe6842e3b7a9df8ff8d7295278d8ced691b3c035b5f87f68f0284b9125fd88"
+CM_BEHAVIOR_SHA = "c215335623a422155786ee093db2171800eb93314ff9adea8b27b871fb323e3d"  # re-fixado uma única vez após a correção de CM3/CM4 (base: fonte 02b7fc0b…8a64, comportamento 91c32679…6ad2); 3.11 e 3.12
 _CM_NAMES = ("ContextualMemory", "ContextMatch", "ContextEncoder", "RealContextualMemorySystem")
 _CM_MARKER = "# MÓDULO 14: CONTEXTUAL MEMORY SYSTEM (POST 14)"
 _CM_END = '            "current_context_dimensions": len(self.current_context)\n        }'

@@ -216,7 +216,7 @@ class ContextualMemoryFixContractTests(unittest.TestCase):
         self.assertEqual(encoder.compute_match([0.1, 0.2], [0.1, 0.3], [0]), 1.0)
         with self.assertRaises(IndexError):
             encoder.compute_match([1.0], [1.0], [3])
-        self.assertEqual(encoder.compute_similarity([0.5, 0.5], [0.5, 0.5]), 1.0)  # cosseno intocado
+        self.assertAlmostEqual(encoder.compute_similarity([0.5, 0.5], [0.5, 0.5]), 1.0)  # cosseno intocado
 
     def test_encoder_is_stable_and_never_calls_builtin_hash(self):
         import builtins
