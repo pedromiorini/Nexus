@@ -24,7 +24,7 @@ from hypothesis import assume, example, given, settings, strategies as st
 
 from tools.state_consistency_audit import DOCUMENTS, ROOT, audit
 
-SYNCED = {"commit": "HEAD", "ci_run": "CURRENT_RUN", "tests": "CURRENT_TESTS", "bandit_low": "131"}
+SYNCED = {"commit": "HEAD", "ci_run": "CURRENT_RUN", "tests": "CURRENT_TESTS", "bandit_low": "138"}
 # Critério copiado de tools/agente/replay/check_resolution.sh (coluna 0).
 STRAY_RE = re.compile(r"^(?:commit|ci_run|tests|bandit_low): |^-->$")
 OPEN_RE = re.compile(r"^<!--\s*NEXUS-CURRENT-STATE\b")
@@ -73,7 +73,7 @@ def _fixture(claims=None, suffixes=None, executed=307):
                 "skipped": 1, "failed": 0, "unexpected": 0, "result": "passed",
             },
         },
-        "security": {"bandit": {"severity": {"LOW": 131}}},
+        "security": {"bandit": {"severity": {"LOW": 138}}},
         "ci": {"run_id": "999", "commit": "abc123", "gates_status": "success"},
     }
     path = directory / "STATE_MANIFEST.json"
