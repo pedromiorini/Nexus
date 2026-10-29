@@ -14,6 +14,12 @@ from core.cognitivo.attention import (
     StimulusItem,
     TopDownAttention,
 )
+from core.cognitivo.contextual_memory import (
+    ContextEncoder,
+    ContextMatch,
+    ContextualMemory,
+    RealContextualMemorySystem,
+)
 from core.cognitivo.episodic_future_thinking import (
     FutureEvent,
     ProspectiveMemory,
@@ -47,6 +53,9 @@ __all__ = [
     "BottomUpAttention",
     "CentralExecutive",
     "ConsolidationReport",
+    "ContextEncoder",
+    "ContextMatch",
+    "ContextualMemory",
     "FutureEvent",
     "LearningEvent",
     "MentalScenario",
@@ -55,6 +64,7 @@ __all__ = [
     "ProspectiveMemory",
     "RealAnalogicalReasoningSystem",
     "RealAttentionSystem",
+    "RealContextualMemorySystem",
     "RealEpisodicFutureThinkingSystem",
     "RealIncrementalLearner",
     "RealMentalSimulationSystem",

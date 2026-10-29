@@ -4568,7 +4568,7 @@ def _cm_selectivity_families(cls):
 
 
 def _cm_process_vectors(source, ctxs, hash_seed):
-    import subprocess
+    import subprocess  # nosec B404 - roda só o interpretador atual com script fixo
     env = {**os.environ, "PYTHONHASHSEED": str(hash_seed), "PYTHONPATH": str(ROOT)}
     proc = subprocess.run(  # nosec B603 - interpretador atual e script fixo do harness
         [sys.executable, "-c", _CM_PROC_SCRIPT.format(source=source)],
@@ -4729,7 +4729,7 @@ def _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect
     none_sys = _cm_system(cls)
     try:
         none_sys.set_current_context(None)
-    except Exception:  # noqa: BLE001 - o registro do erro está em `errors`
+    except Exception:  # noqa: BLE001 - o registro do erro está em `errors`  # nosec B110
         pass
 
     class Raising:

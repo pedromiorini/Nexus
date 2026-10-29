@@ -6,7 +6,7 @@
     "extracted_modules": [
       {
         "path": "core/cognitivo/__init__.py",
-        "lines": 67,
+        "lines": 77,
         "classes": 0,
         "functions": 0
       },
@@ -33,6 +33,12 @@
         "lines": 193,
         "classes": 5,
         "functions": 9
+      },
+      {
+        "path": "core/cognitivo/contextual_memory.py",
+        "lines": 367,
+        "classes": 4,
+        "functions": 12
       },
       {
         "path": "core/cognitivo/counterfactual.py",
@@ -83,9 +89,9 @@
         "functions": 25
       }
     ],
-    "core_lines": 24064,
-    "classes": 227,
-    "functions": 723,
+    "core_lines": 23732,
+    "classes": 223,
+    "functions": 711,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
