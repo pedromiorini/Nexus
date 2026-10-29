@@ -1,18 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "Guarda de margem do timeout do CI (timeout_margin.sh) provada contra o histórico real, com critérios TM1–TM9 pré-registrados"
-    arquivos:
-      - tools/agente/timeout_margin.sh
-      - tools/agente/timeout_margin_backtest.py
-      - tools/agente/replay/casos.tsv
-      - tools/agente/replay/run_replay.sh
-      - tools/agente/replay/fixtures
-      - tools/agente/README.md
-      - test_timeout_margin_contract.py
-      - docs/agentes/MARGEM_TIMEOUT_CI.md
-      - docs/agentes/timeout_margin_historico.json
-      - docs/agentes/CLAIMS.yaml
-    expira_em: "2026-10-31T12:00:00Z"
+claims: []
