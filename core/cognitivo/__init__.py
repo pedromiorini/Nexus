@@ -20,6 +20,10 @@ from core.cognitivo.contextual_memory import (
     ContextualMemory,
     RealContextualMemorySystem,
 )
+from core.cognitivo.emotional_memory_weighting import (
+    EmotionalMemoryWeight,
+    RealEmotionalMemoryWeighting,
+)
 from core.cognitivo.episodic_future_thinking import (
     FutureEvent,
     ProspectiveMemory,
@@ -56,6 +60,7 @@ __all__ = [
     "ContextEncoder",
     "ContextMatch",
     "ContextualMemory",
+    "EmotionalMemoryWeight",
     "FutureEvent",
     "LearningEvent",
     "MentalScenario",
@@ -65,6 +70,7 @@ __all__ = [
     "RealAnalogicalReasoningSystem",
     "RealAttentionSystem",
     "RealContextualMemorySystem",
+    "RealEmotionalMemoryWeighting",
     "RealEpisodicFutureThinkingSystem",
     "RealIncrementalLearner",
     "RealMentalSimulationSystem",
