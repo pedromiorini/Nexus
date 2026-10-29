@@ -36,3 +36,45 @@ Guarda da proposta: casos da proposta passam; o caso de 10+ dígitos falha no RE
 
 ### Disciplina
 Se um critério ou protocolo falhar: parar e relatar opções; **sem errata, sem ajuste** de `N`, limiares, definições ou dados depois de ver o resultado. Reconhecida a limitação: a guarda é um limiar determinístico; a retroprojeção mede recall nos incidentes e o ruído dos alarmes no histórico real, não prova que 85 % seja ótimo. Não toca testes/contrato do Axis, `tools/targeted_mutation.py` nem `versao_aceita`.
+
+## Resultados (registrados depois da pré-registro; critérios e dados não foram alterados)
+
+### RED (commit `a4de80b`)
+Testes de contrato rodados contra a guarda da proposta, sem endurecimento: 11 falhas + 2 erros (avaliador/replay ainda inexistentes e guarda sem limite de dígitos). Ressalvas honestas:
+- A previsão "o caso de 10+ dígitos falha" confirmou-se, mas a redação "estoura a aritmética do bash" para o inteiro de 25 dígitos não foi exata: a guarda da proposta devolveu 6 (não houve *wrap*). Mantida a redação pré-registrada, sem errata; o endurecimento (limite de dígitos) continua necessário porque a decisão por 6 num lixo de 23 dígitos não é uma entrada válida.
+- A falha do timeout de 6 dígitos (`999999` aceito pela guarda da proposta) **não** estava na previsão registrada.
+
+### Dados (commit `48f15e2`)
+Instantâneo congelado de 396 jobs `Contract and regression gate` em 393 execuções (347 sucessos, 4 incidentes de timeout, 45 falhas/cancelamentos curtos fora de escopo, 0 sem timeout conhecido). Coleta feita uma vez; nenhum dado editado.
+
+### Critérios (`python tools/agente/timeout_margin_backtest.py avaliar` → exit 0, "resultado: PASSOU")
+| Critério | Resultado | Evidência |
+|---|---|---|
+| TM1 incidentes | PASSOU | 4/4 sinalizados (os 3 conhecidos + 1 **novo**: run `40911472730`, push em `main` `d15b50e`, `T=20`, cancelado por timeout aos 1210 s em 29/10 16:25 UTC) |
+| TM2 sinal antecipado | PASSOU | 1º alarme sob `T=12` em 2026-10-28T17:34Z, 1º incidente 20:42Z (antecedência 11287 s ≈ 3 h 08) |
+| TM3 execução recente | PASSOU | run `40923631957`: 1100 s, `T=20`, limite 1020 s → 6 |
+| TM4 controle saudável | PASSOU | 323 pontos saudáveis (≥ 30), 0 sinalizados indevidos |
+| TM5 falsos alarmes | PASSOU | 18 alarmes, 12 classificáveis, 0 falsos (taxa 0,0 % ≤ 20 %) |
+| TM6 inválidos | PASSOU | casos negativos da guarda, do avaliador (snapshot ausente/vazio/JSON inválido/campo faltando/lista vazia) e `gh` falso com não-JSON → 3 |
+| TM9 tendência | informativo | tabela abaixo |
+
+### TM8 — modo de operação e o `main` de hoje
+`python tools/agente/timeout_margin_backtest.py atual`: últimas 5 durações de sucesso do `main` = 938, 1096, 917, 1188, 1186 s → máximo 1188 s > 1020 s (85 % de 20 min) → a guarda **daria 6 (bloquearia) o `main` de hoje**. Por isso a guarda **não** é passo bloqueante: o CI só roda os casos `tmo` do replay e o uso vivo é o relatório `atual` (sai 0). O timeout não foi alterado. Opções (decisão do dono): (a) manter relatório; (b) reduzir o custo do job (a suíte leva ~30 s local e ~18 min no CI hospedado); (c) subir o timeout (fora desta entrega); (d) tornar a guarda bloqueante só depois de (b) ou (c).
+
+### TM9 — tendência (sucessos por dia UTC: n, mediana s, máx s, máx/timeout)
+| Dia | n | mediana | máx | razão |
+|---|---|---|---|---|
+| 2026-10-01..06 | 64 | 29–38 | 37–43 | 0,06–0,07 |
+| 2026-10-16 | 58 | 89 | 108 | 0,15 |
+| 2026-10-17 | 34 | 112 | 127 | 0,18 |
+| 2026-10-20 | 11 | 117 | 155 | 0,22 |
+| 2026-10-21 | 42 | 126 | 211 | 0,29 |
+| 2026-10-22 | 65 | 212 | 401 | 0,56 |
+| 2026-10-23 | 35 | 394 | 467 | 0,65 |
+| 2026-10-28 | 16 | 518 | 700 | 0,97 (T=12 até o #123) |
+| 2026-10-29 | 14 | 1003 | 1188 | 0,99 (T=20) |
+
+A duração mediana subiu de ~30 s (início de outubro) para ~1003 s hoje; com `T=20` a margem restante do pior sucesso é 12 s e um job de `main` já foi cancelado por timeout (1210 s).
+
+### Limitações
+A guarda é um limiar determinístico; a retroprojeção mede recall nos incidentes reais e o ruído de alarmes (0/12 classificáveis), não prova que 85 % seja ótimo. Há dependência de durações de runners hospedados (variam ±10 %).
