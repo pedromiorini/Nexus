@@ -4318,6 +4318,168 @@ _CM_LIMIT = 0.90
 _CM_PRECISION = 0.80
 _CM_CTX_SEED = 4014
 _CM_HASH_SEEDS = (101, 101, 202)
+_CM_BASE_ROWS_SHA = "580f978aae9c432701d3ff36aeac39377dca8815ce37c05d40e22ecc4c5cd728"
+_CM_MIN_UNAFFECTED = 12
+# resumo (16 hex) por linha da grade de CM1 no código base 0627ca4, capturado antes da correção (CM9)
+_CM_BASE_ROWS = (
+    "0140b931d1297d2c",
+    "147e1ef664fa92b4",
+    "41abad9a3f13ddf5",
+    "cd8983f17c049dc7",
+    "bde545be62a144b1",
+    "f3489dde828db497",
+    "4ec5bbda65757f88",
+    "7f08fcb9c6789c42",
+    "d9c4ecb6605aa941",
+    "728939031f1b3863",
+    "456946640f679b1e",
+    "64a0c12c96b9d477",
+    "e8fd0a9b73b71be6",
+    "94f4799bfc734f40",
+    "9dfbf6c6c397978a",
+    "42c4e180e813155a",
+    "a8bc24faf45e9ac8",
+    "d27680e306c320a7",
+    "332b6e8be1857df5",
+    "62287686d2b3f629",
+    "ec70d54050d0fa8f",
+    "0414bcf9fc900df0",
+    "80e6ea95628bb7db",
+    "31419a4698894329",
+    "6a435b7549cc26f9",
+    "4503834f6fe44871",
+    "41e576ae05fc94ff",
+    "04fd67b9abb30f21",
+    "6d8138e6deb1f63a",
+    "b686f7a11464bfb0",
+    "02973d5e21e0c2ed",
+    "d94ff505c5724dd4",
+    "63417aadaf1980d6",
+    "39a84f890535f5a6",
+    "ad749809741b7fc3",
+    "3424b401d850d0e4",
+    "1e5861315e1ecd53",
+    "917c048daca7776c",
+    "f1ab623fa774aa66",
+    "631b2f2892fd69b3",
+    "6de030c0f0c468f9",
+    "30698a45bada91b4",
+    "4fb66ea0972ac4f4",
+    "cd0cf4f39009ca27",
+    "1e6efc673ab158e3",
+    "a4b61e24a42993a6",
+    "797b362bf2137b13",
+    "c833007fc7cd0689",
+    "0bffea6a8eccf0c4",
+    "dbe0e6a16c6fead2",
+    "80e6ea95628bb7db",
+    "6199a4bc5c756974",
+    "4c5b66f4280d9918",
+    "4283ce1579698164",
+    "19174c73e4cbcc60",
+    "a0e5a11e77c5925c",
+    "47d27f5ae7b94706",
+    "f3654f9728b43154",
+    "03001de86ea8991f",
+    "561548656717eb32",
+    "e65a48a182ae504e",
+    "a6f5b8abaaff3a7e",
+    "c9fee29988746950",
+    "9eee3561cf148e45",
+    "413ec31ee4791c52",
+    "5a3ecb81339e2aac",
+    "a27091603e36e658",
+    "5a979df47c05a372",
+    "382f9fde7b1ece78",
+    "7b3ea2df5603dfa3",
+    "b4d02750bf44194a",
+    "e6c3e5056581446a",
+    "fa147f08f58ae1af",
+    "2377b3bae6239e5b",
+    "5d7e8a8bb2c1c3a0",
+    "e5f3865d69c66f76",
+    "0f5183a3b1bb86ce",
+    "fb0f9199aa26f43a",
+    "0b0b587b25566c0d",
+    "858e27f18d61a91e",
+    "df656edea8ce6889",
+    "cc85a095f49bd8d2",
+    "29fbe60f2b26cd24",
+    "1fc3ac9c92816b65",
+    "581b2158873b6184",
+    "6f31d003db1435f1",
+    "5c1f0a9dbe71f52c",
+    "c0688c4a6bf43e15",
+    "35f0b8e9005b04e5",
+    "e499a627b9a53743",
+    "315b5bd68cccb2eb",
+    "34619a3c5ae8ff38",
+    "926d6ce979101b7e",
+    "201a777167b1f9a3",
+    "cc11636a4a75702c",
+    "0b974be6cee81848",
+    "5b92065b80d0b9b2",
+    "6e51b2a5230ce60b",
+    "b029bdfaf54cb7ba",
+    "bbf85a3f10b829fe",
+    "8424872c7af63e7c",
+    "0f8951412c49215e",
+    "d34ede8c5018c0d5",
+    "38b4db2e0fcbcaab",
+    "b3e177b6e31afa61",
+    "35baae12d0f2080a",
+    "737e103c07d7ceca",
+    "8e17c034a3fe2555",
+    "4fbf1fdcb8fa2c1a",
+    "fe4ff75177824807",
+    "4b940cba17289615",
+    "bec48b4fc70f43c5",
+    "5480e3638937f637",
+    "b65ea03cde898999",
+    "4768dd0166090b89",
+    "2e22b7467cc0fcdd",
+    "2c8ef2c42a1a8d08",
+    "be7cf56abc4a96d8",
+    "28d58973e253a8fd",
+    "8aadaf6642e0e5da",
+)
+_CM_STABILITY_SEED = 4016
+_CM_STABILITY_SIZE = 200
+_CM_STABILITY_VALUES = ("office", "café", "日本語", "😀", "\ud800", 1, 2.5, None, ("a", 1), True, "", "x" * 50)
+_CM_GOLDEN = (
+    ({}, [0.04, 0.04, 0.04, 0.04, 0.04]),
+    ({"location": "office"}, [0.2, 0.04, 0.04, 0.04, 0.04]),
+    ({"location": "office", "time": "morning", "mood": "calm", "task": "reading", "social": "alone"},
+     [0.2, 0.32, 0.37, 0.78, 0.2]),
+    ({"mood": "focused", "task": "review"}, [0.04, 0.04, 0.25, 0.2, 0.04]),
+    ({"location": 1}, [0.19, 0.04, 0.04, 0.04, 0.04]),
+    ({"social": "team", "weather": "rain"}, [0.04, 0.04, 0.04, 0.04, 0.48]),
+    ({"mood": "\ud800"}, [0.04, 0.04, 0.05, 0.04, 0.04]),
+)
+_CM_M = {"location": "office", "time": "morning", "mood": "calm", "task": "reading", "social": "alone"}
+_CM_SWAPS = (("location", "home"), ("time", "noon"), ("mood", "focused"), ("task", "review"), ("social", "team"))
+_CM_CONTENT = "alpha beta"
+# (nome, contexto da memória, consulta de texto, contexto de recuperação, esperado); M = _CM_M
+_CM8_SCORES = (
+    ("a1", "M", None, 0, 1.0), ("a2", "M", None, 1, 0.8), ("a3", "M", None, 2, 0.6), ("a4", "M", None, 3, 0.4),
+    ("a5", "M", None, 4, 0.2), ("a6", "M", None, 5, 0.0),
+    ("a7", "M", None, {"location": "office"}, 1.0),
+    ("a8", "M", None, {"location": "office", "mood": "focused"}, 0.5),
+    ("a9", "M", None, {}, 1.0),
+    ("a10", "M", None, {"weather": "rain"}, 1.0),
+    ("a11", {}, None, {"location": "office"}, 0.0),
+    ("a12", {}, None, {"location": "unknown"}, 1.0),
+    ("a13", {"mood": 1}, None, {"mood": "1"}, 1.0),
+    ("a14", "M", "alpha", 0, 1.0), ("a15", "M", "zzz", 0, 0.65),
+    ("a16", "M", "alpha", 5, 0.5), ("a17", "M", "zzz", 5, 0.15),
+    ("a18", "M", "", 1, 0.8),
+)
+_CM8_BANDS = {"contents": ["d0", "d1", "d2"], "scores": [1.0, 0.8, 0.6], "features": [5, 4, 3], "retrievals": 1}
+_CM8_MATCH = (
+    ("c1", ([0.1, 0.2], [0.1, 0.3]), 0.5), ("c2", ([], [1.0]), 0.0), ("c3", (None, [1.0]), 0.0),
+    ("c4", ([1.0], [1.0], []), 1.0), ("c5", ([0.1, 0.2, 0.3], [0.1]), 1.0),
+    ("c6", ([0.1, 0.2], [0.1, 0.3], [1]), 0.0), ("c7", ([0.1, 0.2], [0.1, 0.3], [0]), 1.0),
+)
 _CM_FRESH_STATS = {"total_encodings": 0, "total_retrievals": 0, "context_matched_retrievals": 0,
                    "context_match_rate": 0.0, "stored_memories": 0, "current_context_dimensions": 0}
 _CM_COUNTERS_EXPECTED = {
@@ -4328,10 +4490,10 @@ _CM_COUNTERS_EXPECTED = {
 _CM_COLLAB_EXPECTED = {"ltm_calls": [["c", "contextual", 0.7], ["5", "contextual", 0.7]],
                        "falsy_ltm_untouched": True, "wm_attention_untouched": True}
 _CM_GAPS_EXPECTED = {
-    "default_threshold_returns_all": 3,
+    "default_threshold_returns_all": 0,
     "unlisted_keys_ignored": True,
     "aliased_current_context": {"aliased": True, "stale_vector": True},
-    "empty_query": {"same_score_as_none": True, "nonmatching_lowers": True},
+    "empty_query": {"same_score_as_none": True, "nonmatching_lowers": False},
     "specificity_side_effects": {"score": 1.0, "encodings": 2, "retrievals": 1, "stored": 2,
                                  "prior_retrieval_count": 1},
     "reinstate": {"unknown_none": True, "unknown_keeps_context": True, "known_same_object": True,
@@ -4345,6 +4507,10 @@ _CM_GAPS_EXPECTED = {
     "key_order_independent": True,
     "failed_set_leaves_none": True,
     "ltm_failure_after_append": {"stored": 1, "encodings": 1},
+    "cue_subset_is_enough": 1.0,
+    "query_hit_other_context_passes_default": [1, 0.5],
+    "query_miss_same_context_passes_default": [1, 0.65],
+    "bucket_collision": True,
 }
 _CM_ERRORS_EXPECTED = {
     "set_ctx_none": "AttributeError", "set_ctx_list": "AttributeError", "store_ctx_int": "AttributeError",
@@ -4354,6 +4520,7 @@ _CM_ERRORS_EXPECTED = {
     "store_ltm_raises": "RuntimeError",
     "retrieve_threshold_str_empty": "no-error", "retrieve_query_int": "no-error",
     "reinstate_none": "no-error", "similarity_none": "no-error",
+    "match_none": "no-error", "match_cue_out_of_range": "IndexError",
 }
 _CM_PROC_SCRIPT = (
     "import json, sys\n"
@@ -4366,7 +4533,7 @@ _CM_PROC_SCRIPT = (
 
 def _cm_hash(value):
     import hashlib
-    return int(hashlib.sha256(str(value).encode()).hexdigest()[:8], 16)
+    return int(hashlib.sha256(str(value).encode("utf-8", "surrogatepass")).hexdigest()[:8], 16)
 
 
 class _cm_det_hash:
@@ -4435,7 +4602,17 @@ def _cm_ref_cos(left, right):
     return dot / (norm_l * norm_r)
 
 
-def _cm_reference(row):
+def _cm_ref_match(item_vec, ctx):
+    """v2: fração das dimensões consultadas (chave presente no contexto) cujo balde coincide."""
+    vec = _cm_ref_vec(ctx)
+    cued = [i for i, dim in enumerate(_CM_POOLS) if dim in ctx]
+    if not cued:
+        return 1.0
+    return sum(1 for i in cued if item_vec[i] == vec[i]) / len(cued)
+
+
+def _cm_reference(row, legacy=False):
+    """Referência independente. `legacy=True` é a v1 (cosseno e content_match fixo), usada só em CM9."""
     set_ctx, memories, retrievals, reinstate = row
     current = set_ctx if set_ctx is not None else {}
     stored = []
@@ -4448,10 +4625,16 @@ def _cm_reference(row):
         vec = _cm_ref_vec(ctx)
         found = []
         for item in stored:
-            content_match = 1.0
-            if query:
-                content_match = 1.0 if str(query).lower() in str(item["content"]).lower() else 0.3
-            score = (_cm_ref_cos(item["vec"], vec) + content_match) / 2.0
+            if legacy:
+                content_match = 1.0
+                if query:
+                    content_match = 1.0 if str(query).lower() in str(item["content"]).lower() else 0.3
+                score = (_cm_ref_cos(item["vec"], vec) + content_match) / 2.0
+            else:
+                score = _cm_ref_match(item["vec"], ctx)
+                if query:
+                    content_match = 1.0 if str(query).lower() in str(item["content"]).lower() else 0.3
+                    score = (score + content_match) / 2.0
             if score >= threshold:
                 item["n"] += 1
                 feats = [k for k in item["ctx"] if k in ctx and item["ctx"][k] == ctx[k]]
@@ -4550,7 +4733,7 @@ def _cm_scenario(cls, seed):
 
 
 def _cm_selectivity_families(cls):
-    ranked = precise = invalid = 0
+    ranked = precise = recalled = invalid = 0
     returned = []
     for seed in _CM_SEEDS:
         system, ctxs, valid = _cm_scenario(cls, seed)
@@ -4562,9 +4745,11 @@ def _cm_selectivity_families(cls):
         hits = sum(1 for m in default if m.memory.content in want)
         returned.append(len(default))
         precise += bool(default) and hits / len(default) >= _CM_PRECISION
+        recalled += want <= {m.memory.content for m in default}
     total = len(_CM_SEEDS)
     return {"CM2": {"hits": ranked, "total": total, "rate": ranked / total, "invalid": invalid},
-            "CM3": {"hits": precise, "total": total, "rate": precise / total, "returned": returned}}
+            "CM3": {"hits": precise, "total": total, "rate": precise / total, "returned": returned,
+                    "recall_hits": recalled, "recall_rate": recalled / total}}
 
 
 def _cm_process_vectors(source, ctxs, hash_seed):
@@ -4589,6 +4774,82 @@ def _cm_determinism(source):
             "control_rate": control / len(ctxs), "cross_rate": cross / len(ctxs)}
 
 
+def _cm_try(fn):
+    try:
+        return fn()
+    except Exception as exc:  # noqa: BLE001 - o tipo do erro vira o valor medido  # nosec B110
+        return "erro:" + type(exc).__name__
+
+
+def _cm_swapped(count):
+    ctx = dict(_CM_M)
+    for dim, value in _CM_SWAPS[:count]:
+        ctx[dim] = value
+    return ctx
+
+
+def _cm_stability(enc_cls):
+    """CM7: vetores dourados, sem chamar builtins.hash, e grade contra a referência de hashlib."""
+    import builtins
+    import copy
+    enc = enc_cls()
+    golden = sum(1 for ctx, vec in _CM_GOLDEN if _cm_try(lambda: enc.encode_context(ctx)) == vec)
+
+    def boom(*_args, **_kwargs):
+        raise AssertionError("builtins.hash chamado")
+
+    original = builtins.hash
+    builtins.hash = boom
+    try:
+        no_hash = sum(1 for ctx, vec in _CM_GOLDEN if _cm_try(lambda: enc.encode_context(ctx)) == vec)
+    finally:
+        builtins.hash = original
+    rng = random.Random(_CM_STABILITY_SEED)  # nosec B311 - dados sintéticos de avaliação
+    ok = mutated = 0
+    for _ in range(_CM_STABILITY_SIZE):
+        dims = rng.sample(list(_CM_POOLS), rng.randint(0, 5))
+        ctx = {dim: rng.choice(_CM_STABILITY_VALUES) for dim in dims}
+        if rng.random() < 0.3:
+            ctx["weather"] = rng.choice(_CM_STABILITY_VALUES)
+        snapshot = copy.deepcopy(ctx)
+        vec = _cm_try(lambda: enc.encode_context(ctx))
+        ok += vec == _cm_ref_vec(ctx) and len(vec) == len(_CM_POOLS) and all(0.0 <= x < 1.0 for x in vec)
+        mutated += repr(ctx) != repr(snapshot)
+    return {"golden": golden, "golden_total": len(_CM_GOLDEN), "no_hash": no_hash,
+            "grid_ok": ok, "grid_total": _CM_STABILITY_SIZE, "mutated_inputs": mutated}
+
+
+def _cm_scores(cls, enc_cls):
+    """CM8: tabela de score e seletividade."""
+    table = {}
+    for name, mem_ctx, query, retr, _expected in _CM8_SCORES:
+        memory = _cm_swapped(0) if mem_ctx == "M" else mem_ctx
+        retrieval = _cm_swapped(retr) if isinstance(retr, int) else retr
+
+        def run(memory=memory, query=query, retrieval=retrieval):
+            system = _cm_system(cls)
+            system.store_with_context(_CM_CONTENT, dict(memory))
+            found = system.retrieve_by_context(query=query, context=dict(retrieval), threshold=0.0)
+            return round(found[0].match_score, 6) if found else None
+
+        table[name] = _cm_try(run)
+
+    def bands():
+        system = _cm_system(cls)
+        for count in range(6):
+            system.store_with_context(f"d{count}", _cm_swapped(count))
+        found = system.retrieve_by_context(context=_cm_swapped(0))
+        return {"contents": [m.memory.content for m in found],
+                "scores": [round(m.match_score, 6) for m in found],
+                "features": [len(m.matched_features) for m in found],
+                "retrievals": system.get_statistics()["total_retrievals"]}
+
+    table["b1"] = _cm_try(bands)
+    for name, args, _expected in _CM8_MATCH:
+        table[name] = _cm_try(lambda args=args: enc_cls().compute_match(*args))
+    return table
+
+
 def contextual_memory_fingerprint(ns):
     import copy
     import inspect
@@ -4601,11 +4862,12 @@ def contextual_memory_fingerprint(ns):
     cls, mem_cls, match_cls, enc_cls = (get(name) for name in
                                         ("RealContextualMemorySystem", "ContextualMemory", "ContextMatch",
                                          "ContextEncoder"))
+    stability = _cm_stability(enc_cls)  # fora do substituto: mede o hash real do módulo (CM7)
     with _cm_det_hash():
-        return _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect)
+        return _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect, stability)
 
 
-def _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect):
+def _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect, stability):
     import contextlib
     import io
     buf = io.StringIO()
@@ -4616,7 +4878,7 @@ def _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect
 
     # grade (CM1)
     matches = mutated = meta_bad = 0
-    digests = []
+    digests, unaffected = [], []
     for row in _cm_grid():
         snapshot = copy.deepcopy(row)
         view, meta_ok = _cm_run(cls, row)
@@ -4625,8 +4887,10 @@ def _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect
         mutated += row != snapshot
         meta_bad += not meta_ok
         digests.append(_cm_row_digest(view))
+        unaffected.append(_cm_row_digest(_cm_reference(row, legacy=True)) == _cm_row_digest(ref))
     grid_info = {"count": len(digests), "reference_matches": matches, "mutated_inputs": mutated,
-                 "meta_bad": meta_bad, "rows_sha": _ms_sha(digests)}
+                 "meta_bad": meta_bad, "rows_sha": _ms_sha(digests),
+                 "row_digests": [d[:16] for d in digests], "unaffected": unaffected}
 
     families = _cm_selectivity_families(cls)
     determinism = _cm_determinism(source)
@@ -4742,6 +5006,16 @@ def _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect
     except RuntimeError:
         pass
 
+    sub_sys = _cm_system(cls)
+    sub_sys.store_with_context("x", {"location": "office", "mood": "calm", "task": "reading"})
+    sub_found = sub_sys.retrieve_by_context(context={"location": "office"})
+    sub_score = round(sub_found[0].match_score, 9) if sub_found else None
+
+    hit_sys = _cm_system(cls)
+    hit_sys.store_with_context(_CM_CONTENT, {"location": "office"})
+    hit_found = hit_sys.retrieve_by_context(query="alpha", context={"location": "home"})
+    miss_found = hit_sys.retrieve_by_context(query="zzz", context={"location": "office"})
+
     gaps = {
         "default_threshold_returns_all": default_returns,
         "unlisted_keys_ignored": enc.encode_context({"weather": "rain"}) == enc.encode_context({"weather": "sun"})
@@ -4767,6 +5041,12 @@ def _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect
         == enc.encode_context({"task": "b", "mood": "a"}),
         "failed_set_leaves_none": none_sys.current_context is None,
         "ltm_failure_after_append": {"stored": len(ltm_sys.contextual_memories), "encodings": ltm_sys.total_encodings},
+        "cue_subset_is_enough": sub_score,
+        "query_hit_other_context_passes_default": [len(hit_found), round(hit_found[0].match_score, 9)
+                                                   if hit_found else None],
+        "query_miss_same_context_passes_default": [len(miss_found), round(miss_found[0].match_score, 9)
+                                                   if miss_found else None],
+        "bucket_collision": enc.encode_context({"time": "noon"}) == enc.encode_context({"time": "evening"}),
     }
 
     def loaded(threshold):
@@ -4791,10 +5071,12 @@ def _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect
         "retrieve_query_int": _cm_err(lambda: _cm_system(cls).retrieve_by_context(query=5)),
         "reinstate_none": _cm_err(lambda: _cm_system(cls).reinstate_context(None)),
         "similarity_none": _cm_err(lambda: enc_cls().compute_similarity(None, [1.0])),
+        "match_none": _cm_err(lambda: enc_cls().compute_match(None, [1.0])),
+        "match_cue_out_of_range": _cm_err(lambda: enc_cls().compute_match([1.0], [1.0], [3])),
     }
     return {
         "clock": "time.time",
-        "randomness": "uuid4 ids; hash() determinístico no harness",
+        "randomness": "uuid4 ids; sha256 estável no codificador (hash() não é usado)",
         "init_params": list(inspect.signature(cls.__init__).parameters),
         "banner": banner,
         "memory_fields": list(inspect.signature(mem_cls).parameters),
@@ -4807,6 +5089,8 @@ def _cm_fingerprint_body(cls, mem_cls, match_cls, enc_cls, source, copy, inspect
         "collaborators": collaborators,
         "gaps": gaps,
         "errors": errors,
+        "stability": stability,
+        "scores": _cm_scores(cls, enc_cls),
     }
 
 
@@ -4843,7 +5127,7 @@ def _contextual_memory_standalone() -> bool:
 
 
 def eval_contextual_memory(criteria="v1"):
-    """CM1–CM6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    """CM1–CM9. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
     import core.cognitivo.contextual_memory as contextual_memory
     import core.constitutional_brain as brain
     import core.cognitivo as package
@@ -4866,7 +5150,7 @@ def eval_contextual_memory(criteria="v1"):
     fam2, fam3 = payload["families"]["CM2"], payload["families"]["CM3"]
     cm2_invalid = fam2["invalid"] > 0
     cm2 = not cm2_invalid and fam2["rate"] >= _CM_LIMIT
-    cm3 = fam3["rate"] >= _CM_LIMIT
+    cm3 = fam3["rate"] >= _CM_LIMIT and fam3["recall_hits"] == fam3["total"]
     det = payload["determinism"]
     cm4 = det["control_same"] == det["contexts"] and det["cross_rate"] >= _CM_LIMIT
     gaps = payload["gaps"]
@@ -4886,13 +5170,35 @@ def eval_contextual_memory(criteria="v1"):
         and payload["init_params"] == ["self", "long_term_memory", "working_memory", "attention"]
         and payload["banner"] == _CM_BANNER
     )
+    stab = payload["stability"]
+    cm7 = (
+        stab["golden"] == stab["golden_total"] == len(_CM_GOLDEN) == 7
+        and stab["no_hash"] == len(_CM_GOLDEN)
+        and stab["grid_ok"] == stab["grid_total"] == _CM_STABILITY_SIZE and stab["mutated_inputs"] == 0
+    )
+    scores = payload["scores"]
+    expected8 = {name: expected for name, _m, _q, _r, expected in _CM8_SCORES}
+    expected8["b1"] = _CM8_BANDS
+    expected8.update({name: expected for name, _args, expected in _CM8_MATCH})
+    cm8_hits = sum(1 for name, expected in expected8.items() if scores.get(name) == expected)
+    cm8 = len(expected8) == len(scores) == 26 and cm8_hits == 26
+    import hashlib
+    base_rows_ok = (
+        len(_CM_BASE_ROWS) == _CM_GRID_SIZE
+        and hashlib.sha256(json.dumps(list(_CM_BASE_ROWS)).encode()).hexdigest() == _CM_BASE_ROWS_SHA
+    )
+    unaffected_rows = [i for i, flag in enumerate(grid["unaffected"]) if flag]
+    base_diffs = [i for i in unaffected_rows if grid["row_digests"][i] != _CM_BASE_ROWS[i]] if base_rows_ok else []
+    cm9_invalid = not base_rows_ok or len(unaffected_rows) < _CM_MIN_UNAFFECTED
+    cm9 = not cm9_invalid and not base_diffs
     return [
         _check("CM1", {"reference_matches": grid["reference_matches"], "count": grid["count"],
                        "mutated_inputs": grid["mutated_inputs"], "meta_bad": grid["meta_bad"]},
                cm1, "120/120 iguais à referência independente; 0 entradas alteradas; ids e timestamps válidos"),
         _check("CM2", fam2, cm2, "contexto consultado ocupa as 6 primeiras posições em ≥ 0.90 das 20 seeds",
                **({"scenario_invalid": True} if cm2_invalid else {})),
-        _check("CM3", fam3, cm3, "precisão ≥ 0.80 com o limiar padrão em ≥ 0.90 das 20 seeds"),
+        _check("CM3", fam3, cm3,
+               "precisão ≥ 0.80 com o limiar padrão em ≥ 0.90 das 20 seeds e revocação das 6 memórias em 20/20"),
         _check("CM4", det, cm4, "controle 20/20 e vetor igual entre PYTHONHASHSEED 101 e 202 em ≥ 0.90 dos 20 contextos"),
         _check("CM5", {"fresh_stats": payload["fresh_stats"], "counters": payload["counters"],
                        "collaborators": payload["collaborators"], "gap_hits": [gap_hits, len(_CM_GAPS_EXPECTED)],
@@ -4903,6 +5209,13 @@ def eval_contextual_memory(criteria="v1"):
                        "identity": identity, "standalone": standalone, "clock": payload["clock"],
                        "source_golden": CM_SOURCE_SHA, "behavior_golden": CM_BEHAVIOR_SHA},
                cm6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+        _check("CM7", stab, cm7, "7/7 vetores dourados, 7/7 sem builtins.hash e 200/200 contra a referência de hashlib"),
+        _check("CM8", {"hits": [cm8_hits, len(expected8)], "scores": scores},
+               cm8, "26/26 itens de score e seletividade com valores exatos"),
+        _check("CM9", {"unaffected": len(unaffected_rows), "min_unaffected": _CM_MIN_UNAFFECTED,
+                       "base_rows_sha_ok": base_rows_ok, "diffs": base_diffs},
+               cm9, "linhas não afetadas iguais ao resumo congelado do código base (0 diferenças; ≥ 12 linhas)",
+               **({"scenario_invalid": True} if cm9_invalid else {})),
     ]
 
 
