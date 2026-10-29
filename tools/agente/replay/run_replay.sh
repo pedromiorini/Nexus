@@ -27,6 +27,7 @@ while IFS=$'\t' read -r id tipo args exp || [[ -n $id ]]; do
     res) shas_ok "$1" && abre "$1" || continue; "$D/check_resolution.sh" "$T/$id" >/dev/null 2>&1; rc=$?;;
     merge) shas_ok "$1" "$2" && abre "$1" || continue; (cd "$T/$id"; git -c user.email=r@r -c user.name=r merge --no-commit "$2" >/dev/null 2>&1); U=$(cd "$T/$id"; git diff --name-only --diff-filter=U); "$D/check_resolution.sh" "$T/$id" $U >/dev/null 2>&1; rc=$?;;
     pre) R=$R "$D/predeleg.sh" "$1" "$2" >/dev/null 2>&1; rc=$?;;
+    tmo) a2=${2:-}; [[ -n $a2 && $a2 != /* ]] && a2=$D/$a2; "$D/../timeout_margin.sh" "$1" "$a2" >/dev/null 2>&1; rc=$?;;
     *) echo "FALHOU $id tipo desconhecido: $tipo" >&2; fail=1; continue;;
   esac
   executados=$((executados + 1))

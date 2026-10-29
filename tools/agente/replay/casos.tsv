@@ -10,3 +10,9 @@ C-origem58	pre	aecb2c7 721eb9a	2
 C-anterior57	pre	f5fec45 7eabba7	0
 C-anterior61	pre	eb706c7 d3e652f	0
 C-incompat-hash	pre	deadbeef 721eb9a	3
+T-origem	tmo	12 fixtures/tmo_origem.txt	6
+T-anterior	tmo	12 fixtures/tmo_anterior.txt	0
+T-incompat-ausente	tmo	12 fixtures/nao_existe.txt	3
+T-incompat-vazio	tmo	12 fixtures/tmo_vazio.txt	3
+T-incompat-texto	tmo	12 fixtures/tmo_texto.txt	3
+T-incompat-timeout	tmo	abc fixtures/tmo_anterior.txt	3
