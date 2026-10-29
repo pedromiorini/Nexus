@@ -1,4 +1,16 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "Memória episódica: limit==0 valida a query antes de devolver [] e barra invertida literal na busca (pré-registro EL1–EL8)"
+    arquivos:
+      - core/cognitivo/episodic_memory.py
+      - test_episodic_like_literal_contract.py
+      - tools/cognitivo_mutation.py
+      - docs/cognitivo/AUDITORIA_2026-10-22.md
+      - docs/agentes/CLAIMS.yaml
+      - CONTINUATION.md
+      - AUDIT_REALITY_REPORT.md
+      - audit_reality.json
+    expira_em: "2026-10-30T12:00:00Z"

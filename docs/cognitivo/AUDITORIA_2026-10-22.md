@@ -2035,3 +2035,49 @@ Saída do harness: RED `exit 1` (falhas CM1, CM3–CM8); GREEN `exit 0`.
 **Lacunas residuais (mantidas em CM5 ou fora de escopo; nada disto foi tocado).** Com query, o score continua aditivo `(contexto + conteúdo) / 2`: uma query que acerta passa o limiar padrão mesmo com contexto diferente (0.5) e uma que erra passa com contexto igual (0.65). Subconjunto de dimensões consultadas basta (`cue_subset_is_enough` = 1.0). Colisões de balde (`% 100`; por exemplo `noon` e `evening`) tornam valores diferentes iguais (`bucket_collision`). `compute_similarity` (cosseno) continua e não é mais usada na recuperação. `working_memory` e `attention` seguem armazenados e nunca lidos; `long_term_memory` só recebe escrita; entradas não validadas; `nonmatching_lowers` agora é falso (contexto diferente dá 0.0, query errada dá 0.15), mudança declarada no pré-registro.
 
 **Opções se algo for recusado na revisão.** (a) Manter em rascunho como inventário medido; (b) PR separado para o score com query (multiplicativo ou duas etapas) com novo pré-registro; (c) trocar o balde `% 100` por vetor de igualdade exata do valor, com novo protocolo.
+
+## Memória episódica — `limit == 0` e barra invertida literal (pré-registro EL1–EL8)
+
+**Autorização:** Pedro, mensagem pt123u (2026-10-29, «Prossiga»), depois da mescla do #126 (`main` em `4215c4e`): fechar as duas limitações que o #126 declarou. Este PR é **draft e não será mesclado sem nova autorização**.
+
+**Pré-registro escrito antes** do contrato novo e de qualquer mudança em `core/cognitivo/episodic_memory.py`. **Única execução prévia** (declarada): uma sonda de leitura em `4215c4e`, com `:memory:`, quatro títulos (`a_b`, `a\b`, `axb`, `a b`) e as consultas `a\b`, `a_b`, `a b` e `a\`, para confirmar a causa de `a\b` listar `a_b`. Resultado lido: todas as quatro consultas devolvem os mesmos três títulos que têm os tokens `a` e `b` (`a b`, `a\b`, `a_b`). Nenhum resultado com o comportamento novo foi lido.
+
+### Hipóteses
+
+- **H-L0:** em `4215c4e`, `search_episodes(q, limit=0)` devolve `[]` antes de validar `q`, então `""`, `False`, `0`, `b"%"` etc. com `limit=0` não levantam e imitam sucesso. Falsifica se já levantam.
+- **H-BS:** o `ESCAPE` e a troca de `\` no parâmetro do `LIKE` já estão corretos (a #126 testou `a\b` só como inclusão). `a\b` lista `a_b` porque o caminho FTS5 extrai os termos `\w+` (`a`, `b`) e o tokenizador `unicode61` também parte `a_b` em `a`, `b`; a união OR dos termos casa os dois. Falsifica se, com `_fts_enabled = False`, `a\b` ainda listar `a_b`, ou se com FTS ligado a consulta sem barra invertida e com os mesmos termos deixar de listar `a_b`.
+- **Previsão (registrada, não vinculante):** no RED, EL1, EL4 e EL5 falham e os demais passam. Depois da correção, todos passam.
+
+### As mudanças (as únicas permitidas, só em `core/cognitivo/episodic_memory.py`)
+
+1. **Validação da query antes do atalho de `limit == 0`.** `search_episodes` passa a validar `query` (`None` é a ausência documentada; não-`str` → `TypeError("query must be a string")`; `""` → `ValueError("query must be non-empty")`) e só então delega à lógica atual, movida **sem alteração de texto** para um método privado `_search_validated`. O bloco de validação de `limit`, o atalho `limit == 0 → []` e o `"""Buscar episódios"""` ficam byte a byte como estão, para que os 3 mutantes episódicos de `tools/targeted_mutation.py` (arquivo do Axis, **não tocado**) continuem aplicáveis. **Precedência declarada:** se `query` **e** `limit` forem inválidos, o erro da `query` vem primeiro (antes era o do `limit`); nenhum contrato existente cobre os dois inválidos ao mesmo tempo.
+2. **Barra invertida é literal.** Em `_ranked_search`, uma consulta que contém `\` não usa o ramo FTS (os termos `\w+` descartam a barra e a união OR casa por token); ela só usa a substring `LIKE ... ESCAPE`, que já trata `\` como literal. Consultas sem `\` seguem exatamente como hoje (EM1 incluso).
+
+**Não escopo:** `_` literal em consultas com termos (`a_b` continua casando `a b` por tokenização do FTS5, como `a b` sempre casou; sem contrato novo sobre isso); consulta só com espaços; `status` inválido; o FTS em OR; `tools/targeted_mutation.py`, Axis e os testes do Axis; `test_episodic_memory_search_limits_contract.py` (Cue Agent) e seus 4 testes ficam intactos; #79, #115, #116 e state docs; PRs congelados #38–#50, #60, #77.
+
+### Critérios (todos no contrato `test_episodic_like_literal_contract.py`, ampliado; nenhum limite muda depois da primeira execução)
+
+Cenário base do arquivo (já existente): 7 episódios fechados (`100%`, `plain`, `a_b`, `axb`, `rate_limit`, `alpha release`, `note` com gatilho `save 100%`) e um aberto (`100% open`). Cenário novo `B` (`:memory:`, fechados): títulos `a_b`, `a\b`, `axb`, `a b`, `ab`, `xa\y`, `\\` (duas barras), `a\` e `note2` com gatilho `p\q`; sem aleatoriedade e sem seeds (determinístico). `PYTHONHASHSEED` não influencia (as saídas não dependem de `hash()`).
+
+| id | critério | alvo |
+|---|---|---|
+| EL1 | `limit=0` com query inválida levanta antes de qualquer SQL: `""` → `ValueError` (`non-empty`); `False`, `True`, `0`, `1`, `1.5`, `b"%"`, `bytearray(b"a")`, `()` → `TypeError` (`query must be a string`); `statements == []` | 9/9 |
+| EL2 | `limit=0` com query válida (`None`, `"needle"`, `"%"`, `"a\b"`) continua `[]` sem SQL | 4/4 |
+| EL3 | `limit` inválido com query válida igual a antes (`-1` → `ValueError`, `True`/`1.5`/`"1"`/`None` → `TypeError`); com query **e** limite inválidos, o erro é o da query | 6/6 |
+| EL4 | no cenário `B`, com FTS ligado: `a\b` → exatamente `["a\b"]` (título); `a\` → exatamente `["a\b", "xa\y", "a\"]` (todo título com `a\`); `\` → exatamente `["a\b", "xa\y", "\\", "a\", "note2"]` (a barra no gatilho de `note2` conta pelo `p\q`); `p\q` → `["note2"]` | 4/4 |
+| EL5 | controle FTS desligado (`_fts_enabled = False`) devolve o mesmo conjunto de EL4 | 4/4 |
+| EL6 | não regressão: os 10 testes de `test_episodic_like_literal_contract.py` de `4215c4e` e os 4 de `test_episodic_memory_search_limits_contract.py` passam sem edição; `tools/cognitivo_eval.py --capability episodic` sai 0 (EM1–EM3 inalterados); consulta ordinária sem barra (`alp`, termos que casam por token) continua ranqueada | 14/14 e exit 0 |
+| EL7 | saída por processo, sem pipe: query inválida **com `limit=0`** (`""`, `False`, `b"%"`) → **2**; `limit` inválido com query válida (`-1`, `"1"`) → **2**; `limit=0` com query válida → **0**; ausência (`None`) → **0** com listagem; `a\b` literal exato → **0**; resultado errado → **1**; modo desconhecido → **9** | 8/8 |
+| EL8 | gates: suíte completa, `ruff`, `compileall`, `reality_audit` regenerado só pela ferramenta, cobertura `core/cognitivo/*` ≥ 90, `tools/cognitivo_mutation.py` com **todos** os mutantes mortos (inclui os novos abaixo), `tools/targeted_mutation.py` 80/80 sem edição, Bandit sem achado novo sobre a baseline de 131 LOW, `SECURITY_TRIAGE.md --check`, `validar_registro.py --expirados aviso` | todos exit 0 |
+
+**Mutantes novos (somente em `tools/cognitivo_mutation.py`, declarados antes):** (a) guarda de tipo da query removida; (b) guarda de query vazia removida; (c) desvio do FTS para consulta com `\` removido; (d) a validação da query deixa de acontecer antes do atalho `limit == 0` (delegação sem validar). Critério: 4/4 mortos pelo contrato. Se algum sobreviver, vale mais um teste, sem mudar critério.
+
+**Teste negativo e código de entrada inválida:** EL1, EL3 e EL7. Código de saída por processo: **2** = entrada inválida (query vazia/não-`str`, `limit` inválido), **0** = sucesso (inclusive resultado vazio sem correspondência e ausência `None`), **1** = resultado errado, **9** = modo desconhecido do script de teste. Entradas ausente (`None`), vazia (`""`) e não resolvível (sem correspondência, `[]`) têm resultado distinto e declarado.
+
+**Regra:** nenhum critério é alterado depois da primeira execução. Se algum falhar (inclusive por eu errar um valor esperado acima), o PR segue draft, **paro** e levo opções ao Pedro. Um valor esperado errado meu **não** é corrigido em silêncio: reporto.
+
+### Varredura §7.2 (2026-10-29, `gh pr list --state open`)
+
+PRs abertos: #38–#50, #60, #77, #79, #115, #116. Nenhum edita `core/cognitivo/episodic_memory.py`, `test_episodic_like_literal_contract.py` nem este arquivo. Sobreposição declarada: #116 (Axis) altera `tools/cognitivo_mutation.py`, `AUDIT_REALITY_REPORT.md`, `audit_reality.json` e `CONTINUATION.md`; #79 altera `docs/agentes/CLAIMS.yaml`; #49 e #50 e #115 tocam `CONTINUATION.md`/relatórios gerados. Conflitos de linha possíveis, resolvidos só quando outro for mesclado.
+
+Pré-registro escrito **antes** do contrato RED. O SHA deste commit entra no PR. Resultados só numa seção posterior.
