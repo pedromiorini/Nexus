@@ -78,3 +78,6 @@ A duração mediana subiu de ~30 s (início de outubro) para ~1003 s hoje; com `
 
 ### Limitações
 A guarda é um limiar determinístico; a retroprojeção mede recall nos incidentes reais e o ruído de alarmes (0/12 classificáveis), não prova que 85 % seja ótimo. Há dependência de durações de runners hospedados (variam ±10 %).
+
+### Efeito colateral nos contadores de estado
+O avaliador chama `subprocess` (`gh` e a guarda), o que acrescenta 7 achados LOW ao Bandit (B404 ×1, B603 ×3, B607 ×3): 131 → 138. Os achados não foram suprimidos (`# nosec`); a triagem foi regenerada (`SECURITY_TRIAGE.md`, `--check` ok) e o contador `bandit_low` foi sincronizado em `NEXUS_KNOWLEDGE.md`, `NEXUS_EVIDENCE.md`, `CONTINUATION.md`, `SECURITY_TRIAGE.md` e na fixture de `test_state_stray_marker_contract.py` (131 → 138), senão o gate de consistência de estado do CI hospedado falharia.
