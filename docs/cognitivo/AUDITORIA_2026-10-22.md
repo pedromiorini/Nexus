@@ -1688,3 +1688,130 @@ Pré-registro escrito **antes** do move, **antes** do contrato novo de extraçã
 **Gates locais (não substituem a CI hospedada).** `ruff` limpo; `compileall`; `reality_audit` regenerado só pela ferramenta (sem diferença depois do rebase); 703 testes OK em 3.11 e em 3.12 (685 antes do rebase sobre o #120); cobertura `core/cognitivo/*` 97% (`analogical_reasoning.py` 100% com ramos) e monólito 68%; `tools/cognitivo_mutation.py` 292/292 mortos (30 novos); `tools/targeted_mutation.py` 80/80; Bandit 137→131 LOW sem alteração em `SECURITY_TRIAGE.md` (`--check` ok), zero MEDIUM/HIGH; `embedded_assert_audit` ok; `predeleg.sh HEAD origin/main` sem conflito. `git merge-tree` contra #115 e #116: já conflitam com `main` (relatórios e outros arquivos) antes desta mudança; esta mudança só acrescenta os mesmos relatórios gerados.
 
 **Não medido.** CI hospedada; efeito em cenários fora dos pré-registrados; mescla real com #79, #115 ou #116. O #120 já estava mesclado em `main` quando o rebase foi feito.
+
+## Analogical Reasoning — correção de AR3 e AR4 (pré-registro AR7–AR10)
+
+**Autorização:** Pedro, mensagem pt114u (2026-10-28, «Prossiga»), depois da recomendação de mesclar o #121 com AR3/AR4 registrados como gap e corrigir num PR separado de comportamento (opção 2 do relatório do #121), com novo pré-registro. Base: `3eebbbb` (`main`, merge do #121). Este PR é **draft e não será mesclado sem nova autorização**.
+
+**Pré-registro escrito antes** do contrato RED, antes de qualquer mudança em `core/cognitivo/analogical_reasoning.py` e antes de executar qualquer harness, referência ou instância com o comportamento novo. **Única execução prévia:** o código base inalterado (`3eebbbb`), só para congelar o controle de não regressão de AR10 (resumo por linha das 120 instâncias da grade de AR1) e para contar quantas linhas têm no máximo 1 relação no alvo (só leitura das entradas da grade). Nenhum resultado de AR3/AR4 com comportamento novo foi lido. Os valores base de AR1–AR6 são os já medidos no #121 (AR1 120/120, AR2 19/19, AR3 e AR4 0.00 nas cinco famílias de gap e 1.00 nos controles, AR5 conforme o registrado, AR6 com os SHA `a603eafc…1c6a` e `517a4d8e…7b6b`).
+
+### Hipóteses
+
+- **H-AR3v2:** `_map_structures` deixa uma relação da fonte sustentar várias do alvo e aceita mapeamentos não injetivos. Se cada relação da fonte puder ser usada **no máximo uma vez** e um par de entidades só entrar no mapeamento quando for **consistente e injetivo**, `one_to_one` e `injective` passam em 20 seeds (≥ 0.90) e o controle isomorfo continua 1.00.
+- **H-AR4v2:** `transfer_solution` substitui em sequência e por substring, e `reason_by_analogy` nunca usa as entidades extraídas. Se a substituição passar a ser **simultânea e por palavra inteira** e `reason_by_analogy` passar os nomes extraídos às relações, `real_entities`, `simultaneous` e `whole_word` passam em 20 seeds (≥ 0.90) e o controle simples continua 1.00.
+- **Falsificação:** qualquer família de AR3/AR4 com taxa < 0.90; qualquer critério AR7–AR10 fora do alvo; qualquer controle de não regressão diferente do fixado abaixo.
+- **Previsão (registrada, não vinculante):** taxa 1.00 em todas as famílias; AR1, AR2, AR5, AR6 e AR7–AR10 passam; o harness sai com 0.
+
+### As mudanças (as únicas permitidas, só em `core/cognitivo/analogical_reasoning.py`)
+
+1. **`_map_structures`.** Para cada relação do alvo, em ordem, escolher a **primeira relação ainda não usada** da fonte, de mesmo rótulo, **compatível** com o mapeamento já construído. Compatível: para os dois pares `(entidade da fonte → entidade do alvo)` da relação, se a entidade da fonte já está mapeada, o destino tem de ser o mesmo; se não está, o destino não pode já ser imagem de outra entidade da fonte (injetividade); isso vale também dentro de uma mesma relação (`(C,a,b)` contra `(C,x,x)` e `(C,a,a)` contra `(C,x,y)` não casam). Se nenhuma serve, a relação do alvo fica sem correspondência (não é erro). `matched_relations` conta as relações do alvo casadas; `quality_score = matched / max(len(fonte.relations), len(alvo.relations))` e o devolver `None` sem nenhuma correspondência **não mudam**. A ordem de inserção do dicionário continua a da primeira vez que a entidade da fonte é mapeada.
+2. **`transfer_solution`.** Sem mapeamento (`entity_mappings` vazio) devolve a solução como está (como hoje). Com mapeamento, a solução tem de ser `str`, senão **continua levantando `AttributeError`** (contrato de AR5). A substituição é **simultânea** (uma única passagem; o texto já substituído não é substituído de novo) e por **palavra inteira**: uma chave só casa quando não é precedida nem seguida de caractere alfanumérico ou `_` (`\w`), qualquer que seja o primeiro ou último caractere da chave; maiúsculas e minúsculas importam; chaves vazias são ignoradas; entre chaves que começam na mesma posição vence a **mais longa**. `successful_transfers += 1` por chamada, como hoje; `None` para solução falsa, como hoje.
+3. **`reason_by_analogy`.** Se `_extract_entities` devolver **pelo menos 2** entidades, os literais `entity1` e `entity2` das relações extraídas viram a 1ª e a 2ª entidades extraídas **antes** de `find_analogy`. Com menos de 2, nada muda (os literais ficam). `_extract_entities` e `_extract_relations` **não mudam** (AR2 c15–c18 e os gaps de AR5 continuam).
+
+**Não escopo:** extrair os argumentos de cada relação a partir da posição no texto; negação, `dissimilar to` e `counterpart of`; `The`/`A.` como entidades; normalização de domínio; copiar as listas do chamador (aliasing); limitar `transfer_success_rate` a 1.0; casamento ótimo em vez de guloso; usar `reasoning`, `memory` ou `semantic_networks`; validar entradas; o construtor do orquestrador e o teste 25 do demo; Embodied Cognition; Axis, `tools/targeted_mutation.py` e testes do Axis (mutantes só em `tools/cognitivo_mutation.py`); #79, #115, #116 e os arquivos que eles alteram, exceto os relatórios de realidade gerados por `tools/reality_audit.py`; state docs; PRs congelados #38–#50, #60, #77. Os gaps desta lista ficam registrados em AR5 e viram «lacunas residuais» no relatório.
+
+### Critérios (protocolo AR-v2; ids de AR1–AR6 mantidos; AR7–AR10 novos)
+
+Comando: `python tools/cognitivo_eval.py --capability analogical_reasoning`. A grade (`Random(2027)`, 120 instâncias), as seeds `0..19` das famílias e o limite 0.90 **não mudam**. Alvo: todos passam, código 0.
+
+| id | mudança declarada | critério |
+|---|---|---|
+| AR1 | a referência independente ganha as regras 1 e 2 (a antiga fica no harness como `v1`) | 120/120 iguais à referência nova; contadores iguais; 0 entradas alteradas |
+| AR2 | **nenhuma** (não regressão) | os mesmos 19 casos e valores esperados do #121: 19/19 |
+| AR3 | **nenhuma no protocolo** (famílias, seeds, limite) | `one_to_one`, `injective` e `control_isomorphic` ≥ 0.90 em 20 seeds; **o controle tem de continuar 1.00** |
+| AR4 | **nenhuma no protocolo** | `real_entities`, `simultaneous`, `whole_word` e `control_plain` ≥ 0.90; **o controle tem de continuar 1.00** |
+| AR5 | só **um** gap muda: `placeholder_transfer` passa de `"stop entity1"` para `"stop Storm"`; entram dois gaps residuais: `the_cat_transfer` (`"The cat causes Harm."` com fonte `Rain`/`Flood`, solução `"stop Rain"`) → `"stop The"` e `single_entity_placeholder` (`"it causes Harm."`, mesma fonte) → `"stop entity1"`. Os outros 9 gaps, os 15 erros e a regra «colaboradores nunca lidos» **não mudam** | gaps 12/12, erros 15/15 (mesmos valores), colaboradores intactos, estatísticas de sistema novo zeradas |
+| AR6 | **os SHA de fonte e de comportamento são recalculados e re-fixados depois do GREEN** (declarado aqui; são detectores de mudança, não limites de hipótese). Valores base: fonte `a603eafc…1c6a`, comportamento `517a4d8e…7b6b` | reexport idêntico; módulo sem monólito/numpy/vita (`re` é stdlib); SHA igual no módulo e no monólito e em 3.11/3.12; construtor e banner iguais |
+| AR7 | novo: mapeamento um-para-um e injetivo | (a) tabela de 14 casos (abaixo), valores exatos; (b) grade de propriedades `Random(2028)`, 200 instâncias com 1–3 rótulos, 1–3 situações de fonte (0–6 relações) e alvo com 2–5 entidades e 0–6 relações: todo mapeamento devolvido tem valores distintos, `1 <= matched <= min(len(fonte.relations), len(alvo.relations))` (com `matched = quality·max(len, len)` arredondado, tolerância 1e-9) e `0 < quality <= 1`; 0 entradas alteradas. Alvo: 14/14 e 200/200 |
+| AR8 | novo: transferência simultânea e por palavra inteira | (a) tabela de 12 casos (abaixo); (b) grade de propriedades `Random(2029)`, 100 instâncias: mapeamento aleatório de 2–5 palavras `w0..w4` para `T0..T4` (podem ser ciclos e trocas), texto com 6–12 fichas sorteadas entre as chaves, decoys (`w0x`, `xw0`, `w0_`, `1w0`) e pontuação, e referência por **tokenização** (`re.split(r"(\w+)")`, troca ficha a ficha); `successful_transfers == 1` por chamada. Alvo: 12/12 e 100/100 |
+| AR9 | novo: `reason_by_analogy` usa as entidades extraídas | tabela de 8 casos (abaixo); os contadores `total_analogies_found` e `successful_transfers` são os da tabela (casos 1–6: 1 e 1; caso 7: 0 e 0; caso 8: 1 e 0); as situações conhecidas não mudam. Alvo: 8/8 |
+| AR10 | novo: não regressão contra o código base congelado | nas linhas da grade de AR1 em que a referência nova e a `v1` dão o mesmo resultado, o resumo por linha (SHA-256 truncado em 16 hex de `{view, text, stats}`) é igual ao do código base (`3eebbbb`); a lista dos 120 resumos base tem SHA-256 `22a2e7ba12ef6d9a50924ede00d168a80c5bc5e35ba5232ba33dc4c2e468a2c1`, que o harness confere antes de usá-la. **Guarda de validade:** pelo menos 52 linhas «não afetadas» (as 52 linhas da grade com ≤ 1 relação no alvo não são afetadas por construção: nenhuma regra nova muda um alvo de 0 ou 1 relação, e os nomes das entidades da grade não são substring uns dos outros); se houver menos, `scenario_invalid` (código 3). Alvo: 0 diferenças |
+
+**AR7 — os 14 casos** (`C`=`CAUSES`, `P`=`PART_OF`; fonte no domínio `S`, alvo `T`; valor = mapeamento e qualidade):
+
+| # | fonte | alvo | esperado |
+|---|---|---|---|
+| 1 | `[C a b]` | `[C x y, C u v]` | `{a:x,b:y}`, 0.5 |
+| 2 | `[C a b, C c d]` | `[C x y, C u v]` | `{a:x,b:y,c:u,d:v}`, 1.0 |
+| 3 | `[C a b, C c d]` | `[C x y]` | `{a:x,b:y}`, 0.5 |
+| 4 | `[C a b, P c d]` | `[C x y, P x z]` | `{a:x,b:y}`, 0.5 (`c→x` quebraria a injetividade) |
+| 5 | `[C a b, P b c]` | `[C x y, P y z]` | `{a:x,b:y,c:z}`, 1.0 |
+| 6 | `[C a b, P b c]` | `[C x y, P w z]` | `{a:x,b:y}`, 0.5 (`b→y` já fixado) |
+| 7 | `[C a b]` | `[C x x]` | `None` |
+| 8 | `[C a a]` | `[C x y]` | `None` |
+| 9 | `[C a a]` | `[C x x]` | `{a:x}`, 1.0 |
+| 10 | `[C a b, C c d]` | `[C x y, C x z]` | `{a:x,b:y}`, 0.5 |
+| 11 | `[C a b, C b c, C d e]` | `[C x y, C p q]` | `{a:x,b:y,d:p,e:q}`, 2/3 (a 2ª relação da fonte é incompatível; vale a 3ª) |
+| 12 | `[C a b, C b c]` | `[C x y, C y z]` | `{a:x,b:y,c:z}`, 1.0 |
+| 13 | `[P a b, C c d]` | `[C x y, P p q]` | `{c:x,d:y,a:p,b:q}`, 1.0 |
+| 14 | duas fontes `S1 [C a b]` e `S2 [C c d, C e f]` | `[C x y, C u v]` | vence `S2` (qualidade 1.0 contra 0.5), `{c:x,d:y,e:u,f:v}` |
+
+**AR8 — os 12 casos** (`mapping` → texto → esperado; `successful_transfers == 1` por chamada, exceto o caso 10):
+
+| # | mapeamento | texto (= solução da fonte) | esperado |
+|---|---|---|---|
+| 1 | `{a:b, b:c}` | `"a then b"` | `"b then c"` |
+| 2 | `{a:b, b:a}` | `"a and b"` | `"b and a"` |
+| 3 | `{sun:alpha}` | `"sunny sun sun's sun."` | `"sunny alpha alpha's alpha."` |
+| 4 | `{cat:dog}` | `"concatenate cat"` | `"concatenate dog"` |
+| 5 | `{Rain:X, Rainfall:Y}` | `"Rainfall and Rain"` | `"Y and X"` |
+| 6 | `{New York:Paris}` | `"visit New York now, not New Yorker"` | `"visit Paris now, not New Yorker"` |
+| 7 | `{sun:alpha}` | `"Sun sun"` | `"Sun alpha"` |
+| 8 | `{a:a}` | `"a b"` | `"a b"` |
+| 9 | `{a.b:x}` | `"a.b and axb"` | `"x and axb"` |
+| 10 | `{}` (mapeamento montado à mão) | `"keep it"` | `"keep it"` e `successful_transfers == 1` |
+| 11 | `{"":x, a:b}` | `"ab a"` | `"ab b"` (chave vazia ignorada) |
+| 12 | `{C++:Rust}` | `"use C++ now, C++11 later"` | `"use Rust now, C++11 later"` |
+
+**AR9 — os 8 casos** (fonte `Rain`/`Flood` no domínio `S`, relação `CAUSES`; alvo em `T`):
+
+| # | solução da fonte | texto | esperado |
+|---|---|---|---|
+| 1 | `"stop Rain"` | `"Storm causes Damage."` | `"stop Storm"` |
+| 2 | `"avoid Rain before Flood"` | `"Alpha causes Bravo."` | `"avoid Alpha before Bravo"` |
+| 3 | `"avoid Rain before Flood"` | `"Cc causes Dd Ee Ff"` | `"avoid Cc before Dd"` (só as duas primeiras entidades) |
+| 4 | `"stop Rain"` | `"it causes Harm."` | `"stop entity1"` (uma só entidade: literais ficam) |
+| 5 | `"stop Rain"` | `"the thing causes it."` | `"stop entity1"` (nenhuma entidade) |
+| 6 | `"stop Rain"` | `"The cat causes Harm."` | `"stop The"` (gap (vi) residual) |
+| 7 | `"avoid Rain before Flood"` | `"Alpha causes Bravo."` com o alvo também no domínio `S` | `None`, `total_analogies_found == 0` e `successful_transfers == 0` (mesmo domínio) |
+| 8 | solução `None` | `"Alpha causes Bravo."` | `None`; `total_analogies_found == 1`, `successful_transfers == 0` |
+
+**Regra:** nenhum limite, seed, tamanho, caso ou valor acima é alterado depois da primeira execução. Se algum critério falhar, o PR continua draft e as opções vão para o relatório, sem ajuste.
+
+### Regressão exigida e teste negativo
+
+Não há contrato anterior dos três símbolos além de AR1–AR6; AR1 (referência nova), AR2 (idêntico), AR5 (um gap atualizado, dois residuais novos), os dois controles de AR3/AR4 e AR10 são a não regressão. Teste do demo (25) continua chamando `add_situation`, `find_analogy`, `transfer_solution` e `get_statistics` e a suíte integrada continua verde.
+**Entrada inválida:** os 15 erros de AR5 não mudam de classe (`TypeError`, `ValueError`, `AttributeError`, ou sem erro), incluindo `transfer_solution` com solução `5` e mapeamento não vazio → `AttributeError`; o harness continua saindo com **2** (`--capability` ou `--criteria` ausente, vazio ou desconhecido) e com **3** (`scenario_invalid`, p. ex. a guarda de AR10); um comportamento regredido (substituição em sequência, mapeamento não injetivo ou `reason_by_analogy` sem entidades) reprova AR3/AR4/AR7–AR9 e sai com **1**. Cada um desses caminhos tem teste.
+
+### Varredura §7.2 (2026-10-28, `gh pr list --state open`)
+
+PRs abertos: #38–#50, #60, #77, #79, #115, #116 (o #120 já foi mesclado). Nenhum edita `core/cognitivo/analogical_reasoning.py`, `test_analogical_reasoning_contract.py`, `tools/cognitivo_eval.py` nem este arquivo. **Sobreposição declarada, de outro agente em pausa:** #116 (Axis) altera `tools/cognitivo_mutation.py` e os relatórios de realidade; #79 altera `docs/agentes/CLAIMS.yaml`; #115 e #50 alteram `SECURITY_TRIAGE.md`. Este PR não toca nem rebaseia nenhum deles; se algum entrar antes, os relatórios são regenerados pelas ferramentas, nunca à mão. Claim `grok-bot`, prazo `2026-10-29T06:00:00Z` (≈ 8 h), removido no último commit (`claims: []`).
+
+### Resultados da correção AR3/AR4 (depois do pré-registro `0e0e1d3`)
+
+**Commits, em ordem:** `0e0e1d3` pré-registro e claim; `ce8aa5b` **RED** (contrato e harness AR7–AR10; `--capability analogical_reasoning` sai com 1); `32b20fc` **GREEN** (a correção mínima em `core/cognitivo/analogical_reasoning.py`, mutantes, SHAs de AR6 re-fixados, relatórios regenerados por `tools/reality_audit.py`); este commit de resultados (esta seção e `docs/agentes/CLAIMS.yaml` de volta a `claims: []`).
+
+**Valores no RED (código de `main` em `3eebbbb`) e no GREEN** — nenhum limite, seed, tamanho, caso ou valor foi alterado depois da primeira execução:
+
+| id | RED | GREEN |
+|---|---|---|
+| AR1 | falha: 95/120 iguais à referência v2; contadores 116/120 | **passa**: 120/120; contadores iguais (52 analogias, 23 transferências); 0 entradas alteradas |
+| AR2 | passa 19/19 | **passa** 19/19 |
+| AR3 | falha: `one_to_one` 0.00, `injective` 0.00; controle isomorfo 1.00 | **passa**: `one_to_one` 1.00 (20/20), `injective` 1.00 (20/20); controle isomorfo 1.00 |
+| AR4 | falha: `real_entities` 0.00, `simultaneous` 0.00, `whole_word` 0.00; controle simples 1.00 | **passa**: 1.00 (20/20) nas três; controle simples 1.00 |
+| AR5 | falha: gaps 10/12 (o pré-registro atualiza três gaps) | **passa**: gaps 12/12; erros 15/15; colaboradores nunca lidos |
+| AR6 | falha (SHAs ainda dos valores do #121) | **passa** após o re-fixar dos detectores (veja a declaração 1) |
+| AR7 | falha: tabela 4/14; propriedades 138/200 | **passa**: 14/14 e 200/200 |
+| AR8 | falha: tabela 4/12; propriedades 20/100 | **passa**: 12/12 e 100/100 |
+| AR9 | falha: 4/8 | **passa**: 8/8 |
+| AR10 | passa: 95 linhas não afetadas, 0 diferenças | **passa**: 95 ≥ 52 linhas não afetadas, 0 diferenças |
+
+**Declarações de transparência.**
+1. Os SHAs de AR6 (fonte `64e1bd06…66e1`, comportamento `997c1e59…4201`) são detectores: o pré-registro declarou que mudam com o GREEN. Foram re-fixados uma única vez no commit GREEN, depois de todos os outros critérios passarem, como MS6 no #119. São iguais em 3.11 e 3.12.
+2. **Deslize no pré-registro de AR8:** o cabeçalho diz "`successful_transfers == 1` por chamada, exceto o caso 10", mas a linha do caso 10 da tabela diz 1, igual às outras. Não ajustei nada; a tabela (a linha) é o que o harness executa e o que passou. Registrado aqui para o revisor.
+3. O teste de regressão da transferência sequencial legada exigia AR9 por engano; corrigi o teste (ele afirma só AR4 e AR8) antes do commit GREEN. Não é critério do harness.
+4. Cinco testes extras no contrato (par parcial vazado, relação rejeitada com um par concordante, chave vazia, chave mais longa com prefixo curto, nomes reais não sobrescritos) existem para matar mutantes que sobreviveriam; não mudam critérios.
+
+**Lacunas residuais (mantidas em AR5 ou fora de escopo; nada disto foi tocado).** `_extract_entities` ainda aceita `The` e `A` como entidade (gap `stop The`); os argumentos de cada relação são sempre as duas primeiras entidades do texto, não posicionais; detecção de relação por substring, sem negação, `dissimilar to` nem `counterpart of`; domínio com diferenciação de maiúsculas; listas do chamador com aliasing; `transfer_success_rate` pode passar de 1.0; `reasoning`, `memory` e `semantic_networks` não são usados; com menos de 2 entidades os literais `entity1`/`entity2` ficam; entrada não validada; casamento guloso, não ótimo; solução não-str com mapa não vazio agora sempre dá `AttributeError` (antes `bytes` dava `TypeError`). Não afetados: o construtor do orquestrador e o teste 25 da demo.
+
+**Opções se algo for recusado na revisão.** (a) Manter em rascunho como inventário medido; (b) PR separado para as lacunas residuais (extração posicional, `The`/`A`, negação) com novo pré-registro; (c) trocar o casamento guloso por ótimo, com novo protocolo.

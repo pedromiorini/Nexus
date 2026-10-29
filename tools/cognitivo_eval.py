@@ -3419,8 +3419,8 @@ def eval_mental_simulation(criteria="v1"):
 
 # ── Analogical Reasoning (POST27) ───────────────────────────────────────────
 
-AR_SOURCE_SHA = "a603eafc39db384ac6670c6cdba0b490155b46f9e1a38ea79a00202f24741c6a"
-AR_BEHAVIOR_SHA = "517a4d8e2b52d8159e0445d3440a3b1c30cb553b9eb6a7f01ec6a40f07617b6b"  # capturado no monólito antes do move (RED), 3.12 e 3.11
+AR_SOURCE_SHA = "64e1bd060e3cf267970165829bc71515d7ab232e888f24118804215f142966e1"
+AR_BEHAVIOR_SHA = "997c1e59edbbce92e292c8c10b3f789c026c70bee039064241d9ff3ceff94201"  # re-fixado após o GREEN (detector; igual a MS6 em #119); 3.12 e 3.11
 _AR_NAMES = ("AnalogySituation", "AnalogyMapping", "RealAnalogicalReasoningSystem")
 _AR_MARKER = "# MÓDULO 27: ANALOGICAL REASONING SYSTEM (POST 27)"
 _AR_END = '            "transfer_success_rate": self.successful_transfers / max(1, self.total_analogies_found)\n        }'
@@ -3430,6 +3430,135 @@ _AR_GRID_SEED = 2027
 _AR_GRID_SIZE = 120
 _AR_SEEDS = tuple(range(20))
 _AR_LIMIT = 0.90
+_AR_PROP_SEED = 2028
+_AR_PROP_SIZE = 200
+_AR_TRANSFER_SEED = 2029
+_AR_TRANSFER_SIZE = 100
+_AR_MIN_UNAFFECTED = 52
+_AR_BASE_ROWS_SHA = "22a2e7ba12ef6d9a50924ede00d168a80c5bc5e35ba5232ba33dc4c2e468a2c1"
+# resumo (16 hex) por linha da grade de AR1 no código base 3eebbbb, capturado antes da correção (AR10)
+_AR_BASE_ROWS = (
+    "ab033db2a3bc7082",
+    "59294d4d23bf7142",
+    "6d446f7469af8ce0",
+    "9d635636a6afbad0",
+    "12b5f9679fc464f2",
+    "0687dafba1b6ddec",
+    "ed1a3dd2338c89ff",
+    "9d635636a6afbad0",
+    "9d635636a6afbad0",
+    "b8d6156ff711b6f3",
+    "8e329bc28dbc634e",
+    "ab033db2a3bc7082",
+    "52471d4cc071f5a5",
+    "b4e8834cc712af59",
+    "b8d6156ff711b6f3",
+    "ae8684378e8ff7dd",
+    "9d635636a6afbad0",
+    "ab033db2a3bc7082",
+    "edef78052727be1c",
+    "3854134bdf8cab5d",
+    "ab033db2a3bc7082",
+    "ab033db2a3bc7082",
+    "acad21785c655296",
+    "ae8684378e8ff7dd",
+    "293f55fbaaee8c32",
+    "460ffd97fc6d1c13",
+    "03c9eb646972f578",
+    "7816736723831ded",
+    "1d0ab6ec110e939a",
+    "e4965fe9612a080a",
+    "57ccd6321687d7f7",
+    "40877eb627c578b6",
+    "ab033db2a3bc7082",
+    "9d635636a6afbad0",
+    "15b49a3ea1fa81fe",
+    "9d635636a6afbad0",
+    "0c1fc54af90fc4f4",
+    "b8d6156ff711b6f3",
+    "d3a2dd10208e3db1",
+    "ab033db2a3bc7082",
+    "ad622245b382e22c",
+    "54f4b8fe3b5be2a2",
+    "6241d78e343d5e45",
+    "ab033db2a3bc7082",
+    "ab033db2a3bc7082",
+    "ab033db2a3bc7082",
+    "ff72438bad90c557",
+    "d74e1f5383013736",
+    "b8d6156ff711b6f3",
+    "9d635636a6afbad0",
+    "9d635636a6afbad0",
+    "ab033db2a3bc7082",
+    "ab033db2a3bc7082",
+    "5e4566f33775b234",
+    "460ffd97fc6d1c13",
+    "b4c7d9d4223f6882",
+    "ab033db2a3bc7082",
+    "b19c6b4fa840256d",
+    "b4c7d9d4223f6882",
+    "8329ddfb74e5a9d9",
+    "5e705321e9b1cb4b",
+    "ab033db2a3bc7082",
+    "d75e58c453801d34",
+    "6ef9bd5d7e2a076f",
+    "9d635636a6afbad0",
+    "b8d6156ff711b6f3",
+    "ab033db2a3bc7082",
+    "ae8684378e8ff7dd",
+    "9d635636a6afbad0",
+    "460ffd97fc6d1c13",
+    "c296602235fc1dbc",
+    "460ffd97fc6d1c13",
+    "28a5d5bf798917b3",
+    "0dcd7cdc9e11f89c",
+    "4317ab710ebf21d4",
+    "9d635636a6afbad0",
+    "ab033db2a3bc7082",
+    "9d635636a6afbad0",
+    "b4c7d9d4223f6882",
+    "ab033db2a3bc7082",
+    "d5ee350f8d04e8dc",
+    "ae8684378e8ff7dd",
+    "4d17656be3dcb7a6",
+    "b4c7d9d4223f6882",
+    "b8d6156ff711b6f3",
+    "ab033db2a3bc7082",
+    "678923c13b19c024",
+    "9d635636a6afbad0",
+    "b8d6156ff711b6f3",
+    "bbed6dd3eab8a2b4",
+    "9d635636a6afbad0",
+    "b8d6156ff711b6f3",
+    "dd510342e23194ba",
+    "b8d6156ff711b6f3",
+    "ab033db2a3bc7082",
+    "ab033db2a3bc7082",
+    "9cb7f1a0122ea9a9",
+    "4a378262852c0d8b",
+    "01c012ae930676cb",
+    "b4c7d9d4223f6882",
+    "59e71032311fefad",
+    "b8d6156ff711b6f3",
+    "9d635636a6afbad0",
+    "9d635636a6afbad0",
+    "d4c3384d132c0639",
+    "9d635636a6afbad0",
+    "ab033db2a3bc7082",
+    "a863f2d57b6ef339",
+    "898e77b964e4c559",
+    "e8230f62d8fe0956",
+    "1b841530c4f57fa0",
+    "ae8684378e8ff7dd",
+    "30b84a4b5080201d",
+    "460ffd97fc6d1c13",
+    "9d635636a6afbad0",
+    "9d635636a6afbad0",
+    "ab033db2a3bc7082",
+    "b4c7d9d4223f6882",
+    "9d635636a6afbad0",
+    "1146c2063ca40058",
+)
 _AR_NAMES_POOL = ("Alpha", "Bravo", "Cedar", "Delta", "Echo", "Fable", "Gamma", "Harbor")
 _AR_SRC_WORDS = ("sun", "moon", "cat", "dog", "red", "blue")
 _AR_TGT_WORDS = ("alpha", "bravo", "charlie", "delta", "echo", "foxtrot")
@@ -3464,8 +3593,8 @@ def _ar_grid():
     return rows
 
 
-def _ar_reference(known, domain, t_rels):
-    """Referência independente, escrita só da leitura do bloco. Devolve (índice, mapa, qualidade, texto) ou None."""
+def _ar_reference_v1(known, domain, t_rels):
+    """Referência v1 do #121 (mapeamento ingênuo e substituição em sequência), mantida só para o controle de AR10. Devolve (índice, mapa, qualidade, texto) ou None."""
     best = None
     for index, (s_domain, _ents, s_rels, solution) in enumerate(known):
         if s_domain == domain:
@@ -3489,6 +3618,42 @@ def _ar_reference(known, domain, t_rels):
                 for src, dst in mapping.items():
                     text = text.replace(src, dst)
             best = (index, mapping, quality, text, bool(solution))
+    return best
+
+
+def _ar_reference(known, domain, t_rels):
+    """Referência v2 (AR-v2): um-para-um, injetiva, substituição simultânea por palavra inteira.
+    Devolve (índice, mapa, qualidade, texto, tem_solução) ou None."""
+    import re
+    best = None
+    for index, (s_domain, _ents, s_rels, solution) in enumerate(known):
+        if s_domain == domain:
+            continue
+        used, forward, backward, matched = set(), {}, {}, 0
+        for label, t1, t2 in t_rels:
+            for k, (s_label, s1, s2) in enumerate(s_rels):
+                if k in used or s_label != label:
+                    continue
+                f, b, ok = dict(forward), dict(backward), True
+                for src, dst in ((s1, t1), (s2, t2)):
+                    if f.get(src, dst) != dst or b.get(dst, src) != src:
+                        ok = False
+                        break
+                    f[src] = dst
+                    b[dst] = src
+                if ok:
+                    forward, backward = f, b
+                    used.add(k)
+                    matched += 1
+                    break
+        if not matched:
+            continue
+        quality = matched / max(len(s_rels), len(t_rels))
+        if best is None or quality > best[2]:
+            text = None
+            if solution:
+                text = "".join(forward.get(tok, tok) for tok in re.split(r"(\w+)", solution))
+            best = (index, forward, quality, text, bool(solution))
     return best
 
 
@@ -3607,7 +3772,9 @@ _AR_TABLE_EXPECTED = {
 _AR_GAPS_EXPECTED = {
     "repeated_transfer_stats": {"total_analogies_found": 1, "successful_transfers": 2, "known_situations": 1,
                                 "transfer_success_rate": 2.0},
-    "placeholder_transfer": "stop entity1",
+    "placeholder_transfer": "stop Storm",
+    "the_cat_transfer": "stop The",
+    "single_entity_placeholder": "stop entity1",
     "dissimilar": [["SIMILAR", "entity1", "entity2"]],
     "counterpart": [["PART_OF", "entity1", "entity2"]],
     "negation": [["CAUSES", "entity1", "entity2"]],
@@ -3626,11 +3793,95 @@ _AR_ERRORS_EXPECTED = {
 }
 
 
+_AR_C, _AR_P = "CAUSES", "PART_OF"
+# AR7: tabela de mapeamento (pré-registro AR7, 14 casos): (fontes [(domínio, relações)], relações do alvo)
+_AR_MAP_CASES = {
+    "m01": ([("S", [(_AR_C, "a", "b")])], [(_AR_C, "x", "y"), (_AR_C, "u", "v")]),
+    "m02": ([("S", [(_AR_C, "a", "b"), (_AR_C, "c", "d")])], [(_AR_C, "x", "y"), (_AR_C, "u", "v")]),
+    "m03": ([("S", [(_AR_C, "a", "b"), (_AR_C, "c", "d")])], [(_AR_C, "x", "y")]),
+    "m04": ([("S", [(_AR_C, "a", "b"), (_AR_P, "c", "d")])], [(_AR_C, "x", "y"), (_AR_P, "x", "z")]),
+    "m05": ([("S", [(_AR_C, "a", "b"), (_AR_P, "b", "c")])], [(_AR_C, "x", "y"), (_AR_P, "y", "z")]),
+    "m06": ([("S", [(_AR_C, "a", "b"), (_AR_P, "b", "c")])], [(_AR_C, "x", "y"), (_AR_P, "w", "z")]),
+    "m07": ([("S", [(_AR_C, "a", "b")])], [(_AR_C, "x", "x")]),
+    "m08": ([("S", [(_AR_C, "a", "a")])], [(_AR_C, "x", "y")]),
+    "m09": ([("S", [(_AR_C, "a", "a")])], [(_AR_C, "x", "x")]),
+    "m10": ([("S", [(_AR_C, "a", "b"), (_AR_C, "c", "d")])], [(_AR_C, "x", "y"), (_AR_C, "x", "z")]),
+    "m11": ([("S", [(_AR_C, "a", "b"), (_AR_C, "b", "c"), (_AR_C, "d", "e")])],
+            [(_AR_C, "x", "y"), (_AR_C, "p", "q")]),
+    "m12": ([("S", [(_AR_C, "a", "b"), (_AR_C, "b", "c")])], [(_AR_C, "x", "y"), (_AR_C, "y", "z")]),
+    "m13": ([("S", [(_AR_P, "a", "b"), (_AR_C, "c", "d")])], [(_AR_C, "x", "y"), (_AR_P, "p", "q")]),
+    "m14": ([("S1", [(_AR_C, "a", "b")]), ("S2", [(_AR_C, "c", "d"), (_AR_C, "e", "f")])],
+            [(_AR_C, "x", "y"), (_AR_C, "u", "v")]),
+}
+_AR_MAP_EXPECTED = {
+    "m01": [{"a": "x", "b": "y"}, 0.5], "m02": [{"a": "x", "b": "y", "c": "u", "d": "v"}, 1.0],
+    "m03": [{"a": "x", "b": "y"}, 0.5], "m04": [{"a": "x", "b": "y"}, 0.5],
+    "m05": [{"a": "x", "b": "y", "c": "z"}, 1.0], "m06": [{"a": "x", "b": "y"}, 0.5],
+    "m07": None, "m08": None, "m09": [{"a": "x"}, 1.0], "m10": [{"a": "x", "b": "y"}, 0.5],
+    "m11": [{"a": "x", "b": "y", "d": "p", "e": "q"}, 2 / 3],
+    "m12": [{"a": "x", "b": "y", "c": "z"}, 1.0],
+    "m13": [{"c": "x", "d": "y", "a": "p", "b": "q"}, 1.0],
+    "m14": ["S2", {"c": "x", "d": "y", "e": "u", "f": "v"}, 1.0],
+}
+# AR8: tabela de transferência (pré-registro AR8, 12 casos): (mapeamento, solução da fonte, esperado)
+_AR_TRANSFER_CASES = {
+    "t01": ({"a": "b", "b": "c"}, "a then b", "b then c"),
+    "t02": ({"a": "b", "b": "a"}, "a and b", "b and a"),
+    "t03": ({"sun": "alpha"}, "sunny sun sun's sun.", "sunny alpha alpha's alpha."),
+    "t04": ({"cat": "dog"}, "concatenate cat", "concatenate dog"),
+    "t05": ({"Rain": "X", "Rainfall": "Y"}, "Rainfall and Rain", "Y and X"),
+    "t06": ({"New York": "Paris"}, "visit New York now, not New Yorker", "visit Paris now, not New Yorker"),
+    "t07": ({"sun": "alpha"}, "Sun sun", "Sun alpha"),
+    "t08": ({"a": "a"}, "a b", "a b"),
+    "t09": ({"a.b": "x"}, "a.b and axb", "x and axb"),
+    "t10": ({}, "keep it", "keep it"),
+    "t11": ({"": "x", "a": "b"}, "ab a", "ab b"),
+    "t12": ({"C++": "Rust"}, "use C++ now, C++11 later", "use Rust now, C++11 later"),
+}
+# AR9: reason_by_analogy (pré-registro AR9, 8 casos): (solução da fonte, texto, domínio alvo, esperado, [achadas, transferidas])
+_AR_REASON_CASES = {
+    "r1": ("stop Rain", "Storm causes Damage.", "T", "stop Storm", [1, 1]),
+    "r2": ("avoid Rain before Flood", "Alpha causes Bravo.", "T", "avoid Alpha before Bravo", [1, 1]),
+    "r3": ("avoid Rain before Flood", "Cc causes Dd Ee Ff", "T", "avoid Cc before Dd", [1, 1]),
+    "r4": ("stop Rain", "it causes Harm.", "T", "stop entity1", [1, 1]),
+    "r5": ("stop Rain", "the thing causes it.", "T", "stop entity1", [1, 1]),
+    "r6": ("stop Rain", "The cat causes Harm.", "T", "stop The", [1, 1]),
+    "r7": ("avoid Rain before Flood", "Alpha causes Bravo.", "S", None, [0, 0]),
+    "r8": (None, "Alpha causes Bravo.", "T", None, [1, 0]),
+}
+
+
+def _ar_prop_instance(rng, i):
+    labels = rng.sample(_AR_LABELS, rng.randint(1, 3))
+    sources = []
+    for k in range(rng.randint(1, 3)):
+        ents = ["p%d_%d_%d" % (i, k, j) for j in range(rng.randint(2, 4))]
+        rels = [(rng.choice(labels),) + tuple(rng.sample(ents, 2)) for _ in range(rng.randint(0, 6))]
+        sources.append(("S%d" % k, ents, rels, None))
+    t_ents = ["q%d_%d" % (i, j) for j in range(rng.randint(2, 5))]
+    t_rels = [(rng.choice(labels),) + tuple(rng.sample(t_ents, 2)) for _ in range(rng.randint(0, 6))]
+    return sources, t_ents, t_rels
+
+
+def _ar_transfer_instance(rng):
+    keys = ["w%d" % j for j in range(rng.randint(2, 5))]
+    pool = keys + ["T%d" % j for j in range(5)]
+    mapping = {key: rng.choice(pool) for key in keys}
+    decoys = ["w0x", "xw0", "w0_", "1w0"]
+    seps = [" ", ", ", ". ", "-", "'", "; "]
+    tokens = [rng.choice(keys + decoys) for _ in range(rng.randint(6, 12))]
+    text = tokens[0]
+    for token in tokens[1:]:
+        text += rng.choice(seps) + token
+    return mapping, text
+
+
 def analogical_reasoning_fingerprint(ns):
     import contextlib
     import copy
     import inspect
     import io
+    import re
     if isinstance(ns, dict):
         cls, sit_cls, map_cls = ns["RealAnalogicalReasoningSystem"], ns["AnalogySituation"], ns["AnalogyMapping"]
     else:
@@ -3646,6 +3897,7 @@ def analogical_reasoning_fingerprint(ns):
     grid = _ar_grid()
     rows, mutated, reference_matches, counter_matches, found_sum, transfer_sum = [], 0, 0, 0, 0, 0
     ref_found_sum = ref_transfer_sum = 0
+    row_digests, unaffected = [], []
     for known, domain, t_ents, t_rels in grid:
         known_before, ents_before, rels_before = copy.deepcopy(known), list(t_ents), list(t_rels)
         system = _ar_system(cls, known)
@@ -3682,7 +3934,10 @@ def analogical_reasoning_fingerprint(ns):
         found_sum += stats["total_analogies_found"]
         transfer_sum += stats["successful_transfers"]
         rows.append({"view": _ar_view(mapping), "text": text, "stats": stats})
+        row_digests.append(_ms_sha(rows[-1])[:16])
+        unaffected.append(_ar_reference_v1(known, domain, t_rels) == ref)
     grid_info = {"count": len(rows), "digest": _ms_sha(rows), "mutated_inputs": mutated,
+                 "row_digests": row_digests, "unaffected": unaffected,
                  "reference_matches": reference_matches, "counter_matches": counter_matches,
                  "found_sum": found_sum, "transfer_sum": transfer_sum,
                  "ref_found_sum": ref_found_sum, "ref_transfer_sum": ref_transfer_sum}
@@ -3732,6 +3987,71 @@ def analogical_reasoning_fingerprint(ns):
     table["c19"] = [system.reason_by_analogy("Nothing relational here.", "T"),
                     system.total_analogies_found, system.successful_transfers]
 
+    # mapeamento um-para-um e injetivo (AR7)
+    map_table = {}
+    for name, (sources, rels) in _AR_MAP_CASES.items():
+        known = [(domain, [], s_rels, None) for domain, s_rels in sources]
+        _, mapping = _ar_find(cls, known, "T", [], rels)
+        if mapping is None:
+            map_table[name] = None
+        elif name == "m14":
+            map_table[name] = [mapping.source_situation.domain, dict(mapping.entity_mappings), mapping.quality_score]
+        else:
+            map_table[name] = [dict(mapping.entity_mappings), mapping.quality_score]
+    prop_rng = random.Random(_AR_PROP_SEED)  # nosec B311 - dados sintéticos de avaliação
+    prop_ok = prop_found = prop_mutated = 0
+    for i in range(_AR_PROP_SIZE):
+        sources, t_ents, t_rels = _ar_prop_instance(prop_rng, i)
+        before = (copy.deepcopy(sources), list(t_ents), list(t_rels))
+        system = _ar_system(cls, sources)
+        mapping = system.find_analogy("T", t_ents, t_rels)
+        if (copy.deepcopy([(x.domain, x.entities, x.relations, x.solution) for x in system.known_situations]),
+                t_ents, t_rels) != (before[0], before[1], before[2]):
+            prop_mutated += 1
+        if mapping is None:
+            prop_ok += 1
+            continue
+        prop_found += 1
+        src = mapping.source_situation
+        scale = max(len(src.relations), len(t_rels))
+        matched = mapping.quality_score * scale
+        s_args = {a for _l, e1, e2 in src.relations for a in (e1, e2)}
+        t_args = {a for _l, e1, e2 in t_rels for a in (e1, e2)}
+        values = list(mapping.entity_mappings.values())
+        prop_ok += (
+            len(set(values)) == len(values)
+            and abs(matched - round(matched)) < 1e-9
+            and 1 <= round(matched) <= min(len(src.relations), len(t_rels))
+            and 0 < mapping.quality_score <= 1
+            and set(mapping.entity_mappings) <= s_args and set(values) <= t_args
+        )
+    map_props = {"ok": prop_ok, "total": _AR_PROP_SIZE, "found": prop_found, "mutated": prop_mutated}
+
+    # transferência simultânea e por palavra inteira (AR8)
+    transfer_table = {}
+    for name, (mapping_spec, solution, _expected) in _AR_TRANSFER_CASES.items():
+        src = sit_cls("s", "S", list(mapping_spec), [], solution)
+        system = _ar_system(cls, [])
+        text = system.transfer_solution(map_cls("m", src, src, dict(mapping_spec), 1.0))
+        transfer_table[name] = [text, system.successful_transfers]
+    transfer_rng = random.Random(_AR_TRANSFER_SEED)  # nosec B311 - dados sintéticos de avaliação
+    transfer_ok = 0
+    for _ in range(_AR_TRANSFER_SIZE):
+        mapping_spec, text = _ar_transfer_instance(transfer_rng)
+        src = sit_cls("s", "S", list(mapping_spec), [], text)
+        system = _ar_system(cls, [])
+        out = system.transfer_solution(map_cls("m", src, src, dict(mapping_spec), 1.0))
+        expected = "".join(mapping_spec.get(tok, tok) for tok in re.split(r"(\w+)", text))
+        transfer_ok += out == expected and system.successful_transfers == 1
+    transfer_props = {"ok": transfer_ok, "total": _AR_TRANSFER_SIZE}
+
+    # reason_by_analogy usa as entidades extraídas (AR9)
+    reason_table = {}
+    for name, (solution, text, domain, _expected, _counts) in _AR_REASON_CASES.items():
+        system = _ar_system(cls, [("S", ["Rain", "Flood"], [(_AR_C, "Rain", "Flood")], solution)])
+        out = system.reason_by_analogy(text, domain)
+        reason_table[name] = [out, [system.total_analogies_found, system.successful_transfers]]
+
     # famílias de propósito (AR3, AR4)
     families = {}
     for items in _AR_FAMILIES.values():
@@ -3772,6 +4092,8 @@ def analogical_reasoning_fingerprint(ns):
     gaps = {
         "repeated_transfer_stats": repeated,
         "placeholder_transfer": placeholder.reason_by_analogy("Storm causes Damage.", "T"),
+        "the_cat_transfer": placeholder.reason_by_analogy("The cat causes Harm.", "T"),
+        "single_entity_placeholder": placeholder.reason_by_analogy("it causes Harm.", "T"),
         "dissimilar": [list(r) for r in probe._extract_relations("dissimilar to the rest")],
         "counterpart": [list(r) for r in probe._extract_relations("a counterpart of b")],
         "negation": [list(r) for r in probe._extract_relations("X never causes Y")],
@@ -3816,6 +4138,9 @@ def analogical_reasoning_fingerprint(ns):
         "fresh_stats": fresh_stats,
         "grid": grid_info,
         "table": table,
+        "map_table": map_table, "map_props": map_props,
+        "transfer_table": transfer_table, "transfer_props": transfer_props,
+        "reason_table": reason_table,
         "families": families,
         "collaborators": collaborators,
         "gaps": gaps,
@@ -3861,7 +4186,7 @@ def _ar_rates(payload, ids):
 
 
 def eval_analogical_reasoning(criteria="v1"):
-    """AR1–AR6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    """AR1–AR10. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
     import core.cognitivo.analogical_reasoning as analogical_reasoning
     import core.constitutional_brain as brain
     import core.cognitivo as package
@@ -3910,12 +4235,37 @@ def eval_analogical_reasoning(criteria="v1"):
         and payload["init_params"] == ["self", "reasoning", "memory", "semantic_networks"]
         and payload["banner"] == _AR_BANNER
     )
+    map_hits = sum(1 for name, expected in _AR_MAP_EXPECTED.items() if payload["map_table"].get(name) == expected)
+    map_props = payload["map_props"]
+    ar7 = (
+        len(payload["map_table"]) == len(_AR_MAP_EXPECTED) == 14 and map_hits == 14
+        and map_props["ok"] == map_props["total"] == _AR_PROP_SIZE and map_props["mutated"] == 0
+    )
+    transfer_hits = sum(1 for name, (_m, _s, expected) in _AR_TRANSFER_CASES.items()
+                        if payload["transfer_table"].get(name) == [expected, 1])
+    transfer_props = payload["transfer_props"]
+    ar8 = (
+        len(payload["transfer_table"]) == len(_AR_TRANSFER_CASES) == 12 and transfer_hits == 12
+        and transfer_props["ok"] == transfer_props["total"] == _AR_TRANSFER_SIZE
+    )
+    reason_hits = sum(1 for name, (_sol, _text, _dom, expected, counts) in _AR_REASON_CASES.items()
+                      if payload["reason_table"].get(name) == [expected, counts])
+    ar9 = len(payload["reason_table"]) == len(_AR_REASON_CASES) == 8 and reason_hits == 8
+    import hashlib
+    base_rows_ok = (
+        len(_AR_BASE_ROWS) == _AR_GRID_SIZE
+        and hashlib.sha256(json.dumps(list(_AR_BASE_ROWS)).encode()).hexdigest() == _AR_BASE_ROWS_SHA
+    )
+    unaffected_rows = [i for i, flag in enumerate(grid["unaffected"]) if flag]
+    base_diffs = [i for i in unaffected_rows if grid["row_digests"][i] != _AR_BASE_ROWS[i]] if base_rows_ok else []
+    ar10_invalid = not base_rows_ok or len(unaffected_rows) < _AR_MIN_UNAFFECTED
+    ar10 = not ar10_invalid and not base_diffs
     return [
         _check("AR1", {"reference_matches": grid["reference_matches"], "count": grid["count"],
                        "counter_matches": grid["counter_matches"], "mutated_inputs": grid["mutated_inputs"],
                        "found_sum": [grid["found_sum"], grid["ref_found_sum"]],
                        "transfer_sum": [grid["transfer_sum"], grid["ref_transfer_sum"]]},
-               ar1, "120/120 iguais à referência independente; contadores iguais; 0 entradas alteradas"),
+               ar1, "120/120 iguais à referência independente v2; contadores iguais; 0 entradas alteradas"),
         _check("AR2", {"hits": table_hits, "cases": len(_AR_TABLE_EXPECTED)},
                ar2, "19/19 casos de borda de domínio, rótulo, qualidade, empate, transferência e extração"),
         _check("AR3", rates3, ar3, "one_to_one, injective e control_isomorphic ≥ 0.90 em 20 seeds"),
@@ -3929,6 +4279,16 @@ def eval_analogical_reasoning(criteria="v1"):
                        "identity": identity, "standalone": standalone, "clock": payload["clock"],
                        "source_golden": AR_SOURCE_SHA, "behavior_golden": AR_BEHAVIOR_SHA},
                ar6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+        _check("AR7", {"table_hits": [map_hits, len(_AR_MAP_EXPECTED)], "props": map_props},
+               ar7, "mapeamento um-para-um e injetivo: 14/14 casos e 200/200 instâncias da grade de propriedades"),
+        _check("AR8", {"table_hits": [transfer_hits, len(_AR_TRANSFER_CASES)], "props": transfer_props},
+               ar8, "transferência simultânea e por palavra inteira: 12/12 casos e 100/100 instâncias"),
+        _check("AR9", {"hits": [reason_hits, len(_AR_REASON_CASES)], "cases": payload["reason_table"]},
+               ar9, "reason_by_analogy usa as entidades extraídas: 8/8 casos"),
+        _check("AR10", {"unaffected": len(unaffected_rows), "min_unaffected": _AR_MIN_UNAFFECTED,
+                        "base_rows_sha_ok": base_rows_ok, "diffs": base_diffs},
+               ar10, "linhas não afetadas iguais ao resumo congelado do código base (0 diferenças; ≥ 52 linhas)",
+               **({"scenario_invalid": True} if ar10_invalid else {})),
     ]
 
 
