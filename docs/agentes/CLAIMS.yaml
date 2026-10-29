@@ -1,13 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "Acelerar o passo core/cognitivo mutation gate do CI com trabalhadores paralelos (cópias isoladas), critérios M1–M8 pré-registrados"
-    arquivos:
-      - tools/cognitivo_mutation.py
-      - test_cognitivo_mutation_parallel_contract.py
-      - docs/agentes/MUTACAO_COGNITIVO_PARALELA.md
-      - docs/agentes/mutacao_cognitivo_passos_hospedados.json
-      - docs/agentes/CLAIMS.yaml
-    expira_em: "2026-10-31T12:00:00Z"
+claims: []

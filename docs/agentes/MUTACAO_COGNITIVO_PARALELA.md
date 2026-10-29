@@ -38,3 +38,22 @@ Se algum critério falhar: parar e relatar opções; **sem errata e sem ajuste**
 
 ### Previsões (não vinculantes)
 Speedup ≈ 3–3,7× em 4 vCPU (passo ≈ 230–280 s hospedado, ≈ 200–250 s local com 4 trabalhadores). Risco principal: testes que dependem de relógio/CPU sob carga; M2 verifica que nada vira 124.
+
+## Resultados (medidos depois do pré-registro; nenhum critério ou limiar foi alterado)
+
+Implementação em `tools/cognitivo_mutation.py` (`parse_jobs`, `evaluate_mutation`, `run_catalog`, `main(argv)`); testes de contrato em `test_cognitivo_mutation_parallel_contract.py` (16 testes). RED: contra o `tools/cognitivo_mutation.py` de `main`, 38 erros (`parse_jobs`/`run_catalog` inexistentes). GREEN: 16/16, 3 execuções seguidas sem falha (≈ 2,8 s cada). Verificação extra do teste de isolamento: com todos os trabalhadores forçados a compartilhar uma única cópia, ele falha (1 morto, 5 `not_applied`), logo detecta a regressão que protege.
+
+| Critério | Resultado |
+|---|---|
+| M1 equivalência sintética | PASSA: `--jobs` 1, 3 e 8 dão relatório idêntico (campos, ordem, resumo `6/3/1/2`, saída 1) |
+| M2 equivalência real | PASSA: `--jobs 4` (2×) e `--jobs 8` (Python 3.11) idênticos ao baseline serial de `main` nos 483 mutantes (`name, target, tests, status, exit_code`, ordem); resumo 483/483/0/0; nenhum `exit_code` 124 |
+| M3 determinismo | PASSA: as duas execuções `--jobs 4` têm relatório idêntico |
+| M4 ganho local | PASSA: `--jobs 4` = 186,1 s e 182,2 s (alvo ≤ 358 s; serial 716 s → 26 %) |
+| M5 ganho hospedado | PASSA: 1º `contract-gate` do cabeçalho `d693f05`: passo cognitivo **342 s** (alvo ≤ 450 s; antes 829 s) e job **604 s** (alvo ≤ 900 s; antes 1100–1210 s) |
+| M6 negativos | PASSA: `--jobs` ausente/vazio/0/negativo/decimal/`01`/>32/duplicado/argumento desconhecido → 2 sem executar nada nem escrever relatório; sobrevivente → 1; `not_applied` (0 e 2 ocorrências) → 1; linha de base quebrada aborta sem relatório; timeout continua "morto" (124); cópias isoladas; concorrência real (barreira de 3) |
+| M7 gate não enfraquecido | PASSA: diff vazio em `tools/targeted_mutation.py` e no workflow; o bloco `MUTATIONS` é idêntico byte a byte ao de `main`; `TIMEOUT_SECONDS` 180; `timeout-minutes: 20` |
+| M8 sem regressão | PASSA localmente: suíte 816 testes OK em Python 3.11.17 e 3.12.15, ruff, compileall, `reality_audit` sem diff, Bandit 131 LOW (inalterado) com `security_triage --check` ok, `claims: []`; CI hospedado do cabeçalho final: ver o PR |
+
+Observação (não é critério): com `--jobs 8` numa máquina de 8 núcleos o tempo foi **340 s**, pior que `--jobs 4` (186 s), porque os testes de contrato já usam mais de um núcleo por processo (19 min 50 s de CPU em 11 min 56 s no serial). O padrão pré-registrado `min(núcleos, 8)` vale 4 no runner hospedado (onde foi medido), mas numa máquina de 8 núcleos convém passar `--jobs 4`. Opção, não aplicada para não alterar o que foi pré-registrado depois de ver os dados: reduzir `DEFAULT_MAX_JOBS` para 4 em PR seguinte.
+
+Limite honesto: o relatório do cognitivo continua sem retenção como artefato no CI, então ainda não há duração por mutante hospedada; opção futura: incluí-lo no passo "Retain mutation report".
