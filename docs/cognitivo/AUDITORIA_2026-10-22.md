@@ -2005,3 +2005,33 @@ Não há outro contrato dos quatro símbolos além de CM1–CM6; CM1 (referênci
 PRs abertos: #38–#50, #60, #77, #79, #115, #116. Nenhum edita `core/cognitivo/contextual_memory.py`, `test_contextual_memory_contract.py`, `tools/cognitivo_eval.py` nem este arquivo. **Sobreposição declarada, de outro agente em pausa:** #116 (Axis) altera `tools/cognitivo_mutation.py` e `AUDIT_REALITY_REPORT.md`; #79 altera `docs/agentes/CLAIMS.yaml`; #115 altera `core/temporal_facts.py`, que esta rodada não toca. Este PR não toca nem rebaseia nenhum deles; se algum entrar antes, os relatórios são regenerados pelas ferramentas, nunca à mão. Claim `grok-bot`, prazo `2026-10-30T12:00:00Z`, removido no último commit (`claims: []`).
 
 Pré-registro escrito **antes** do contrato RED e antes de rodar o harness com o comportamento novo. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados da correção CM3/CM4 (depois do pré-registro `022706f`)
+
+**Commits, em ordem:** `022706f` pré-registro e claim; `fe1c931` **RED** (contrato e harness CM7–CM9; `--capability contextual_memory` sai com 1, código de produção inalterado); `4fb42da` **GREEN** (a correção mínima em `core/cognitivo/contextual_memory.py`, mutantes, SHAs de CM6 re-fixados, relatórios regenerados por `tools/reality_audit.py`); este commit de resultados (esta seção e `docs/agentes/CLAIMS.yaml` de volta a `claims: []`).
+
+**Valores no RED (código de `main` em `0627ca4`) e no GREEN** — nenhum limite, seed, tamanho, caso ou valor foi alterado depois da primeira execução:
+
+| id | RED | GREEN |
+|---|---|---|
+| CM1 | falha: 34/120 iguais à referência v2 | **passa**: 120/120; 0 entradas alteradas; ids e timestamps válidos |
+| CM2 | passa 20/20 | **passa** 20/20 |
+| CM3 | falha: precisão 0/20 (30 retornadas em cada seed); controle de revocação 20/20 | **passa**: precisão 20/20 (6 retornadas, as 6 memórias do contexto 0); revocação 20/20 |
+| CM4 | falha: controle 101×101 20/20; cruzado 101×202 0/20 | **passa**: controle 20/20; cruzado 20/20 (taxa 1.00) |
+| CM5 | falha: gaps 14/18; erros 16/18 (o pré-registro muda dois gaps e acrescenta quatro gaps e dois erros) | **passa**: gaps 18/18; erros 18/18; colaboradores nunca lidos |
+| CM6 | falha (SHAs ainda dos valores de `0627ca4`) | **passa** após o re-fixar dos detectores (declaração 1) |
+| CM7 | falha: dourados 0/7; sem `builtins.hash` 0/7; grade 0/200 | **passa**: 7/7, 7/7 e 200/200; 0 entradas alteradas |
+| CM8 | falha: 5/26 itens | **passa**: 26/26 |
+| CM9 | passa: 34 ≥ 12 linhas não afetadas, 0 diferenças | **passa**: 34 ≥ 12 linhas não afetadas, 0 diferenças |
+
+Saída do harness: RED `exit 1` (falhas CM1, CM3–CM8); GREEN `exit 0`.
+
+**Declarações de transparência.**
+1. Os SHAs de CM6 (fonte `79fe6842…fd88`, comportamento `c2153356…3e3d`) são detectores: o pré-registro declarou que mudam com o GREEN. Foram re-fixados uma única vez no commit GREEN, depois de todos os outros critérios passarem. Valores anteriores: fonte `02b7fc0b…8a64`, comportamento `91c32679…6ad2`. São iguais em 3.11 e 3.12.
+2. O harness chama `hash()` real só em CM4 (subprocessos) e em CM7; no restante o `hash` é o substituto determinístico `_cm_hash`, que equivale ao novo código. Por isso a base só falha em CM4 e CM7 por esse caminho, e CM1/CM3/CM5/CM8 falham pela mudança do score.
+3. Mutantes: dois mutantes antigos de `compute_similarity` (`cm_similarity_empty_guard_dropped`, `cm_similarity_one_empty_only`) perderam a unicidade da agulha porque `compute_match` repete o guard; as agulhas foram estendidas, sem mudar o que cada mutante faz. Há 19 mutantes novos (menos o `cm_hash_of_repr` removido) para `compute_match`, o sha256 e a seleção de dimensões consultadas.
+4. Testes extras no contrato (bordas de `compute_match`, hash sem `hash()`, vetor igual entre `PYTHONHASHSEED`, regressões de score e de codificação, guarda e resumos do CM9) existem para matar mutantes que sobreviveriam; não mudam critérios.
+
+**Lacunas residuais (mantidas em CM5 ou fora de escopo; nada disto foi tocado).** Com query, o score continua aditivo `(contexto + conteúdo) / 2`: uma query que acerta passa o limiar padrão mesmo com contexto diferente (0.5) e uma que erra passa com contexto igual (0.65). Subconjunto de dimensões consultadas basta (`cue_subset_is_enough` = 1.0). Colisões de balde (`% 100`; por exemplo `noon` e `evening`) tornam valores diferentes iguais (`bucket_collision`). `compute_similarity` (cosseno) continua e não é mais usada na recuperação. `working_memory` e `attention` seguem armazenados e nunca lidos; `long_term_memory` só recebe escrita; entradas não validadas; `nonmatching_lowers` agora é falso (contexto diferente dá 0.0, query errada dá 0.15), mudança declarada no pré-registro.
+
+**Opções se algo for recusado na revisão.** (a) Manter em rascunho como inventário medido; (b) PR separado para o score com query (multiplicativo ou duas etapas) com novo pré-registro; (c) trocar o balde `% 100` por vetor de igualdade exata do valor, com novo protocolo.
