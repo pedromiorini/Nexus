@@ -118,7 +118,6 @@ class History:
         self.jobs = jobs
         self.successes = sorted((j for j in jobs if is_success(j)), key=job_key)
         self.success_keys = [job_key(j) for j in self.successes]
-        self.success_starts = sorted(((j["_end"], j["run"], j["attempt"]) for j in self.successes))
 
     def window_until_end(self, job):
         """Ultimas N duracoes de sucesso com fim <= fim de `job` (inclui o proprio, se sucesso)."""
