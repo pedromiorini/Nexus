@@ -9787,6 +9787,8 @@ class CentralRouter:
             "module_call_count": {m: 0 for m in ModuleType},
             "module_errors": {m: 0 for m in ModuleType},
             "avg_modules_per_request": 0,
+            "blocked_requests": 0,
+            "blocked_by_error": defaultdict(int),
             "deferred_reprocessing": {
                 "attempts": 0,
                 "completed": 0,
@@ -10116,6 +10118,13 @@ class CentralRouter:
                 if result.success:
                     aggregated_data[result.module.value] = result.data
 
+            # Fail-closed: segurança e módulos obrigatórios não passam como sucesso
+            blocked = self._blocking_decision(request_type, all_results)
+            if blocked is not None:
+                return self._finish_blocked(
+                    prompt, request_type, blocked, execution_plan, all_results, start_time
+                )
+
         # ─── 6. VALIDAÇÃO ÉTICA PÓS ───────────────────────────────────────
         ethics_post = self.ethics.post_execution_validation(prompt, all_results)
 
@@ -10133,7 +10142,11 @@ class CentralRouter:
 
         # Adicionar metadados
         latency_ms = (time.time() - start_time) * 1000
+        failed_modules = self._failed_module_names(all_results)
         final_result["success"] = True
+        final_result["degraded"] = bool(failed_modules)
+        final_result["failed_modules"] = failed_modules
+        final_result["failed_modules_detail"] = self._failed_module_details(all_results)
         final_result["latency_ms"] = latency_ms
         final_result["modules_executed"] = [
             r.module.value for r in all_results if r.success
@@ -10149,7 +10162,7 @@ class CentralRouter:
         _dbg(f"🔍 DEBUG v3.70: request_type = {final_result['request_type']}")
 
         # ─── 8. CACHEAR ────────────────────────────────────────────────────
-        if cacheable:
+        if cacheable and not failed_modules:
             try:
                 cached_result = copy.deepcopy(final_result)
             except Exception:
@@ -10164,6 +10177,108 @@ class CentralRouter:
         self._update_statistics(latency_ms, execution_plan, all_results)
 
         return final_result
+
+    _NO_VERDICT = object()
+
+    @staticmethod
+    def _failed_module_names(results: List[ModuleResult]) -> List[str]:
+        """Módulos com falha, na ordem de execução e sem repetição."""
+        names: List[str] = []
+        for result in results:
+            if not result.success and result.module.value not in names:
+                names.append(result.module.value)
+        return names
+
+    @staticmethod
+    def _failed_module_details(results: List[ModuleResult]) -> List[Dict[str, str]]:
+        """Causa da primeira falha de cada módulo, na mesma ordem de ``failed_modules``."""
+        details: List[Dict[str, str]] = []
+        seen: List[str] = []
+        for result in results:
+            if not result.success and result.module.value not in seen:
+                seen.append(result.module.value)
+                details.append({"module": result.module.value, "error": str(result.error)})
+        return details
+
+    def _finish_blocked(
+        self,
+        prompt: str,
+        request_type: RequestType,
+        blocked: Dict[str, Any],
+        plan: ExecutionPlan,
+        results: List[ModuleResult],
+        start_time: float,
+    ) -> Dict[str, Any]:
+        """Resposta de bloqueio + um evento ROUTER_BLOCKED no log + estatística de requisição bloqueada."""
+        response = self._blocked_response(prompt, request_type, blocked)
+        log_module = self.modules.get(ModuleType.LOG)
+        if log_module is not None:
+            try:
+                log_module.log_event("ROUTER_BLOCKED", {
+                    "error": blocked["error"],
+                    "module": blocked["module"].value,
+                    "request_type": request_type.value,
+                    "prompt": prompt[:100],
+                })
+            except Exception as exc:  # o log não pode desfazer nem mascarar o bloqueio
+                _dbg(f"🔍 DEBUG: ROUTER_BLOCKED log failed: {exc}")
+        self.stats["blocked_requests"] = self.stats.get("blocked_requests", 0) + 1
+        by_error = self.stats.setdefault("blocked_by_error", defaultdict(int))
+        by_error[blocked["error"]] += 1
+        self._update_statistics((time.time() - start_time) * 1000, plan, results)
+        return response
+
+    def _blocking_decision(
+        self, request_type: RequestType, results: List[ModuleResult]
+    ) -> Optional[Dict[str, Any]]:
+        """Decide se os resultados já obtidos impedem a requisição (fail-closed).
+
+        Bloqueiam: jailbreak detectado ou verificação que falhou/sem veredito, orçamento
+        negado e Swarm obrigatório que falhou em decisão ética. Falhas de orçamento por
+        exceção e de módulos opcionais apenas degradam o resultado.
+        """
+        for result in results:
+            if result.module != ModuleType.JAILBREAK:
+                continue
+            if not result.success:
+                return {"error": "JAILBREAK_CHECK_FAILED", "module": result.module,
+                        "reason": f"jailbreak check failed: {result.error}"}
+            data = result.data
+            if isinstance(data, dict):
+                verdict = data.get("detected", self._NO_VERDICT)
+            else:
+                verdict = getattr(data, "detected", self._NO_VERDICT)
+            if verdict is self._NO_VERDICT:
+                return {"error": "JAILBREAK_CHECK_FAILED", "module": result.module,
+                        "reason": "jailbreak check returned no verdict"}
+            if verdict:
+                return {"error": "JAILBREAK_DETECTED", "module": result.module,
+                        "reason": "jailbreak detector flagged the prompt"}
+        for result in results:
+            if result.module == ModuleType.BUDGET and result.success:
+                allowed = result.data.get("allowed") if isinstance(result.data, dict) else None
+                if not allowed:
+                    return {"error": "BUDGET_DENIED", "module": result.module,
+                            "reason": "resource budget denied"}
+        if request_type == RequestType.ETHICAL_DECISION:
+            for result in results:
+                if result.module == ModuleType.SWARM and not result.success:
+                    return {"error": "MANDATORY_MODULE_FAILED", "module": result.module,
+                            "reason": f"swarm is mandatory for ethical decisions and failed: {result.error}"}
+        return None
+
+    @staticmethod
+    def _blocked_response(prompt: str, request_type: RequestType, blocked: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "success": False,
+            "error": blocked["error"],
+            "reason": blocked["reason"],
+            "prompt": prompt[:100],
+            "degraded": True,
+            "failed_modules": [blocked["module"].value],
+            "failed_modules_detail": [{"module": blocked["module"].value, "error": blocked["reason"]}],
+            "request_type": request_type.value,
+        }
 
     def consume_deferred_tasks(self, processor, max_batch: int = 1, on_success=None, on_failure=None, on_discard=None) -> Dict[str, Any]:
         """Consome tarefas adiadas somente após rechecagem de pressão VRAM."""
@@ -10488,6 +10603,8 @@ class CentralRouter:
             },
 
             "requests_by_type": dict(self.stats["requests_by_type"]),
+            "blocked_requests": self.stats.get("blocked_requests", 0),
+            "blocked_by_error": dict(self.stats.get("blocked_by_error", {})),
             "module_usage": {
                 k.value: v for k, v in self.stats["module_call_count"].items()
                 if v > 0
@@ -21169,6 +21286,10 @@ class CompleteNexusBrain:
                     result["modules_executed"] = reasoning_result.get("modules_executed", [])
                     result["request_type"] = reasoning_result.get("request_type", "unknown")
                     result["cached"] = reasoning_result.get("cached", False)
+                    # Bloqueio, falhas e degradação do roteador chegam ao chamador (revisão do Laird, RT9–RT13)
+                    for field in ["success", "error", "reason", "degraded", "failed_modules", "failed_modules_detail"]:
+                        if field in reasoning_result:
+                            result[field] = reasoning_result[field]
                     
                     # Optional fields - only if present
                     for field in ["confidence", "swarm_decision", "mcts_plan", "swarm_included", "router_latency_ms"]:
