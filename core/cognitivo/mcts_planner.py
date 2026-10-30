@@ -147,7 +147,7 @@ class RealMCTSPlanner:
         if steps not in self._world_rewards:
             final = self.world_model.simulate(list(steps)).final_state.state
             utility = STATUS_UTILITY.get(final.get("system_status"), 0)
-            self._world_rewards[steps] = max(0, utility) / 3.0
+            self._world_rewards[steps] = utility / 3.0
         return self._world_rewards[steps]
 
     def _is_unmodeled(self, action: str) -> bool:
@@ -406,7 +406,6 @@ class RealMCTSPlanner:
             self._plan_actions = allowed
             self._plan_effects = {}
             self._best_found = None
-            self._world_rewards = {}
             return self._run_plan(goal, initial_state, allowed, max_iterations, start_time)
         finally:
             self._plan_actions = None

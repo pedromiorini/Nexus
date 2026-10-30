@@ -119,6 +119,18 @@ class MCTSWorldEffectsContractTests(unittest.TestCase):
                 r = planner.plan(GOAL, available_actions=["MONITOR"], max_iterations=50)
                 self.assertEqual(r.expected_reward, 0.0)
 
+    def test_mw9_model_without_simulate_keeps_the_numeric_path(self):
+        # Acrescentado após o RED (guiado pelo mutante mw_world_forced_without_simulate): dublê só com current_state.
+        class Stub:
+            current_state = type("S", (), {"state": {"system_status": "vulnerable"}})()
+
+        for seed in SEEDS[:5]:
+            with self.subTest(seed=seed):
+                random.seed(seed)
+                got = RealMCTSPlanner(world_model=Stub(), max_depth=3).plan(GOAL, max_iterations=100)
+                self.assertEqual(got.expected_reward, 0.5)
+                self.assertEqual(got.success_probability, 0.55)
+
     def test_mw8_planning_time_p95(self):
         times = []
         for seed in SEEDS:
