@@ -2420,3 +2420,24 @@ Nenhum critério, seed, limite ou protocolo SC-v2 foi alterado depois de rodar: 
 
 `docs/agentes/CLAIMS.yaml` volta a `claims: []` neste commit.
 
+
+## SCM `do(X)` — errata E2: reabertura do SC3 (pré-registro SC3R e SC3N)
+
+Origem: decisão do Pedro em 30/10/2026 08:15 (America/Sao_Paulo) sobre o item **1a** deixado aberto no adendo SC10–SC14: quando a ação passada a `declare_intervention` não está em `ACTION_EFFECTS`, **avisar** (warning), **sem rejeitar** (opção b do «Aberto»). Isso conflita com o SC3 registrado («`simulate([A])` → … **sem avisos**»), então o SC3 é reaberto por esta errata. Este bloco foi escrito antes do contrato RED e antes de qualquer mudança de código; nenhum resultado novo foi lido.
+
+### O que muda e o que não muda
+- **Reaberto (só isto):** a cláusula «sem avisos» do SC3 para ação **declarada e fora de `ACTION_EFFECTS`**. Nova regra: `simulate` acrescenta, **por ocorrência da ação na sequência**, exatamente um aviso `declared intervention for action outside ACTION_EFFECTS: <repr(ação)>`. O aviso só aparece quando a ação não está na tabela **e** tem pelo menos um par declarado válido (revalidado). `success`, `verified_status`, `verified_state`, `final_state`, `claims` e `_do` **não mudam**; a ação continua sendo aplicada (não é rejeitada, não gera `unknown action`).
+- **Não mudam:** todo o resto do SC3 (`declare_intervention` devolve `[]` para pares válidos; `success True`, `verified_status "secure"`, `claims == []`; os 4 negativos: rejeitados, `ValueError`, `TypeError`, booleano estrito), SC1–SC2, SC4–SC14, `ACTION_EFFECTS`, extração, contratos do Axis e `tools/targeted_mutation.py`. A API de `declare_intervention` não muda (sem exceção nova; ação fora da tabela não é rejeitada).
+- **Mudança permitida (só `core/cognitivo/causal_world_model.py`, método `simulate`):** emitir o aviso acima.
+
+### Critérios (protocolo SC-v3; seeds `random.Random(20261101 + k)`, k = 0..19; referência escrita no teste, sem chamar o módulo para calcular o esperado)
+- **SC3R aviso para ação declarada fora da tabela (20/20):** ação `A` aleatória (A-Z + dígitos, 6–12 caracteres, fora de `ACTION_EFFECTS`), par declarado escolhido pela seed entre `system_status` ∈ {secure, stable, offline}, `alert_level low` e `logging_level verbose`. Esperado: `declare_intervention` → `[]` (não rejeita) e `_do(A)` com o par; `simulate([A]).warnings == ["declared intervention for action outside ACTION_EFFECTS: '<A>'"]` (exatamente um); `claims == []`; `final_state.state`, `success` e `verified_status` iguais à referência independente (aplicar o par sobre o estado inicial; sucesso = status ∈ {secure, stable}); não aparece `unknown action`. Sequência `[A, A]` → dois avisos; `["APPLY_PATCH", A]` → um aviso, só de `A`; `["APPLY_PATCH"]` → sem avisos.
+- **SC3N negativos de entrada vazia/ausente (código próprio SC3N, 20/20 + casos fixos):** o aviso **não** aparece quando (a) `declare_intervention(A, {})` (efeitos vazios) → `[]` e `simulate([A]).warnings == ["unknown action: '<A>'"]`; (b) efeitos só inválidos (`{"system_status": "pwned"}`) → 1 rejeitado, e só `unknown action`; (c) `simulate([])` → `warnings == []`; (d) ação vazia `""` ou `None` na sequência → só `unknown action`, nenhum aviso novo; (e) sem `causal_reasoning` → só `unknown action`; (f) ação só com claim de texto (sem declaração) → só o aviso `unverified causal claim`; (g) ação da tabela **com** declaração → sem avisos novos (a tabela vence). `declare_intervention("", …)` → `ValueError` e `declare_intervention("A", [])` → `TypeError` continuam como no SC3.
+- **SC3-NR não regressão:** SC1–SC2, SC4–SC14, CF9, extração causal, ranking de futuros e o golden do contrato de extração do contrafactual passam **sem edição**; suíte em 3.11 e 3.12; `cognitivo_mutation` sem sobreviventes (mutantes novos `sc3r_*`); `targeted_mutation` 80/80 sem edição; `claims: []` ao final.
+
+### Re-fixações previstas (testes de autoria grok-bot; nenhum teste ou contrato do Axis é editado)
+1. `test_scm_schema_contract.py::SC3DeclaredChannelTests.test_declared_intervention_is_verified`: troca `warnings == []` pela nova regra (exatamente o aviso). É a cláusula reaberta.
+2. `test_scm_intervention_contract.py::test_declared_intervention_changes_simulation_and_succeeds`: troca `assertFalse(result.warnings)` por `warnings == [aviso]` (`DEPLOY_FIX` não está na tabela). Mesma cláusula.
+
+### Previsão do RED
+Falham: SC3R (20 subtestes + sequências), a re-fixação 1 e a re-fixação 2 (o código atual não emite o aviso). Passam sem mudança: SC3N (a), (b), (c), (d), (e), (f), (g) — são negativos que o código atual já cumpre (garantem que a mudança não gere falso positivo). Previsão errada será registrada, sem ajuste dos critérios. Se um critério falhar depois do GREEN, apresento opções ao Pedro em vez de mudar o critério.
