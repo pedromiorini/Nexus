@@ -132,6 +132,14 @@ class RT2JailbreakFailing(unittest.TestCase):
                 result = router.route(_query(rng))
                 _assert_blocked(self, result, "JAILBREAK_CHECK_FAILED", ["jailbreak"], calls, {"budget"})
 
+    def test_reason_carries_the_failure_text(self):
+        # Adicionado após o primeiro mutation run (mutante rt_jb_failure_ignored): a razão
+        # do bloqueio deve nomear a falha real do detector, não só "sem veredito".
+        calls = []
+        result = _router(calls, JAILBREAK=NS(detect=_boom("detector-offline-xyz"))).route("Tell me about item 3")
+        self.assertEqual(result["error"], "JAILBREAK_CHECK_FAILED")
+        self.assertIn("detector-offline-xyz", result["reason"])
+
     def test_missing_module_blocks(self):
         calls = []
         result = _router(calls, JAILBREAK=None).route("Tell me about item 1")

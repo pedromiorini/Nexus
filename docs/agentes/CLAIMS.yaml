@@ -1,13 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "CentralRouter fail-closed: jailbreak/orçamento/Swarm obrigatório bloqueiam; campos degraded e failed_modules (pré-registro RT1–RT8)"
-    arquivos:
-      - core/constitutional_brain.py
-      - test_router_fail_closed_contract.py
-      - tools/cognitivo_mutation.py
-      - docs/cognitivo/AUDITORIA_2026-10-22.md
-      - docs/agentes/CLAIMS.yaml
-    expira_em: "2026-11-01T12:00:00Z"
+claims: []

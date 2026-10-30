@@ -95,9 +95,9 @@
         "functions": 25
       }
     ],
-    "core_lines": 23481,
+    "core_lines": 23551,
     "classes": 221,
-    "functions": 702,
+    "functions": 705,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -106,6 +106,7 @@
       }
     ],
     "dynamic_literal_return_functions": [
+      "CentralRouter._blocked_response",
       "CentralRouter._init_routing_rules",
       "EthicsGuard.get_statistics",
       "RealAdversarialRobustnessLayer.get_robustness_report",

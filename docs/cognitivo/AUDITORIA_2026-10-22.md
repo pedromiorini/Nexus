@@ -2355,3 +2355,22 @@ RT1, RT2, RT3, RT4 falham em tudo (hoje `success True` e sem os campos). RT5 e R
 
 ### Risco declarado (não é critério)
 O chamador em `NexusBrain` (`self.router.route(...)`, ~linha 20882) usa o dicionário devolvido como `reasoning_result`; um bloqueio devolve o mesmo formato de erro dos bloqueios éticos já existentes, então o caminho a jusante é o mesmo desses, mas **não foi medido** aqui.
+
+### Resultados RT1–RT8 (GREEN)
+Nenhum critério, seed, limite ou protocolo foi alterado depois de rodar: **sem errata**. Commits: pré-registro → contrato RED (`test_router_fail_closed_contract.py`, produção intacta) → GREEN (este, produção + mutantes + resultados + `claims: []`).
+
+**Ordem das sondas (declarada):** o pré-registro diz «3 sondas, todas com `success=True`»; elas foram rodadas **depois** de escrito o texto do pré-registro e **antes** de qualquer contrato ou código. O resultado coincidiu com o texto; a ordem fica registrada aqui.
+
+**RED (código de `main`):** 88 falhas e 81 erros em subtestes. Falharam: RT1 (20/20 e o caso real com `RealJailbreakDetector`, mais a repetição sem cache), RT2 (20/20, módulo ausente e 4/4 veredictos sem `detected`), RT3 (20/20 nos dois sentidos), RT4 (20/20 em ambos os tipos de requisição e o caso com Swarm saudável, pela ausência dos campos), RT5 20/20, RT6 20/20 (só pelos campos novos), RT7 só o formato de bloqueio. `test_central_router_contract.py` passou sem edição. **As previsões acertaram**, sem previsão errada a registrar.
+
+**GREEN (Python 3.11 e 3.12):** o contrato novo e `test_central_router_contract.py` passam sem edição deste último; suíte completa 855 testes OK nas duas versões. `python core/constitutional_brain.py` (demo integrada) sai com 0.
+
+**Mudança (só `core/constitutional_brain.py`, `CentralRouter`):** `_blocking_decision` (jailbreak falho/sem veredito/detectado → bloqueia; orçamento negado → bloqueia; Swarm falho em `ETHICAL_DECISION` → bloqueia; nada mais), chamada após cada stage de `_route`; `_blocked_response` (formato dos bloqueios éticos + `degraded`/`failed_modules`); `_failed_module_names`; `degraded`/`failed_modules` no resultado de sucesso; resultado degradado não é cacheado. Chaves planas, `original_prompt` e a assinatura de `_aggregate_results` não mudaram.
+
+**Teste acrescentado depois do 1º mutation run (`RT2.test_reason_carries_the_failure_text`):** o mutante `rt_jb_failure_ignored` sobreviveu porque o dado `None` de um módulo falho já cai em «sem veredito» e dá o mesmo código. Em vez de declarar equivalente, o teste passou a exigir que a razão do bloqueio carregue o texto da falha real do detector. Critérios RT1–RT8 intactos.
+
+**Gates:** `ruff`, `compileall`, `reality_audit` regenerado só pela ferramenta + `git diff --exit-code`, `validar_registro` OK; Bandit sem MEDIUM/HIGH, `security_triage --check`, `embedded_assert_audit` e `implementation_gap_audit` OK (`SECURITY_TRIAGE.md` não mudou). Cobertura `core/cognitivo/*` 98% (≥ 90), brain 68% (≥ 62). `cognitivo_mutation` 502/502 mortos (19 novos `rt_*`; `tools/targeted_mutation.py` não editado); `targeted_mutation` 80/80.
+
+**Risco declarado, ainda não medido:** o chamador em `NexusBrain` (`self.router.route(...)`) usa o dicionário devolvido como `reasoning_result`; o bloqueio devolve o formato de erro já usado pelos bloqueios éticos, mas o efeito no fluxo completo do `NexusBrain` com `success=False` não foi exercitado por teste dedicado (só pela demo integrada, que saiu com 0).
+
+`docs/agentes/CLAIMS.yaml` volta a `claims: []` neste commit.

@@ -10116,6 +10116,11 @@ class CentralRouter:
                 if result.success:
                     aggregated_data[result.module.value] = result.data
 
+            # Fail-closed: segurança e módulos obrigatórios não passam como sucesso
+            blocked = self._blocking_decision(request_type, all_results)
+            if blocked is not None:
+                return self._blocked_response(prompt, request_type, blocked)
+
         # ─── 6. VALIDAÇÃO ÉTICA PÓS ───────────────────────────────────────
         ethics_post = self.ethics.post_execution_validation(prompt, all_results)
 
@@ -10133,7 +10138,10 @@ class CentralRouter:
 
         # Adicionar metadados
         latency_ms = (time.time() - start_time) * 1000
+        failed_modules = self._failed_module_names(all_results)
         final_result["success"] = True
+        final_result["degraded"] = bool(failed_modules)
+        final_result["failed_modules"] = failed_modules
         final_result["latency_ms"] = latency_ms
         final_result["modules_executed"] = [
             r.module.value for r in all_results if r.success
@@ -10149,7 +10157,7 @@ class CentralRouter:
         _dbg(f"🔍 DEBUG v3.70: request_type = {final_result['request_type']}")
 
         # ─── 8. CACHEAR ────────────────────────────────────────────────────
-        if cacheable:
+        if cacheable and not failed_modules:
             try:
                 cached_result = copy.deepcopy(final_result)
             except Exception:
@@ -10164,6 +10172,68 @@ class CentralRouter:
         self._update_statistics(latency_ms, execution_plan, all_results)
 
         return final_result
+
+    _NO_VERDICT = object()
+
+    @staticmethod
+    def _failed_module_names(results: List[ModuleResult]) -> List[str]:
+        """Módulos com falha, na ordem de execução e sem repetição."""
+        names: List[str] = []
+        for result in results:
+            if not result.success and result.module.value not in names:
+                names.append(result.module.value)
+        return names
+
+    def _blocking_decision(
+        self, request_type: RequestType, results: List[ModuleResult]
+    ) -> Optional[Dict[str, Any]]:
+        """Decide se os resultados já obtidos impedem a requisição (fail-closed).
+
+        Bloqueiam: jailbreak detectado ou verificação que falhou/sem veredito, orçamento
+        negado e Swarm obrigatório que falhou em decisão ética. Falhas de orçamento por
+        exceção e de módulos opcionais apenas degradam o resultado.
+        """
+        for result in results:
+            if result.module != ModuleType.JAILBREAK:
+                continue
+            if not result.success:
+                return {"error": "JAILBREAK_CHECK_FAILED", "module": result.module,
+                        "reason": f"jailbreak check failed: {result.error}"}
+            data = result.data
+            if isinstance(data, dict):
+                verdict = data.get("detected", self._NO_VERDICT)
+            else:
+                verdict = getattr(data, "detected", self._NO_VERDICT)
+            if verdict is self._NO_VERDICT:
+                return {"error": "JAILBREAK_CHECK_FAILED", "module": result.module,
+                        "reason": "jailbreak check returned no verdict"}
+            if verdict:
+                return {"error": "JAILBREAK_DETECTED", "module": result.module,
+                        "reason": "jailbreak detector flagged the prompt"}
+        for result in results:
+            if result.module == ModuleType.BUDGET and result.success:
+                allowed = result.data.get("allowed") if isinstance(result.data, dict) else None
+                if not allowed:
+                    return {"error": "BUDGET_DENIED", "module": result.module,
+                            "reason": "resource budget denied"}
+        if request_type == RequestType.ETHICAL_DECISION:
+            for result in results:
+                if result.module == ModuleType.SWARM and not result.success:
+                    return {"error": "MANDATORY_MODULE_FAILED", "module": result.module,
+                            "reason": f"swarm is mandatory for ethical decisions and failed: {result.error}"}
+        return None
+
+    @staticmethod
+    def _blocked_response(prompt: str, request_type: RequestType, blocked: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "success": False,
+            "error": blocked["error"],
+            "reason": blocked["reason"],
+            "prompt": prompt[:100],
+            "degraded": True,
+            "failed_modules": [blocked["module"].value],
+            "request_type": request_type.value,
+        }
 
     def consume_deferred_tasks(self, processor, max_batch: int = 1, on_success=None, on_failure=None, on_discard=None) -> Dict[str, Any]:
         """Consome tarefas adiadas somente após rechecagem de pressão VRAM."""

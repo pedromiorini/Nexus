@@ -38,6 +38,8 @@ MCTS_TESTS = ("test_mcts_planner_extraction_contract.py", "test_mcts_action_cont
 _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")'
 
 CAUSAL = "core/cognitivo/causal_world_model.py"
+BRAIN = "core/constitutional_brain.py"
+RT_TESTS = ("test_router_fail_closed_contract.py", "test_central_router_contract.py")
 COUNTERFACTUAL = "core/cognitivo/counterfactual.py"
 EFFECTS = "core/cognitivo/action_effects.py"
 R1_TESTS = ("test_action_effects_contract.py",)
@@ -1169,6 +1171,26 @@ MUTATIONS = [
              ")\n"
              "RealEmotionalMemoryWeighting = type(\"RealEmotionalMemoryWeighting\", (_RealEmotionalMemoryWeighting,), {})\n",
              tests=EW_TESTS),
+    # RT1–RT7: CentralRouter fail-closed (segurança e módulos obrigatórios)
+    Mutation("rt_block_skipped", BRAIN, '            if blocked is not None:\n', '            if False:\n', tests=RT_TESTS),
+    Mutation("rt_detected_ignored", BRAIN, '            if verdict:\n', '            if False:\n', tests=RT_TESTS),
+    Mutation("rt_jb_failure_ignored", BRAIN, '            if not result.success:\n                return {"error": "JAILBREAK_CHECK_FAILED"', '            if False:\n                return {"error": "JAILBREAK_CHECK_FAILED"', tests=RT_TESTS),
+    Mutation("rt_no_verdict_ignored", BRAIN, '            if verdict is self._NO_VERDICT:\n', '            if False:\n', tests=RT_TESTS),
+    Mutation("rt_dict_verdict_ignored", BRAIN, 'verdict = data.get("detected", self._NO_VERDICT)', 'verdict = self._NO_VERDICT', tests=RT_TESTS),
+    Mutation("rt_budget_ignored", BRAIN, '                if not allowed:\n', '                if False:\n', tests=RT_TESTS),
+    Mutation("rt_budget_error_blocks", BRAIN, 'if result.module == ModuleType.BUDGET and result.success:', 'if result.module == ModuleType.BUDGET:', tests=RT_TESTS),
+    Mutation("rt_swarm_rule_off", BRAIN, '        if request_type == RequestType.ETHICAL_DECISION:\n            for result in results:\n                if result.module == ModuleType.SWARM', '        if False:\n            for result in results:\n                if result.module == ModuleType.SWARM', tests=RT_TESTS),
+    Mutation("rt_swarm_rule_all_types", BRAIN, '        if request_type == RequestType.ETHICAL_DECISION:\n            for result in results:\n                if result.module == ModuleType.SWARM', '        if True:\n            for result in results:\n                if result.module == ModuleType.SWARM', tests=RT_TESTS),
+    Mutation("rt_swarm_success_inverted", BRAIN, 'ModuleType.SWARM and not result.success:\n                    return {"error": "MANDATORY', 'ModuleType.SWARM and result.success:\n                    return {"error": "MANDATORY', tests=RT_TESTS),
+    Mutation("rt_degraded_always_false", BRAIN, 'final_result["degraded"] = bool(failed_modules)', 'final_result["degraded"] = False', tests=RT_TESTS),
+    Mutation("rt_failed_modules_empty", BRAIN, 'final_result["failed_modules"] = failed_modules', 'final_result["failed_modules"] = []', tests=RT_TESTS),
+    Mutation("rt_degraded_cached", BRAIN, '        if cacheable and not failed_modules:\n', '        if cacheable:\n', tests=RT_TESTS),
+    Mutation("rt_failed_names_inverted", BRAIN, 'if not result.success and result.module.value not in names:', 'if result.success and result.module.value not in names:', tests=RT_TESTS),
+    Mutation("rt_blocked_success_true", BRAIN, '"success": False,\n            "error": blocked["error"],', '"success": True,\n            "error": blocked["error"],', tests=RT_TESTS),
+    Mutation("rt_blocked_not_degraded", BRAIN, '"degraded": True,\n            "failed_modules": [blocked', '"degraded": False,\n            "failed_modules": [blocked', tests=RT_TESTS),
+    Mutation("rt_blocked_modules_empty", BRAIN, '"failed_modules": [blocked["module"].value],', '"failed_modules": [],', tests=RT_TESTS),
+    Mutation("rt_blocked_prompt_untruncated", BRAIN, '"prompt": prompt[:100],\n            "degraded": True,', '"prompt": prompt,\n            "degraded": True,', tests=RT_TESTS),
+    Mutation("rt_blocked_wrong_code", BRAIN, '"error": blocked["error"],\n            "reason": blocked["reason"],', '"error": "ETHICS_VIOLATION",\n            "reason": blocked["reason"],', tests=RT_TESTS),
 ]
 
 
