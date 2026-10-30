@@ -11,12 +11,19 @@ import random
 import time
 from dataclasses import dataclass, field
 from numbers import Real
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Mapping, Optional, Tuple
 
 from core.cognitivo.action_effects import planner_deltas
 from core.cognitivo.causal_world_model import STATUS_UTILITY
 
-__all__ = ["MCTSNode", "PlanResult", "RealMCTSPlanner"]
+__all__ = ["DEFAULT_VETOES", "MCTSNode", "PlanResult", "RealMCTSPlanner"]
+
+# P1b: ações que o planejador não recomenda por padrão (motivo devolvido em PlanResult.vetoed_actions).
+# Quem quiser planejar com elas passa ``vetoes={}`` (ou outro mapa) ao construir o planejador.
+DEFAULT_VETOES: Dict[str, str] = {
+    "IGNORE_ALERT": "ignorar um alerta de segurança não é uma resposta aceitável por padrão",
+    "SHUTDOWN_SERVICE": "desligar o serviço é uma ação destrutiva e exige decisão humana explícita",
+}
 
 
 @dataclass
@@ -81,6 +88,9 @@ class PlanResult:
     alternative_plans: List[Dict]        # Planos alternativos encontrados
     planning_time: float                 # Tempo de planejamento em segundos
     success_probability: float           # Probabilidade estimada de sucesso
+    # P1b: ações vetadas e motivo. Atributo da instância, não campo do dataclass (``fields``/``asdict``
+    # seguem iguais ao contrato ER5); o planejador o preenche a cada ``plan()``.
+    vetoed_actions: ClassVar[Tuple[Dict[str, str], ...]] = ()
 
 
 class RealMCTSPlanner:
@@ -104,7 +114,8 @@ class RealMCTSPlanner:
         causal_reasoning: Optional[Any] = None,
         episodic_memory: Optional[Any] = None,
         exploration_constant: float = 1.414,
-        max_depth: int = 5
+        max_depth: int = 5,
+        vetoes: Optional[Mapping[str, str]] = None
     ):
         if isinstance(exploration_constant, bool) or not isinstance(exploration_constant, Real):
             raise TypeError("exploration_constant must be a real number")
@@ -116,6 +127,9 @@ class RealMCTSPlanner:
             raise TypeError("max_depth must be an integer")
         if max_depth <= 0:
             raise ValueError("max_depth must be positive")
+        if vetoes is not None and not isinstance(vetoes, Mapping):
+            raise TypeError("vetoes must be a mapping of action -> reason")
+        self.vetoes: Dict[str, str] = dict(DEFAULT_VETOES if vetoes is None else vetoes)
         self.world_model = world_model
         self.causal_reasoning = causal_reasoning
         self.episodic_memory = episodic_memory
@@ -154,8 +168,15 @@ class RealMCTSPlanner:
         return self._world_rewards[steps]
 
     def _is_unmodeled(self, action: str) -> bool:
-        """Ação sem efeito conhecido: fora da tabela (sem modelo) ou aviso do simulador (com modelo)."""
+        """Ação sem efeito conhecido, por estrutura: fora da tabela de ações e não declarada.
+
+        Texto livre sobre a ação (afirmação causal, aviso do simulador) não decide: só a tabela e as
+        intervenções declaradas. Um modelo sem ``is_modeled`` cai no aviso do simulador (compatibilidade).
+        """
         if self._uses_world_effects():
+            is_modeled = getattr(self.world_model, "is_modeled", None)
+            if callable(is_modeled):
+                return not is_modeled(action)
             return bool(getattr(self.world_model.simulate([action]), "warnings", []))
         return action not in self._action_effects
 
@@ -220,16 +241,23 @@ class RealMCTSPlanner:
         self._record_found(reward, state)
         return reward
 
+    def _found_rank(self, steps: List[str]) -> Tuple[int, int, Tuple[str, ...]]:
+        """Chave de desempate do modo mundo (menor vence): menos ações fora da tabela (declaradas ou
+        desconhecidas), depois menos passos, depois ordem lexicográfica da sequência."""
+        outside = sum(1 for action in steps if action not in self._action_effects)
+        return (outside, len(steps), tuple(str(action) for action in steps))
+
     def _record_found(self, reward: float, state: Dict) -> None:
         if reward <= 0:
             return
+        steps = list(state.get("steps_taken", []))
         if self._best_found is not None and reward == self._best_found[0] and self._uses_world_effects():
-            # modo mundo: entre planos de mesma recompensa, o de menos passos
-            if len(state.get("steps_taken", [])) < len(self._best_found[1]):
-                self._best_found = (reward, list(state.get("steps_taken", [])))
+            # modo mundo: entre planos de mesma recompensa, decide a chave determinística (_found_rank)
+            if self._found_rank(steps) < self._found_rank(self._best_found[1]):
+                self._best_found = (reward, steps)
             return
         if self._best_found is None or reward > self._best_found[0]:
-            self._best_found = (reward, list(state.get("steps_taken", [])))
+            self._best_found = (reward, steps)
 
     # ─── Fase 4: RETROPROPAGAÇÃO ─────────────────────────────────────────────
 
@@ -356,7 +384,11 @@ class RealMCTSPlanner:
         if not root.children:
             return []
 
-        sorted_children = sorted(root.children, key=lambda c: c.avg_reward, reverse=True)
+        # recompensa (já arredondada) em ordem decrescente; empate decidido pela primeira ação (estável)
+        sorted_children = sorted(
+            (c for c in root.children if c.action_taken),
+            key=lambda c: (-round(c.avg_reward, 4), str(c.action_taken)),
+        )
 
         alternatives = []
         for child in sorted_children[:top_n]:
@@ -405,11 +437,20 @@ class RealMCTSPlanner:
         # Ações fornecidas valem em todas as profundidades, só neste plano; a lista do
         # chamador é copiada. Ações sem modelo deixam as métricas do estado intactas.
         allowed = list(available_actions) if available_actions is not None else None
+        # P1b: veto padrão. Ações vetadas saem do espaço de busca e voltam em PlanResult.vetoed_actions.
+        candidates = allowed if allowed is not None else list(self._action_effects)
+        vetoed: List[Dict[str, str]] = []
+        for action in candidates:
+            if isinstance(action, str) and action in self.vetoes and all(v["action"] != action for v in vetoed):
+                vetoed.append({"action": action, "reason": self.vetoes[action]})
+        if vetoed:
+            names = {v["action"] for v in vetoed}
+            allowed = [a for a in candidates if a not in names]
         try:
             self._plan_actions = allowed
             self._plan_effects = {}
             self._best_found = None
-            return self._run_plan(goal, initial_state, allowed, max_iterations, start_time)
+            return self._run_plan(goal, initial_state, allowed, max_iterations, start_time, vetoed)
         finally:
             self._plan_actions = None
             self._plan_effects = {}
@@ -417,7 +458,8 @@ class RealMCTSPlanner:
             self._world_rewards = {}
 
     def _run_plan(self, goal: str, initial_state: Dict[str, Any], allowed: Optional[List[str]],
-                  max_iterations: int, start_time: float) -> PlanResult:
+                  max_iterations: int, start_time: float,
+                  vetoed: Optional[List[Dict[str, str]]] = None) -> PlanResult:
         # Criar raiz da árvore
         prefix = len(initial_state.get("steps_taken", []))
         root = MCTSNode(
@@ -467,7 +509,7 @@ class RealMCTSPlanner:
         else:
             success_probability = round(min(1.0, expected_reward * 1.1), 4)
 
-        return PlanResult(
+        result = PlanResult(
             goal=goal,
             best_action_sequence=best_sequence,
             expected_reward=round(expected_reward, 4),
@@ -477,6 +519,8 @@ class RealMCTSPlanner:
             planning_time=round(planning_time, 4),
             success_probability=success_probability
         )
+        result.vetoed_actions = [dict(item) for item in (vetoed or [])]
+        return result
 
     def get_statistics(self) -> Dict:
         """Estatísticas do planejador"""
