@@ -104,7 +104,8 @@ class SC3DeclaredChannelTests(unittest.TestCase):
                 result = world.simulate([a])
                 self.assertIs(result.success, True)
                 self.assertEqual(result.verified_status, "secure")
-                self.assertEqual(result.warnings, [])
+                # Errata E2 (SC3 reaberto): ação declarada fora de ACTION_EFFECTS avisa, sem rejeitar.
+                self.assertEqual(result.warnings, [f"declared intervention for action outside ACTION_EFFECTS: {a!r}"])
                 self.assertEqual(result.claims, [])
 
     def test_invalid_pairs_rejected_and_not_stored(self):
