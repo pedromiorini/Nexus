@@ -2791,3 +2791,45 @@ BS1, BS2 (a e b), BS3 (orçamento ausente/levantando), BS4 (Swarm falho com red 
 1. **Orçamento desabilitado por configuração declarada:** esse conceito **não existe** no código (`RealCognitiveBudgetEnforcer` só tem limites por `ResourceType`); portanto **nenhuma isenção foi criada** (BS3/BS8 fixam isso). Orçamento ausente, que levanta ou sem veredito `True` booleano bloqueia.
 2. **Swarm obrigatório:** **não existe** enum/lista de tipos de decisão de alto risco além de `ETHICAL_DECISION`. Não inventei classificação; estendi apenas a regra já existente do P4 (`ethical_red_flags`) via `EthicsGuard.requires_swarm`, com `ETHICAL_DECISION` como piso. **Reverter = apagar `requires_swarm`** (o guard sem o método volta a ETHICAL-only). Se o Pedro preferir manter só ETHICAL, é o único ponto a remover.
 3. Observações não alteradas: cache devolvido antes do orçamento/jailbreak; plano modificado sem jailbreak não é checado; `allowed is True` estrito.
+
+
+## MCTS — `expected_reward` e `success_probability` refletem a sequência devolvida (pré-registro ER1–ER9)
+Pré-registrado em commit próprio, **antes** de qualquer teste ou código novo. Autorização do Pedro: pt145u ("Prossiga", sobre a lacuna registrada na #136). Base: `main` `d2ffbb2`.
+
+### Fatos lidos antes de escrever (código e contratos, sem rodar critério novo)
+- `RealMCTSPlanner._run_plan` devolve `best_action_sequence` = melhor **sequência completa vista nos rollouts** (`_best_found`), mas `expected_reward` = média do rollout do **melhor filho da raiz** (`best_child.avg_reward`) e `success_probability` = `min(1, 1.1·expected_reward)` desse mesmo número. Com modelo de mundo, a recompensa de uma sequência é **determinística** (`world_model.simulate(sequência)`), então o número devolvido pode descrever outra ação (visto na #136: plano `APPLY_PATCH`, filho de maior média `ESCALATE`/`ISOLATE_SYSTEM`).
+- `test_mcts_planner_extraction_contract.py` (golden do Axis; SHA-256 fixo, `random.seed(20261016)`, **sem** modelo de mundo) fixa o `PlanResult` inteiro, incluindo `expected_reward 0.6333` e `success_probability 0.6967` para `best_action_sequence == ["APPLY_PATCH"]` (cuja recompensa heurística real, pelo cabeçalho do próprio teste, é 0.867). `test_mcts_action_contract.py` exige `expected_reward == 0.0` com ações vazias; `test_mcts_planner_quality_contract.py::test_unknown_custom_action_has_neutral_effects` exige `expected_reward == baseline` para ação desconhecida sem modelo. Esses contratos **não podem ser editados** (regra do Pedro/Axis).
+- Consumidor: `CompleteNexusBrain.think` usa `expected_reward` como `confidence` do plano.
+
+### Hipóteses
+- **H1:** no modo mundo, devolver como `expected_reward` a recompensa determinística da sequência escolhida (utilidade do status final simulado ÷ 3, a mesma função que guia a busca) e derivar `success_probability` desse valor torna os dois campos coerentes com `best_action_sequence`.
+- **H2 (alternativa excluída):** estender o mesmo cálculo ao caminho **sem** modelo. Mudaria `expected_reward` (0.6333 → ≈0.867) e `success_probability` no golden do Axis, que não posso editar. Fica fora; é a **lacuna residual declarada** e exige decisão do Pedro/Axis (re-fixar o golden).
+- **H3 (alternativa excluída):** `success_probability` vir de `simulate(...).success`. É outra semântica (booleano), não "derivada"; fora do escopo.
+
+### Mudança permitida (só `core/cognitivo/mcts_planner.py`, `_run_plan`; mais `tools/cognitivo_mutation.py`, teste novo e docs)
+1. **Modo mundo** (`_uses_world_effects()`): se `best_action_sequence` é vazia, `expected_reward = 0.0` (sem plano, sem recompensa; mesma convenção do caminho atual); senão `expected_reward = _evaluate_world({"steps_taken": passos_iniciais + best_action_sequence})` (cache por sequência já existente, zerado ao fim do `plan()`).
+2. `success_probability` mantém a fórmula atual (`0.0` se alguma ação da sequência é sem efeito conhecido; senão `round(min(1, 1.1·expected_reward), 4)`), agora aplicada ao novo `expected_reward` (derivada, portanto reflete a sequência).
+3. **Sem modelo, ou modelo sem `simulate`:** caminho **byte a byte** igual ao de `main` (golden, `test_mcts_action_contract`, `test_unknown_custom_action_has_neutral_effects`).
+4. `alternative_plans` (média dos rollouts por primeira ação) e `PlanResult` (sem campo novo) não mudam. Fora do escopo: constante 1.1, teto do M3 v2, `simulate` que levanta (propaga).
+
+### Critérios (protocolo ER-v1; seeds `random.Random(20261102 + k)`, k = 0..19, passadas a `random.seed` antes de cada `plan`; referência independente escrita no teste, sem chamar o módulo para calcular o esperado)
+Modelo: `RealWorldModelSimulator()`, `max_depth=3`, `goal="secure the system"`. Subconjunto da seed: `rng = random.Random(seed)`; `pool = ACTION_EFFECTS + ["ZZ_<rng.randrange(10**6)>"]`; `subset = rng.sample(pool, rng.randint(1, 4))`; iterações em `(30, 300)` alternadas por seed.
+- **ER1 coerência (20/20 seeds × ações padrão e subconjunto):** `expected_reward == round(ref_reward(best_action_sequence), 4)` (sequência vazia: `0.0`, regra 1 da mudança permitida) e `success_probability == 0.0` se a sequência contém a ação `ZZ_*`, senão `round(min(1, 1.1·expected_reward), 4)` (referência do `ref_reward`: `ACTION_EFFECTS[...]["world"]` aplicado no teste, utilidade `{secure:3, stable:2, isolated:1, offline:1, vulnerable:1, compromised:0}` ÷ 3).
+- **ER2 independe do filho (20/20):** com ações padrão, `expected_reward == 1.0` (plano `APPLY_PATCH`/`DEPLOY_UPDATE`) mesmo quando `alternative_plans[0]["expected_reward"] != 1.0` (o número do filho **não** vaza para o topo); e a igualdade `expected_reward == alternative_plans[0]["expected_reward"]` **não** é exigida no modo mundo.
+- **ER3 negativos (entrada vazia/ausente/desconhecida; 20/20 cada):** `available_actions=[]` → sequência `[]`, `expected_reward == 0.0`, `success_probability == 0.0`; `available_actions=["ZZ_n"]` → `[ZZ_n]`, `expected_reward == 0.3333`, `success_probability == 0.0`; status `compromised` com `["MONITOR"]` → `[]`, `0.0`, `0.0`; `goal=None` → `ValueError`; `goal=""` aceito e coerente com ER1.
+- **ER4 não vaza entre planos (20/20):** depois de um `plan`, `planner._world_rewards == {}` e `world_model.current_state.state` intacto; um segundo `plan` depois de trocar o status do modelo usa o status novo.
+- **ER5 estrutura intacta (20/20):** `alternative_plans` tem ≤ 3 itens com chaves `first_action`/`expected_reward`/`visits`, `first_action` ∈ ações permitidas; `PlanResult` mantém exatamente os 8 campos atuais.
+- **ER6 sem modelo inalterado (20/20):** `RealMCTSPlanner(max_depth=3)` (sem modelo): `expected_reward == alternative_plans[0]["expected_reward"]` (semântica atual, documentada) e o golden de extração passa **sem edição**.
+- **ER7 integrado (5 seeds):** o `mcts_planner` de um `CompleteNexusBrain` real (modelo ligado) planeja `"secure the system"` com `expected_reward == round(ref_reward(sequência), 4)`.
+- **ER8 tempo:** p95 de `plan(200)` com o modelo, `max_depth=5`, 20 execuções ≤ 0.10 s (o MW8, sem edição, também exige).
+- **ER9 não regressão:** `test_mcts_world_effects_contract.py` (MW1–MW12), `test_mcts_planner_quality_contract.py`, `test_mcts_action_contract.py`, `test_mcts_planner_extraction_contract.py` (golden) e `test_mcts_planner_input_contract.py` passam **sem edição**; `eval_mcts` M1, M2, M4, M5 passam (M3 v2 segue como em `main`, teto fora do escopo); suíte em 3.11 e 3.12; `cognitivo_mutation` e `targeted_mutation` (ferramenta sem edição) sem sobreviventes; `claims: []` ao final.
+
+### Previsão do RED
+Falhas **comportamentais** (asserções), sem `AttributeError` (nenhuma API nova): ER1 e ER2 em quase todas as seeds (o topo vem do filho, ≈0.63–0.66, não 1.0), ER3 só nos casos em que a ação padrão/`[]` diverge (a parte de `[]` e `ZZ` única tende a passar: filho == sequência), ER4–ER6 passam (previstos como não regressão), ER7 falha, ER8 passa.
+
+### Riscos declarados (não são critérios)
+- `confidence` do cérebro (= `expected_reward`) sobe para 1.0 em planos que o simulador leva a `secure`: é uma recompensa **determinística de utilidade**, não probabilidade calibrada; a constante 1.1 e a fórmula de `success_probability` continuam heurísticas.
+- Os campos do topo e `alternative_plans[*].expected_reward` passam a ter semânticas diferentes no modo mundo (valor da sequência × média de rollouts do filho); fica documentado aqui, sem renomear campo.
+- Sem modelo a lacuna **continua** (H2); decisão do Pedro/Axis: re-fixar o golden para estender o conserto.
+
+`docs/agentes/CLAIMS.yaml` abre um claim com prazo neste commit e volta a `claims: []` no commit de resultados.
