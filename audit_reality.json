@@ -72,9 +72,9 @@
       },
       {
         "path": "core/cognitivo/mcts_planner.py",
-        "lines": 446,
+        "lines": 483,
         "classes": 3,
-        "functions": 19
+        "functions": 22
       },
       {
         "path": "core/cognitivo/mental_simulation.py",

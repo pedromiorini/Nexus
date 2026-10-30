@@ -118,6 +118,7 @@ class MCTSWorldEffectsContractTests(unittest.TestCase):
                 wm.current_state.state["system_status"] = "compromised"
                 r = planner.plan(GOAL, available_actions=["MONITOR"], max_iterations=50)
                 self.assertEqual(r.expected_reward, 0.0)
+                self.assertEqual(r.best_action_sequence, [])
 
     def test_mw9_model_without_simulate_keeps_the_numeric_path(self):
         # Acrescentado após o RED (guiado pelo mutante mw_world_forced_without_simulate): dublê só com current_state.
@@ -130,6 +131,39 @@ class MCTSWorldEffectsContractTests(unittest.TestCase):
                 got = RealMCTSPlanner(world_model=Stub(), max_depth=3).plan(GOAL, max_iterations=100)
                 self.assertEqual(got.expected_reward, 0.5)
                 self.assertEqual(got.success_probability, 0.55)
+
+    def test_mw10_unknown_status_scores_zero(self):
+        # Acrescentado após o RED (mutante mw_unknown_status_scores_high).
+        wm = RealWorldModelSimulator()
+        wm.current_state.state["system_status"] = "weird"
+        random.seed(SEEDS[0])
+        r = RealMCTSPlanner(world_model=wm, max_depth=2).plan(GOAL, available_actions=["MONITOR"], max_iterations=30)
+        self.assertEqual(r.expected_reward, 0.0)
+        self.assertEqual(r.best_action_sequence, [])
+
+    def test_mw11_tie_break_only_in_world_mode(self):
+        # Acrescentado após o RED (mutante mw_tie_applies_without_model).
+        for model, expected in ((True, ["A"]), (False, ["A", "B"])):
+            with self.subTest(model=model):
+                planner = RealMCTSPlanner(world_model=RealWorldModelSimulator() if model else None)
+                planner._record_found(0.7, {"steps_taken": ["A", "B"]})
+                planner._record_found(0.7, {"steps_taken": ["A"]})
+                planner._record_found(0.7, {"steps_taken": ["C", "D", "E"]})
+                self.assertEqual(planner._best_found, (0.7, expected))
+                planner._record_found(0.8, {"steps_taken": ["X", "Y"]})
+                self.assertEqual(planner._best_found, (0.8, ["X", "Y"]))
+
+    def test_mw12_any_unmodeled_action_zeroes_success(self):
+        # Acrescentado após o RED (mutante mw_unmodeled_requires_all).
+        for model in (True, False):
+            with self.subTest(model=model):
+                random.seed(SEEDS[0])
+                planner = RealMCTSPlanner(world_model=RealWorldModelSimulator() if model else None, max_depth=3)
+                planner._best_found = (9.0, ["APPLY_PATCH", "ZZ_unmodeled"])
+                r = planner._run_plan(GOAL, planner._get_initial_state(GOAL), ["APPLY_PATCH"], 5, time.time())
+                self.assertEqual(r.best_action_sequence, ["APPLY_PATCH", "ZZ_unmodeled"])
+                self.assertGreater(r.expected_reward, 0.0)
+                self.assertEqual(r.success_probability, 0.0)
 
     def test_mw8_planning_time_p95(self):
         times = []
