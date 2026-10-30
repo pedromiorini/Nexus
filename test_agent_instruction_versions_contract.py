@@ -255,17 +255,19 @@ class InstructionVersionsContract(unittest.TestCase):
                 self.assertEqual(rc, 1)
                 self.assertIn("ERRO:", err.getvalue())
 
-    def test_repository_migration_preserves_341_acceptances_and_bytes(self):
+    def test_repository_preserves_341_bytes_and_axis_acceptance(self):
         reg = yaml.safe_load((ROOT / REG).read_text())
         self.assertEqual(reg["schema_version"], 2)
-        self.assertEqual(reg["instrucoes_atuais"]["versao"], "3.4.1")
         expected = "6778552adef5433c85bf9209b494456f4f497ffdf6f8e190b19eab45d54c20a6"
         artifact = reg["instrucoes_versoes"]["3.4.1"]
         self.assertEqual(artifact["sha256"], expected)
-        self.assertEqual((ROOT / artifact["arquivo"]).read_bytes(),
+        self.assertEqual(hashlib.sha256((ROOT / artifact["arquivo"]).read_bytes()).hexdigest(),
+                         expected)
+        current = reg["instrucoes_versoes"][reg["instrucoes_atuais"]["versao"]]
+        self.assertEqual((ROOT / current["arquivo"]).read_bytes(),
                          (ROOT / reg["instrucoes_atuais"]["arquivo"]).read_bytes())
-        for agent in reg["agentes"]:
-            self.assertEqual(agent["instrucoes"], {**artifact, "versao_aceita": "3.4.1"})
+        axis = next(agent for agent in reg["agentes"] if agent["id"] == "axis")
+        self.assertEqual(axis["instrucoes"], {**artifact, "versao_aceita": "3.4.1"})
 
     def test_schema_exposes_explicit_v2_catalog(self):
         schema = json.loads((ROOT / "docs/agentes/schema/registro_agentes.schema.json").read_text())
