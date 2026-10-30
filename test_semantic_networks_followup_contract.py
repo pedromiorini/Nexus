@@ -193,6 +193,37 @@ class F4F5Atomic(unittest.TestCase):
         self.assertEqual(broken.spread_activation(3), fresh.spread_activation(3))
 
 
+class _Boom:
+    """Força que levanta um erro que não é TypeError quando multiplicada."""
+
+    def __init__(self, error):
+        self.error = error
+
+    def __rmul__(self, other):
+        raise self.error
+
+
+class _Interrupt(BaseException):
+    pass
+
+
+class F5AnyException(unittest.TestCase):
+    """Rollback vale para qualquer exceção, inclusive BaseException (acrescentado no GREEN para os mutantes)."""
+
+    def _check(self, error):
+        system = _build([("A", "x", "B", 0.5), ("B", "x", "C", _Boom(error))], "ABC", {"A": 1.0})
+        before = _state(system)
+        with self.assertRaises(type(error)):
+            system.spread_activation(3)
+        self.assertEqual(_state(system), before)
+
+    def test_runtime_error_in_iteration_2_rolls_back(self):
+        self._check(RuntimeError("boom"))
+
+    def test_base_exception_in_iteration_2_rolls_back(self):
+        self._check(_Interrupt())
+
+
 class F6Saturation(unittest.TestCase):
     def test_full_target_with_plus_and_minus_stays_at_point_nine(self):
         # A->B +1.0 -> +0.7; C->B -1.0 -> -0.7; B começa em 1.0: min(1, 1.0 + 0.7 - 0.7) = 1.0, menos 0.1

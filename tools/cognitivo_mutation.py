@@ -83,6 +83,7 @@ EW = "core/cognitivo/emotional_memory_weighting.py"
 EW_TESTS = ("test_emotional_memory_weighting_contract.py",)
 SN = "core/cognitivo/semantic_networks.py"
 SN_TESTS = ("test_semantic_networks_contract.py",)
+SN_FU_TESTS = SN_TESTS + ("test_semantic_networks_followup_contract.py",)
 
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
@@ -1420,9 +1421,9 @@ MUTATIONS = [
     Mutation('sn_inherit_mutates_own_properties', SN, 'inherited = concept.properties.copy()', 'inherited = concept.properties', tests=SN_TESTS),
     Mutation('sn_inherit_deep_copies', SN, 'inherited = concept.properties.copy()', "inherited = __import__('copy').deepcopy(concept.properties)", tests=SN_TESTS),
     Mutation('sn_inherit_parent_overrides', SN, 'if key not in inherited:', 'if True:', tests=SN_TESTS),
-    Mutation('sn_inherit_ignores_parents', SN, 'parent_concepts = self.get_related_concepts(concept_label, "IS-A")', 'parent_concepts = []', tests=SN_TESTS),
-    Mutation('sn_inherit_any_relation', SN, 'parent_concepts = self.get_related_concepts(concept_label, "IS-A")', 'parent_concepts = self.get_related_concepts(concept_label)', tests=SN_TESTS),
-    Mutation('sn_inherit_not_recursive', SN, 'parent_props = self._inherit(parent.label, path)', 'parent_props = parent.properties', tests=SN_TESTS),
+    Mutation('sn_inherit_ignores_parents', SN, 'pending = [iter(self.get_related_concepts(concept_label, "IS-A"))]', 'pending = []', tests=SN_FU_TESTS),
+    Mutation('sn_inherit_any_relation', SN, 'pending = [iter(self.get_related_concepts(concept_label, "IS-A"))]', 'pending = [iter(self.get_related_concepts(concept_label))]', tests=SN_FU_TESTS),
+    Mutation('sn_inherit_not_recursive', SN, 'pending.append(iter(self.get_related_concepts(parent.label, "IS-A")))', 'pass', tests=SN_FU_TESTS),
     Mutation('sn_verify_case_sensitive', SN, 'if label.lower() == target:', 'if label == target:', tests=SN_TESTS),
     Mutation('sn_verify_identity_false', SN, 'return True\n\n            # Ciclo IS-A', 'return False\n\n            # Ciclo IS-A', tests=SN_TESTS),
     Mutation('sn_verify_any_relation', SN, 'self.get_related_concepts(label, "IS-A"))', 'self.get_related_concepts(label))', tests=SN_TESTS),
@@ -1448,13 +1449,22 @@ MUTATIONS = [
     Mutation('sn_spread_applies_in_place', SN, 'incoming.setdefault(relation.target_id, []).append(spread_amount)', 'target.activation = min(1.0, target.activation + spread_amount)', tests=SN_TESTS),
     Mutation('sn_spread_decay_before_apply', SN, '            # Soma em ordem canônica e limite 1.0 uma vez por alvo\n', '            for concept in self.concepts.values():\n                concept.activation = max(0.0, concept.activation - self.activation_decay)\n            # Soma em ordem canônica e limite 1.0 uma vez por alvo\n', tests=SN_TESTS),
     Mutation('sn_spread_target_from_zero', SN, 'min(1.0, start[target_id] + sum(sorted(amounts)))', 'min(1.0, sum(sorted(amounts)) + 0.0)', tests=SN_TESTS),
-    Mutation('sn_inherit_path_not_updated', SN, 'path = path | {concept.concept_id}', 'path = path', tests=SN_TESTS),
-    Mutation('sn_inherit_cycle_check_dropped', SN, 'if self._find_or_create_concept(parent.label).concept_id in path:\n                continue', 'if False:\n                continue', tests=SN_TESTS),
-    Mutation('sn_inherit_cycle_stops_all_parents', SN, 'concept_id in path:\n                continue', 'concept_id in path:\n                return inherited', tests=SN_TESTS),
-    Mutation('sn_inherit_path_reset', SN, 'parent_props = self._inherit(parent.label, path)', 'parent_props = self._inherit(parent.label, frozenset())', tests=SN_TESTS),
-    Mutation('sn_inherit_cycle_skip_by_label', SN, 'if self._find_or_create_concept(parent.label).concept_id in path:', 'if parent.label == concept_label:', tests=SN_TESTS),
+    Mutation('sn_inherit_cycle_stops_all_parents', SN, 'if node.concept_id in visited:\n                continue', 'if node.concept_id in visited:\n                break', tests=SN_FU_TESTS),
     Mutation('sn_verify_cycle_returns_true', SN, 'if label.lower() in visited:\n                continue', 'if label.lower() in visited:\n                return True', tests=SN_TESTS),
     Mutation('sn_verify_cycle_returns_false', SN, 'if label.lower() in visited:\n                continue', 'if label.lower() in visited:\n                return False', tests=SN_TESTS),
+    Mutation('sn_inherit_parent_any_relation', SN, 'pending.append(iter(self.get_related_concepts(parent.label, "IS-A")))', 'pending.append(iter(self.get_related_concepts(parent.label)))', tests=SN_FU_TESTS),
+    Mutation('sn_inherit_root_not_visited', SN, 'visited = {concept.concept_id}', 'visited = set()', tests=SN_FU_TESTS),
+    Mutation('sn_inherit_expansion_reversed', SN, 'pending.append(iter(self.get_related_concepts(parent.label, "IS-A")))', 'pending.append(iter(reversed(self.get_related_concepts(parent.label, "IS-A"))))', tests=SN_FU_TESTS),
+    Mutation('sn_inherit_root_parents_reversed', SN, 'pending = [iter(self.get_related_concepts(concept_label, "IS-A"))]', 'pending = [iter(reversed(self.get_related_concepts(concept_label, "IS-A")))]', tests=SN_FU_TESTS),
+    Mutation('sn_inherit_parent_props_dropped', SN, 'for key, value in node.properties.items():', 'for key, value in {}.items():', tests=SN_FU_TESTS),
+    Mutation('sn_inherit_stops_at_first_exhausted_iterator', SN, 'if parent is None:\n                pending.pop()\n                continue', 'if parent is None:\n                break', tests=SN_FU_TESTS),
+    Mutation('sn_spread_rollback_dropped', SN, 'self.concepts[cid].activation = activation', 'pass', tests=SN_FU_TESTS),
+    Mutation('sn_spread_rollback_partial', SN, 'for cid, activation in snapshot.items():', 'for cid, activation in list(snapshot.items())[:1]:', tests=SN_FU_TESTS),
+    Mutation('sn_spread_rollback_zeroes', SN, 'self.concepts[cid].activation = activation', 'self.concepts[cid].activation = 0.0', tests=SN_FU_TESTS),
+    Mutation('sn_spread_rollback_only_exception', SN, 'except BaseException:', 'except Exception:', tests=SN_FU_TESTS),
+    Mutation('sn_spread_rollback_only_type_error', SN, 'except BaseException:', 'except TypeError:', tests=SN_FU_TESTS),
+    Mutation('sn_spread_error_swallowed', SN, '            raise\n\n    def _spread_iterations', '            return {}\n\n    def _spread_iterations', tests=SN_FU_TESTS),
+    Mutation('sn_spread_error_replaced', SN, '            raise\n\n    def _spread_iterations', '            raise RuntimeError("spread failed")\n\n    def _spread_iterations', tests=SN_FU_TESTS),
     Mutation('sn_verify_first_parent_only', SN, 'pending.extend(parent.label for parent in self.get_related_concepts(label, "IS-A"))', 'pending.extend([parent.label for parent in self.get_related_concepts(label, "IS-A")][:1])', tests=SN_TESTS),
     Mutation('sn_verify_target_case_sensitive', SN, 'target = ancestor_label.lower()', 'target = ancestor_label', tests=SN_TESTS),
     Mutation("sn_module_pulls_monolith", SN, "import uuid\n",
