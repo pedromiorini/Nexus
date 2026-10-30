@@ -4,7 +4,7 @@
 commit: HEAD
 ci_run: CURRENT_RUN
 tests: CURRENT_TESTS
-bandit_low: 138
+bandit_low: 139
 -->
 
 > This is a conservative inventory, not a clearance report. Findings remain open until reviewed and fixed or explicitly justified.
