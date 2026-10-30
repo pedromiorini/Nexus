@@ -2916,3 +2916,26 @@ Qualquer critério (SN1, SN2, SN3, SN3b, SN4, SN4b, SN5 não afetado, a verifica
 ### Claim
 
 `docs/agentes/CLAIMS.yaml` aberto neste commit (agente `grok-bot`, 72 h); volta a `claims: []` no commit de resultados.
+
+### Resultados (SN1–SN6, SN3b, SN4b; GREEN em 55f8cce)
+
+Todos os critérios pré-registrados passaram no GREEN; nenhuma condição de parada foi acionada e a errata E1 não foi reaberta.
+
+| critério | RED (previsto = obtido) | GREEN |
+|---|---|---|
+| SN1 | 114/120 | **120/120** (referência síncrona; riqueza igual) |
+| SN2 | passa | passa (1,0) |
+| SN3 | 0/20 | **20/20** |
+| SN3b | 0/20 | **20/20** |
+| SN4 | 0/20 (`RecursionError`) | **20/20** |
+| SN4b | 0/20 (`RecursionError`) | **20/20** |
+| SN5 | falhava só em `spread` e `cycles` | passa (valores da errata, `hits` todos verdadeiros) |
+| SN6 | vermelho até re-fixar | passa: `SN_SOURCE_SHA = 4ba90214…`, `SN_BEHAVIOR_SHA = 9e987822…` (3.11 = 3.12) |
+
+Verificação do fingerprint × `main` (`c9cf359`), com o harness novo e a classe antiga carregada de `git show`: difere **exatamente** em 6 digests de linha (`18, 53, 65, 83, 91, 108`), `spread.forward_1/forward_3`, `cycles` (`verify_absent`, `inherit`, `self_inherit`, `self_verify_absent`) e nas famílias SN3/SN4 (mais SN3b/SN4b, que só existem no harness novo). O resto do fingerprint é idêntico.
+
+Mutantes (`tools/cognitivo_mutation.py`): catálogo 697/697 mortos, 0 sobreviventes, 0 não aplicados. 11 âncoras de mutantes `sn_*` existentes foram **reapontadas** para as linhas novas (mesma intenção) e 18 mutantes novos foram adicionados (`sn_spread_snapshot_once`, `_sum_unsorted`, `_sum_keeps_last`, `_sum_keeps_max`, `_incoming_overwritten`, `_cap_per_contribution`, `_applies_in_place`, `_decay_before_apply`, `_target_from_zero`; `sn_inherit_path_not_updated`, `_cycle_check_dropped`, `_cycle_stops_all_parents`, `_path_reset`, `_cycle_skip_by_label`; `sn_verify_cycle_returns_true`, `_cycle_returns_false`, `_first_parent_only`, `_target_case_sensitive`). `targeted_mutation` 80/80 (arquivo não editado). Equivalentes documentados, **fora** do catálogo: ler a ativação da fonte/alvo ao vivo em vez do snapshot (as ativações só mudam depois do laço de relações; equivale ao snapshot) e variantes que removem o conjunto de visitados (não terminam; só morreriam pelo timeout de 180 s).
+
+Desvios: (1) um teste **meu** do arquivo novo (`test_self_loop_and_unknown_relation_endpoints`) tinha a expectativa calculada errada (0.8): a derivação correta com o autolaço é `min(1, 0.9 + 0.63) = 1.0`, menos 0.1 = **0.9**; corrigi o teste (não é critério registrado); (2) 11 âncoras de mutantes reapontadas (acima); (3) o docstring do módulo (fora do bloco hasheado) deixou de dizer "move-only/byte-idêntico".
+
+`claims: []` restaurado neste commit.
