@@ -2765,6 +2765,9 @@ Nenhum outro teste é editado; `test_central_router_contract.py` e todos os test
 - **BS9 contrato:** `test_central_router_contract.py` passa sem edição; RT1–RT8 e RT9–RT14 passam (com a errata E2 e a errata E1 anterior); assinatura de `_aggregate_results` `(self, results, request_type, context)`; chaves do bloqueio (`success`, `error`, `reason`, `prompt`, `degraded`, `failed_modules`, `failed_modules_detail`, `request_type`).
 - **BS10 sem regressão:** suíte completa 3.11 e 3.12, `ruff`, `compileall`, `reality_audit` + `git diff --exit-code`, cobertura (monólito ≥ 62, `core/cognitivo` ≥ 90), `cognitivo_mutation` e `targeted_mutation` sem sobreviventes (`tools/targeted_mutation.py` não editado), Bandit/triage/asserts/gaps, `validar_registro`, `claims: []` ao final.
 
+### Errata E3 (declarada **antes** do RED, depois de reler `think()`)
+O BS7(a) como escrito («orçamento real esgotado → `think()` devolve `BUDGET_DENIED`») não é mensurável: `think()` tem a **própria** checagem de orçamento (PHASE 5, `self.budget.request_budget`) que devolve `BUDGET_EXCEEDED` **antes** de chamar o roteador. O BS7(a) passa a ser medido no **roteador**: `RealCognitiveBudgetEnforcer` real como módulo `BUDGET`, com `usage` no limite → `BUDGET_DENIED`; e, com o uso zerado, a requisição passa. O BS7(b) e (c) ficam como escritos (o módulo de orçamento trocado só no roteador). Nenhum limite, seed ou expectativa dos demais critérios muda; a previsão do RED para BS7(a) segue «passa» (comportamento atual).
+
 ### Previsão do RED
 BS1, BS2 (a e b), BS3 (orçamento ausente/levantando), BS4 (Swarm falho com red flag), BS5 (b, c-passa, d, e), BS6 e BS7 (b) falham de forma **comportamental** (hoje `success True`); BS5 (e) e BS8 (`requires_swarm`) falham por `AttributeError` (API nova, inevitável: é o próprio critério). BS5 (a), (c), a parte `False`→`DENIED`, BS7 (a) e (c), BS9 e BS10 passam no RED (comportamento atual). Erro de previsão será registrado, sem ajuste de critério.
 
