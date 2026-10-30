@@ -163,6 +163,13 @@ class BrainTests(unittest.TestCase):
                 self.assertEqual(r["vetoed_actions"], [])
                 self.assertIn(r["best_future"], (0, 1))
 
+    def test_b5_vetoed_actions_from_planner_and_from_later_steps(self):
+        r = self._think([["SHUTDOWN_SERVICE"]])  # uma só ação: não há comparação; vale o veto do planejador
+        self.assertEqual([v["action"] for v in r["vetoed_actions"]], ["SHUTDOWN_SERVICE"])
+        r = self._think([["MONITOR", "IGNORE_ALERT"], ["MONITOR"]])  # só a comparação vê o passo vetado
+        self.assertEqual(r["best_future"], 1)
+        self.assertEqual([v["action"] for v in r["vetoed_actions"]], ["IGNORE_ALERT"])
+
     def test_b5_disabled_vetoes_in_the_brain_planner(self):
         saved = self.brain.mcts_planner.vetoes
         self.brain.mcts_planner.vetoes = {}
@@ -193,6 +200,19 @@ class BrainTests(unittest.TestCase):
         self.assertEqual(out["vetoed_actions"], [])
         self.assertEqual(out["best_future_index"], 0)
 
+    def test_b7_router_uses_the_planner_vetoes(self):
+        from core.constitutional_brain import ModuleType
+        planner = self.brain.router.modules[ModuleType.MCTS_PLANNER]
+        saved = planner.vetoes
+        planner.vetoes = {"monitor": "só neste teste"}
+        try:
+            out = self.brain.router._invoke_module(ModuleType.WORLD_MODEL, self.brain.world_model, "p",
+                                                   {"possible_actions": [["MONITOR"], ["IGNORE_ALERT"]]})
+        finally:
+            planner.vetoes = saved
+        self.assertEqual(out["best_future_index"], 1)
+        self.assertEqual(out["vetoed_actions"], [{"action": "MONITOR", "reason": "só neste teste"}])
+
 
 class D1DeclaredSuccessTests(unittest.TestCase):
     def test_declared_secure_action_does_not_reach_full_success(self):
@@ -221,6 +241,13 @@ class D1DeclaredSuccessTests(unittest.TestCase):
         r = planner._run_plan(GOAL, planner._get_initial_state(GOAL), ["AAA_DECL"], 5, 0.0)
         self.assertEqual(r.success_probability, 0.0)
 
+    def test_declared_action_after_a_table_action_is_capped(self):
+        planner = RealMCTSPlanner(world_model=_wm(_declared()), max_depth=3)
+        planner._best_found = (9.0, ["APPLY_PATCH", "AAA_DECL"])
+        r = planner._run_plan(GOAL, planner._get_initial_state(GOAL), ["AAA_DECL"], 5, 0.0)
+        self.assertEqual(r.expected_reward, 1.0)
+        self.assertEqual(r.success_probability, 0.9)
+
     def test_cap_only_lowers(self):
         for seed in SEEDS_D:
             with self.subTest(seed=seed):
@@ -243,6 +270,11 @@ class D1DeclaredSuccessTests(unittest.TestCase):
                 random.seed(seed)
                 r = RealMCTSPlanner(world_model=Double(), max_depth=3).plan(GOAL, available_actions=["MONITOR"],
                                                                             max_iterations=50)
+                self.assertEqual(r.success_probability, 1.0)
+                random.seed(seed)  # fora da tabela e sem is_modeled: decide o aviso do simulador, sem teto
+                r = RealMCTSPlanner(world_model=Double(), max_depth=3).plan(GOAL, available_actions=["CUSTOM_X"],
+                                                                            max_iterations=50)
+                self.assertEqual(r.best_action_sequence, ["CUSTOM_X"])
                 self.assertEqual(r.success_probability, 1.0)
 
 
