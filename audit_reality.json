@@ -90,7 +90,7 @@
       },
       {
         "path": "core/cognitivo/semantic_networks.py",
-        "lines": 381,
+        "lines": 399,
         "classes": 3,
         "functions": 12
       },
