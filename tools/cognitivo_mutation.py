@@ -60,6 +60,7 @@ CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
 MW_TESTS = ("test_mcts_world_effects_contract.py",)
+ER_TESTS = ("test_mcts_expected_reward_contract.py",)
 
 PC_LEARNING = ("test_predictive_learning_contract.py",)
 
@@ -202,6 +203,24 @@ MUTATIONS = [
              "return False", tests=MW_TESTS),
     Mutation("mw_world_forced_without_simulate", MCTS,
              'callable(getattr(self.world_model, "simulate", None))', "True", tests=MW_TESTS),
+    Mutation("er_reward_from_best_child", MCTS,
+             "        if self._uses_world_effects():\n            # Modo mundo: a recompensa da sequência",
+             "        if False:\n            # Modo mundo: a recompensa da sequência", tests=ER_TESTS),
+    Mutation("er_empty_sequence_scored", MCTS, "                if best_sequence else 0.0",
+             "                if True else 0.0", tests=ER_TESTS),
+    Mutation("er_scores_only_first_action", MCTS, '"steps_taken": list(initial_state.get("steps_taken", [])) + best_sequence})',
+             '"steps_taken": list(initial_state.get("steps_taken", [])) + best_sequence[:1]})', tests=ER_TESTS),
+    Mutation("er_ignores_initial_steps", MCTS, 'self._evaluate_world({"steps_taken": list(initial_state.get("steps_taken", [])) + best_sequence})',
+             'self._evaluate_world({"steps_taken": best_sequence})', tests=ER_TESTS),
+    Mutation("er_world_reward_applies_without_model", MCTS,
+             "        if self._uses_world_effects():\n            # Modo mundo: a recompensa da sequência",
+             "        if True:\n            # Modo mundo: a recompensa da sequência",
+             tests=ER_TESTS + MCTS_TESTS + MCTS_QUALITY + MCTS_INPUT),
+    Mutation("er_success_from_best_child", MCTS, "success_probability = round(min(1.0, expected_reward * 1.1), 4)",
+             "success_probability = round(min(1.0, (best_child.avg_reward if best_child else 0.0) * 1.1), 4)",
+             tests=ER_TESTS),
+    Mutation("er_success_without_cap", MCTS, "success_probability = round(min(1.0, expected_reward * 1.1), 4)",
+             "success_probability = round(expected_reward * 1.1, 4)", tests=ER_TESTS),
     Mutation("mcts_backprop_skips_reward", MCTS,
              "current.total_reward += reward", "current.total_reward += 0.0", tests=MCTS_TESTS),
     Mutation("mcts_depth_limit_off_by_one", MCTS,

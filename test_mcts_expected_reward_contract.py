@@ -135,6 +135,26 @@ class MCTSExpectedRewardContractTests(unittest.TestCase):
                 self.assertTrue(r.best_action_sequence)
                 self.assertEqual(r.expected_reward, round(ref_reward(r.best_action_sequence), 4))
 
+    def test_er_whitebox_reward_scores_initial_steps_and_whole_returned_suffix(self):
+        """Guiado pelos mutantes er_ignores_initial_steps e er_scores_only_first_action: pela API pública a melhor
+        sequência é sempre de 1 ação sem passos iniciais (o último status vence e o empate prefere menos passos),
+        então a regra "passos iniciais + sequência inteira devolvida" só é observável chamando `_run_plan`."""
+        cases = (
+            (["APPLY_PATCH"], ["APPLY_PATCH", "ESCALATE"], ["ESCALATE"]),
+            (["APPLY_PATCH"], ["APPLY_PATCH", "ESCALATE", "ISOLATE_SYSTEM"], ["ESCALATE", "ISOLATE_SYSTEM"]),
+        )
+        for initial_steps, found, suffix in cases:
+            with self.subTest(initial_steps=initial_steps, suffix=suffix):
+                planner = RealMCTSPlanner(world_model=RealWorldModelSimulator(), max_depth=3)
+                state = {"steps_taken": list(initial_steps)}
+                planner._best_found = (0.0, list(found))
+                try:
+                    r = planner._run_plan(GOAL, state, None, 0, time.time())
+                finally:
+                    planner._world_rewards = {}
+                self.assertEqual(r.best_action_sequence, suffix)
+                self.assertEqual(r.expected_reward, round(ref_reward(found), 4))
+
     def test_er8_planning_time_p95(self):
         times = []
         for seed in SEEDS:
