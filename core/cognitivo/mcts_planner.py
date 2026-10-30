@@ -450,6 +450,12 @@ class RealMCTSPlanner:
                          else self._extract_best_sequence(root))
         best_child = max(root.children, key=lambda c: c.avg_reward) if root.children else None
         expected_reward = best_child.avg_reward if best_child else 0.0
+        if self._uses_world_effects():
+            # Modo mundo: a recompensa da sequência devolvida é determinística (simulate), não a média do filho.
+            expected_reward = (
+                self._evaluate_world({"steps_taken": list(initial_state.get("steps_taken", [])) + best_sequence})
+                if best_sequence else 0.0
+            )
         alternatives = self._extract_alternatives(root)
 
         planning_time = time.time() - start_time
