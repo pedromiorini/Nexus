@@ -6138,7 +6138,7 @@ def eval_emotional_memory(criteria="v1"):
 
 # ── Semantic Networks (POST26): amostragem e referência independentes do bloco ──
 
-SN_SOURCE_SHA = "4ba902140f4d5ee49c34f585ed5961ec0cfb44bcb2453e0b178d6011331575ec"
+SN_SOURCE_SHA = "c0c0465ed64340f818224c1ca961ff5db63e8382a3fb29b81008db87ab0474e8"  # re-fixado no GREEN do seguimento do Marcus (errata declarada antes do RED)
 SN_BEHAVIOR_SHA = "9e98782252e9b7eab5c57060fb7fb7c21bca50c33448c1efa47dfa8319a5ba02"  # re-fixado uma vez no GREEN da errata E1 (3.11 e 3.12 idênticos)
 _SN_MARKER = "# MÓDULO 26: SEMANTIC NETWORKS SYSTEM (POST 26)"
 _SN_END = '            "avg_activation": sum(c.activation for c in self.concepts.values()) / max(1, len(self.concepts))\n        }'

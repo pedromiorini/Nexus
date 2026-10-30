@@ -196,12 +196,25 @@ n's Semantic Networks (1968)
         Spreading Activation: ativação se propaga de nós ativos
         para nós conectados, com decay.
         
+        Atômica: se qualquer exceção ocorrer em qualquer iteração, as ativações
+        voltam ao valor que tinham antes da chamada e a exceção é relançada.
+        
         Args:
             iterations: Número de iterações
         
         Returns:
             Dict de conceitos ativados
         """
+        snapshot = {cid: c.activation for cid, c in self.concepts.items()}
+        try:
+            return self._spread_iterations(iterations)
+        except BaseException:
+            for cid, activation in snapshot.items():
+                self.concepts[cid].activation = activation
+            raise
+
+    def _spread_iterations(self, iterations: int) -> Dict[str, float]:
+        """Corpo de spread_activation (sem rollback)."""
         for _ in range(iterations):
             # Síncrono: toda relação lê a ativação do início da iteração
             start = {cid: c.activation for cid, c in self.concepts.items()}
@@ -276,35 +289,40 @@ n's Semantic Networks (1968)
         Property Inheritance: conceitos herdam propriedades
         de conceitos superiores na hierarquia IS-A.
         
+        Iterativo (pilha explícita, sem limite de profundidade) e com um único
+        conjunto de visitados por consulta: cada conceito é expandido no máximo
+        uma vez, inclusive em ciclos IS-A e em losangos. Propriedades próprias
+        primeiro; depois os pais na ordem das relações; pai não sobrescreve.
+        
         Args:
             concept_label: Label do conceito
         
         Returns:
             Propriedades herdadas
         """
-        return self._inherit(concept_label, frozenset())
-
-    def _inherit(self, concept_label: str, path: frozenset) -> Dict[str, Any]:
-        """Herança com o caminho atual: um nó já no caminho (ciclo IS-A) é pulado."""
         # Encontrar conceito
         concept = self._find_or_create_concept(concept_label)
-        path = path | {concept.concept_id}
+        visited = {concept.concept_id}
 
         # Propriedades próprias
         inherited = concept.properties.copy()
 
-        # Buscar relações IS-A
-        parent_concepts = self.get_related_concepts(concept_label, "IS-A")
-
-        # Herdar recursivamente
-        for parent in parent_concepts:
-            if self._find_or_create_concept(parent.label).concept_id in path:
+        # Pilha de iteradores sobre os pais (relações IS-A) de cada nó em expansão
+        pending = [iter(self.get_related_concepts(concept_label, "IS-A"))]
+        while pending:
+            parent = next(pending[-1], None)
+            if parent is None:
+                pending.pop()
                 continue
-            parent_props = self._inherit(parent.label, path)
+            node = self._find_or_create_concept(parent.label)
+            if node.concept_id in visited:
+                continue
+            visited.add(node.concept_id)
             # Propriedades do pai são default (não sobrescrevem)
-            for key, value in parent_props.items():
+            for key, value in node.properties.items():
                 if key not in inherited:
                     inherited[key] = value
+            pending.append(iter(self.get_related_concepts(parent.label, "IS-A")))
 
         return inherited
 
