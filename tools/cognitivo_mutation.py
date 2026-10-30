@@ -336,7 +336,7 @@ MUTATIONS = [
              "adjacency.get(action.lower(), ())", tests=R4_TESTS),
     # SC1–SC8: texto livre não forja sucesso (WORLD_SCHEMA, claims não verificadas)
     Mutation("sc_claim_promotes_success", CAUSAL, 'success = verified.get("system_status") in',
-             'success = state.state.get("system_status") in', tests=SC_TESTS),
+             'success = state.state.get("system_status") in', tests=SC_TESTS + IJ_TESTS),
     Mutation("sc_verified_status_from_state", CAUSAL, 'verified_status=verified.get("system_status")',
              'verified_status=state.state.get("system_status")', tests=SC_TESTS),
     Mutation("sc_claim_updates_verified", CAUSAL, "                state.state.update(claims)\n",
