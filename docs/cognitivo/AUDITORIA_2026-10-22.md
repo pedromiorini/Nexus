@@ -2775,3 +2775,19 @@ BS1, BS2 (a e b), BS3 (orçamento ausente/levantando), BS4 (Swarm falho com red 
 - `allowed is True` estrito: um orçamento externo que devolva truthy não booleano passa a ser bloqueado (o único em `main` devolve `bool`; os dublês dos testes do repositório serão revistos na suíte).
 - Observação fora de escopo, **não alterada**: o roteador devolve um resultado em **cache** antes de consultar o orçamento (e antes do jailbreak); só resultados limpos são cacheados, então não reabre fail-open, mas o orçamento não é cobrado em acerto de cache. Plano modificado sem o jailbreak também não é checado (só orçamento e Swarm entram no BS6).
 - Prompts com «bypass», «exploit», «violate», … agora bloqueiam quando o Swarm falha (antes só degradavam).
+
+### Resultados (BS1–BS10) — `claims: []`
+**RED** (commit `8393e74`, produção intacta; as duas errata E2 e a E3 já declaradas antes): as 4 suítes do roteador rodaram 60 testes com `failures=165`, `errors=11` (todos `AttributeError: 'EthicsGuard' object has no attribute 'requires_swarm'`, BS5(e)); só o contrato novo: 22 testes, `failures=144`, `errors=11`. A previsão do RED se confirmou sem ajuste: falharam BS1, BS2 (a/b), BS3, BS4 (Swarm falho), BS5 (b/d/e), BS6, BS7(b), BS8 (`requires_swarm`) e BS9; passaram BS5 (a/c), BS7 (a/c), BS2 `False`/`True`, BS3 com prompt vazio e orçamento `True`, BS4 saudável e sem red flag.
+
+**GREEN:** `EthicsGuard.requires_swarm`, `CentralRouter._swarm_mandatory` e `_blocking_decision(results, swarm_required, complete=False)` com checagem final de completude (orçamento e Swarm obrigatório precisam ter *executado*). As 4 suítes do roteador: 64 testes OK.
+
+**Acrescentado depois do RED e antes/durante o mutation run (não alteram critério, só reforçam):** `BS6.test_hook_makes_a_missing_swarm_block_in_a_query` e a classe `BS10Rule` (chamadas diretas a `_blocking_decision`), antes do 1º run; `BS6.test_failing_swarm_stops_later_stages_and_reports_its_error`, depois do 1º run, que teve 2 sobreviventes de 672 (`bs_swarm_flag_not_passed`, `bs_swarm_reason_text_dropped`). Não foram declarados equivalentes: ganharam teste e morreram.
+
+**Mutação:** `cognitivo_mutation` 672/672 mortos (35 mutantes adicionados e 5 removidos: as âncoras antigas `rt_budget_ignored`, `rt_budget_error_blocks`, `rt_swarm_rule_off`, `rt_swarm_rule_all_types` e `rt_swarm_success_inverted` não casam mais com o código e foram readaptadas como `rt_budget_denied_ignored`, `bs_budget_failure_ignored`, `rt_swarm_rule_off`, `rt_swarm_rule_all_types` e `rt_swarm_success_inverted`, mais 30 mutantes `bs_*` novos); `targeted_mutation` 80/80 (ferramenta não editada).
+
+**Suíte e gates (3.11 e 3.12):** 992 testes OK em ambos; `ruff` e `compileall` limpos; cobertura `core/cognitivo` 97 % (≥ 90) e monólito 68 % (≥ 62); `core/constitutional_brain.py` roda com rc 0; Bandit sem MEDIUM/HIGH, `security_triage --check`, `embedded_assert_audit` e `implementation_gap_audit` ok; `validar_registro` ok; `reality_audit` + `git diff --exit-code` limpos.
+
+**Decisões e desvios (para o Pedro):**
+1. **Orçamento desabilitado por configuração declarada:** esse conceito **não existe** no código (`RealCognitiveBudgetEnforcer` só tem limites por `ResourceType`); portanto **nenhuma isenção foi criada** (BS3/BS8 fixam isso). Orçamento ausente, que levanta ou sem veredito `True` booleano bloqueia.
+2. **Swarm obrigatório:** **não existe** enum/lista de tipos de decisão de alto risco além de `ETHICAL_DECISION`. Não inventei classificação; estendi apenas a regra já existente do P4 (`ethical_red_flags`) via `EthicsGuard.requires_swarm`, com `ETHICAL_DECISION` como piso. **Reverter = apagar `requires_swarm`** (o guard sem o método volta a ETHICAL-only). Se o Pedro preferir manter só ETHICAL, é o único ponto a remover.
+3. Observações não alteradas: cache devolvido antes do orçamento/jailbreak; plano modificado sem jailbreak não é checado; `allowed is True` estrito.

@@ -101,9 +101,9 @@
         "functions": 25
       }
     ],
-    "core_lines": 23276,
+    "core_lines": 23327,
     "classes": 218,
-    "functions": 696,
+    "functions": 698,
     "pass_only_functions": [],
     "constant_return_functions": [
       {

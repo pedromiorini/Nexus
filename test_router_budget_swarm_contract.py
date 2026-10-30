@@ -13,6 +13,7 @@ from core.constitutional_brain import (
     CentralRouter,
     EthicsGuard,
     ExecutionPlan,
+    ModuleResult,
     ModuleType,
     RealCognitiveBudgetEnforcer,
     RequestType,
@@ -44,8 +45,10 @@ class _EthicsWith(_Ethics):
 class _PlanEthics(_Ethics):
     """Guard falso que devolve um plano modificado (estágios escolhidos pelo teste)."""
 
-    def __init__(self, stages):
+    def __init__(self, stages, requires_swarm=None):
         self.stages = stages
+        if requires_swarm is not None:
+            self.requires_swarm = requires_swarm
 
     def pre_execution_check(self, prompt, plan):
         modified = ExecutionPlan(
@@ -249,6 +252,31 @@ class BS6ModifiedPlan(unittest.TestCase):
                     result = _build([], ethics=ethics).route(f"Is this moral case {rng.randrange(10**6)}?")
                     _blocked(self, result, "MANDATORY_MODULE_FAILED", ["swarm"])
 
+    def test_hook_makes_a_missing_swarm_block_in_a_query(self):
+        # acrescentado antes do 1º mutation run: a checagem final também usa o requires_swarm do guard
+        ethics = _PlanEthics([[ModuleType.JAILBREAK, ModuleType.BUDGET], [ModuleType.LOG]], requires_swarm=lambda p: True)
+        result = _build([], ethics=ethics).route("Tell me about item 12")
+        _blocked(self, result, "MANDATORY_MODULE_FAILED", ["swarm"])
+        quiet = _PlanEthics([[ModuleType.JAILBREAK, ModuleType.BUDGET], [ModuleType.LOG]], requires_swarm=lambda p: False)
+        self.assertIs(_build([], ethics=quiet).route("Tell me about item 12")["success"], True)
+
+    def test_failing_swarm_stops_later_stages_and_reports_its_error(self):
+        # acrescentado após o 1º mutation run (sobreviventes bs_swarm_flag_not_passed e
+        # bs_swarm_reason_text_dropped): bloqueio no estágio do Swarm, com o erro na razão
+        for seed in SEEDS:
+            rng = random.Random(seed)
+            with self.subTest(seed=seed):
+                text = f"swarm-down-{rng.randrange(10**6)}"
+                calls = []
+                stages = [[ModuleType.JAILBREAK, ModuleType.BUDGET], [ModuleType.SWARM],
+                          [ModuleType.REASONING], [ModuleType.LOG]]
+                ethics = _PlanEthics(stages, requires_swarm=lambda p: True)
+                router = _build(calls, ethics=ethics, SWARM=NS(deliberate=_boom(text)))
+                result = router.route(_query(rng))
+                _blocked(self, result, "MANDATORY_MODULE_FAILED", ["swarm"])
+                self.assertIn(text, result["reason"])
+                self.assertNotIn("reasoning", calls)
+
     def test_unmodified_plan_still_passes(self):
         for seed in SEEDS[:5]:
             result = _build([]).route(_query(random.Random(seed)))
@@ -304,6 +332,34 @@ class BS8NoNewSurface(unittest.TestCase):
             {"review_action_plan", "pre_execution_check", "post_execution_validation", "get_statistics", "requires_swarm"},
         )
         self.assertIn("requires_swarm", public)
+
+
+class BS10Rule(unittest.TestCase):
+    """Chama a regra direto (acrescentado antes do 1º mutation run: nenhum plano real produz estes dados)."""
+
+    @staticmethod
+    def _result(module, success=True, data=None, error=None):
+        return ModuleResult(module, success, data, 0.0, error)
+
+    def test_budget_data_without_a_boolean_allowed_blocks(self):
+        router = _build([])
+        for data in ({}, {"allowed": None}, "yes", None, ["allowed"]):
+            with self.subTest(data=data):
+                blocked = router._blocking_decision([self._result(ModuleType.BUDGET, data=data)], False)
+                self.assertEqual(blocked["error"], "BUDGET_CHECK_FAILED")
+        ok = router._blocking_decision([self._result(ModuleType.BUDGET, data={"allowed": True})], False)
+        self.assertIsNone(ok)
+
+    def test_completeness_is_only_checked_after_the_last_stage(self):
+        router = _build([])
+        budget = self._result(ModuleType.BUDGET, data={"allowed": True})
+        self.assertIsNone(router._blocking_decision([], False))
+        self.assertIsNone(router._blocking_decision([budget], True))
+        self.assertEqual(router._blocking_decision([], False, complete=True)["error"], "BUDGET_CHECK_FAILED")
+        self.assertEqual(router._blocking_decision([budget], True, complete=True)["error"], "MANDATORY_MODULE_FAILED")
+        self.assertIsNone(router._blocking_decision([budget], False, complete=True))
+        swarm = self._result(ModuleType.SWARM, data=NS())
+        self.assertIsNone(router._blocking_decision([budget, swarm], True, complete=True))
 
 
 class BS9Contract(unittest.TestCase):
