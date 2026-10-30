@@ -127,7 +127,8 @@ class SynchronousSpreadContractTests(unittest.TestCase):
         system.activate_concept("A", 1.0)
         self.assertAlmostEqual(system.spread_activation(1)["A"], 0.9, places=9)
         system.relations.append(type(system.relations[0])("r", "x", "ghost-id", "A", 1.0))
-        self.assertAlmostEqual(system.spread_activation(1)["A"], 0.8, places=9)
+        # snapshot 0.9 + 0.63 = 1.53 limitado a 1.0, menos o decaimento: 0.9; a relação sem origem é ignorada
+        self.assertAlmostEqual(system.spread_activation(1)["A"], 0.9, places=9)
 
     def test_empty_zero_and_negative_iterations_and_threshold_are_unchanged(self):
         self.assertEqual(_quiet().spread_activation(3), {})

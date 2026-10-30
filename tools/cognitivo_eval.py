@@ -6138,8 +6138,8 @@ def eval_emotional_memory(criteria="v1"):
 
 # ── Semantic Networks (POST26): amostragem e referência independentes do bloco ──
 
-SN_SOURCE_SHA = "63e1dacce01592338007cd6a408197bd22b7f2a5d55a37f91b966888c0ad2e90"
-SN_BEHAVIOR_SHA = "38c6b6f4dccebf3ede5620b8f0e3d0a8cd7b5c6d71be2c75ec9b9faf183108de"  # capturado uma vez no monólito (3.11 e 3.12 idênticos), antes do move
+SN_SOURCE_SHA = "4ba902140f4d5ee49c34f585ed5961ec0cfb44bcb2453e0b178d6011331575ec"
+SN_BEHAVIOR_SHA = "9e98782252e9b7eab5c57060fb7fb7c21bca50c33448c1efa47dfa8319a5ba02"  # re-fixado uma vez no GREEN da errata E1 (3.11 e 3.12 idênticos)
 _SN_MARKER = "# MÓDULO 26: SEMANTIC NETWORKS SYSTEM (POST 26)"
 _SN_END = '            "avg_activation": sum(c.activation for c in self.concepts.values()) / max(1, len(self.concepts))\n        }'
 _SN_BANNER = "🧠🕸️ POST 26 - RealSemanticNetworksSystem initialized (Conceptual knowledge graph active)\n"
