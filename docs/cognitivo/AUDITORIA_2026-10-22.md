@@ -2579,3 +2579,16 @@ Falhas **comportamentais** (asserções), sem `AttributeError` (nenhuma API nova
 ### Risco declarado (não é critério)
 Com modelo, `success_probability` continua `min(1, 1.1·r)` para planos conhecidos; um plano que o simulador dá como sucesso pode sair com < 1.0. Valor `0.0` para ação sem efeito é escolha conservadora e fica à vista do Pedro; alternativas: `None` (muda o tipo) ou manter `expected_reward` apenas.
 
+### Resultados (MW1–MW9; critérios não reajustados)
+**RED** (`09e4fdf`, contra `main` inalterado): 8 testes, 149 falhas, 0 erros, 0 `AttributeError` (todas comportamentais: MW1 20, MW2 16, MW3 16, MW4 27, MW5 47, MW6 3, MW7 20). MW8 e o caso "ações padrão sem modelo" do MW5 passaram, como previsto. **Previsão errada do pré-registro:** a parte do cache do MW7 também falhou no RED (a expectativa `0.0` não vale com a recompensa travada em 0.5), em vez de passar.
+
+**GREEN** (`mcts_planner.py`, +40/−2 linhas; só esse módulo de produção): MW1–MW8 passam com as 20 seeds. MW8: p95 0.0091 s com modelo (limite 0.10 s). MW6 usa o `CompleteNexusBrain` real. Reprodução depois: com modelo, as 5 seeds dão `APPLY_PATCH` ou `DEPLOY_UPDATE` (antes: ação arbitrária); `FOO` dá `success_probability` 0.0 (antes 0.55/0.7333); caminho sem modelo igual ao de `main` (`APPLY_PATCH`, 0.62–0.67).
+
+**Acréscimos depois do RED, guiados por mutantes (não alteram critérios):** MW9 (dublê só com `current_state` mantém o caminho numérico), MW10 (status desconhecido vale 0), MW11 (desempate por menos passos só no modo mundo), MW12 (qualquer ação sem efeito zera `success_probability`) e, no MW7, `best_action_sequence == []` (o cache vazado só aparecia no plano, não no `expected_reward`). Mutante `mcts_keeps_strictly_better_found` precisou de agulha nova (a linha mudou); mesma troca, mesmo teste. Sem `max(0, …)` na utilidade e sem o reset de cache antes do plano (equivalentes: nenhum status tem utilidade negativa e o `finally` já zera).
+
+**Gates:** `cognitivo_mutation` 496/496 (13 `mw_*` novos); `targeted_mutation` 80/80 (ferramenta sem edição); suíte 850 testes OK em 3.11 e 3.12; ruff, compileall, bandit/triage/asserts/gaps e `validar_registro` OK; `reality_audit` + `git diff --exit-code` limpos (relatórios só via ferramenta); cobertura `core/cognitivo/*` 97% (≥ 90; `mcts_planner` 92%), brain 68% (≥ 62); `python core/constitutional_brain.py` rc 0; `cognitivo_eval --capability mcts`: M1, M2, M4, M5 passam, M3 v2 segue falhando como em `main` (teto, fora do escopo). Contratos do Axis (`quality`, `action`, `input`, `extraction`/golden) passam sem edição.
+
+**Lacunas residuais, declaradas:** `expected_reward` e `success_probability` vêm da média do **melhor filho da raiz** (rollouts aleatórios), não da sequência escolhida; com modelo, o filho de maior média pode ser outro (p.ex. `ESCALATE`) enquanto o plano escolhido é `APPLY_PATCH` (visto em `alternative_plans`). A constante 1.1 e o teto do M3 ficam. O custo de passos não entra na recompensa do modo mundo (só o desempate). `0.0` para ação sem efeito é decisão a confirmar pelo Pedro.
+
+`docs/agentes/CLAIMS.yaml` volta a `claims: []` neste commit.
+
