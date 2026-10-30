@@ -272,9 +272,11 @@ class RT13FailureCauseIsReported(_BrainCase):
 
 class RT14ContractsStillHold(unittest.TestCase):
     def test_existing_decisions_are_unchanged(self):
-        # Decisões do Pedro, fora deste adendo: orçamento que levanta só degrada; Swarm só é obrigatório em ETHICAL_DECISION.
+        # Errata E2 (RT-v3): o orçamento que levanta passou a bloquear (decisão do Pedro, 30/10/2026).
+        # Swarm: prompt sem red flag do P4 e sem gatilho ético continua só degradando.
         raising = _router([], BUDGET=NS(request_budget=_boom())).route("Tell me about item 8")
-        self.assertIs(raising["success"], True)
+        self.assertIs(raising["success"], False)
+        self.assertEqual(raising["error"], "BUDGET_CHECK_FAILED")
         self.assertEqual(raising["failed_modules"], ["budget"])
         swarm = _router([], SWARM=NS(deliberate=_boom())).route("Tell me about item 9")
         self.assertIs(swarm["success"], True)

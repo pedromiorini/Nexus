@@ -171,15 +171,14 @@ class RT3Budget(unittest.TestCase):
                 result = router.route(_query(random.Random(seed)))
                 _assert_blocked(self, result, "BUDGET_DENIED", ["budget"], calls, {"jailbreak"})
 
-    def test_raising_budget_only_degrades(self):
+    def test_raising_budget_blocks(self):
+        # Errata E2 (RT-v3): antes «só degrada»; o Pedro decidiu fail-closed (30/10/2026).
         for seed in SEEDS:
             with self.subTest(seed=seed):
                 calls = []
                 router = _router(calls, BUDGET=NS(request_budget=_boom()))
                 result = router.route(_query(random.Random(seed)))
-                self.assertIs(result["success"], True)
-                self.assertIs(result["degraded"], True)
-                self.assertEqual(result["failed_modules"], ["budget"])
+                _assert_blocked(self, result, "BUDGET_CHECK_FAILED", ["budget"], calls, {"jailbreak"})
 
 
 class RT4MandatorySwarm(unittest.TestCase):

@@ -9229,6 +9229,11 @@ class EthicsGuard:
         result = self.pre_execution_check(question, plan)
         return type("EthicalReview", (), {"is_approved": result["cleared"], "concern": result["reason"]})()
 
+    def requires_swarm(self, prompt: str) -> bool:
+        """P4: o prompt tem red flag ético e, portanto, a deliberação do Swarm é obrigatória."""
+        lowered = prompt.lower()
+        return any(flag in lowered for flag in self.ethical_red_flags)
+
     def pre_execution_check(self, prompt: str, execution_plan: ExecutionPlan) -> Dict:
         """
         Validação PRÉ-execução: Verificar se request viola algum princípio.
@@ -9269,9 +9274,7 @@ class EthicsGuard:
 
         # ─── CHECK 3: Primado Ético (P4) ──────────────────────────────────
         # Se request contém red flags éticos, Swarm é OBRIGATÓRIO
-        has_ethical_concerns = any(
-            flag in prompt.lower() for flag in self.ethical_red_flags
-        )
+        has_ethical_concerns = self.requires_swarm(prompt)
 
         if has_ethical_concerns:
             if ModuleType.SWARM not in execution_plan.modules_required:
@@ -9781,6 +9784,8 @@ class CentralRouter:
         
         _dbg(f"🔍 DEBUG v3.70: Executing {len(execution_plan.execution_stages)} stages")
 
+        swarm_required = self._swarm_mandatory(prompt, request_type)
+
         for _stage_idx, stage_modules in enumerate(execution_plan.execution_stages):
             stage_results = self._execute_stage(
                 stage_modules, prompt, aggregated_data
@@ -9793,11 +9798,18 @@ class CentralRouter:
                     aggregated_data[result.module.value] = result.data
 
             # Fail-closed: segurança e módulos obrigatórios não passam como sucesso
-            blocked = self._blocking_decision(request_type, all_results)
+            blocked = self._blocking_decision(all_results, swarm_required)
             if blocked is not None:
                 return self._finish_blocked(
                     prompt, request_type, blocked, execution_plan, all_results, start_time
                 )
+
+        # Plano que terminou sem executar o orçamento, ou o Swarm obrigatório, também bloqueia
+        blocked = self._blocking_decision(all_results, swarm_required, complete=True)
+        if blocked is not None:
+            return self._finish_blocked(
+                prompt, request_type, blocked, execution_plan, all_results, start_time
+            )
 
         # ─── 6. VALIDAÇÃO ÉTICA PÓS ───────────────────────────────────────
         ethics_post = self.ethics.post_execution_validation(prompt, all_results)
@@ -9902,14 +9914,34 @@ class CentralRouter:
         self._update_statistics((time.time() - start_time) * 1000, plan, results)
         return response
 
+    def _swarm_mandatory(self, prompt: str, request_type: RequestType) -> bool:
+        """Swarm é obrigatório em decisão ética ou quando o EthicsGuard (P4) vê red flag no prompt.
+
+        Guard sem ``requires_swarm`` (dublê) vale só ``ETHICAL_DECISION``; ``requires_swarm`` que
+        levanta exceção conta como obrigatório (fail-closed).
+        """
+        if request_type == RequestType.ETHICAL_DECISION:
+            return True
+        hook = getattr(self.ethics, "requires_swarm", None)
+        if not callable(hook):
+            return False
+        try:
+            return bool(hook(prompt))
+        except Exception:
+            return True
+
     def _blocking_decision(
-        self, request_type: RequestType, results: List[ModuleResult]
+        self,
+        results: List[ModuleResult],
+        swarm_required: bool,
+        complete: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """Decide se os resultados já obtidos impedem a requisição (fail-closed).
 
-        Bloqueiam: jailbreak detectado ou verificação que falhou/sem veredito, orçamento
-        negado e Swarm obrigatório que falhou em decisão ética. Falhas de orçamento por
-        exceção e de módulos opcionais apenas degradam o resultado.
+        Bloqueiam: jailbreak detectado ou verificação que falhou/sem veredito; orçamento negado,
+        que falhou (exceção ou ausente) ou sem veredito booleano ``True``; e Swarm obrigatório que
+        falhou. Com ``complete=True`` (depois do último stage) o orçamento e o Swarm obrigatório
+        também precisam ter executado. Falhas de módulos opcionais apenas degradam o resultado.
         """
         for result in results:
             if result.module != ModuleType.JAILBREAK:
@@ -9928,17 +9960,36 @@ class CentralRouter:
             if verdict:
                 return {"error": "JAILBREAK_DETECTED", "module": result.module,
                         "reason": "jailbreak detector flagged the prompt"}
+        budget_ran = False
         for result in results:
-            if result.module == ModuleType.BUDGET and result.success:
-                allowed = result.data.get("allowed") if isinstance(result.data, dict) else None
-                if not allowed:
-                    return {"error": "BUDGET_DENIED", "module": result.module,
-                            "reason": "resource budget denied"}
-        if request_type == RequestType.ETHICAL_DECISION:
+            if result.module != ModuleType.BUDGET:
+                continue
+            budget_ran = True
+            if not result.success:
+                return {"error": "BUDGET_CHECK_FAILED", "module": result.module,
+                        "reason": f"budget check failed: {result.error}"}
+            allowed = result.data.get("allowed", self._NO_VERDICT) if isinstance(result.data, dict) else self._NO_VERDICT
+            if allowed is False:
+                return {"error": "BUDGET_DENIED", "module": result.module,
+                        "reason": "resource budget denied"}
+            if allowed is not True:
+                return {"error": "BUDGET_CHECK_FAILED", "module": result.module,
+                        "reason": "budget check returned no boolean verdict"}
+        if complete and not budget_ran:
+            return {"error": "BUDGET_CHECK_FAILED", "module": ModuleType.BUDGET,
+                    "reason": "budget check was not executed"}
+        if swarm_required:
+            swarm_ran = False
             for result in results:
-                if result.module == ModuleType.SWARM and not result.success:
+                if result.module != ModuleType.SWARM:
+                    continue
+                swarm_ran = True
+                if not result.success:
                     return {"error": "MANDATORY_MODULE_FAILED", "module": result.module,
-                            "reason": f"swarm is mandatory for ethical decisions and failed: {result.error}"}
+                            "reason": f"swarm is mandatory for this request and failed: {result.error}"}
+            if complete and not swarm_ran:
+                return {"error": "MANDATORY_MODULE_FAILED", "module": ModuleType.SWARM,
+                        "reason": "swarm is mandatory for this request and was not executed"}
         return None
 
     @staticmethod
