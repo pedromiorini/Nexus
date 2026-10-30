@@ -8,6 +8,7 @@ Scripts shell usados pelos agentes antes de agir no GitHub. Não fazem parte do 
 | `preflight_rotina.sh` | Preflight da rotina diária (`NUVEM_STATUS=ok\|blocked`) | `MODO=nuvem` 0; `MODO=local` 10; `MODO=abortar` 3 |
 | `replay/check_resolution.sh <worktree> [arquivos]` | Após resolver conflito: marcadores, linhas de estado fora do bloco `NEXUS-CURRENT-STATE`, conflito de código | 0 ok; 1 falha; 2 conflito de código |
 | `replay/run_replay.sh [casos.tsv]` | Suíte de replay das falhas reais de 21/10/2026 (L-001..L-003) | 0 somente com ≥ 1 caso executado e todos os códigos esperados; 1 para entrada vazia/ilegível ou divergência |
+| `artefatos_drift.sh <repo_dir>` | Antes do push: numa cópia do repo, a triagem Bandit (`security_triage.py --check`) e os relatórios de `reality_audit` continuam iguais ao commitado? Requer `bandit`; não cobre o marcador `bandit_low` dos documentos de estado | 0 atuais; 7 algum diverge; 3 entrada inválida |
 | `timeout_margin.sh <timeout_min> <duracoes.txt>` | Guarda de margem de timeout do CI: bloqueia se a maior duração (s, uma por linha) passa de 85 % de `timeout_min·60` | 0 dentro da margem; 6 acima de 85 %; 3 entrada inválida |
 | `timeout_margin_backtest.py coletar\|avaliar\|atual` | Retroprojeção da guarda sobre o histórico real do `nexus-contract-gate` (`docs/agentes/timeout_margin_historico.json`); `atual` é só relatório | `avaliar`: 0 critérios TM1–TM5 ok; 1 falha; 3 dado inválido. `atual`/`coletar`: 0 (3 se dado inválido) |
 
@@ -28,3 +29,5 @@ O runner deve manter modo Git `100755`: `tools/agente/replay/run_replay.sh` func
 - A tabela e o ambiente de execução são controlados pelo repositório; o runner não é sandbox para tabelas arbitrárias. A contagem não prova cobertura de todas as guardas nem valida segurança geral. Os testes do workflow verificam sua estrutura; não substituem um run hospedado.
 
 A guarda de timeout **não** é passo bloqueante do CI (modo relatório, ver `docs/agentes/MARGEM_TIMEOUT_CI.md`); só os casos `tmo` do replay, que não dependem de durações reais, rodam no CI.
+
+Os casos `drift` do replay (`replay/casos_drift.tsv`) são de uso **local**: o job `Agent guard replay` do CI não instala bandit e continua só com `casos.tsv` (17 casos). `bash tools/agente/replay/run_replay.sh tools/agente/replay/casos_drift.tsv` exige bandit e, para `D-origem`, o SHA `afd12a5` (`git fetch origin pull/132/head`). Ver `docs/agentes/ARTEFATOS_DRIFT.md`.

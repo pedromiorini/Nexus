@@ -191,12 +191,12 @@ class AD3AD6Properties(DriftGuardBase):
 
 
 class AD7ReplayType(DriftGuardBase):
-    def replay(self, table_text):
+    def replay(self, table_text, **stubs):
         table = self.base / "casos.tsv"
         table.write_text(table_text, encoding="utf-8")
         return subprocess.run(
             ["bash", str(REPLAY), str(table)], cwd=ROOT, capture_output=True,
-            text=True, timeout=120, env=self.env(),
+            text=True, timeout=120, env=self.env(**stubs),
         )
 
     def test_absolute_path_cases_follow_the_guard(self):
@@ -217,9 +217,7 @@ class AD7ReplayType(DriftGuardBase):
 
     def test_divergent_repo_is_7_in_the_replay(self):
         repo = self.make_repo()
-        os.environ["STUB_TRIAGE"] = "fail"
-        self.addCleanup(os.environ.pop, "STUB_TRIAGE", None)
-        result = self.replay(f"div\tdrift\t{repo}\t7\n")
+        result = self.replay(f"div\tdrift\t{repo}\t7\n", STUB_TRIAGE="fail")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_missing_sha_is_invalid_input_of_the_replay(self):

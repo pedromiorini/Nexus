@@ -30,3 +30,23 @@ Origem: proposta de retro `2026-10-29-drift-artefatos` (lição L-010). Pedro ap
 
 ### Previsão do RED
 O contrato falha inteiro (o script e o tipo `drift` não existem): AD3–AD7 em erro/falha. AD1 só é medido no GREEN. Qualquer previsão errada será registrada, sem ajuste dos critérios.
+
+## Resultados (registrados depois de rodar; critérios não ajustados)
+
+**RED** (`0c9aecc`, repo sem a guarda): `Ran 20 tests … FAILED (failures=17, errors=1)`. Previsão "falha inteiro" acertou em 18 de 20; 2 testes passaram trivialmente sem a guarda (entrada inválida nunca sai 0/7, pois o script ausente dá 127; "não escreve no original", pois nada roda). Registrado, sem mudar critério.
+
+**Correção do próprio harness (declarada):** no primeiro GREEN, `test_divergent_repo_is_7_in_the_replay` falhou por defeito do teste (o ambiente do replay filtrava as variáveis `STUB_*`), não da guarda. Corrigido passando `STUB_TRIAGE=fail` por argumento a `replay()`. Nenhum critério mudou.
+
+| Critério | Resultado |
+|---|---|
+| AD1 | PASSOU (local, bandit 1.9.4): `D-origem` (afd12a5) → 7, `D-anterior` (23fde14) → 0, `D-incompat` → 3 |
+| AD2 | PASSOU: replay padrão 17/17, rc 0, `casos.tsv` e workflow inalterados; suíte 858 testes OK em 3.11 e 3.12 |
+| AD3 | PASSOU: `artefatos_drift.sh` modo 100755, execução direta testada |
+| AD4 | PASSOU (contrato hermético, 20/20 OK) |
+| AD5 | PASSOU |
+| AD6 | PASSOU |
+| AD7 | PASSOU (inclui SHA ausente → 4 e tipo desconhecido falhando fechado) |
+| AD8 | PASSOU com **desvio**: L-010 está como `registrada`, não `pendente`. `test_correction_claim_audit_contract.test_current_lessons_are_not_reported_as_measured` exige `nao_checavel` para toda lição não ativa, e uma lição com o bloco de reincidência (mesmo com os três eixos "não medido") vira `verificada` e quebra a suíte. Por isso L-010 é `registrada` **e sem o bloco** (o auditor a reporta `nao_checavel`, como L-001..L-007); o bloco entra quando o Pedro ativar a lição e a reincidência for medida. `correction_claim_audit` e `validar_registro` passam. Ativar/medir reincidência fica com o Pedro |
+| AD9 | PASSOU: ruff, compileall, bandit/triage/asserts/gaps, `validar_registro`; `cognitivo_mutation` 483/483, `targeted_mutation` 80/80; cobertura `core/cognitivo` 98%, brain 68%; `claims: []` |
+
+**Limites declarados:** a guarda não cobre o marcador `bandit_low` nem a fixture do contrato (a classe que ainda quebrou o #132); os casos `drift` não rodam no CI (sem bandit lá); `D-origem` exige buscar `pull/132/head`.
