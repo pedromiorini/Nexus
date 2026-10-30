@@ -208,7 +208,7 @@ class RealWorldModelSimulator:
 
         ``success`` e ``verified_status`` usam só o estado verificado (tabela + declaradas): uma
         afirmação extraída de texto livre aparece em ``final_state`` e em ``claims``, com aviso,
-        mas não promove o sucesso.
+        mas não promove o sucesso. Ação fora da tabela e sem declaração torna ``success`` falso.
         """
         state = copy.deepcopy(self.current_state)
         verified = dict(state.state)
@@ -216,6 +216,7 @@ class RealWorldModelSimulator:
         claim_log: List[str] = []
 
         claim_items: List[Dict[str, Any]] = []
+        unmodeled = False
 
         for action in actions:
             applied = False
@@ -225,6 +226,8 @@ class RealWorldModelSimulator:
                 verified.update(entry["world"])
                 applied = True
             declared, claims, ignored, conflicts = self._split_do(action)
+            if entry is None and not declared:
+                unmodeled = True  # P1a: fora da tabela e sem declaração; afirmação de texto não modela
             if declared:
                 state.state.update(declared)
                 verified.update(declared)
@@ -247,8 +250,8 @@ class RealWorldModelSimulator:
             if not applied:
                 warnings.append(f"unknown action: {action!r}")
 
-        # Evaluate success (só estado verificado)
-        success = verified.get("system_status") in ["secure", "stable"]
+        # Evaluate success (só estado verificado; ação não modelada na sequência nunca é sucesso)
+        success = verified.get("system_status") in ["secure", "stable"] and not unmodeled
 
         return SimulationResult(
             initial_state=self.current_state,

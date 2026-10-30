@@ -30,7 +30,7 @@
       },
       {
         "path": "core/cognitivo/causal_world_model.py",
-        "lines": 309,
+        "lines": 312,
         "classes": 5,
         "functions": 13
       },
@@ -72,7 +72,7 @@
       },
       {
         "path": "core/cognitivo/mcts_planner.py",
-        "lines": 489,
+        "lines": 492,
         "classes": 3,
         "functions": 22
       },
