@@ -142,11 +142,14 @@ class RealMCTSPlanner:
         return self.world_model is not None and callable(getattr(self.world_model, "simulate", None))
 
     def _evaluate_world(self, state: Dict) -> float:
-        """Recompensa do estado = utilidade do status final simulado pelo modelo, em [0, 1]."""
+        """Recompensa do estado = utilidade do status *verificado* simulado pelo modelo, em [0, 1].
+
+        Afirmação causal de texto livre (``final_state``) é hipótese não confiável: não pontua nem escolhe.
+        """
         steps = tuple(state.get("steps_taken", []))
         if steps not in self._world_rewards:
-            final = self.world_model.simulate(list(steps)).final_state.state
-            utility = STATUS_UTILITY.get(final.get("system_status"), 0)
+            simulated = self.world_model.simulate(list(steps))
+            utility = STATUS_UTILITY.get(simulated.verified_status, 0)
             self._world_rewards[steps] = utility / 3.0
         return self._world_rewards[steps]
 

@@ -60,6 +60,7 @@ CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
 MW_TESTS = ("test_mcts_world_effects_contract.py",)
+IJ_TESTS = ("test_mcts_prompt_injection_contract.py",)
 ER_TESTS = ("test_mcts_expected_reward_contract.py",)
 
 PC_LEARNING = ("test_predictive_learning_contract.py",)
@@ -178,9 +179,9 @@ MUTATIONS = [
              "pass", tests=MW_TESTS),
     Mutation("mw_scale_wrong", MCTS, "utility / 3.0", "utility / 4.0", tests=MW_TESTS),
     Mutation("mw_unknown_status_scores_high", MCTS,
-             'STATUS_UTILITY.get(final.get("system_status"), 0)',
-             'STATUS_UTILITY.get(final.get("system_status"), 3)', tests=MW_TESTS),
-    Mutation("mw_reads_wrong_world_key", MCTS, 'final.get("system_status")', 'final.get("alert_level")',
+             'STATUS_UTILITY.get(simulated.verified_status, 0)',
+             'STATUS_UTILITY.get(simulated.verified_status, 3)', tests=MW_TESTS),
+    Mutation("mw_reads_wrong_world_key", MCTS, "simulated.verified_status", 'simulated.verified_state.get("alert_level")',
              tests=MW_TESTS),
     Mutation("mw_cache_never_reset", MCTS,
              "            self._best_found = None\n            self._world_rewards = {}",
@@ -336,7 +337,7 @@ MUTATIONS = [
              "adjacency.get(action.lower(), ())", tests=R4_TESTS),
     # SC1–SC8: texto livre não forja sucesso (WORLD_SCHEMA, claims não verificadas)
     Mutation("sc_claim_promotes_success", CAUSAL, 'success = verified.get("system_status") in',
-             'success = state.state.get("system_status") in', tests=SC_TESTS),
+             'success = state.state.get("system_status") in', tests=SC_TESTS + IJ_TESTS),
     Mutation("sc_verified_status_from_state", CAUSAL, 'verified_status=verified.get("system_status")',
              'verified_status=state.state.get("system_status")', tests=SC_TESTS),
     Mutation("sc_claim_updates_verified", CAUSAL, "                state.state.update(claims)\n",
@@ -1495,6 +1496,29 @@ MUTATIONS = [
              ")\n"
              "RealSemanticNetworksSystem = type(\"RealSemanticNetworksSystem\", (_RealSemanticNetworksSystem,), {})\n",
              tests=SN_TESTS),
+    Mutation("ij_reward_from_final_state", MCTS, "STATUS_UTILITY.get(simulated.verified_status, 0)",
+             'STATUS_UTILITY.get(simulated.final_state.state.get("system_status"), 0)', tests=IJ_TESTS),
+    Mutation("ij_reward_max_of_final_and_verified", MCTS, "utility = STATUS_UTILITY.get(simulated.verified_status, 0)",
+             "utility = max(STATUS_UTILITY.get(simulated.verified_status, 0),\n"
+             '                          STATUS_UTILITY.get(simulated.final_state.state.get("system_status"), 0))',
+             tests=IJ_TESTS),
+    Mutation("ij_verified_status_from_final_state", CAUSAL, 'verified_status=verified.get("system_status"),',
+             'verified_status=state.state.get("system_status"),', tests=IJ_TESTS),
+    Mutation("ij_claims_leak_into_verified", CAUSAL, "            if claims:\n                state.state.update(claims)",
+             "            if claims:\n                state.state.update(claims)\n                verified.update(claims)",
+             tests=IJ_TESTS),
+    Mutation("om_unmodeled_flag_never_set", CAUSAL, "unmodeled = True  # P1a", "pass  # P1a", tests=IJ_TESTS),
+    Mutation("om_success_ignores_unmodeled", CAUSAL, " and not unmodeled", "", tests=IJ_TESTS),
+    Mutation("om_text_claim_counts_as_modeled", CAUSAL, "if entry is None and not declared:",
+             "if entry is None and not (declared or claims):", tests=IJ_TESTS),
+    Mutation("om_declared_counts_as_unmodeled", CAUSAL, "if entry is None and not declared:",
+             "if entry is None:", tests=IJ_TESTS),
+    Mutation("om_only_last_action_checked", CAUSAL, "unmodeled = True  # P1a",
+             "unmodeled = action is actions[-1]  # P1a", tests=IJ_TESTS),
+    Mutation("om_flag_reset_each_action", CAUSAL, "            entry = ACTION_EFFECTS.get(action)\n",
+             "            unmodeled = False\n            entry = ACTION_EFFECTS.get(action)\n", tests=IJ_TESTS),
+    Mutation("om_isolated_counts_as_success", CAUSAL, 'in ["secure", "stable"] and not unmodeled',
+             'in ["secure", "stable", "isolated"] and not unmodeled', tests=IJ_TESTS),
 ]
 
 
