@@ -30,9 +30,9 @@
       },
       {
         "path": "core/cognitivo/causal_world_model.py",
-        "lines": 193,
+        "lines": 309,
         "classes": 5,
-        "functions": 9
+        "functions": 13
       },
       {
         "path": "core/cognitivo/contextual_memory.py",
@@ -42,7 +42,7 @@
       },
       {
         "path": "core/cognitivo/counterfactual.py",
-        "lines": 581,
+        "lines": 602,
         "classes": 4,
         "functions": 26
       },
