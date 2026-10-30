@@ -2987,3 +2987,27 @@ Qualquer critério F1–F9 que falhar no GREEN (inclusive F3 ou F9, que provaria
 ### Claim
 
 `docs/agentes/CLAIMS.yaml` aberto neste commit (agente `grok-bot`, 72 h); volta a `claims: []` no commit de resultados.
+
+### Resultados do seguimento (F1–F9; RED em `93e8b1b`, GREEN em `006e8d3`)
+
+Todos os critérios pré-registrados passaram no GREEN; nenhuma condição de parada foi acionada e a errata não foi reaberta.
+
+| id | RED (previsto = obtido) | GREEN |
+|---|---|---|
+| F1 cadeia de 1500 | `RecursionError` | passa (herança e `verify_hierarchy`) |
+| F2 `K_9` / `K_10` / expansões | `K_9` 0,65 s (verde, como previsto), `K_10` 7,2 s vermelho, 109601 expansões vermelho | passam (cada nó expandido uma vez; tempos ≪ 1 s) |
+| F3 igual ao atual (sementes 0..1999, itens e ordem) | verde (preservação) | passa |
+| F4 força `1j` | `B = 0.35` (sem rollback) vermelho | estado igual ao anterior |
+| F5 erro só na iteração 2 / 3 | vermelho (+ `retry`, derivado) | rollback; coleta e sucesso seguem verdes |
+| F6 `B=1.0`, `+0.7/−0.7` | verde (guarda) | `0.9` |
+| F7 especificidade | 3 `expectedFailure` falham como esperado | **continuam** `expectedFailure` (sem mudança de comportamento) |
+| F8 `query_by_properties` | verde (guarda) | passa (delegação + mesmo resultado em 300 sementes) |
+| F9 fingerprint × `main` | — | **idêntico** (`sha_module = 9e987822…`, 3.11 = 3.12); só `SN_SOURCE_SHA` mudou: `4ba90214…` → **`c0c0465e…`** (declarado) |
+
+Medido no GREEN: o harness `semantic_networks` passa SN1–SN6, SN3b e SN4b (`failed: []`) em 3.11 e 3.12; `--capability all` só falha em M3 (lacuna conhecida e anterior, sem PR por decisão do Pedro).
+
+Mutantes (`tools/cognitivo_mutation.py`): catálogo **706/706 mortos**, 0 sobreviventes, 0 não aplicados; `targeted_mutation` 80/80 (arquivo não editado). Quatro âncoras `sn_inherit_*` foram **reapontadas** para o código novo (`ignores_parents`, `any_relation`, `not_recursive`, `cycle_stops_all_parents`); quatro mutantes antigos (`path_not_updated`, `cycle_check_dropped`, `path_reset`, `cycle_skip_by_label`) **foram retirados**: sem o conjunto de visitados (ou com ele corrompido) a travessia não termina em ciclo e só "morreria" pelo timeout de 180 s (equivalentes por não terminação, fora do catálogo; o mesmo vale para `sn_inherit_pop_dropped`, que testei e retirei). Treze mutantes novos: `sn_inherit_parent_any_relation`, `_root_not_visited`, `_expansion_reversed`, `_root_parents_reversed`, `_parent_props_dropped`, `_stops_at_first_exhausted_iterator`; `sn_spread_rollback_dropped`, `_rollback_partial`, `_rollback_zeroes`, `_rollback_only_exception`, `_rollback_only_type_error`, `_error_swallowed`, `_error_replaced`. Resolver o pai por `parent.concept_id` em vez de por rótulo só difere com rótulos duplicados (não testado; documentado, fora do catálogo).
+
+Desvios: (1) acrescentei no GREEN dois testes (`F5AnyException`: `RuntimeError` e `BaseException` na iteração 2) e um de repetição (`retry`, no RED) para matar mutantes de rollback; não alteram critério; (2) `K_9 < 1 s` sozinho não ficou vermelho (0,65 s), por isso F2 já tinha `K_10` e a contagem de expansões; (3) `query_by_properties` com cadeia de 1500 ficou fora (custo cúbico atual, declarado antes do RED); (4) `AUDIT_REALITY_REPORT.md`/`audit_reality.json` regenerados só via `tools/reality_audit.py` (linhas do módulo extraído 5645 → 5663).
+
+`claims: []` restaurado neste commit.
