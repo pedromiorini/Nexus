@@ -2508,3 +2508,36 @@ Antes e depois do move: `python -m unittest discover` sem falhas novas, `python 
 O harness sai com **2** para `--capability` ausente, vazia ou desconhecida (`semantic-networks`, `Semantic_Networks`, `semantic`, `semantic_networks2`) e com **3** quando um critério marca `scenario_invalid` (precondições de SN1, SN2, SN3 ou SN4 ou controle que falha), nunca com 1. Um comportamento adulterado muda o SHA do fingerprint, e um golden errado reprova SN6 com saída 1. Como o move não pode alterar comportamento, os critérios que falham (SN3, SN4) devem falhar do mesmo modo antes e depois.
 
 Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability semantic_networks`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Resultados da extração de Semantic Networks (depois do pré-registro `4ba5ca1`)
+
+Sequência no branch `grok/extract-semantic-networks-20261029`: pré-registro `4ba5ca1` → contrato RED `c1d12c3` → move-only `afd12a5` → este commit de resultados. Sem errata: nenhum problema de protocolo apareceu depois de rodar; o pré-registro não foi alterado.
+
+**RED (antes do move):** o contrato e o harness falham por `ModuleNotFoundError: core.cognitivo.semantic_networks`; `tools/cognitivo_eval.py --capability semantic_networks` sai com 1 pelo mesmo motivo.
+
+**Move:** `ConceptNode`, `SemanticRelation` e `RealSemanticNetworksSystem` movidos byte a byte (SHA-256 da fonte `63e1dacc…2ad2e90`, igual ao pré-registrado) para `core/cognitivo/semantic_networks.py`; o monólito e `core/cognitivo/__init__.py` reexportam (objetos idênticos). Fingerprint de comportamento `38c6b6f4…108de` congelado no RED, capturado no monólito, e idêntico depois do move (3.11 e 3.12).
+
+| Critério | Resultado | Valor |
+|---|---|---|
+| SN1 grade de 120 instâncias vs referência independente | **passa** | 120/120; 0 entradas alteradas |
+| SN2 IS-A acíclico: `verify_hierarchy` e `inherit_properties` vs referência | **passa** | 20/20 (rate 1.0); 0 inválidas |
+| SN3 propagação independente da ordem das relações | **FALHA (previsto)** | 0/20; controle 0 ruins; diferença mínima observada 0.0454 |
+| SN4 consultas hierárquicas terminam em ciclo IS-A | **FALHA (previsto)** | 0/20; `RecursionError` ×20 |
+| SN5 contadores, colaboradores, valores exatos, erros, gaps | **passa** | todas as tabelas iguais |
+| SN6 SHA da fonte, SHA de comportamento, identidade, isolamento (AST) | **passa** | fonte e comportamento iguais aos congelados |
+
+Harness: exit 1 (SN3 e SN4), igual em 3.11 e 3.12. SN3 e SN4 **não** foram corrigidos (lacunas de comportamento, fora de escopo do move). `--capability all` sai com 1 por SN3, SN4 e pelo M3 v1 que já falhava antes (a v2 o substitui); os critérios das demais capacidades não mudaram.
+
+**Negativos:** capability ausente, vazia, `semantic-networks`, `Semantic_Networks`, `semantic`, `semantic_networks2` → exit 2; `scenario_invalid` → exit 3; golden de comportamento ou fonte errado → SN6 falha e exit 1. Mutantes de reexport/isolamento: o monólito ou o pacote deixando de reexportar o mesmo objeto, e o módulo importando o monólito, são mortos.
+
+**Gates locais (por código de saída):**
+- Suíte completa: 856 testes OK em Python 3.11 e em 3.12 (18 novos de SN).
+- ruff e compileall: OK. `reality_audit` + `git diff --exit-code`: OK. `validar_registro`: OK.
+- Cobertura: `core/cognitivo/*` 98 % (limite 90; `semantic_networks.py` 99 %); `constitutional_brain.py` 68 % (limite 62).
+- `cognitivo_mutation`: 550 declarados, 550 mortos, 0 sobreviventes, 0 não aplicados (+67 de SN: 64 de comportamento, 3 de reexport/isolamento).
+- `targeted_mutation`: 80 declarados, 80 mortos (score 100 %); `tools/targeted_mutation.py` não foi tocado.
+- Bandit: 139 achados LOW, 0 MEDIUM/HIGH; `security_triage --check`, `embedded_assert_audit`, `implementation_gap_audit`: OK. `SECURITY_TRIAGE.md` regenerado pela ferramenta (+1 achado B110 em `tools/cognitivo_eval.py::_sn_family_sn2`, `try/except/pass` do harness de SN2, que conta a seed como não passada).
+
+**Notas honestas:**
+- Fixture do teste de isolamento corrigida no commit do move: ele chamava `add_concept("Animal", …)` depois de `add_relation(…, "Animal")`, mas `add_concept` sempre cria um nó novo (duplicata), então a herança ia ao nó sem propriedades. Foi erro do meu teste, descoberto só ao rodar o contrato verde (o RED não chega nesse teste); inverti a ordem. Critérios SN1–SN6, grades e fingerprint não mudaram.
+- O achado B110 é novo em relação ao número anterior de Bandit (131 documentado antes; 138 no triage de main segundo o cabeçalho); não corrigi o `except` para não mexer no harness congelado do RED.
