@@ -46,6 +46,7 @@ R3_TESTS = ("test_causal_extraction_contract.py",)
 R4_TESTS = ("test_scm_intervention_contract.py", "test_scm_schema_contract.py")
 SR_TESTS = ("test_scm_review_addendum_contract.py",)
 SC_TESTS = ("test_scm_schema_contract.py", "test_scm_intervention_contract.py")
+SC3R_TESTS = ("test_scm_outside_table_contract.py", "test_scm_schema_contract.py")
 CF_TESTS = ("test_counterfactual_extraction_contract.py", "test_counterfactual_contract.py",
             "test_counterfactual_gap3_contract.py",
             "test_counterfactual_gap4_contract.py",
@@ -322,6 +323,17 @@ MUTATIONS = [
              "        claims_seen = list(self._pending_claims)\n        self._pending_claims = []\n", "        claims_seen = list(self._pending_claims)\n", tests=SR_TESTS),
     Mutation("sr_benchmark_reads_mixed_state", "benchmarks/nexus_capability_benchmark.py",
              ".simulate(case[\"actions\"]).verified_state", ".simulate(case[\"actions\"]).final_state.state", tests=SR_TESTS),
+    Mutation("sc3r_warning_dropped", CAUSAL,
+             "                    warnings.append(f\"declared intervention for action outside ACTION_EFFECTS: {action!r}\")\n",
+             "                    pass\n", tests=SC3R_TESTS),
+    Mutation("sc3r_warns_for_table_actions", CAUSAL, "                if entry is None:\n                    # SC3 (errata E2)",
+             "                if True:\n                    # SC3 (errata E2)", tests=SC3R_TESTS),
+    Mutation("sc3r_warning_text_changed", CAUSAL, "declared intervention for action outside ACTION_EFFECTS: {action!r}",
+             "declared intervention for action outside ACTION_EFFECTS", tests=SC3R_TESTS),
+    Mutation("sc3r_outside_table_not_verified", CAUSAL,
+             "                verified.update(declared)\n                applied = True\n                if entry is None:",
+             "                verified.update(declared if entry is not None else {})\n                applied = True\n                if entry is None:",
+             tests=SC3R_TESTS),
     Mutation("sc_claim_warning_dropped", CAUSAL, "                    warnings.append(f\"unverified causal claim (free text): {action!r} -> {key}={value}\")\n",
              "                    pass\n", tests=SC_TESTS),
     Mutation("sc_ignored_warning_dropped", CAUSAL, "                warnings.append(f\"ignored causal claim outside WORLD_SCHEMA: {action!r} -> {pair}\")\n",

@@ -229,6 +229,9 @@ class RealWorldModelSimulator:
                 state.state.update(declared)
                 verified.update(declared)
                 applied = True
+                if entry is None:
+                    # SC3 (errata E2): ação declarada fora de ACTION_EFFECTS é aplicada, mas avisa.
+                    warnings.append(f"declared intervention for action outside ACTION_EFFECTS: {action!r}")
             if claims:
                 state.state.update(claims)
                 applied = True
