@@ -9,6 +9,16 @@ bandit_low: 139
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
+## Revalidação da PR #116 sobre main 046474f (#135) — 2026-10-30
+
+- **Base e estado no checkpoint:** main `046474f425293b0e72f883143f58c85745865c56`, filho de `539813f88a2279b4c9b74f30876d7aaadd8a7f31`. Antes desta atualização, #116 estava OPEN/draft no head remoto `25b17e5a003620649f1878e60a4b415d87a0c278`, base registrada `cb74cad7cfcd0ab536178ed984989ef2425c8211`; a branch local foi rebaseada sem conflitos, preservando seus dois commits funcionais/documentais sobre 046. Nenhuma PR foi mesclada.
+- **Preservação:** #135 acrescenta docs, testes de drift e scripts/replay de agentes; não altera `core/cognitivo`, `tools/cognitivo_mutation.py`, `tools/targeted_mutation.py` nem os contratos/implementação MCTS. A comparação 539→046 nesses caminhos ficou vazia; por isso o resultado da mutação de 539 segue aplicável: 594/594 mortos, 0 sobreviventes, 0 não aplicados. `CLAIMS.yaml` continua com `claims: []`.
+- **Validação focada:** working memory, contratos MCTS, Semantic Networks e drift da #135 → 83/83; CLI `tools/cognitivo_eval.py --capability working_memory` → WM1–WM6 aprovados. Ruff (`ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`) e compileall passaram.
+- **Suíte e cobertura CI local:** `coverage run --branch -m unittest discover -p 'test_*.py'` → 937 testes em 200,022 s, OK (2 skips); execução subsequente de `core/constitutional_brain.py`, summary integrado presente e todos os pisos passaram. Cobertura total 80%; `core/cognitivo` 98%, `core/constitutional_brain.py` 68%, deferred queue 95%, VRAM 94%, temporal facts 93%, bridge Vita 76%. Summary integrado: `passed`, 30 aprovados, skip `0`, sem itens missing/unexpected/conflicting/duplicates.
+- **M5/performance:** uma execução preliminar sobre 539 concorrente aos oito workers de mutação mediu MCTS M5 em 0,1191 s (limite 0,10 s). Sem concorrência, o contrato MCTS passou (1/1, 68,890 s); o gate completo serial sobre 539 e o gate final serial sobre 046 também passaram. Nenhum código ou contrato MCTS/POMDP foi alterado.
+- **Segurança e artefatos:** Bandit 139 LOW, 0 MEDIUM/HIGH; `security_triage.py --check`, `embedded_assert_audit.py` e `implementation_gap_audit.py` passaram. `tools/reality_audit.py` foi executado duas vezes; só `AUDIT_REALITY_REPORT.md` e `audit_reality.json` mudaram, com hashes idênticos entre execuções (`91f4e3682c75432b9937451c31c27639a7dbe4a899e4fe3cd06ca061fa0c6538` e `04299a932be00b27501f67c0c03a2609b0d039031ea614c1141160504b156ddd`).
+- **Limites:** CI hospedada não foi executada. Avisos opcionais de `psutil` e FAISS/SentenceTransformers não bloquearam os testes. Os resultados anteriores sobre base `cb74cad` são snapshots históricos e não validam este estado pós-#135.
+
 ## Rodada — `limit==0` e barra invertida na busca episódica — 2026-10-29
 
 - **Base:** `4215c4e` (`origin/main` depois do #126). Branch `grok/episodic-limit0-backslash-20261029`. Código novo só em `core/cognitivo/episodic_memory.py`, `test_episodic_like_literal_contract.py` e `tools/cognitivo_mutation.py`; `tools/targeted_mutation.py` e os testes do Axis intactos. Pré-registro EL1–EL8 em `docs/cognitivo/AUDITORIA_2026-10-22.md` (commit `1874de4`, antes do RED). O claim foi aberto no pré-registro e removido no último commit; `CLAIMS.yaml` volta a `claims: []`.
