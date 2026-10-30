@@ -43,8 +43,15 @@ class _BrainCase(unittest.TestCase):
 
     def setUp(self):
         modules = self.brain.router.modules
-        saved = dict(modules)
-        self.addCleanup(lambda: (modules.clear(), modules.update(saved)))
+        self._saved = dict(modules)
+        self.addCleanup(lambda: (modules.clear(), modules.update(self._saved)))
+        self.reset()
+
+    def reset(self):
+        """Volta os módulos do roteador ao estado original (com LOG gravador) entre subtestes."""
+        modules = self.brain.router.modules
+        modules.clear()
+        modules.update(self._saved)
         self.log = _Recorder()
         modules[ModuleType.LOG] = self.log
 
@@ -63,6 +70,7 @@ class RT9ThinkPropagatesBlock(_BrainCase):
         for k, seed in enumerate(SEEDS):
             code, name, module_type, factory = BLOCKERS[k % 2]
             with self.subTest(seed=seed, code=code):
+                self.reset()
                 self.brain.router.modules[module_type] = factory()
                 result = self.think(_query(random.Random(seed)))
                 self.assertEqual(result.get("error"), code)
@@ -92,6 +100,7 @@ class RT10ThinkPropagatesDegraded(_BrainCase):
         for k, seed in enumerate(SEEDS):
             module_type, fn_name = OPTIONAL[k % 3]
             with self.subTest(seed=seed, module=module_type.value):
+                self.reset()
                 self.brain.router.modules[module_type] = NS(**{fn_name: _boom("down")})
                 result = self.think(_query(random.Random(seed)))
                 self.assertFalse(result.get("error"))
@@ -181,7 +190,8 @@ class RT12BlockedRequestsAreCounted(unittest.TestCase):
                         before = len(calls)
                         result = router.route(make_prompt(random.Random(seed + i)))
                         self.assertEqual(result["error"], code)
-                        per_request.append(len(calls) - before)
+                        # o módulo substituído não grava em `calls`; budget/jailbreak respondem com sucesso, swarm levanta
+                        per_request.append(len(calls) - before + (name in ("budget", "jailbreak")))
                 stats = router.get_statistics()
                 self.assertEqual(stats["total_requests"], n)
                 self.assertEqual(stats["blocked_requests"], n)
@@ -235,6 +245,20 @@ class RT13FailureCauseIsReported(_BrainCase):
     def test_failed_modules_stays_a_list_of_names(self):
         result = _router([], KNOWLEDGE_GRAPH=NS(rag_query=_boom())).route("Tell me about item 4")
         self.assertEqual(result["failed_modules"], ["kg"])
+
+    def test_detail_keeps_the_first_failure_of_each_module(self):
+        # Acrescentado depois do 1º mutation run: `rv_detail_duplicates` sobreviveu porque nenhum plano
+        # real executa o mesmo módulo duas vezes; o teste chama a regra diretamente.
+        from core.constitutional_brain import CentralRouter, ModuleResult
+
+        results = [
+            ModuleResult(ModuleType.MEMORY, False, None, 0.0, "first"),
+            ModuleResult(ModuleType.KNOWLEDGE_GRAPH, True, {}, 0.0),
+            ModuleResult(ModuleType.MEMORY, False, None, 0.0, "second"),
+        ]
+        self.assertEqual(
+            CentralRouter._failed_module_details(results), [{"module": "memory", "error": "first"}]
+        )
 
     def test_think_propagates_the_detail(self):
         self.brain.router.modules[ModuleType.KNOWLEDGE_GRAPH] = NS(rag_query=_boom("kg offline"))

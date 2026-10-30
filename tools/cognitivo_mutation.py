@@ -40,6 +40,7 @@ _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isi
 CAUSAL = "core/cognitivo/causal_world_model.py"
 BRAIN = "core/constitutional_brain.py"
 RT_TESTS = ("test_router_fail_closed_contract.py", "test_central_router_contract.py")
+RV_TESTS = ("test_router_review_addendum_contract.py", "test_router_fail_closed_contract.py", "test_central_router_contract.py")
 COUNTERFACTUAL = "core/cognitivo/counterfactual.py"
 EFFECTS = "core/cognitivo/action_effects.py"
 R1_TESTS = ("test_action_effects_contract.py",)
@@ -1191,6 +1192,27 @@ MUTATIONS = [
     Mutation("rt_blocked_modules_empty", BRAIN, '"failed_modules": [blocked["module"].value],', '"failed_modules": [],', tests=RT_TESTS),
     Mutation("rt_blocked_prompt_untruncated", BRAIN, '"prompt": prompt[:100],\n            "degraded": True,', '"prompt": prompt,\n            "degraded": True,', tests=RT_TESTS),
     Mutation("rt_blocked_wrong_code", BRAIN, '"error": blocked["error"],\n            "reason": blocked["reason"],', '"error": "ETHICS_VIOLATION",\n            "reason": blocked["reason"],', tests=RT_TESTS),
+    Mutation('rv_think_drops_error', BRAIN, '"success", "error", "reason", "degraded"', '"success", "reason", "degraded"', tests=RV_TESTS),
+    Mutation('rv_think_drops_degraded', BRAIN, '"reason", "degraded", "failed_modules", "failed_modules_detail"]', '"reason", "failed_modules", "failed_modules_detail"]', tests=RV_TESTS),
+    Mutation('rv_think_drops_failed_modules', BRAIN, '"degraded", "failed_modules", "failed_modules_detail"]', '"degraded", "failed_modules_detail"]', tests=RV_TESTS),
+    Mutation('rv_think_drops_detail', BRAIN, '"degraded", "failed_modules", "failed_modules_detail"]', '"degraded", "failed_modules"]', tests=RV_TESTS),
+    Mutation('rv_think_drops_success', BRAIN, 'for field in ["success", "error"', 'for field in ["error"', tests=RV_TESTS),
+    Mutation('rv_block_not_logged', BRAIN, '        if log_module is not None:\n            try:\n                log_module.log_event("ROUTER_BLOCKED"', '        if False:\n            try:\n                log_module.log_event("ROUTER_BLOCKED"', tests=RV_TESTS),
+    Mutation('rv_block_logged_twice', BRAIN, 'log_module.log_event("ROUTER_BLOCKED", {\n', 'log_module.log_event("ROUTER_BLOCKED", {}); log_module.log_event("ROUTER_BLOCKED", {\n', tests=RV_TESTS),
+    Mutation('rv_block_log_failure_propagates', BRAIN, '            except Exception as exc:  # o log não pode', '            except ZeroDivisionError as exc:  # o log não pode', tests=RV_TESTS),
+    Mutation('rv_block_log_prompt_untruncated', BRAIN, '"prompt": prompt[:100],\n                })', '"prompt": prompt,\n                })', tests=RV_TESTS),
+    Mutation('rv_block_log_wrong_module', BRAIN, '"module": blocked["module"].value,\n                    "request_type"', '"module": blocked["error"],\n                    "request_type"', tests=RV_TESTS),
+    Mutation('rv_block_log_wrong_request_type', BRAIN, '"request_type": request_type.value,\n                    "prompt"', '"request_type": "x",\n                    "prompt"', tests=RV_TESTS),
+    Mutation('rv_block_stats_not_updated', BRAIN, '        self._update_statistics((time.time() - start_time) * 1000, plan, results)\n        return response', '        return response', tests=RV_TESTS),
+    Mutation('rv_block_not_counted', BRAIN, 'self.stats["blocked_requests"] = self.stats.get("blocked_requests", 0) + 1', 'pass', tests=RV_TESTS),
+    Mutation('rv_block_cause_not_counted', BRAIN, 'by_error[blocked["error"]] += 1', 'pass', tests=RV_TESTS),
+    Mutation('rv_block_stats_not_exposed', BRAIN, '"blocked_requests": self.stats.get("blocked_requests", 0),', '"blocked_requests": 0,', tests=RV_TESTS),
+    Mutation('rv_block_cause_not_exposed', BRAIN, '"blocked_by_error": dict(self.stats.get("blocked_by_error", {})),', '"blocked_by_error": {},', tests=RV_TESTS),
+    Mutation('rv_detail_blocked_wrong_cause', BRAIN, '"failed_modules_detail": [{"module": blocked["module"].value, "error": blocked["reason"]}],', '"failed_modules_detail": [{"module": blocked["module"].value, "error": blocked["error"]}],', tests=RV_TESTS),
+    Mutation('rv_detail_cause_empty', BRAIN, 'details.append({"module": result.module.value, "error": str(result.error)})', 'details.append({"module": result.module.value, "error": ""})', tests=RV_TESTS),
+    Mutation('rv_detail_dropped', BRAIN, 'final_result["failed_modules_detail"] = self._failed_module_details(all_results)', 'final_result["failed_modules_detail"] = []', tests=RV_TESTS),
+    Mutation('rv_detail_duplicates', BRAIN, 'if not result.success and result.module.value not in seen:\n                seen.append', 'if not result.success:\n                seen.append', tests=RV_TESTS),
+    Mutation('rv_detail_includes_success', BRAIN, 'if not result.success and result.module.value not in seen:\n                seen.append', 'if result.module.value not in seen:\n                seen.append', tests=RV_TESTS),
 ]
 
 

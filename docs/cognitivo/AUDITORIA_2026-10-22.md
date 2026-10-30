@@ -2409,3 +2409,22 @@ O RED do adendo rodou como previsto. Ao implementar o registro do bloqueio pelo 
 
 Decisão (errata, **não** ajuste de critério por resultado): o critério passa a ser lido como «nenhum **stage** seguinte do plano é executado; a única chamada permitida depois do bloqueio é um único `log_event("ROUTER_BLOCKED", …)`». A única edição em teste já registrado é o `LOG` falso de `test_router_fail_closed_contract.py` (`_log`), que passa a **não** contar `ROUTER_BLOCKED` em `calls`; o resto de `_assert_blocked` (módulos de stage seguinte, sucesso, erro, `degraded`, `failed_modules`) fica intacto, e o RT11 novo exige exatamente 1 chamada `ROUTER_BLOCKED`. Alternativa descartada: um gancho `block_log` separado do `LOG` (evitaria a edição, mas o evento deixaria de passar pelo log constitucional que o Laird pediu). A errata fica à vista do Pedro no corpo do PR.
 
+### Resultados RT9–RT14 (GREEN)
+Nenhum critério, seed, limite ou protocolo RT-v2 foi alterado depois de rodar. Houve **uma errata (E1)**, descrita acima, escrita e commitada **antes** do GREEN. Commits: pré-registro → contrato RED → errata E1 → GREEN (este: produção + correções de harness + mutantes + resultados + `claims: []`).
+
+**Reprodução dos fatos do Laird antes de corrigir (`/tmp/repro134.py`, `/tmp/probe134.py`):** (4) confirmado: `think()` devolvia a resposta de bloqueio sem `error` e sem `degraded`; (5) confirmado: um bloqueio dava 0 chamadas ao LOG e nenhuma estatística; (6) confirmado: `failed_modules` só tinha nomes, sem a causa. **Não alterado, em aberto para o Pedro:** orçamento que levanta exceção/ausente só degrada (fail-open) e o Swarm só é obrigatório em `ETHICAL_DECISION`; os dois comportamentos ficam fixados em RT14.
+
+**RED (código de `main` do PR):** `Ran 16 tests`, 66 falhas e 50 erros em subtestes, **todos comportamentais (0 `AttributeError`)**: `KeyError`/`assertIn` por chave ausente em `think()`, 0 chamadas `ROUTER_BLOCKED`, `KeyError` em `blocked_requests`/`failed_modules_detail`. A previsão (comportamental, `KeyError`, não `AttributeError`) acertou. O RED foi **rodado de novo** depois de duas correções do harness (abaixo), com os mesmos números.
+
+**Correções de harness no GREEN (bugs do meu teste, não de critério):** (i) o módulo trocado por uma seed vazava para a seed seguinte (agora `reset()` por subteste); (ii) o RT12 contava só chamadas gravadas, e o módulo substituído de budget/jailbreak responde com sucesso sem gravar (a média esperada ganhou +1 nesses dois casos). Os dois só afetavam o GREEN; o RED não mudou.
+
+**Errata E1 em efeito:** a única edição em teste já registrado é o `LOG` falso (`_log`) de `test_router_fail_closed_contract.py`; RT1–RT8 passam, com essa edição. `test_central_router_contract.py` e `test_jailbreak_detector_contract.py` sem edição.
+
+**GREEN:** `think()` copia `success`, `error`, `reason`, `degraded`, `failed_modules` e `failed_modules_detail` do roteador quando presentes; o bloqueio vai por `_finish_blocked` (resposta + um `log_event("ROUTER_BLOCKED", {error, module, request_type, prompt[:100]})`, falha do LOG engolida, `blocked_requests`, `blocked_by_error`, `_update_statistics`); `get_statistics` expõe `blocked_requests`/`blocked_by_error` (com `.get`, porque o contrato do roteador monta `stats` à mão); `failed_modules_detail` em sucesso degradado e em bloqueio (orçamento negado: `resource budget denied`). **Decisão de semântica:** o bloqueio entra em `total_requests`/latência/média de módulos, mas **não** é contado como sucesso (o texto antigo «sem estatística de sucesso» do RT1–RT8 trata de sucesso, não de requisição).
+
+**Teste acrescentado depois do 1º mutation run** (522/523; sobrevivente `rv_detail_duplicates`, não declarado equivalente): `RT13.test_detail_keeps_the_first_failure_of_each_module`, que chama a regra diretamente (nenhum plano real repete módulo). O contrato novo passa de 16 para 17 testes.
+
+**Resultados:** suíte 872 testes OK em Python 3.11 e 3.12; `ruff`, `compileall`, `reality_audit` regenerado só pela ferramenta + `git diff --exit-code`, `validar_registro` OK; Bandit sem MEDIUM/HIGH, `security_triage --check`, `embedded_assert_audit`, `implementation_gap_audit` OK (`SECURITY_TRIAGE.md` não mudou); cobertura `core/cognitivo/*` 98%, monólito 68%; `cognitivo_mutation` 523/523 (21 novos `rv_*`); `targeted_mutation` 80/80 sem edição da ferramenta; `python core/constitutional_brain.py` sai com 0.
+
+`docs/agentes/CLAIMS.yaml` volta a `claims: []` neste commit.
+
