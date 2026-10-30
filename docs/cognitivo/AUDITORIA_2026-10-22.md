@@ -2939,3 +2939,51 @@ Mutantes (`tools/cognitivo_mutation.py`): catálogo 697/697 mortos, 0 sobreviven
 Desvios: (1) um teste **meu** do arquivo novo (`test_self_loop_and_unknown_relation_endpoints`) tinha a expectativa calculada errada (0.8): a derivação correta com o autolaço é `min(1, 0.9 + 0.63) = 1.0`, menos 0.1 = **0.9**; corrigi o teste (não é critério registrado); (2) 11 âncoras de mutantes reapontadas (acima); (3) o docstring do módulo (fora do bloco hasheado) deixou de dizer "move-only/byte-idêntico".
 
 `claims: []` restaurado neste commit.
+
+## Semantic Networks — seguimento da revisão do Marcus (pré-registro F1–F9; herança iterativa, atomicidade, especificidade)
+
+Card t151s956 (Pedro): #143 mesclada (`main` = `51ffa97`). Este PR de seguimento fecha os achados da revisão do Marcus (sondas `p1`, `p6`, `p7`, `p9` em `/workspace/res143/`). **Este commit só registra decisões, critérios, errata e previsão; nenhum teste nem código de produção mudou.** Os critérios abaixo não são ajustados depois do RED.
+
+### Decisões
+
+1. **Herança iterativa com conjunto de visitados global** em `inherit_properties` (e, por delegação, em `query_by_properties`, que já chama `inherit_properties` por conceito; não há outro caminho). Pilha explícita no lugar da recursão; um único conjunto de `concept_id` por consulta, preenchido ao entrar no nó; propriedades próprias primeiro, depois os pais na ordem das relações; propriedade de pai não sobrescreve. A resolução do pai continua por rótulo (`_find_or_create_concept(parent.label)`), como hoje, para não mudar o caso de rótulos duplicados. O efeito colateral atual (consultar rótulo desconhecido cria o conceito) **fica**.
+2. **Atomicidade de `spread_activation`**: fotografia das ativações antes da chamada inteira; em **qualquer** exceção (`BaseException`) as ativações voltam à fotografia e a exceção é relançada. Caminho de sucesso inalterado. O único estado que a função muda é `concept.activation`.
+3. **Especificidade na herança: só testes `expectedFailure`**, **sem mudar comportamento**. "Ciclo com valores conflitantes sinalizado" não tem forma definida no código; o teste documenta uma **proposta** (um `UserWarning` com o texto "conflito" ao herdar num ciclo com valores diferentes para a mesma chave). A forma exata não é compromisso do PR; o teste só mantém a lacuna visível. Um sucesso inesperado desses testes falha a suíte (alguém mudou o comportamento sem registrar).
+
+### Medido no `main` (`51ffa97`, esta máquina, antes de qualquer mudança)
+
+- `p9` (caminho × visitados global, itens **e** ordem): 1645 casos, **0** diferenças; estendido por mim (6000 sementes, 2–10 nós, até 30 relações, tipos `IS-A`/`part`, 3 propriedades): **36086** casos, **0** diferenças. Ou seja, o resultado atual e o novo coincidem nas amostras; F3 é um critério de **preservação** (não esperado vermelho).
+- Cadeia IS-A: `inherit_properties` dá `RecursionError` a partir de 1000 nós (300, 900 e 980 ok); `query_by_properties` também.
+- `K_n` completo IS-A: chamadas de `_inherit` `K_6` 326, `K_7` 1957, `K_8` 13700, **`K_9` 109601 (0,65 s)**, `K_10` 986410 (6,99 s). **`K_9` já fica abaixo de 1 s nesta máquina**, então o critério "K_9 < 1 s" sozinho pode não ficar vermelho aqui (o RED do Marcus foi em contagem/tempo de máquina mais lenta). Por isso acrescento, **antes do RED**, dois critérios deterministas que ficam vermelhos: `K_10 < 1 s` e "no máximo uma expansão por nó" (F2).
+- `spread_activation`: força `1j` → `TypeError`, estado final `{A: 1.0, B: 0.35, C: 0.0}` ≠ inicial (falha na fase de aplicação, com `B` já alterado); erro só na iteração 2 (`str` em `B→C`) → `{A: 0.9, B: 0.25, C: 0.0}` ≠ inicial `{A: 1.0, B: 0.0, C: 0.0}`; `str` na fase de coleta da 1ª iteração já deixa o estado igual (guarda). `B = 1.0` inicial com `+0.7`/`−0.7` → `B = 0.9` **já hoje** (guarda, não vermelho).
+- Especificidade hoje: `Opus IS-A Bird`, depois `Opus IS-A Penguin`, `Penguin IS-A Bird` → `flies = True` (esperado `False`); `C IS-A P1 (P1 IS-A G, x='avo')`, `C IS-A P2 (x='pai')` → `x = 'avo'` (esperado `'pai'`); ciclo `A(red) ↔ B(blue)` → sem sinalização.
+
+### Critérios (F1–F9), no arquivo novo `test_semantic_networks_followup_contract.py`
+
+| id | critério | previsão no RED (código atual) |
+|---|---|---|
+| F1 | Cadeia de 1500 nós IS-A, limite de recursão padrão (1000): `inherit_properties` não levanta `RecursionError`, devolve as propriedades próprias do nó e a do topo da cadeia; `verify_hierarchy` continua `True` | **vermelho** (`RecursionError`) |
+| F2 | `K_9` IS-A completo: `inherit_properties` em **< 1 s**; `K_10` em **< 1 s**; e `get_related_concepts` chamado **no máximo uma vez por nó** (≤ 9 em `K_9`) | `K_9` tempo: provavelmente verde nesta máquina (0,65 s); `K_10` tempo **vermelho** (≈ 7 s); expansões **vermelho** (109601) |
+| F3 | Resultado **igual ao atual** (itens **e** ordem das chaves) em grafos aleatórios com ciclos, sementes fixas `0..1999` (2–10 nós, até 30 relações, `IS-A` e outro tipo), contra uma cópia congelada do algoritmo atual (baseado em caminho) dentro do teste | **verde** (preservação) |
+| F4 | Força `1j` → `TypeError` **e** ativações iguais às de antes da chamada (também com `iterations=1` e `3`) | **vermelho** (`B = 0.35`) |
+| F5 | Erro só na iteração 2 (e outro só na 3) → exceção relançada **e** ativações iguais às originais; com `str` na iteração 1 (guarda) e rede sem erro (caminho de sucesso igual ao registrado em SN3b/SN5) | iteração 2/3 **vermelho**; coleta e sucesso **verdes** |
+| F6 | `B = 1.0` com `+0.7` e `−0.7` e `spread_activation(1)` → `B = 0.9` | **verde** (guarda) |
+| F7 | Especificidade: 3 testes `expectedFailure` (Opus `[Bird, Penguin]` → `flies=False`; pai direto vence avô; ciclo conflitante sinalizado) | falham como esperado (contam como "expected failure"); precisam **continuar** falhando no GREEN |
+| F8 | `query_by_properties` delega a `inherit_properties` uma vez por conceito (espião) e dá o mesmo resultado que o atual nas mesmas sementes de F3; o harness SN1–SN6/SN3b/SN4b e `tests` existentes continuam passando | **verde** (guarda), exceto SN6 (abaixo) |
+| F9 | Fingerprint do módulo novo × o do `main` (`51ffa97`), com o harness **sem alteração**: **idêntico** inteiro (comportamento igual nas entradas do harness) | verificado no GREEN |
+
+`query_by_properties` com cadeia de 1500 **não** é critério: ela chama `inherit_properties` para cada conceito e `get_related_concepts` varre conceitos e relações (custo cúbico, ~minutos); mudar isso é otimização de estrutura de dados, fora deste PR. Fica registrado como limite conhecido.
+
+### Errata (SN6; declarada antes do RED)
+
+- `SN_SOURCE_SHA` (hash do bloco entre `# MÓDULO 26` e `get_statistics`) **muda**, porque `inherit_properties`/`_inherit` e `spread_activation` são reescritos. É **re-fixado uma vez**, depois do GREEN, a partir do código final, e só se **todos** os critérios passarem.
+- `SN_BEHAVIOR_SHA` (fingerprint) **não deve mudar**: o comportamento nas entradas do harness é o mesmo. Verificação F9 (fingerprint completo igual ao do `main`). Se o fingerprint mudar em qualquer campo, é critério falho: **parar sem push**.
+- Nenhum outro golden do SN6 e nenhuma linha de SN1–SN5/SN3b/SN4b do harness muda. Linhas de teste/harness tocadas: só a constante `SN_SOURCE_SHA` em `tools/cognitivo_eval.py` e as âncoras (mesma intenção) dos mutantes `sn_inherit_*` em `tools/cognitivo_mutation.py` que apontam para o texto de `_inherit`, que deixa de existir; mutantes novos são adicionados. Nada do Axis é tocado.
+
+### Parada
+
+Qualquer critério F1–F9 que falhar no GREEN (inclusive F3 ou F9, que provariam que "visitados global" muda resultado): **parar sem push** e reportar opções com a recomendada. O PR é DRAFT, "não mesclar sem go explícito do Pedro"; não mesclo.
+
+### Claim
+
+`docs/agentes/CLAIMS.yaml` aberto neste commit (agente `grok-bot`, 72 h); volta a `claims: []` no commit de resultados.
