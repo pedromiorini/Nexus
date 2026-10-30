@@ -9,6 +9,16 @@ bandit_low: 139
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
+## Rebase e validação da PR #116 sobre main `c9cf359` — 2026-10-30
+
+- **Base e estado:** main `c9cf359f29ff6a0ae5a134aafab60f741c2e8e74`; código validado em `43b46c12d7ccc7d7a414a5e1024257afb182e648`. O head remoto pré-push era `874dab2a8e49efa353b660f10133a8c4e793dddc`; #116 continuava OPEN/draft.
+- **Rebase e artefatos:** o conflito era apenas em `AUDIT_REALITY_REPORT.md`; `tools/reality_audit.py` regenerou `AUDIT_REALITY_REPORT.md` e `audit_reality.json`, e a verificação posterior confirmou outputs estáveis. Nenhum output foi editado à mão.
+- **Suíte/cobertura CI local:** Python 3.11.16 com `requirements-ci.lock` instalado via hashes, Ruff 0.17.1 e coverage 7.16.2. A suíte completa sob coverage → 1.028 testes em 214,807 s, OK. Coverage total 80%; pisos: `core/cognitivo` 97% (working memory 100%), brain 69%, deferred queue 95%, VRAM 94%, temporal facts 93%, bridge Vita 76%.
+- **Variação observada:** numa execução local anterior em Python 3.12.3 sob coverage, 1.028 testes, 2 skips e só dois contratos MCTS p95 falharam: 103,811 ms e 107,173 ms, acima do limite de 100 ms. Em Python 3.11.16, os contratos p95 sob coverage passaram (21/21), assim como a suíte integral; nenhum limite ou código foi alterado.
+- **WM e mutação:** WM1–WM6 passaram; `test_working_memory_contract` 34/34. No catálogo combinado após #141/#142, `tools/cognitivo_mutation.py` matou 683/683 mutantes; targeted mutation 80/80.
+- **Outros gates:** capability benchmark 4/4; POMDP benchmark 18/18; Bandit 139 LOW, 0 MEDIUM/HIGH; triagem de segurança, auditorias de asserts/gaps, artefatos drift e replay passaram; replay 17/17. Ruff, compileall, registro e requisitos também passaram.
+- **Limites:** actionlint e zizmor não estavam disponíveis localmente. Os checks hospedados ainda precisam ser conferidos no head final publicado; nenhuma PR foi mesclada.
+
 ## Revalidação da PR #116 sobre main 046474f (#135) — 2026-10-30
 
 - **Base e estado no checkpoint:** main `046474f425293b0e72f883143f58c85745865c56`, filho de `539813f88a2279b4c9b74f30876d7aaadd8a7f31`. Antes desta atualização, #116 estava OPEN/draft no head remoto `25b17e5a003620649f1878e60a4b415d87a0c278`, base registrada `cb74cad7cfcd0ab536178ed984989ef2425c8211`; a branch local foi rebaseada sem conflitos, preservando seus dois commits funcionais/documentais sobre 046. Nenhuma PR foi mesclada.
