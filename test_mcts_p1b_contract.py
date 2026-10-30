@@ -62,7 +62,16 @@ class V1DefaultVetoTests(unittest.TestCase):
             for seed in SEEDS20:
                 for actions, expected in cases:
                     with self.subTest(model=model, seed=seed, actions=actions):
-                        self.assertEqual(_plan(seed, actions=actions, model=model).best_action_sequence, expected)
+                        seq = _plan(seed, actions=actions, model=model).best_action_sequence
+                        if not model and actions == ["IGNORE_ALERT", "MONITOR"]:
+                            # Errata E2-P1b (t155s991): sem modelo, com uma só ação restante, o _record_found
+                            # (inalterado) devolve a sequência de profundidade 3; o critério é «não vazia, só MONITOR,
+                            # sem ação vetada».
+                            self.assertTrue(seq)
+                            self.assertEqual(set(seq), {"MONITOR"})
+                            self.assertFalse(set(seq) & set(VETOED))
+                        else:
+                            self.assertEqual(seq, expected)
 
     def test_default_action_space_never_returns_a_vetoed_action(self):
         for model in (True, False):
