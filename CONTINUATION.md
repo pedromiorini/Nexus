@@ -9,6 +9,13 @@ bandit_low: 139
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
+## Rebase e validação da PR #79 sobre main `51ffa974` (#143) — 2026-10-30
+
+- **Base e estado:** main `51ffa974a7c06d0e3377c3b81cbf546c3a4f67d9`; branch local `work/pr79-test-fix`, código verificado em `347656620a03008d1e2bf95170e3a1ae56a7509f`. Antes do push, a PR #79 continuava OPEN/draft no head remoto original `521b5231700221e036008181c3b8d316a5a84a8a`; nenhuma PR foi mesclada.
+- **Preservação da diff:** os 12 caminhos próprios da PR foram preservados. `tools/reality_audit.py` deixou `AUDIT_REALITY_REPORT.md` e `audit_reality.json` byte-a-byte iguais aos da main; nenhum output foi incluído na branch. Os arquivos de claims e aceites da PR não foram alterados durante esta validação.
+- **Contratos locais:** Python 3.11.16 com dependências de `requirements-ci.lock`; Ruff 0.17.1 e compileall passaram. Registro, instruções versionadas, composição da #79, aceite individual, replay e auditor de claims → 89 testes, 0 falhas, em 1,551 s. `tools/agente/validar_registro.py --expirados aviso` → registro OK; dois avisos históricos: Axis e `cursor-grok-4-7` aceitam 3.4.1, anterior à versão atual 3.4.2, com artefatos verificados. `tools/agente/replay/run_replay.sh` → 17/17.
+- **Limites:** nesta branch documental/de claims foram executados os contratos focados e seus gates de registro/replay; a suíte integral sob coverage foi executada separadamente na #116, não nesta tree. `git diff --check` só aponta a linha vazia final do snapshot versionado 3.4.2, preservada para manter o SHA exato; o artefato não foi editado. Os checks hospedados precisam ser conferidos nos heads finais publicados.
+
 ## Rebase e validação da PR #79 sobre main `c9cf359` — 2026-10-30
 
 - **Base e estado:** main `c9cf359f29ff6a0ae5a134aafab60f741c2e8e74`; código validado em `117793823f347df4e4bcc4f5b1c62630ef3a7989`. O head remoto pré-push era `f9eadc0139fd4b9c026bf201deee44e526130133`; #79 continuava OPEN/draft.
