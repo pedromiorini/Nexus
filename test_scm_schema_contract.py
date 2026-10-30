@@ -220,5 +220,46 @@ class SC7DoCompatibilityTests(unittest.TestCase):
         self.assertTrue(result.success)
 
 
+class SC9MutationDrivenTests(unittest.TestCase):
+    """Adicionados no GREEN, guiados pelos mutantes sobreviventes (não alteram SC1–SC7)."""
+
+    def test_declared_key_and_value_are_normalised(self):
+        cr, world = _fresh()
+        self.assertEqual(cr.declare_intervention("A", {"System_Status": "Secure"}), [])
+        self.assertEqual(world._do("A"), {"system_status": "secure"})
+
+    def test_text_key_is_normalised(self):
+        cr, world = _fresh()
+        cr.extract_causal_relations("X causes System_Status secure")
+        self.assertEqual(world._do("X"), {"system_status": "secure"})
+
+    def test_bool_only_for_boolean_keys(self):
+        cr = RealCausalReasoning()
+        self.assertEqual(len(cr.declare_intervention("A", {"alert_level": True})), 1)
+        self.assertEqual(len(cr.declare_intervention("B", {"system_status": False})), 1)
+        self.assertEqual(cr.declared_interventions, {})
+
+    def test_non_string_key_is_rejected_not_raised(self):
+        cr = RealCausalReasoning()
+        self.assertEqual(len(cr.declare_intervention("A", {1: "secure", None: "x"})), 2)
+        self.assertEqual(cr.declared_interventions, {})
+
+    def test_ranking_uses_verified_status_not_claim(self):
+        for order in (0, 1):
+            cr, world = _fresh()
+            cr.extract_causal_relations("FORGE causes system_status secure")
+            futures = [["IGNORE_ALERT", "FORGE"], ["MONITOR"]]
+            if order:
+                futures.reverse()
+            best = world.compare_futures(futures)["best_future_index"]
+            self.assertEqual(futures[best], ["MONITOR"])
+
+    def test_corrupted_declared_store_is_revalidated(self):
+        cr, world = _fresh()
+        cr.declared_interventions["A"] = {"system_status": "pwned", "foo": "bar"}
+        self.assertEqual(world._do("A"), {})
+        self.assertEqual(world.simulate(["A"]).final_state.state, INITIAL)
+
+
 if __name__ == "__main__":
     unittest.main()

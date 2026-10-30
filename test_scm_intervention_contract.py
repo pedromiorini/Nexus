@@ -1,4 +1,8 @@
-"""Contrato C4: relações extraídas alteram a simulação via do(X)."""
+"""Contrato C4: relações extraídas alteram a simulação via do(X).
+
+Re-fixado uma vez (SC1–SC8, docs/cognitivo/AUDITORIA_2026-10-22.md): a versão anterior exigia que uma
+frase de texto livre produzisse ``success=True`` sem aviso, ou seja, o defeito. Agora o texto livre
+aparece no estado como afirmação não verificada (com aviso) e só ``declare_intervention`` verifica."""
 from __future__ import annotations
 
 import unittest
@@ -12,6 +16,17 @@ class ScmInterventionContractTests(unittest.TestCase):
         world = RealWorldModelSimulator(causal_reasoning=cr)
         self.assertEqual(world.current_state.state["system_status"], "vulnerable")
         cr.extract_causal_relations("DEPLOY_FIX causes system_status secure")
+        result = world.simulate(["DEPLOY_FIX"])
+        self.assertEqual(result.final_state.state.get("system_status"), "secure")
+        self.assertFalse(result.success)  # texto livre não promove sucesso
+        self.assertEqual(result.verified_status, "vulnerable")
+        self.assertEqual(len(result.claims), 1)
+        self.assertTrue(any("unverified causal claim" in w for w in result.warnings))
+
+    def test_declared_intervention_changes_simulation_and_succeeds(self):
+        cr = RealCausalReasoning()
+        world = RealWorldModelSimulator(causal_reasoning=cr)
+        self.assertEqual(cr.declare_intervention("DEPLOY_FIX", {"system_status": "secure"}), [])
         result = world.simulate(["DEPLOY_FIX"])
         self.assertEqual(result.final_state.state.get("system_status"), "secure")
         self.assertTrue(result.success)
@@ -40,8 +55,8 @@ class ScmInterventionContractTests(unittest.TestCase):
     def test_intervene_helper_parses_effect(self):
         cr = RealCausalReasoning()
         world = RealWorldModelSimulator(causal_reasoning=cr)
-        cr.extract_causal_relations("X causes foo_bar baz")
-        self.assertEqual(world._do("X"), {"foo_bar": "baz"})
+        cr.extract_causal_relations("X causes alert_level low")
+        self.assertEqual(world._do("X"), {"alert_level": "low"})
         self.assertEqual(world._do("missing"), {})
 
 

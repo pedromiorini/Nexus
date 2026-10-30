@@ -2355,3 +2355,22 @@ SC1, SC2, SC3, SC5, SC6 falham (SC3 por `AttributeError: declare_intervention`);
 
 ### Re-fixação (uma vez, justificada)
 `test_scm_intervention_contract.py` é do grok-bot. Seu `test_extracted_relation_changes_simulation` afirma `result.success is True` e `warnings == []` para uma frase de texto livre: é exatamente o defeito. Passa a afirmar que o estado mostra a claim, `success is False` e o aviso de não verificada; a versão com sucesso usa `declare_intervention`. `test_intervene_helper_parses_effect` usa `foo_bar baz` (fora do schema) e passa a usar um par do schema. Os demais testes do arquivo ficam como estão.
+
+### Resultados SC1–SC8 (GREEN)
+Nenhum critério, seed, limite ou protocolo foi alterado depois de rodar: **sem errata**. Commits: `f7ac962` (pré-registro) → `1979301` (RED) → GREEN (este, produção + re-fixação + mutantes + resultados + `claims: []`).
+
+**RED (`1979301`, código de `main`):** 15 testes, 47 falhas e 60 erros em subtestes. SC1 falha 20/20; SC2 falha 15/20 e erra 5/20; SC3 erra (sem `declare_intervention`); SC5 erra 20/20; SC6 falha 10/20; SC7 falha 2/5. **Previsão errada, registrada:** previ «SC4 passa»; as sequências aleatórias passaram, mas o teste por ação da tabela errou, porque lê o campo novo `claims` (inexistente no código base). Os critérios SC4 não mudaram; só a previsão estava imprecisa.
+
+**GREEN (Python 3.11 e 3.12):** SC1 20/20, SC2 20/20, SC3 20/20 + os 4 negativos, SC4 10/10 ações + 20/20 sequências, SC5 20/20, SC6 20/20, SC7 exato, SC8 verde. Suíte completa 860 testes OK em 3.11 e em 3.12. `test_counterfactual_dox_contract.py` (CF9), `test_causal_world_model_extraction_contract.py` e `test_futures_ranking_contract.py` passam **sem edição**. `cognitivo_eval --capability causal`: saída idêntica byte a byte à de `main` (C1–C4/H inalterados, `failed: []`).
+
+**Mudança (só `core/cognitivo/causal_world_model.py`):** `WORLD_SCHEMA`, `_schema_pair`, `RealCausalReasoning.declare_intervention` (devolve pares rejeitados; `ValueError` ação vazia/não-str; `TypeError` efeitos não-dict), `_split_do`, `_do` só com pares do schema (declarado vence texto), `simulate` com `verified` separado de `state` (claims visíveis só no estado, com avisos `unverified causal claim (free text)` e `ignored causal claim outside WORLD_SCHEMA`), `SimulationResult.claims` e `verified_status` (com default), `compare_futures` usa o status verificado.
+
+**Re-fixação (uma única vez, justificada):** `test_scm_intervention_contract.py` (autoria grok-bot). `test_extracted_relation_changes_simulation` fixava `success is True` e `warnings == []` para texto livre, que é o defeito; agora afirma `success False`, `verified_status == "vulnerable"`, 1 claim e o aviso. Novo `test_declared_intervention_changes_simulation_and_succeeds` cobre a versão com sucesso via canal declarado. `test_intervene_helper_parses_effect` passa de `foo_bar baz` (fora do schema) para `alert_level low`.
+
+**Testes acrescentados no GREEN, guiados por mutantes sobreviventes (SC9, `test_scm_schema_contract.py`; SC1–SC7 intactos):** normalização de chave e valor, booleano só em chave booleana, chave não-str rejeitada sem exceção, ranking pelo status verificado e revalidação de um armazenamento declarado corrompido. Seis mutantes sobreviveram na primeira rodada; um deles (`sc_do_text_over_declared`) era **equivalente** (as claims nunca contêm chave declarada, a ordem é redundante) e foi removido do catálogo em vez de forçar teste.
+
+**Gates:** `ruff`, `compileall`, `reality_audit` regenerado só pela ferramenta + `git diff --exit-code` OK; `validar_registro` OK; Bandit sem MEDIUM/HIGH e `security_triage --check`, `embedded_assert_audit`, `implementation_gap_audit` OK (`SECURITY_TRIAGE.md` não mudou). Cobertura `core/cognitivo/*` 98% (≥ 90). `cognitivo_mutation` 503/503 mortos (24 novos mutantes `sc_*`; as agulhas de `c4_*` e `r2_unknown_status_ranks_high` foram atualizadas para as linhas alteradas, sem tocar `tools/targeted_mutation.py`); `targeted_mutation` 80/80 sem edição.
+
+**Lacuna residual declarada:** `declare_intervention` é confiável por convenção (qualquer código com acesso à instância pode chamar); não há autenticação do chamador. O ganho é separar texto não confiável (claim) de intervenção programática (verificada).
+
+`docs/agentes/CLAIMS.yaml` volta a `claims: []` neste commit.

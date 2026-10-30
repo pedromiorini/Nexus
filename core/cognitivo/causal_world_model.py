@@ -5,14 +5,41 @@ import copy
 import re
 import time
 from collections import defaultdict
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.cognitivo.action_effects import ACTION_EFFECTS
 
 # R2: utilidade ordinal do estado final (status desconhecido fica abaixo de todos)
 STATUS_UTILITY: Dict[str, int] = {"secure": 3, "stable": 2, "isolated": 1, "offline": 1, "vulnerable": 1,
                                   "compromised": 0}
+
+
+# SC: esquema declarado do mundo simbólico. Só pares (chave, valor) daqui podem virar efeito de
+# do(X); texto livre fora do esquema não muda nada. Valores de texto comparam sem diferença de
+# maiúsculas; booleanos são estritos (``True``/``False``, nunca "true" nem 1).
+WORLD_SCHEMA: Dict[str, Tuple[Any, ...]] = {
+    "security_patch_applied": (True, False),
+    "alert_level": ("low", "medium", "high", "critical"),
+    "system_status": ("secure", "stable", "isolated", "offline", "vulnerable", "compromised"),
+    "logging_level": ("normal", "verbose"),
+}
+
+
+def _schema_pair(key: Any, value: Any) -> Optional[Tuple[str, Any]]:
+    """Par (chave, valor) canônico se estiver no WORLD_SCHEMA; None caso contrário."""
+    if not isinstance(key, str):
+        return None
+    canon_key = key.strip().lower()
+    allowed = WORLD_SCHEMA.get(canon_key)
+    if allowed is None:
+        return None
+    if isinstance(value, bool):
+        return (canon_key, value) if any(isinstance(v, bool) for v in allowed) else None
+    if isinstance(value, str):
+        canon_value = value.strip().lower()
+        return (canon_key, canon_value) if canon_value in [v for v in allowed if isinstance(v, str)] else None
+    return None
 
 
 @dataclass
@@ -28,6 +55,26 @@ class RealCausalReasoning:
     def __init__(self):
         self.relations_extracted = 0
         self.causal_graph = {"adjacency": defaultdict(set)}
+        # Canal confiável (programático): ação -> efeitos validados contra o WORLD_SCHEMA.
+        self.declared_interventions: Dict[str, Dict[str, Any]] = {}
+
+    def declare_intervention(self, action: str, effects: Dict[str, Any]) -> List[str]:
+        """Declara os efeitos verificados de uma ação. Guarda só pares do WORLD_SCHEMA e devolve os rejeitados."""
+        if not isinstance(action, str) or not action.strip():
+            raise ValueError("action deve ser str não vazia")
+        if not isinstance(effects, dict):
+            raise TypeError("effects deve ser dict")
+        accepted: Dict[str, Any] = {}
+        rejected: List[str] = []
+        for key, value in effects.items():
+            pair = _schema_pair(key, value)
+            if pair is None:
+                rejected.append(f"{key!r}={value!r} fora do WORLD_SCHEMA")
+            else:
+                accepted[pair[0]] = pair[1]
+        if accepted:
+            self.declared_interventions.setdefault(action, {}).update(accepted)
+        return rejected
 
     def extract_causal_relations(self, text: str) -> List[CausalRelation]:
         """Extrair relações causais (R3: banco de marcadores + escopo de negação).
@@ -89,6 +136,8 @@ class SimulationResult:
     final_state: WorldState
     success: bool
     warnings: List[str]
+    claims: List[str] = field(default_factory=list)  # afirmações de texto livre aplicadas, não verificadas
+    verified_status: Optional[str] = None  # system_status só com tabela + intervenções declaradas
 
 class RealWorldModelSimulator:
     """POST13: World Model & Simulation - CONSOLIDADO"""
@@ -104,45 +153,84 @@ class RealWorldModelSimulator:
             timestamp=time.time()
         )
 
-    def _do(self, action: str) -> Dict[str, object]:
-        """Intervenção do(ação): efeitos simbólicos das arestas causa→efeito (Pearl)."""
+    def _split_do(self, action: str) -> Tuple[Dict[str, object], Dict[str, object], List[str]]:
+        """Separa os efeitos de do(ação): (declarados e verificados, claims de texto válidas, ignorados)."""
         cr = self.causal_reasoning
         if cr is None:
-            return {}
+            return {}, {}, []
+        declared_raw = getattr(cr, "declared_interventions", None)
+        declared: Dict[str, object] = {}
+        if isinstance(declared_raw, dict):
+            for key, value in (declared_raw.get(action) or {}).items():
+                pair = _schema_pair(key, value)
+                if pair is not None:
+                    declared[pair[0]] = pair[1]
         adjacency = getattr(cr, "causal_graph", {}).get("adjacency") or {}
-        effects: Dict[str, object] = {}
+        claims: Dict[str, object] = {}
+        ignored: List[str] = []
         for effect in adjacency.get(action, ()):
             parts = str(effect).strip().split(None, 1)
-            if len(parts) == 2:
-                effects[parts[0]] = parts[1]
+            if len(parts) != 2:
+                continue
+            pair = _schema_pair(parts[0], parts[1])
+            if pair is None:
+                ignored.append(f"{parts[0]}={parts[1]}")
+            elif pair[0] not in declared:
+                claims[pair[0]] = pair[1]
+        return declared, claims, ignored
+
+    def _do(self, action: str) -> Dict[str, object]:
+        """Intervenção do(ação): só pares do WORLD_SCHEMA; declarado vence texto na mesma chave."""
+        declared, claims, _ = self._split_do(action)
+        effects = dict(claims)
+        effects.update(declared)
         return effects
 
     def simulate(self, actions: List[str]) -> SimulationResult:
-        """Simular sequência de ações; aplica ACTION_EFFECTS e do(ação)."""
+        """Simular sequência de ações; aplica ACTION_EFFECTS, intervenções declaradas e claims de texto.
+
+        ``success`` e ``verified_status`` usam só o estado verificado (tabela + declaradas): uma
+        afirmação extraída de texto livre aparece em ``final_state`` e em ``claims``, com aviso,
+        mas não promove o sucesso.
+        """
         state = copy.deepcopy(self.current_state)
+        verified = dict(state.state)
         warnings = []
+        claim_log: List[str] = []
 
         for action in actions:
             applied = False
             entry = ACTION_EFFECTS.get(action)
             if entry is not None:
                 state.state.update(entry["world"])
+                verified.update(entry["world"])
                 applied = True
-            intervened = self._do(action)
-            if intervened:
-                state.state.update(intervened)
+            declared, claims, ignored = self._split_do(action)
+            if declared:
+                state.state.update(declared)
+                verified.update(declared)
                 applied = True
+            if claims:
+                state.state.update(claims)
+                applied = True
+                for key, value in claims.items():
+                    claim_log.append(f"{action}: {key}={value}")
+                    warnings.append(f"unverified causal claim (free text): {action!r} -> {key}={value}")
+            for pair in ignored:
+                warnings.append(f"ignored causal claim outside WORLD_SCHEMA: {action!r} -> {pair}")
             if not applied:
                 warnings.append(f"unknown action: {action!r}")
 
-        # Evaluate success
-        success = state.state.get("system_status") in ["secure", "stable"]
+        # Evaluate success (só estado verificado)
+        success = verified.get("system_status") in ["secure", "stable"]
 
         return SimulationResult(
             initial_state=self.current_state,
             final_state=state,
             success=success,
-            warnings=warnings
+            warnings=warnings,
+            claims=claim_log,
+            verified_status=verified.get("system_status"),
         )
 
     def compare_futures(self, action_sequences: List[List[str]]) -> Dict:
@@ -150,7 +238,7 @@ class RealWorldModelSimulator:
         results = [self.simulate(seq) for seq in action_sequences]
         best_idx = max(range(len(results)),
                        key=lambda i: (results[i].success,
-                                      STATUS_UTILITY.get(results[i].final_state.state.get("system_status"), -1)))
+                                      STATUS_UTILITY.get(results[i].verified_status, -1)))
 
         return {
             "results": results,
