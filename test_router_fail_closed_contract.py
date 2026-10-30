@@ -39,6 +39,15 @@ def _boom(message="boom"):
     return fail
 
 
+def _log(calls):
+    """LOG falso: o evento ROUTER_BLOCKED (errata E1 do RT-v2) não conta como stage executado."""
+    def log_event(event_type, data=None):
+        if event_type != "ROUTER_BLOCKED":
+            calls.append("log")
+        return "hash"
+    return log_event
+
+
 def _modules(calls):
     def rec(name, value):
         def fn(*args, **kwargs):
@@ -49,7 +58,7 @@ def _modules(calls):
     return {
         ModuleType.JAILBREAK: NS(detect=rec("jailbreak", NS(detected=False))),
         ModuleType.BUDGET: NS(request_budget=rec("budget", True)),
-        ModuleType.LOG: NS(log_event=rec("log", "hash")),
+        ModuleType.LOG: NS(log_event=_log(calls)),
         ModuleType.MEMORY: NS(retrieve=rec("memory", [])),
         ModuleType.KNOWLEDGE_GRAPH: NS(rag_query=rec("kg", {"graph_entities": [], "confidence": 0.0})),
         ModuleType.REASONING: NS(reason=rec("reasoning", {"answer": "ok", "confidence": 0.7})),

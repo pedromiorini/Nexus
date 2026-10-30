@@ -2404,3 +2404,8 @@ RT9, RT10 falham por **comportamento** (chaves ausentes em `think()`; `KeyError`
 ### Risco declarado (não é critério)
 `think()` passa a expor `degraded`/`failed_modules` também no caminho limpo (`False`/`[]`); campos novos são aditivos, mas um chamador que compare o dicionário inteiro de `think()` veria diferença.
 
+### Errata E1 do adendo RT-v2 (descoberta ao rodar o GREEN; escrita antes de mudar `core/constitutional_brain.py`)
+O RED do adendo rodou como previsto. Ao implementar o registro do bloqueio pelo módulo `LOG` (mudança 2 acima), os testes **já registrados** RT1–RT4 falharam: `_assert_blocked` exige que, após um bloqueio, `set(calls) ⊆ allowed_calls`, e o `LOG` falso de `test_router_fail_closed_contract.py` grava `"log"` em qualquer `log_event`. O critério RT1–RT4 («nenhum módulo dos stages seguintes invocado») e o pedido do Laird («registrar o bloqueio no LOG») entram em conflito literal quando o registro passa pelo próprio módulo `LOG`.
+
+Decisão (errata, **não** ajuste de critério por resultado): o critério passa a ser lido como «nenhum **stage** seguinte do plano é executado; a única chamada permitida depois do bloqueio é um único `log_event("ROUTER_BLOCKED", …)`». A única edição em teste já registrado é o `LOG` falso de `test_router_fail_closed_contract.py` (`_log`), que passa a **não** contar `ROUTER_BLOCKED` em `calls`; o resto de `_assert_blocked` (módulos de stage seguinte, sucesso, erro, `degraded`, `failed_modules`) fica intacto, e o RT11 novo exige exatamente 1 chamada `ROUTER_BLOCKED`. Alternativa descartada: um gancho `block_log` separado do `LOG` (evitaria a edição, mas o evento deixaria de passar pelo log constitucional que o Laird pediu). A errata fica à vista do Pedro no corpo do PR.
+
