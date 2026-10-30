@@ -20,7 +20,7 @@ Ler este arquivo **antes** de começar qualquer tarefa no repositório.
   - Falha-alvo: corrigida | não corrigida | não medido
   - Falhas parecidas: melhoraram | não melhoraram | mistas | não medido
   - Casos novos: melhoraram | pioraram | inalterados | não medido
-- Propostas rejeitadas ou que não funcionaram: <texto> | nenhuma registrada
+- Alternativas descartadas: <texto> | nenhuma registrada
 - Status: pendente | ativa | promovida (onde: instrução §/arquivo, ou teste/gate) | aposentada (data, motivo)
 ```
 
@@ -114,3 +114,16 @@ O replay `tools/agente/replay/run_replay.sh` não executa este auditor. Tipo des
 - Regra/checagem derivada: declaração de formato em schema não substitui teste negativo do caminho efetivamente executado; parser ISO sozinho também aceita formatos compactos/semanais.
 - Evidência: base `b2b01f2c6b044f0f7f1b60ec1e9c0d615fa4d296`; correção no PR #70 (head `10a48e81316b3f13c1cff414bbaa6dc91cf791a1`, merge `a663a55a560e00ae818e9c8f60aacd4cf9bd93f7`).
 - Status: registrada; sem promoção das instruções, publicação ou alegação de validação genérica de todo o schema.
+
+### L-010 — Artefato derivado commitado ficou desatualizado e só o CI percebeu (#132)
+- Data: 2026-10-29
+- Verificador que falhou (ou que deveria ter falhado): nenhum local; só o gate do CI (`security_triage.py --check`).
+- Fato observado: run 40968648232 (`afd12a5`, #132) falhou com "SECURITY_TRIAGE.md está desatualizado" após mover código para `core/cognitivo`. Depois de regenerar a triagem (`1c4970d`), o gate falhou mais duas vezes pelo marcador `bandit_low` nos documentos de estado e na fixture de `test_state_stray_marker_contract.py` (runs 40999295183 e 41000593789), corrigido em `99f5c94` e `365a1d9`.
+- Causa (Fato): o push saiu sem regenerar a triagem Bandit e sem sincronizar o contador `bandit_low`; não há checagem local antes do push.
+- Correção: `tools/agente/artefatos_drift.sh <repo_dir>` (0 atual; 7 divergente; 3 entrada inválida) e tipo `drift` no replay; casos locais em `tools/agente/replay/casos_drift.tsv`; contrato hermético `test_artefatos_drift_contract.py`. Ver `docs/agentes/ARTEFATOS_DRIFT.md`.
+- Regra/checagem derivada: antes de push que move ou cria código em `core`/`vita`/`tools`, rodar a guarda de artefatos; sai 7 se algo diverge. A guarda **não** cobre o marcador `bandit_low` dos documentos de estado nem a fixture do contrato: depois de regenerar `SECURITY_TRIAGE.md`, sincronizar também esses marcadores (precedente `23fde14`).
+- Evidência: runs 40968648232, 40999295183, 41000593789 (#132); recorrência de classe: 39862499062 (#93), 40707824816 (#79).
+- Derivada de: nenhuma.
+- Nota sobre medição: sem bloco de reincidência de propósito (lição `registrada`, reincidência não medida; ver desvio de AD8 em `ARTEFATOS_DRIFT.md`). Inferir `não medido` aqui faria o auditor reportá-la como `verificada`, e `test_current_lessons_are_not_reported_as_measured` exige `nao_checavel`.
+- Alternativas descartadas: colocar os casos `drift` em `casos.tsv` (o job de replay do CI não instala bandit); estender a guarda ao marcador `bandit_low` (fora do escopo pré-registrado; fica como proposta separada).
+- Status: registrada (origem/anterior/incompatível medidos no replay local; o teste de lição atual exige `nao_checavel` para lições não ativas; a ativação e a medição de reincidência são decisão do Pedro)

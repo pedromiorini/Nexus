@@ -38,6 +38,9 @@ MCTS_TESTS = ("test_mcts_planner_extraction_contract.py", "test_mcts_action_cont
 _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")'
 
 CAUSAL = "core/cognitivo/causal_world_model.py"
+BRAIN = "core/constitutional_brain.py"
+RT_TESTS = ("test_router_fail_closed_contract.py", "test_central_router_contract.py")
+RV_TESTS = ("test_router_review_addendum_contract.py", "test_router_fail_closed_contract.py", "test_central_router_contract.py")
 COUNTERFACTUAL = "core/cognitivo/counterfactual.py"
 EFFECTS = "core/cognitivo/action_effects.py"
 R1_TESTS = ("test_action_effects_contract.py",)
@@ -55,6 +58,7 @@ CF_TESTS = ("test_counterfactual_extraction_contract.py", "test_counterfactual_c
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
+MW_TESTS = ("test_mcts_world_effects_contract.py",)
 
 PC_LEARNING = ("test_predictive_learning_contract.py",)
 
@@ -75,6 +79,8 @@ CM = "core/cognitivo/contextual_memory.py"
 CM_TESTS = ("test_contextual_memory_contract.py",)
 EW = "core/cognitivo/emotional_memory_weighting.py"
 EW_TESTS = ("test_emotional_memory_weighting_contract.py",)
+SN = "core/cognitivo/semantic_networks.py"
+SN_TESTS = ("test_semantic_networks_contract.py",)
 
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
@@ -120,8 +126,8 @@ MUTATIONS = [
              "best_sequence = (self._best_found[1][prefix:] if self._best_found is not None",
              "best_sequence = (self._best_found[1][prefix:] if False", tests=MCTS_QUALITY),
     Mutation("mcts_keeps_strictly_better_found", MCTS,
-             "reward > 0 and (self._best_found is None or reward > self._best_found[0])",
-             "reward > 0", tests=MCTS_QUALITY),
+             "if self._best_found is None or reward > self._best_found[0]:",
+             "if True:", tests=MCTS_QUALITY),
     Mutation("episodic_search_rejects_boolean_and_non_integer_limit", EPISODIC, _GUARD,
              '"""Buscar episódios"""\n        if False:\n            raise TypeError("limit must be an integer")', tests=LIMITS),
     Mutation("episodic_search_rejects_negative_limit", EPISODIC,
@@ -165,6 +171,36 @@ MUTATIONS = [
              tests=PC_EXTRACTION),
     Mutation("mcts_exploration_term_dropped", MCTS,
              "exploration = exploration_constant * math.sqrt(", "exploration = 0.0 * math.sqrt(", tests=MCTS_TESTS),
+    Mutation("mw_world_evaluation_off", MCTS, "return self._evaluate_world(state)",
+             "pass", tests=MW_TESTS),
+    Mutation("mw_scale_wrong", MCTS, "utility / 3.0", "utility / 4.0", tests=MW_TESTS),
+    Mutation("mw_unknown_status_scores_high", MCTS,
+             'STATUS_UTILITY.get(final.get("system_status"), 0)',
+             'STATUS_UTILITY.get(final.get("system_status"), 3)', tests=MW_TESTS),
+    Mutation("mw_reads_wrong_world_key", MCTS, 'final.get("system_status")', 'final.get("alert_level")',
+             tests=MW_TESTS),
+    Mutation("mw_cache_never_reset", MCTS,
+             "            self._best_found = None\n            self._world_rewards = {}",
+             "            self._best_found = None\n            pass", tests=MW_TESTS),
+    Mutation("mw_cache_key_by_length", MCTS, 'steps = tuple(state.get("steps_taken", []))',
+             'steps = (len(state.get("steps_taken", [])),)', tests=MW_TESTS),
+    Mutation("mw_tie_prefers_longer", MCTS,
+             'if len(state.get("steps_taken", [])) < len(self._best_found[1]):',
+             'if len(state.get("steps_taken", [])) > len(self._best_found[1]):', tests=MW_TESTS),
+    Mutation("mw_tie_applies_without_model", MCTS,
+             "reward == self._best_found[0] and self._uses_world_effects():",
+             "reward == self._best_found[0]:", tests=MW_TESTS + MCTS_TESTS + MCTS_QUALITY + MCTS_INPUT),
+    Mutation("mw_unmodeled_ignored", MCTS, "if any(self._is_unmodeled(a) for a in best_sequence):",
+             "if False:", tests=MW_TESTS),
+    Mutation("mw_unmodeled_requires_all", MCTS, "if any(self._is_unmodeled(a) for a in best_sequence):",
+             "if all(self._is_unmodeled(a) for a in best_sequence):", tests=MW_TESTS),
+    Mutation("mw_unmodeled_ignores_warnings", MCTS,
+             'return bool(getattr(self.world_model.simulate([action]), "warnings", []))',
+             "return False", tests=MW_TESTS),
+    Mutation("mw_unmodeled_ignores_table", MCTS, "return action not in self._action_effects",
+             "return False", tests=MW_TESTS),
+    Mutation("mw_world_forced_without_simulate", MCTS,
+             'callable(getattr(self.world_model, "simulate", None))', "True", tests=MW_TESTS),
     Mutation("mcts_backprop_skips_reward", MCTS,
              "current.total_reward += reward", "current.total_reward += 0.0", tests=MCTS_TESTS),
     Mutation("mcts_depth_limit_off_by_one", MCTS,
@@ -1247,6 +1283,139 @@ MUTATIONS = [
              ")\n"
              "RealEmotionalMemoryWeighting = type(\"RealEmotionalMemoryWeighting\", (_RealEmotionalMemoryWeighting,), {})\n",
              tests=EW_TESTS),
+    # RT1–RT7: CentralRouter fail-closed (segurança e módulos obrigatórios)
+    Mutation("rt_block_skipped", BRAIN, '            if blocked is not None:\n', '            if False:\n', tests=RT_TESTS),
+    Mutation("rt_detected_ignored", BRAIN, '            if verdict:\n', '            if False:\n', tests=RT_TESTS),
+    Mutation("rt_jb_failure_ignored", BRAIN, '            if not result.success:\n                return {"error": "JAILBREAK_CHECK_FAILED"', '            if False:\n                return {"error": "JAILBREAK_CHECK_FAILED"', tests=RT_TESTS),
+    Mutation("rt_no_verdict_ignored", BRAIN, '            if verdict is self._NO_VERDICT:\n', '            if False:\n', tests=RT_TESTS),
+    Mutation("rt_dict_verdict_ignored", BRAIN, 'verdict = data.get("detected", self._NO_VERDICT)', 'verdict = self._NO_VERDICT', tests=RT_TESTS),
+    Mutation("rt_budget_ignored", BRAIN, '                if not allowed:\n', '                if False:\n', tests=RT_TESTS),
+    Mutation("rt_budget_error_blocks", BRAIN, 'if result.module == ModuleType.BUDGET and result.success:', 'if result.module == ModuleType.BUDGET:', tests=RT_TESTS),
+    Mutation("rt_swarm_rule_off", BRAIN, '        if request_type == RequestType.ETHICAL_DECISION:\n            for result in results:\n                if result.module == ModuleType.SWARM', '        if False:\n            for result in results:\n                if result.module == ModuleType.SWARM', tests=RT_TESTS),
+    Mutation("rt_swarm_rule_all_types", BRAIN, '        if request_type == RequestType.ETHICAL_DECISION:\n            for result in results:\n                if result.module == ModuleType.SWARM', '        if True:\n            for result in results:\n                if result.module == ModuleType.SWARM', tests=RT_TESTS),
+    Mutation("rt_swarm_success_inverted", BRAIN, 'ModuleType.SWARM and not result.success:\n                    return {"error": "MANDATORY', 'ModuleType.SWARM and result.success:\n                    return {"error": "MANDATORY', tests=RT_TESTS),
+    Mutation("rt_degraded_always_false", BRAIN, 'final_result["degraded"] = bool(failed_modules)', 'final_result["degraded"] = False', tests=RT_TESTS),
+    Mutation("rt_failed_modules_empty", BRAIN, 'final_result["failed_modules"] = failed_modules', 'final_result["failed_modules"] = []', tests=RT_TESTS),
+    Mutation("rt_degraded_cached", BRAIN, '        if cacheable and not failed_modules:\n', '        if cacheable:\n', tests=RT_TESTS),
+    Mutation("rt_failed_names_inverted", BRAIN, 'if not result.success and result.module.value not in names:', 'if result.success and result.module.value not in names:', tests=RT_TESTS),
+    Mutation("rt_blocked_success_true", BRAIN, '"success": False,\n            "error": blocked["error"],', '"success": True,\n            "error": blocked["error"],', tests=RT_TESTS),
+    Mutation("rt_blocked_not_degraded", BRAIN, '"degraded": True,\n            "failed_modules": [blocked', '"degraded": False,\n            "failed_modules": [blocked', tests=RT_TESTS),
+    Mutation("rt_blocked_modules_empty", BRAIN, '"failed_modules": [blocked["module"].value],', '"failed_modules": [],', tests=RT_TESTS),
+    Mutation("rt_blocked_prompt_untruncated", BRAIN, '"prompt": prompt[:100],\n            "degraded": True,', '"prompt": prompt,\n            "degraded": True,', tests=RT_TESTS),
+    Mutation("rt_blocked_wrong_code", BRAIN, '"error": blocked["error"],\n            "reason": blocked["reason"],', '"error": "ETHICS_VIOLATION",\n            "reason": blocked["reason"],', tests=RT_TESTS),
+    Mutation('rv_think_drops_error', BRAIN, '"success", "error", "reason", "degraded"', '"success", "reason", "degraded"', tests=RV_TESTS),
+    Mutation('rv_think_drops_degraded', BRAIN, '"reason", "degraded", "failed_modules", "failed_modules_detail"]', '"reason", "failed_modules", "failed_modules_detail"]', tests=RV_TESTS),
+    Mutation('rv_think_drops_failed_modules', BRAIN, '"degraded", "failed_modules", "failed_modules_detail"]', '"degraded", "failed_modules_detail"]', tests=RV_TESTS),
+    Mutation('rv_think_drops_detail', BRAIN, '"degraded", "failed_modules", "failed_modules_detail"]', '"degraded", "failed_modules"]', tests=RV_TESTS),
+    Mutation('rv_think_drops_success', BRAIN, 'for field in ["success", "error"', 'for field in ["error"', tests=RV_TESTS),
+    Mutation('rv_block_not_logged', BRAIN, '        if log_module is not None:\n            try:\n                log_module.log_event("ROUTER_BLOCKED"', '        if False:\n            try:\n                log_module.log_event("ROUTER_BLOCKED"', tests=RV_TESTS),
+    Mutation('rv_block_logged_twice', BRAIN, 'log_module.log_event("ROUTER_BLOCKED", {\n', 'log_module.log_event("ROUTER_BLOCKED", {}); log_module.log_event("ROUTER_BLOCKED", {\n', tests=RV_TESTS),
+    Mutation('rv_block_log_failure_propagates', BRAIN, '            except Exception as exc:  # o log não pode', '            except ZeroDivisionError as exc:  # o log não pode', tests=RV_TESTS),
+    Mutation('rv_block_log_prompt_untruncated', BRAIN, '"prompt": prompt[:100],\n                })', '"prompt": prompt,\n                })', tests=RV_TESTS),
+    Mutation('rv_block_log_wrong_module', BRAIN, '"module": blocked["module"].value,\n                    "request_type"', '"module": blocked["error"],\n                    "request_type"', tests=RV_TESTS),
+    Mutation('rv_block_log_wrong_request_type', BRAIN, '"request_type": request_type.value,\n                    "prompt"', '"request_type": "x",\n                    "prompt"', tests=RV_TESTS),
+    Mutation('rv_block_stats_not_updated', BRAIN, '        self._update_statistics((time.time() - start_time) * 1000, plan, results)\n        return response', '        return response', tests=RV_TESTS),
+    Mutation('rv_block_not_counted', BRAIN, 'self.stats["blocked_requests"] = self.stats.get("blocked_requests", 0) + 1', 'pass', tests=RV_TESTS),
+    Mutation('rv_block_cause_not_counted', BRAIN, 'by_error[blocked["error"]] += 1', 'pass', tests=RV_TESTS),
+    Mutation('rv_block_stats_not_exposed', BRAIN, '"blocked_requests": self.stats.get("blocked_requests", 0),', '"blocked_requests": 0,', tests=RV_TESTS),
+    Mutation('rv_block_cause_not_exposed', BRAIN, '"blocked_by_error": dict(self.stats.get("blocked_by_error", {})),', '"blocked_by_error": {},', tests=RV_TESTS),
+    Mutation('rv_detail_blocked_wrong_cause', BRAIN, '"failed_modules_detail": [{"module": blocked["module"].value, "error": blocked["reason"]}],', '"failed_modules_detail": [{"module": blocked["module"].value, "error": blocked["error"]}],', tests=RV_TESTS),
+    Mutation('rv_detail_cause_empty', BRAIN, 'details.append({"module": result.module.value, "error": str(result.error)})', 'details.append({"module": result.module.value, "error": ""})', tests=RV_TESTS),
+    Mutation('rv_detail_dropped', BRAIN, 'final_result["failed_modules_detail"] = self._failed_module_details(all_results)', 'final_result["failed_modules_detail"] = []', tests=RV_TESTS),
+    Mutation('rv_detail_duplicates', BRAIN, 'if not result.success and result.module.value not in seen:\n                seen.append', 'if not result.success:\n                seen.append', tests=RV_TESTS),
+    Mutation('rv_detail_includes_success', BRAIN, 'if not result.success and result.module.value not in seen:\n                seen.append', 'if result.module.value not in seen:\n                seen.append', tests=RV_TESTS),
+    Mutation('sn_banner_dropped', SN, 'print("🧠🕸️ POST 26', 'pass  # print("🧠🕸️ POST 26', tests=SN_TESTS),
+    Mutation('sn_kg_not_stored', SN, 'self.kg = knowledge_graph', 'self.kg = None', tests=SN_TESTS),
+    Mutation('sn_language_not_stored', SN, 'self.language = language', 'self.language = None', tests=SN_TESTS),
+    Mutation('sn_decay_changed', SN, 'self.activation_decay = 0.1', 'self.activation_decay = 0.2', tests=SN_TESTS),
+    Mutation('sn_spread_factor_changed', SN, 'self.spread_factor = 0.7', 'self.spread_factor = 0.8', tests=SN_TESTS),
+    Mutation('sn_concept_counter_dropped', SN, 'self.total_concepts += 1', 'self.total_concepts += 0', tests=SN_TESTS),
+    Mutation('sn_relation_counter_dropped', SN, 'self.total_relations += 1', 'self.total_relations += 0', tests=SN_TESTS),
+    Mutation('sn_activation_counter_dropped', SN, 'self.activations_performed += 1', 'self.activations_performed += 0', tests=SN_TESTS),
+    Mutation('sn_properties_default_dropped', SN, 'properties = properties or {}', 'properties = properties', tests=SN_TESTS),
+    Mutation('sn_properties_copied_on_add', SN, 'properties = properties or {}', 'properties = dict(properties or {})', tests=SN_TESTS),
+    Mutation('sn_concept_id_truncated', SN, 'concept_id=str(uuid.uuid4())', 'concept_id=str(uuid.uuid4())[:8]', tests=SN_TESTS),
+    Mutation('sn_relation_id_truncated', SN, 'relation_id=str(uuid.uuid4())', 'relation_id=str(uuid.uuid4())[:8]', tests=SN_TESTS),
+    Mutation('sn_created_at_monotonic', SN, 'created_at=time.time()', 'created_at=time.monotonic()', tests=SN_TESTS),
+    Mutation('sn_created_at_zero', SN, 'created_at=time.time()', 'created_at=0.0', tests=SN_TESTS),
+    Mutation('sn_initial_activation_changed', SN, 'activation=0.0,', 'activation=0.1,', tests=SN_TESTS),
+    Mutation('sn_concept_not_stored', SN, 'self.concepts[concept.concept_id] = concept', 'pass', tests=SN_TESTS),
+    Mutation('sn_relation_not_stored', SN, 'self.relations.append(relation)', 'pass', tests=SN_TESTS),
+    Mutation('sn_relation_strength_ignored', SN, 'strength=strength', 'strength=1.0', tests=SN_TESTS),
+    Mutation('sn_relation_type_ignored', SN, 'relation_type=relation_type,', 'relation_type="IS-A",', tests=SN_TESTS),
+    Mutation('sn_relation_ends_swapped', SN, 'source_id=source.concept_id,\n            target_id=target.concept_id,', 'source_id=target.concept_id,\n            target_id=source.concept_id,', tests=SN_TESTS),
+    Mutation('sn_strength_default_changed', SN, 'strength: float = 1.0', 'strength: float = 0.5', tests=SN_TESTS),
+    Mutation('sn_find_case_sensitive', SN, 'if concept.label.lower() == label.lower():\n                return concept', 'if concept.label == label:\n                return concept', tests=SN_TESTS),
+    Mutation('sn_find_never_reuses', SN, 'if concept.label.lower() == label.lower():\n                return concept', 'if False:\n                return concept', tests=SN_TESTS),
+    Mutation('sn_activation_not_clamped', SN, 'concept.activation = min(1.0, activation)', 'concept.activation = activation', tests=SN_TESTS),
+    Mutation('sn_activation_clamp_changed', SN, 'concept.activation = min(1.0, activation)', 'concept.activation = min(0.9, activation)', tests=SN_TESTS),
+    Mutation('sn_spread_threshold_inclusive', SN, 'if source.activation > 0.1:', 'if source.activation >= 0.1:', tests=SN_TESTS),
+    Mutation('sn_spread_threshold_raised', SN, 'if source.activation > 0.1:', 'if source.activation > 0.2:', tests=SN_TESTS),
+    Mutation('sn_spread_factor_unused', SN, 'source.activation * self.spread_factor * relation.strength', 'source.activation * relation.strength', tests=SN_TESTS),
+    Mutation('sn_spread_strength_unused', SN, 'source.activation * self.spread_factor * relation.strength', 'source.activation * self.spread_factor', tests=SN_TESTS),
+    Mutation('sn_spread_target_unclamped', SN, 'target.activation = min(1.0, target.activation + spread_amount)', 'target.activation = target.activation + spread_amount', tests=SN_TESTS),
+    Mutation('sn_spread_overwrites_target', SN, 'target.activation = min(1.0, target.activation + spread_amount)', 'target.activation = min(1.0, spread_amount)', tests=SN_TESTS),
+    Mutation('sn_spread_decay_unused', SN, 'concept.activation = max(0.0, concept.activation - self.activation_decay)', 'pass', tests=SN_TESTS),
+    Mutation('sn_spread_decay_floor_dropped', SN, 'concept.activation = max(0.0, concept.activation - self.activation_decay)', 'concept.activation = concept.activation - self.activation_decay', tests=SN_TESTS),
+    Mutation('sn_spread_iterations_ignored', SN, 'for _ in range(iterations):', 'for _ in range(1):', tests=SN_TESTS),
+    Mutation('sn_spread_result_inclusive', SN, 'if c.activation > 0.1\n        }', 'if c.activation >= 0.1\n        }', tests=SN_TESTS),
+    Mutation('sn_spread_result_keyed_by_id', SN, 'c.label: c.activation', 'c.concept_id: c.activation', tests=SN_TESTS),
+    Mutation('sn_related_case_sensitive', SN, 'if c.label.lower() == label.lower():\n                source = c', 'if c.label == label:\n                source = c', tests=SN_TESTS),
+    Mutation('sn_related_type_ignored', SN, 'if relation_type is None or relation.relation_type == relation_type:', 'if True:', tests=SN_TESTS),
+    Mutation('sn_related_none_matches_nothing', SN, 'if relation_type is None or relation.relation_type == relation_type:', 'if relation_type is not None and relation.relation_type == relation_type:', tests=SN_TESTS),
+    Mutation('sn_related_reversed_direction', SN, 'if relation.source_id == source.concept_id:', 'if relation.target_id == source.concept_id:', tests=SN_TESTS),
+    Mutation('sn_related_returns_sources', SN, 'related_ids.append(relation.target_id)', 'related_ids.append(relation.source_id)', tests=SN_TESTS),
+    Mutation('sn_related_creates_missing', SN, 'if not source:\n            return []', 'if not source:\n            self.add_concept(label)\n            return []', tests=SN_TESTS),
+    Mutation('sn_inherit_mutates_own_properties', SN, 'inherited = concept.properties.copy()', 'inherited = concept.properties', tests=SN_TESTS),
+    Mutation('sn_inherit_deep_copies', SN, 'inherited = concept.properties.copy()', "inherited = __import__('copy').deepcopy(concept.properties)", tests=SN_TESTS),
+    Mutation('sn_inherit_parent_overrides', SN, 'if key not in inherited:', 'if True:', tests=SN_TESTS),
+    Mutation('sn_inherit_ignores_parents', SN, 'parent_concepts = self.get_related_concepts(concept_label, "IS-A")', 'parent_concepts = []', tests=SN_TESTS),
+    Mutation('sn_inherit_any_relation', SN, 'parent_concepts = self.get_related_concepts(concept_label, "IS-A")', 'parent_concepts = self.get_related_concepts(concept_label)', tests=SN_TESTS),
+    Mutation('sn_inherit_not_recursive', SN, 'parent_props = self.inherit_properties(parent.label)', 'parent_props = parent.properties', tests=SN_TESTS),
+    Mutation('sn_verify_case_sensitive', SN, 'if child_label.lower() == ancestor_label.lower():', 'if child_label == ancestor_label:', tests=SN_TESTS),
+    Mutation('sn_verify_identity_false', SN, 'return True\n\n        # Buscar pais', 'return False\n\n        # Buscar pais', tests=SN_TESTS),
+    Mutation('sn_verify_any_relation', SN, 'parents = self.get_related_concepts(child_label, "IS-A")', 'parents = self.get_related_concepts(child_label)', tests=SN_TESTS),
+    Mutation('sn_verify_not_recursive', SN, 'if self.verify_hierarchy(parent.label, ancestor_label):', 'if parent.label.lower() == ancestor_label.lower():', tests=SN_TESTS),
+    Mutation('sn_verify_default_true', SN, 'return False\n\n    def query_by_properties', 'return True\n\n    def query_by_properties', tests=SN_TESTS),
+    Mutation('sn_query_uses_own_properties', SN, 'all_props = self.inherit_properties(concept.label)', 'all_props = concept.properties', tests=SN_TESTS),
+    Mutation('sn_query_value_not_compared', SN, 'if key not in all_props or all_props[key] != value:', 'if key not in all_props:', tests=SN_TESTS),
+    Mutation('sn_query_value_equality_inverted', SN, 'all_props[key] != value', 'all_props[key] == value', tests=SN_TESTS),
+    Mutation('sn_query_mismatch_ignored', SN, 'match = False\n                    break', 'match = True\n                    break', tests=SN_TESTS),
+    Mutation('sn_stats_activated_inclusive', SN, 'if c.activation > 0.1)', 'if c.activation >= 0.1)', tests=SN_TESTS),
+    Mutation('sn_stats_activated_threshold_raised', SN, 'if c.activation > 0.1)', 'if c.activation > 0.2)', tests=SN_TESTS),
+    Mutation('sn_stats_activated_zero', SN, '"activated_concepts": activated_concepts,', '"activated_concepts": 0,', tests=SN_TESTS),
+    Mutation('sn_stats_activation_count_zero', SN, '"activations_performed": self.activations_performed,', '"activations_performed": 0,', tests=SN_TESTS),
+    Mutation('sn_stats_avg_floor_two', SN, 'max(1, len(self.concepts))', 'max(2, len(self.concepts))', tests=SN_TESTS),
+    Mutation('sn_stats_avg_unguarded', SN, 'max(1, len(self.concepts))', 'len(self.concepts)', tests=SN_TESTS),
+    Mutation('sn_stats_avg_only_active', SN, 'sum(c.activation for c in self.concepts.values())', 'sum(c.activation for c in self.concepts.values() if c.activation > 0.1)', tests=SN_TESTS),
+    Mutation("sn_module_pulls_monolith", SN, "import uuid\n",
+             "import uuid\nimport core.constitutional_brain  # noqa: F401\n", tests=SN_TESTS),
+    Mutation("sn_monolith_stops_reexporting", "core/constitutional_brain.py",
+             "from core.cognitivo.semantic_networks import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    ConceptNode,\n"
+             "    RealSemanticNetworksSystem,\n"
+             "    SemanticRelation,\n"
+             ")\n",
+             "from core.cognitivo.semantic_networks import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    ConceptNode,\n"
+             "    RealSemanticNetworksSystem as _RealSemanticNetworksSystem,\n"
+             "    SemanticRelation,\n"
+             ")\n"
+             "RealSemanticNetworksSystem = type(\"RealSemanticNetworksSystem\", (_RealSemanticNetworksSystem,), {})\n",
+             tests=SN_TESTS),
+    Mutation("sn_package_stops_reexporting", "core/cognitivo/__init__.py",
+             "from core.cognitivo.semantic_networks import (\n"
+             "    ConceptNode,\n"
+             "    RealSemanticNetworksSystem,\n"
+             "    SemanticRelation,\n"
+             ")\n",
+             "from core.cognitivo.semantic_networks import (\n"
+             "    ConceptNode,\n"
+             "    RealSemanticNetworksSystem as _RealSemanticNetworksSystem,\n"
+             "    SemanticRelation,\n"
+             ")\n"
+             "RealSemanticNetworksSystem = type(\"RealSemanticNetworksSystem\", (_RealSemanticNetworksSystem,), {})\n",
+             tests=SN_TESTS),
 ]
 
 

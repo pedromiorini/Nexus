@@ -1,0 +1,6 @@
+# Casos da guarda de artefatos (uso LOCAL, antes do push; o CI nao instala bandit): bash tools/agente/replay/run_replay.sh tools/agente/replay/casos_drift.tsv
+# D-origem: afd12a5 so existe no historico do #132 (git fetch origin pull/132/head); sem o SHA o replay sai 4 (entrada invalida).
+# id	tipo	args	rc_esperado
+D-origem	drift	afd12a5	7
+D-anterior	drift	23fde14	0
+D-incompat	drift	/tmp/nao-existe-drift	3

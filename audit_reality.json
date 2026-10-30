@@ -6,7 +6,7 @@
     "extracted_modules": [
       {
         "path": "core/cognitivo/__init__.py",
-        "lines": 83,
+        "lines": 91,
         "classes": 0,
         "functions": 0
       },
@@ -72,9 +72,9 @@
       },
       {
         "path": "core/cognitivo/mcts_planner.py",
-        "lines": 446,
+        "lines": 483,
         "classes": 3,
-        "functions": 19
+        "functions": 22
       },
       {
         "path": "core/cognitivo/mental_simulation.py",
@@ -89,15 +89,21 @@
         "functions": 17
       },
       {
+        "path": "core/cognitivo/semantic_networks.py",
+        "lines": 359,
+        "classes": 3,
+        "functions": 11
+      },
+      {
         "path": "core/cognitivo/working_memory.py",
         "lines": 438,
         "classes": 6,
         "functions": 25
       }
     ],
-    "core_lines": 23481,
-    "classes": 221,
-    "functions": 702,
+    "core_lines": 23276,
+    "classes": 218,
+    "functions": 696,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -106,6 +112,7 @@
       }
     ],
     "dynamic_literal_return_functions": [
+      "CentralRouter._blocked_response",
       "CentralRouter._init_routing_rules",
       "EthicsGuard.get_statistics",
       "RealAdversarialRobustnessLayer.get_robustness_report",

@@ -4,7 +4,7 @@
 commit: HEAD
 ci_run: CURRENT_RUN
 tests: CURRENT_TESTS
-bandit_low: 138
+bandit_low: 139
 -->
 
 ## Fonte de verdade

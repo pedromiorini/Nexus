@@ -5081,337 +5081,11 @@ from core.cognitivo.analogical_reasoning import (  # noqa: E402,F401  (strangler
 # MÓDULO 26: SEMANTIC NETWORKS SYSTEM (POST 26)
 # ═══════════════════════════════════════════════════════════════════════════
 
-@dataclass
-class ConceptNode:
-    """Nó representando conceito na rede semântica"""
-    concept_id: str
-    label: str
-    properties: Dict[str, Any]
-    activation: float  # Nível de ativação (0-1)
-    created_at: float
-
-
-@dataclass
-class SemanticRelation:
-    """Relação semântica entre conceitos"""
-    relation_id: str
-    relation_type: str  # IS-A, HAS-A, PART-OF, CAUSES, etc.
-    source_id: str
-    target_id: str
-    strength: float  # Força da relação (0-1)
-
-
-class RealSemanticNetworksSystem:
-    """
-    POST26: Semantic Networks System — REAL Conceptual Knowledge Graph
-    
-    Redes Semânticas = representação de conhecimento conceitual em grafo.
-    
-    Características:
-    - Nós representam conceitos
-    - Arestas representam relações semânticas
-    - Spreading activation para recuperação
-    - Herança de propriedades via IS-A
-    
-    Tipos de Relações:
-    - IS-A: hierarquia taxonômica
-    - HAS-A: propriedades/atributos
-    - PART-OF: composição mereológica
-    - CAUSES: relações causais
-    - SIMILAR-TO: similaridade
-    
-    Componentes:
-    - Concept Nodes: Conceitos com ativação
-    - Semantic Relations: Relações tipadas
-    - Spreading Activation: Propagação de ativação
-    - Inheritance: Herança via IS-A
-    
-    Multiplica:
-    • × POST4 (KnowledgeGraph): Complementa com semântica
-    • × POST18 (Language): Semântica linguística
-    • × POST1 (Memory): Memória conceitual
-    • × POST2 (Reasoning): Raciocínio por redes
-    
-    Baseado em:
-    - Collins & Quillian's Hierarchical Network (1969)
-    - Collins & Loftus' Spreading Activation (1975)
-    - Anderson's ACT-R Semantic Memory (1983)
-    - Quillia
-
-n's Semantic Networks (1968)
-    """
-
-    def __init__(self, knowledge_graph=None, language=None):
-        self.kg = knowledge_graph
-        self.language = language
-
-        # Network storage
-        self.concepts: Dict[str, ConceptNode] = {}
-        self.relations: List[SemanticRelation] = []
-
-        # Spreading activation parameters
-        self.activation_decay = 0.1
-        self.spread_factor = 0.7
-
-        # Estatísticas
-        self.total_concepts = 0
-        self.total_relations = 0
-        self.activations_performed = 0
-
-        print("🧠🕸️ POST 26 - RealSemanticNetworksSystem initialized (Conceptual knowledge graph active)")
-
-    def add_concept(self, label: str, properties: Dict[str, Any] | None = None) -> ConceptNode:
-        """
-        Adicionar conceito à rede.
-        
-        Args:
-            label: Label do conceito
-            properties: Propriedades do conceito
-        
-        Returns:
-            ConceptNode criado
-        """
-        properties = properties or {}
-
-        concept = ConceptNode(
-            concept_id=str(uuid.uuid4()),
-            label=label,
-            properties=properties,
-            activation=0.0,
-            created_at=time.time()
-        )
-
-        self.concepts[concept.concept_id] = concept
-        self.total_concepts += 1
-
-        return concept
-
-    def add_relation(self, 
-                    source_label: str,
-                    relation_type: str,
-                    target_label: str,
-                    strength: float = 1.0) -> SemanticRelation:
-        """
-        Adicionar relação semântica.
-        
-        Args:
-            source_label: Conceito fonte
-            relation_type: Tipo de relação
-            target_label: Conceito alvo
-            strength: Força da relação
-        
-        Returns:
-            SemanticRelation criada
-        """
-        # Encontrar ou criar conceitos
-        source = self._find_or_create_concept(source_label)
-        target = self._find_or_create_concept(target_label)
-
-        relation = SemanticRelation(
-            relation_id=str(uuid.uuid4()),
-            relation_type=relation_type,
-            source_id=source.concept_id,
-            target_id=target.concept_id,
-            strength=strength
-        )
-
-        self.relations.append(relation)
-        self.total_relations += 1
-
-        return relation
-
-    def _find_or_create_concept(self, label: str) -> ConceptNode:
-        """Encontrar ou criar conceito por label"""
-        # Buscar existente
-        for concept in self.concepts.values():
-            if concept.label.lower() == label.lower():
-                return concept
-
-        # Criar novo
-        return self.add_concept(label)
-
-    def activate_concept(self, label: str, activation: float = 1.0):
-        """
-        Ativar conceito.
-        
-        Args:
-            label: Label do conceito
-            activation: Nível de ativação inicial
-        """
-        concept = self._find_or_create_concept(label)
-        concept.activation = min(1.0, activation)
-
-        self.activations_performed += 1
-
-    def spread_activation(self, iterations: int = 3) -> Dict[str, float]:
-        """
-        Propagar ativação pela rede.
-        
-        Spreading Activation: ativação se propaga de nós ativos
-        para nós conectados, com decay.
-        
-        Args:
-            iterations: Número de iterações
-        
-        Returns:
-            Dict de conceitos ativados
-        """
-        for _ in range(iterations):
-            # Para cada relação
-            for relation in self.relations:
-                source = self.concepts.get(relation.source_id)
-                target = self.concepts.get(relation.target_id)
-
-                if not source or not target:
-                    continue
-
-                # Propagar ativação de source para target
-                if source.activation > 0.1:
-                    spread_amount = source.activation * self.spread_factor * relation.strength
-                    target.activation = min(1.0, target.activation + spread_amount)
-
-            # Apply decay
-            for concept in self.concepts.values():
-                concept.activation = max(0.0, concept.activation - self.activation_decay)
-
-        # Retornar conceitos ativados
-        activated = {
-            c.label: c.activation
-            for c in self.concepts.values()
-            if c.activation > 0.1
-        }
-
-        return activated
-
-    def get_related_concepts(self, label: str, relation_type: str | None = None) -> List[ConceptNode]:
-        """
-        Obter conceitos relacionados.
-        
-        Args:
-            label: Label do conceito
-            relation_type: Tipo de relação (None = todos)
-        
-        Returns:
-            Lista de conceitos relacionados
-        """
-        # Encontrar conceito
-        source = None
-        for c in self.concepts.values():
-            if c.label.lower() == label.lower():
-                source = c
-                break
-
-        if not source:
-            return []
-
-        # Buscar relações
-        related_ids = []
-        for relation in self.relations:
-            if relation.source_id == source.concept_id:
-                if relation_type is None or relation.relation_type == relation_type:
-                    related_ids.append(relation.target_id)
-
-        # Retornar conceitos
-        related = [self.concepts[rid] for rid in related_ids if rid in self.concepts]
-
-        return related
-
-    def inherit_properties(self, concept_label: str) -> Dict[str, Any]:
-        """
-        Herdar propriedades via relações IS-A.
-        
-        Property Inheritance: conceitos herdam propriedades
-        de conceitos superiores na hierarquia IS-A.
-        
-        Args:
-            concept_label: Label do conceito
-        
-        Returns:
-            Propriedades herdadas
-        """
-        # Encontrar conceito
-        concept = self._find_or_create_concept(concept_label)
-
-        # Propriedades próprias
-        inherited = concept.properties.copy()
-
-        # Buscar relações IS-A
-        parent_concepts = self.get_related_concepts(concept_label, "IS-A")
-
-        # Herdar recursivamente
-        for parent in parent_concepts:
-            parent_props = self.inherit_properties(parent.label)
-            # Propriedades do pai são default (não sobrescrevem)
-            for key, value in parent_props.items():
-                if key not in inherited:
-                    inherited[key] = value
-
-        return inherited
-
-    def verify_hierarchy(self, child_label: str, ancestor_label: str) -> bool:
-        """
-        Verificar se child é descendente de ancestor via IS-A.
-        
-        Args:
-            child_label: Conceito filho
-            ancestor_label: Conceito ancestral
-        
-        Returns:
-            True se child IS-A ancestor
-        """
-        # Base case
-        if child_label.lower() == ancestor_label.lower():
-            return True
-
-        # Buscar pais
-        parents = self.get_related_concepts(child_label, "IS-A")
-
-        # Recursão
-        for parent in parents:
-            if self.verify_hierarchy(parent.label, ancestor_label):
-                return True
-
-        return False
-
-    def query_by_properties(self, required_properties: Dict[str, Any]) -> List[ConceptNode]:
-        """
-        Query conceitos por propriedades.
-        
-        Args:
-            required_properties: Propriedades requeridas
-        
-        Returns:
-            Conceitos matching
-        """
-        matches = []
-
-        for concept in self.concepts.values():
-            # Obter propriedades herdadas
-            all_props = self.inherit_properties(concept.label)
-
-            # Verificar match
-            match = True
-            for key, value in required_properties.items():
-                if key not in all_props or all_props[key] != value:
-                    match = False
-                    break
-
-            if match:
-                matches.append(concept)
-
-        return matches
-
-    def get_statistics(self) -> Dict:
-        """Estatísticas do Semantic Networks System"""
-        activated_concepts = sum(1 for c in self.concepts.values() if c.activation > 0.1)
-
-        return {
-            "total_concepts": self.total_concepts,
-            "total_relations": self.total_relations,
-            "activations_performed": self.activations_performed,
-            "activated_concepts": activated_concepts,
-            "avg_activation": sum(c.activation for c in self.concepts.values()) / max(1, len(self.concepts))
-        }
+from core.cognitivo.semantic_networks import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)
+    ConceptNode,
+    RealSemanticNetworksSystem,
+    SemanticRelation,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -9787,6 +9461,8 @@ class CentralRouter:
             "module_call_count": {m: 0 for m in ModuleType},
             "module_errors": {m: 0 for m in ModuleType},
             "avg_modules_per_request": 0,
+            "blocked_requests": 0,
+            "blocked_by_error": defaultdict(int),
             "deferred_reprocessing": {
                 "attempts": 0,
                 "completed": 0,
@@ -10116,6 +9792,13 @@ class CentralRouter:
                 if result.success:
                     aggregated_data[result.module.value] = result.data
 
+            # Fail-closed: segurança e módulos obrigatórios não passam como sucesso
+            blocked = self._blocking_decision(request_type, all_results)
+            if blocked is not None:
+                return self._finish_blocked(
+                    prompt, request_type, blocked, execution_plan, all_results, start_time
+                )
+
         # ─── 6. VALIDAÇÃO ÉTICA PÓS ───────────────────────────────────────
         ethics_post = self.ethics.post_execution_validation(prompt, all_results)
 
@@ -10133,7 +9816,11 @@ class CentralRouter:
 
         # Adicionar metadados
         latency_ms = (time.time() - start_time) * 1000
+        failed_modules = self._failed_module_names(all_results)
         final_result["success"] = True
+        final_result["degraded"] = bool(failed_modules)
+        final_result["failed_modules"] = failed_modules
+        final_result["failed_modules_detail"] = self._failed_module_details(all_results)
         final_result["latency_ms"] = latency_ms
         final_result["modules_executed"] = [
             r.module.value for r in all_results if r.success
@@ -10149,7 +9836,7 @@ class CentralRouter:
         _dbg(f"🔍 DEBUG v3.70: request_type = {final_result['request_type']}")
 
         # ─── 8. CACHEAR ────────────────────────────────────────────────────
-        if cacheable:
+        if cacheable and not failed_modules:
             try:
                 cached_result = copy.deepcopy(final_result)
             except Exception:
@@ -10164,6 +9851,108 @@ class CentralRouter:
         self._update_statistics(latency_ms, execution_plan, all_results)
 
         return final_result
+
+    _NO_VERDICT = object()
+
+    @staticmethod
+    def _failed_module_names(results: List[ModuleResult]) -> List[str]:
+        """Módulos com falha, na ordem de execução e sem repetição."""
+        names: List[str] = []
+        for result in results:
+            if not result.success and result.module.value not in names:
+                names.append(result.module.value)
+        return names
+
+    @staticmethod
+    def _failed_module_details(results: List[ModuleResult]) -> List[Dict[str, str]]:
+        """Causa da primeira falha de cada módulo, na mesma ordem de ``failed_modules``."""
+        details: List[Dict[str, str]] = []
+        seen: List[str] = []
+        for result in results:
+            if not result.success and result.module.value not in seen:
+                seen.append(result.module.value)
+                details.append({"module": result.module.value, "error": str(result.error)})
+        return details
+
+    def _finish_blocked(
+        self,
+        prompt: str,
+        request_type: RequestType,
+        blocked: Dict[str, Any],
+        plan: ExecutionPlan,
+        results: List[ModuleResult],
+        start_time: float,
+    ) -> Dict[str, Any]:
+        """Resposta de bloqueio + um evento ROUTER_BLOCKED no log + estatística de requisição bloqueada."""
+        response = self._blocked_response(prompt, request_type, blocked)
+        log_module = self.modules.get(ModuleType.LOG)
+        if log_module is not None:
+            try:
+                log_module.log_event("ROUTER_BLOCKED", {
+                    "error": blocked["error"],
+                    "module": blocked["module"].value,
+                    "request_type": request_type.value,
+                    "prompt": prompt[:100],
+                })
+            except Exception as exc:  # o log não pode desfazer nem mascarar o bloqueio
+                _dbg(f"🔍 DEBUG: ROUTER_BLOCKED log failed: {exc}")
+        self.stats["blocked_requests"] = self.stats.get("blocked_requests", 0) + 1
+        by_error = self.stats.setdefault("blocked_by_error", defaultdict(int))
+        by_error[blocked["error"]] += 1
+        self._update_statistics((time.time() - start_time) * 1000, plan, results)
+        return response
+
+    def _blocking_decision(
+        self, request_type: RequestType, results: List[ModuleResult]
+    ) -> Optional[Dict[str, Any]]:
+        """Decide se os resultados já obtidos impedem a requisição (fail-closed).
+
+        Bloqueiam: jailbreak detectado ou verificação que falhou/sem veredito, orçamento
+        negado e Swarm obrigatório que falhou em decisão ética. Falhas de orçamento por
+        exceção e de módulos opcionais apenas degradam o resultado.
+        """
+        for result in results:
+            if result.module != ModuleType.JAILBREAK:
+                continue
+            if not result.success:
+                return {"error": "JAILBREAK_CHECK_FAILED", "module": result.module,
+                        "reason": f"jailbreak check failed: {result.error}"}
+            data = result.data
+            if isinstance(data, dict):
+                verdict = data.get("detected", self._NO_VERDICT)
+            else:
+                verdict = getattr(data, "detected", self._NO_VERDICT)
+            if verdict is self._NO_VERDICT:
+                return {"error": "JAILBREAK_CHECK_FAILED", "module": result.module,
+                        "reason": "jailbreak check returned no verdict"}
+            if verdict:
+                return {"error": "JAILBREAK_DETECTED", "module": result.module,
+                        "reason": "jailbreak detector flagged the prompt"}
+        for result in results:
+            if result.module == ModuleType.BUDGET and result.success:
+                allowed = result.data.get("allowed") if isinstance(result.data, dict) else None
+                if not allowed:
+                    return {"error": "BUDGET_DENIED", "module": result.module,
+                            "reason": "resource budget denied"}
+        if request_type == RequestType.ETHICAL_DECISION:
+            for result in results:
+                if result.module == ModuleType.SWARM and not result.success:
+                    return {"error": "MANDATORY_MODULE_FAILED", "module": result.module,
+                            "reason": f"swarm is mandatory for ethical decisions and failed: {result.error}"}
+        return None
+
+    @staticmethod
+    def _blocked_response(prompt: str, request_type: RequestType, blocked: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "success": False,
+            "error": blocked["error"],
+            "reason": blocked["reason"],
+            "prompt": prompt[:100],
+            "degraded": True,
+            "failed_modules": [blocked["module"].value],
+            "failed_modules_detail": [{"module": blocked["module"].value, "error": blocked["reason"]}],
+            "request_type": request_type.value,
+        }
 
     def consume_deferred_tasks(self, processor, max_batch: int = 1, on_success=None, on_failure=None, on_discard=None) -> Dict[str, Any]:
         """Consome tarefas adiadas somente após rechecagem de pressão VRAM."""
@@ -10488,6 +10277,8 @@ class CentralRouter:
             },
 
             "requests_by_type": dict(self.stats["requests_by_type"]),
+            "blocked_requests": self.stats.get("blocked_requests", 0),
+            "blocked_by_error": dict(self.stats.get("blocked_by_error", {})),
             "module_usage": {
                 k.value: v for k, v in self.stats["module_call_count"].items()
                 if v > 0
@@ -21169,6 +20960,10 @@ class CompleteNexusBrain:
                     result["modules_executed"] = reasoning_result.get("modules_executed", [])
                     result["request_type"] = reasoning_result.get("request_type", "unknown")
                     result["cached"] = reasoning_result.get("cached", False)
+                    # Bloqueio, falhas e degradação do roteador chegam ao chamador (revisão do Laird, RT9–RT13)
+                    for field in ["success", "error", "reason", "degraded", "failed_modules", "failed_modules_detail"]:
+                        if field in reasoning_result:
+                            result[field] = reasoning_result[field]
                     
                     # Optional fields - only if present
                     for field in ["confidence", "swarm_decision", "mcts_plan", "swarm_included", "router_latency_ms"]:

@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
-CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future", "mental_simulation", "analogical_reasoning", "contextual_memory", "emotional_memory")
+CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future", "mental_simulation", "analogical_reasoning", "contextual_memory", "emotional_memory", "semantic_networks")
 
 TOPICS = [
     ("database", "migration", "rollback"), ("network", "latency", "spike"), ("disk", "quota", "exceeded"),
@@ -6136,6 +6136,881 @@ def eval_emotional_memory(criteria="v1"):
     ]
 
 
+# ── Semantic Networks (POST26): amostragem e referência independentes do bloco ──
+
+SN_SOURCE_SHA = "63e1dacce01592338007cd6a408197bd22b7f2a5d55a37f91b966888c0ad2e90"
+SN_BEHAVIOR_SHA = "38c6b6f4dccebf3ede5620b8f0e3d0a8cd7b5c6d71be2c75ec9b9faf183108de"  # capturado uma vez no monólito (3.11 e 3.12 idênticos), antes do move
+_SN_MARKER = "# MÓDULO 26: SEMANTIC NETWORKS SYSTEM (POST 26)"
+_SN_END = '            "avg_activation": sum(c.activation for c in self.concepts.values()) / max(1, len(self.concepts))\n        }'
+_SN_BANNER = "🧠🕸️ POST 26 - RealSemanticNetworksSystem initialized (Conceptual knowledge graph active)\n"
+_SN_NAMES = ("ConceptNode", "SemanticRelation", "RealSemanticNetworksSystem")
+_SN_GRID_SEED = 2026
+_SN_GRID_SIZE = 120
+_SN_SEEDS = tuple(range(20))
+_SN_LIMIT = 0.90
+_SN_POOL = ("Cat", "Dog", "Bird", "Fish", "Animal", "Pet", "Fur", "Wing")
+_SN_TYPES = ("IS-A", "HAS-A", "PART-OF", "CAUSES")
+_SN_ITERATIONS = (0, 1, 2, 3, 5)
+_SN_KEYS = ("a", "b", "c")
+_SN_VALUES = (1, 2, 3, "x")
+_SN_MIN_GAP = 1e-3
+_SN_TOL = 1e-9
+
+
+def _sn_variant(rng, index):
+    name = _SN_POOL[index]
+    return rng.choice((name, name.lower(), name.upper()))
+
+
+def _sn_grid():
+    rng = random.Random(_SN_GRID_SEED)  # nosec B311 - dados sintéticos de avaliação
+    rows = []
+    for _ in range(_SN_GRID_SIZE):
+        ops = []
+        for _o in range(rng.randint(4, 14)):
+            kind = rng.random()
+            if kind < 0.4:
+                props = None if rng.random() < 0.1 else {k: rng.choice(_SN_VALUES)
+                                                         for k in rng.sample(_SN_KEYS, rng.randint(1, 3))}
+                ops.append(("concept", _sn_variant(rng, rng.randrange(8)), props))
+            elif kind < 0.85:
+                si, ti = rng.randrange(8), rng.randrange(8)
+                kind_rel = rng.choice(_SN_TYPES + ("IS-A", "IS-A"))
+                if kind_rel == "IS-A" and si <= ti:  # IS-A só de índice maior para menor: acíclico por construção
+                    kind_rel = "SIMILAR-TO"
+                ops.append(("rel", _sn_variant(rng, si), kind_rel, _sn_variant(rng, ti), round(rng.uniform(0, 1), 3)))
+            else:
+                ops.append(("act", _sn_variant(rng, rng.randrange(8)), round(rng.uniform(0, 1.5), 3)))
+        spreads = [rng.choice(_SN_ITERATIONS) for _s in range(rng.randint(0, 2))]
+        seen = [o[1] for o in ops] + [o[3] for o in ops if o[0] == "rel"]
+        sources = [o[1] for o in ops if o[0] == "rel" and o[2] == "IS-A"] or seen
+        targets = [o[3] for o in ops if o[0] == "rel" and o[2] == "IS-A"] or seen
+
+        def pick(pool):
+            if pool and rng.random() < 0.8:
+                label = rng.choice(pool)
+                return rng.choice((label, label.lower(), label.upper()))
+            return _sn_variant(rng, rng.randrange(8))
+
+        related = [(pick(seen), rng.choice((None, "IS-A", "HAS-A"))) for _r in range(3)]
+        inherits = [pick(sources) for _i in range(4)]
+        verifies = [(pick(sources), pick(targets)) for _v in range(5)]
+        queries = [{k: rng.choice(_SN_VALUES) for k in rng.sample(_SN_KEYS, rng.randint(0, 2))} for _q in range(2)]
+        rows.append((ops, spreads, related, inherits, verifies, queries))
+    return rows
+
+
+def _sn_ref_spread(acts, rels, iterations, decay=0.1, factor=0.7):
+    """Propagação sequencial na ordem das relações, depois decaimento (leitura das regras do bloco)."""
+    for _ in range(iterations):
+        for source, _kind, target, strength in rels:
+            if acts[source] > 0.1:
+                acts[target] = min(1.0, acts[target] + acts[source] * factor * strength)
+        for index in range(len(acts)):
+            acts[index] = max(0.0, acts[index] - decay)
+    return acts
+
+
+def _sn_reference(row):
+    ops, spreads, related, inherits, verifies, queries = row
+    labels, props, acts, rels = [], [], [], []
+    count = {"concepts": 0, "relations": 0, "activations": 0}
+
+    def first(label):
+        low = label.lower()
+        for index, name in enumerate(labels):
+            if name.lower() == low:
+                return index
+        return None
+
+    def add(label, own=None):
+        labels.append(label)
+        props.append(own or {})
+        acts.append(0.0)
+        count["concepts"] += 1
+        return len(labels) - 1
+
+    def find_or_create(label):
+        index = first(label)
+        return add(label) if index is None else index
+
+    def parents(label):
+        index = first(label)
+        if index is None:
+            return []
+        return [t for s, kind, t, _w in rels if s == index and kind == "IS-A"]
+
+    def inherit(label):
+        index = find_or_create(label)
+        merged = dict(props[index])
+        for parent in parents(label):
+            for key, value in inherit(labels[parent]).items():
+                if key not in merged:
+                    merged[key] = value
+        return merged
+
+    def verify(child, ancestor):
+        if child.lower() == ancestor.lower():
+            return True
+        return any(verify(labels[p], ancestor) for p in parents(child))
+
+    for op in ops:
+        if op[0] == "concept":
+            add(op[1], op[2])
+        elif op[0] == "rel":
+            source = find_or_create(op[1])
+            target = find_or_create(op[3])
+            rels.append((source, op[2], target, op[4]))
+            count["relations"] += 1
+        else:
+            acts[find_or_create(op[1])] = min(1.0, op[2])
+            count["activations"] += 1
+    spread_out = []
+    for iterations in spreads:
+        _sn_ref_spread(acts, rels, iterations)
+        spread_out.append({labels[i]: acts[i] for i in range(len(labels)) if acts[i] > 0.1})
+    related_out = []
+    for label, kind in related:
+        index = first(label)
+        related_out.append([] if index is None else [t for s, k, t, _w in rels
+                                                     if s == index and (kind is None or k == kind)])
+    inherit_out = [list(inherit(label).items()) for label in inherits]
+    verify_out = [verify(child, ancestor) for child, ancestor in verifies]
+    query_out = []
+    for required in queries:
+        matched = []
+        for index in range(len(labels)):
+            merged = inherit(labels[index])
+            if all(key in merged and merged[key] == value for key, value in required.items()):
+                matched.append(index)
+        query_out.append(matched)
+    activated = sum(1 for value in acts if value > 0.1)
+    return {"spreads": spread_out, "related": related_out, "inherit": inherit_out, "verify": verify_out,
+            "query": query_out,
+            "stats": {"total_concepts": count["concepts"], "total_relations": count["relations"],
+                      "activations_performed": count["activations"], "activated_concepts": activated,
+                      "avg_activation": sum(acts) / max(1, len(acts))},
+            "labels": labels, "props": props, "acts": acts, "rels": rels}
+
+
+def _sn_sn2_instance(seed):
+    """SN2: hierarquia IS-A acíclica por construção (arestas de índice maior para menor), sem rejeição."""
+    rng = random.Random(seed)  # nosec B311 - dados sintéticos de avaliação
+    names = [f"N{i}" for i in range(8)]
+    props = []
+    for _ in names:
+        props.append({k: rng.choice((1, 2, 3)) for k in rng.sample(("k0", "k1", "k2"), rng.randint(0, 3))})
+    edges = [(2, 1), (1, 0)]
+    for child in range(3, 7):
+        edges += [(child, parent) for parent in rng.sample(range(child), rng.randint(1, 2))]
+    noise = []
+    for _ in range(3):
+        a, b = rng.sample(range(8), 2)
+        noise.append((a, "HAS-A", b))
+    relations = [(a, "IS-A", b) for a, b in edges] + noise
+    rng.shuffle(relations)
+    return {"names": names, "props": props, "relations": relations, "edges": edges}
+
+
+def _sn_reach(inst):
+    """Alcance IS-A por busca iterativa (independente da recursão do bloco)."""
+    parents = {i: [] for i in range(len(inst["names"]))}
+    for a, b in inst["edges"]:
+        parents[a].append(b)
+    reach = {}
+    for start in parents:
+        seen, stack = set(), list(parents[start])
+        while stack:
+            node = stack.pop()
+            if node not in seen:
+                seen.add(node)
+                stack.extend(parents[node])
+        reach[start] = seen
+    return reach
+
+
+def _sn_inherit_ref(inst, index):
+    order = {}
+    for a, kind, b in inst["relations"]:
+        if kind == "IS-A":
+            order.setdefault(a, []).append(b)
+    merged = dict(inst["props"][index])
+    for parent in order.get(index, []):
+        for key, value in _sn_inherit_ref(inst, parent).items():
+            if key not in merged:
+                merged[key] = value
+    return merged
+
+
+def _sn_sn2_valid(inst):
+    reach = _sn_reach(inst)
+    direct = {(a, b) for a, b in inst["edges"]}
+    return 0 in reach[2] and (2, 0) not in direct and 7 not in reach[0] \
+        and not any(7 in (a, b) for a, b in inst["edges"])
+
+
+def _sn_sn3_instance(seed):
+    """SN3: cadeia C0→C1→C2 com força em [0.5, 1] + distratores em componente separado; sem rejeição."""
+    rng = random.Random(seed)  # nosec B311 - dados sintéticos de avaliação
+    chain = rng.sample(_SN_POOL, 3)
+    rest = [n for n in _SN_POOL if n not in chain]
+    distractors = rest[:2 + seed % 3]
+    s1, s2 = round(rng.uniform(0.5, 1.0), 3), round(rng.uniform(0.5, 1.0), 3)
+    d_edges = [(distractors[i], distractors[i + 1], round(rng.uniform(0, 1), 3)) for i in range(len(distractors) - 1)]
+    d_act = round(rng.uniform(0.2, 1.0), 3)
+    return {"concepts": chain + distractors, "chain": chain, "s": (s1, s2), "d_edges": d_edges, "d_act": d_act,
+            "iterations": 1 + seed % 3}
+
+
+def _sn_sn3_relations(inst):
+    c0, c1, c2 = inst["chain"]
+    return [(a, "CAUSES", b, w) for a, b, w in inst["d_edges"]] + [(c0, "CAUSES", c1, inst["s"][0]),
+                                                                  (c1, "CAUSES", c2, inst["s"][1])]
+
+
+def _sn_sn3_gap(inst):
+    """Maior diferença de ativação entre as duas ordens segundo a referência sequencial (precondição)."""
+    names = inst["concepts"]
+    index = {n: i for i, n in enumerate(names)}
+    rels = [(index[a], k, index[b], w) for a, k, b, w in _sn_sn3_relations(inst)]
+    out = []
+    for order in (rels, list(reversed(rels))):
+        acts = [0.0] * len(names)
+        acts[index[inst["chain"][0]]] = 1.0
+        if inst["d_edges"]:
+            acts[index[inst["d_edges"][0][0]]] = inst["d_act"]
+        out.append(_sn_ref_spread(acts, order, inst["iterations"]))
+    return max(abs(x - y) for x, y in zip(*out))
+
+
+def _sn_sn4_instance(seed):
+    """SN4: ciclo IS-A de tamanho 2–4; propriedades de chaves distintas por nó; sem rejeição."""
+    rng = random.Random(seed)  # nosec B311 - dados sintéticos de avaliação
+    size = 2 + seed % 3
+    names = rng.sample(_SN_POOL, size)
+    return {"names": names, "props": [{f"p{i}": i} for i in range(size)]}
+
+
+def _sn_sn4_valid(inst):
+    names = inst["names"]
+    keys = [k for p in inst["props"] for k in p]
+    return 2 <= len(names) <= 4 and len({n.lower() for n in names}) == len(names) and len(set(keys)) == len(keys)
+
+
+def _sn_grid_richness(rows, refs):
+    """Contagens da grade segundo a referência (precondição de cobertura; o bloco não participa)."""
+    out = {"isa_rows": 0, "verify_true_nonself": 0, "verify_false": 0, "inherit_nonempty": 0,
+           "inherit_from_ancestor": 0, "related_nonempty": 0, "spread_multi": 0, "query_nonempty": 0,
+           "duplicate_label_rows": 0, "clipped_rows": 0}
+    for row, ref in zip(rows, refs):
+        ops, _spreads, _related, inherits, verifies, _queries = row
+        out["isa_rows"] += any(o[0] == "rel" and o[2] == "IS-A" for o in ops)
+        out["verify_true_nonself"] += sum(1 for v, (a, b) in zip(ref["verify"], verifies) if v and a.lower() != b.lower())
+        out["verify_false"] += sum(1 for v in ref["verify"] if not v)
+        out["inherit_nonempty"] += sum(1 for items in ref["inherit"] if items)
+        own = {}
+        for label, prop in zip(ref["labels"], ref["props"]):
+            own.setdefault(label.lower(), prop)
+        out["inherit_from_ancestor"] += sum(1 for label, items in zip(inherits, ref["inherit"])
+                                            if len(items) > len(own.get(label.lower(), {})))
+        out["related_nonempty"] += sum(1 for x in ref["related"] if x)
+        out["spread_multi"] += sum(1 for s in ref["spreads"] if len(s) >= 2)
+        out["query_nonempty"] += sum(1 for x in ref["query"] if x)
+        out["duplicate_label_rows"] += len({n.lower() for n in ref["labels"]}) != len(ref["labels"])
+        out["clipped_rows"] += any(o[0] == "act" and o[1] and o[2] > 1.0 for o in ops)
+    return out
+
+
+_SN_RICHNESS_MIN = {"isa_rows": 50, "verify_true_nonself": 150, "verify_false": 250, "inherit_nonempty": 100,
+                    "inherit_from_ancestor": 25, "related_nonempty": 80, "spread_multi": 35, "query_nonempty": 80,
+                    "duplicate_label_rows": 60, "clipped_rows": 35}
+_SN_GRID_SHA = "338e70da6187458d80b12f3ce7a654f33b01940341a2d28a7d54c549a8dad3a1"
+_SN_FRESH_STATS = {"total_concepts": 0, "total_relations": 0, "activations_performed": 0,
+                   "activated_concepts": 0, "avg_activation": 0.0}
+_SN_COUNTERS_EXPECTED = {
+    "labels": ["A", "a", "B", "C", "Z"], "rel_sources": ["A", "A"],
+    "stats": {"total_concepts": 5, "total_relations": 2, "activations_performed": 2,
+              "activated_concepts": 2, "avg_activation": 0.3}}
+_SN_COLLAB_EXPECTED = {"kg_is": True, "language_is": True, "ran": True, "source_reads": {"self.kg": 1, "self.language": 1}}
+_SN_CASE_EXPECTED = {"labels": ["Cat", "animal", "Fur"], "cat_all": ["animal", "Fur"], "cat_isa": ["animal"],
+                     "animal": [], "zzz": [], "zzz_created": False}
+_SN_SPREAD_EXPECTED = {
+    "forward_1": {"A": 0.9, "B": 0.6, "C": 0.145}, "forward_3": {"A": 0.7, "B": 0.9, "C": 0.645},
+    "reverse_1": {"A": 0.9, "B": 0.6}, "reverse_3": {"A": 0.7, "B": 0.9, "C": 0.325},
+    "zero": {"A": 1.0}, "negative": {"A": 1.0}, "exact_threshold": {"A": 1.0},
+    "source_at_threshold": {}, "strength_5": {"A": 0.9, "B": 0.9}, "negative_after_spread": 0.0}
+_SN_ACTIVATION_EXPECTED = {
+    "negative": {"activation": -0.5, "avg": -0.5, "activated": 0}, "nan": 1.0, "big": 1.0, "creates": True,
+    "str": {"error": "TypeError", "labels": ["V2"], "performed": 0}}
+_SN_INHERIT_EXPECTED = {
+    "tweety": [["name", "t"], ["legs", 2], ["flies", True], ["alive", True]],
+    "verify": {"tweety_animal": True, "case": True, "reverse": False, "q_same": True, "q_other": False,
+               "labels_after_q": []},
+    "query": {"legs2": ["Bird", "Tweety"], "alive": ["Animal", "Bird", "Tweety"], "legs_flies_false": [],
+              "empty": ["Animal", "Bird", "Tweety"], "flies": ["Bird", "Tweety"],
+              "legs_float": ["Bird", "Tweety"], "alive_one": ["Animal", "Bird", "Tweety"]},
+    "multi_parent": [["color", "red"], ["size", 1]], "multi_parent_reversed": [["color", "blue"], ["size", 1]]}
+_SN_EFFECTS_EXPECTED = {
+    "ghost": {"inherited": {}, "labels": ["Ghost"]}, "dup": {"q1": [0, 1], "q2": []},
+    "alias_nonempty": True, "alias_empty": False, "inherit_copy": {"new_dict": True, "nested_shared": True},
+    "strengths": ["5.0", "-2.0", "nan"]}
+_SN_CYCLES_EXPECTED = {"verify_absent": "RecursionError", "inherit": "RecursionError", "verify_b": True,
+                       "verify_c": True, "self_inherit": "RecursionError", "self_verify_absent": "RecursionError",
+                       "self_verify_self": True}
+_SN_ERRORS_EXPECTED = {
+    "add_concept_no_args": "TypeError", "add_relation_missing": "TypeError", "spread_str": "TypeError",
+    "spread_float": "TypeError", "spread_none": "TypeError", "spread_str_strength": "TypeError",
+    "construct_extra": "TypeError", "add_relation_int": "AttributeError",
+    "get_related_int_populated": "AttributeError", "query_none_populated": "AttributeError",
+    "verify_int": "AttributeError", "inherit_int_empty": "AttributeError", "find_after_none_label": "AttributeError",
+    "get_related_int_empty": "no-error", "query_none_empty": "no-error", "add_concept_none": "no-error",
+    "add_relation_int_partial": {"concepts": 1, "relations": 0}}
+
+
+def _sn_err(fn):
+    try:
+        fn()
+    except Exception as exc:  # RecursionError herda de Exception
+        return type(exc).__name__
+    return "no-error"
+
+
+def _sn_system(cls, **kwargs):
+    with contextlib.redirect_stdout(io.StringIO()):
+        return cls(**kwargs)
+
+
+def _sn_labels(system):
+    return [c.label for c in system.concepts.values()]
+
+
+def _sn_round(value):
+    if isinstance(value, float):
+        return round(value, 9)
+    if isinstance(value, dict):
+        return {k: _sn_round(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sn_round(v) for v in value]
+    return value
+
+
+def _sn_close(a, b):
+    if isinstance(a, float) and isinstance(b, float):
+        return abs(a - b) <= 1e-12
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_sn_close(a[k], b[k]) for k in a)
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return len(a) == len(b) and all(_sn_close(x, y) for x, y in zip(a, b))
+    return type(a) is type(b) and a == b
+
+
+def _sn_run(cls, row):
+    """Executa uma linha da grade no bloco e devolve (visão, metadados válidos)."""
+    import uuid as _uuid
+    ops, spreads, related, inherits, verifies, queries = row
+    system = _sn_system(cls)
+    before = time.time()
+    for op in ops:
+        if op[0] == "concept":
+            system.add_concept(op[1], op[2])
+        elif op[0] == "rel":
+            system.add_relation(op[1], op[2], op[3], op[4])
+        else:
+            system.activate_concept(op[1], op[2])
+    spread_out = [system.spread_activation(iterations) for iterations in spreads]
+    view = {"spreads": spread_out}
+    index = {}
+
+    def idx(concept):
+        return list(system.concepts).index(concept.concept_id)
+
+    view["related"] = [[idx(c) for c in system.get_related_concepts(label, kind)] for label, kind in related]
+    view["inherit"] = [list(system.inherit_properties(label).items()) for label in inherits]
+    view["verify"] = [system.verify_hierarchy(child, ancestor) for child, ancestor in verifies]
+    view["query"] = [[idx(c) for c in system.query_by_properties(required)] for required in queries]
+    view["stats"] = system.get_statistics()
+    nodes = list(system.concepts.values())
+    index = {c.concept_id: i for i, c in enumerate(nodes)}
+    view["labels"] = [c.label for c in nodes]
+    view["props"] = [c.properties for c in nodes]
+    view["acts"] = [c.activation for c in nodes]
+    view["rels"] = [(index[r.source_id], r.relation_type, index[r.target_id], r.strength) for r in system.relations]
+    after = time.time()
+    ids = [c.concept_id for c in nodes] + [r.relation_id for r in system.relations]
+    meta_ok = (len(set(ids)) == len(ids) and all(isinstance(i, str) and len(i) == 36 for i in ids)
+               and all(before <= c.created_at <= after for c in nodes))
+    try:
+        meta_ok = meta_ok and all(_uuid.UUID(i).version == 4 for i in ids)
+    except ValueError:
+        meta_ok = False
+    return view, meta_ok
+
+
+def _sn_row_digest(view):
+    return _ms_sha(_sn_round({k: view[k] for k in ("spreads", "related", "inherit", "verify", "query", "stats",
+                                                    "labels", "props", "acts", "rels")}))[:16]
+
+
+def _sn_same(view, ref):
+    return all(_sn_close(view[k], ref[k]) for k in ("spreads", "related", "inherit", "verify", "query", "stats",
+                                                    "labels", "props", "acts", "rels"))
+
+
+def _sn_build(cls, labels, props=None):
+    system = _sn_system(cls)
+    for i, label in enumerate(labels):
+        system.add_concept(label, dict(props[i]) if props else None)
+    return system
+
+
+def _sn_family_sn2(cls):
+    passed = invalid = 0
+    for seed in _SN_SEEDS:
+        inst = _sn_sn2_instance(seed)
+        if not _sn_sn2_valid(inst):
+            invalid += 1
+            continue
+        names = inst["names"]
+        system = _sn_build(cls, names, inst["props"])
+        for a, kind, b in inst["relations"]:
+            system.add_relation(names[a], kind, names[b])
+        reach = _sn_reach(inst)
+        try:
+            verify_ok = all(system.verify_hierarchy(names[i], names[j]) == (i == j or j in reach[i])
+                            for i in range(8) for j in range(8))
+            inherit_ok = all(list(system.inherit_properties(names[i]).items()) == list(_sn_inherit_ref(inst, i).items())
+                             for i in range(8))
+            want = [names[i] for i in range(8) if _sn_inherit_ref(inst, i).get("k0") == 1]
+            query_ok = [c.label for c in system.query_by_properties({"k0": 1})] == want
+            passed += bool(verify_ok and inherit_ok and query_ok)
+        except Exception:
+            pass
+    return {"seeds": len(_SN_SEEDS), "passed": passed, "rate": passed / len(_SN_SEEDS), "invalid": invalid}
+
+
+def _sn_spread_run(cls, inst, reverse):
+    system = _sn_build(cls, inst["concepts"])
+    relations = _sn_sn3_relations(inst)
+    for source, kind, target, strength in (list(reversed(relations)) if reverse else relations):
+        system.add_relation(source, kind, target, strength)
+    system.activate_concept(inst["chain"][0], 1.0)
+    if inst["d_edges"]:
+        system.activate_concept(inst["d_edges"][0][0], inst["d_act"])
+    system.spread_activation(inst["iterations"])
+    return [c.activation for c in system.concepts.values()]
+
+
+def _sn_control_run(cls, iterations, reverse):
+    system = _sn_build(cls, ["ctl_a", "ctl_b", "ctl_c", "ctl_d"])
+    relations = [("ctl_a", "CAUSES", "ctl_b", 0.6), ("ctl_c", "CAUSES", "ctl_d", 0.8)]
+    for source, kind, target, strength in (list(reversed(relations)) if reverse else relations):
+        system.add_relation(source, kind, target, strength)
+    system.activate_concept("ctl_a", 1.0)
+    system.activate_concept("ctl_c", 0.9)
+    system.spread_activation(iterations)
+    return [c.activation for c in system.concepts.values()]
+
+
+def _sn_family_sn3(cls):
+    passed = invalid = control_bad = 0
+    diffs = []
+    for seed in _SN_SEEDS:
+        inst = _sn_sn3_instance(seed)
+        if _sn_sn3_gap(inst) < _SN_MIN_GAP:
+            invalid += 1
+            continue
+        control_a, control_b = (_sn_control_run(cls, inst["iterations"], r) for r in (False, True))
+        if max(abs(x - y) for x, y in zip(control_a, control_b)) > _SN_TOL:
+            control_bad += 1
+            continue
+        forward, backward = _sn_spread_run(cls, inst, False), _sn_spread_run(cls, inst, True)
+        diff = max(abs(x - y) for x, y in zip(forward, backward))
+        diffs.append(diff)
+        passed += diff <= _SN_TOL
+    return {"seeds": len(_SN_SEEDS), "passed": passed, "rate": passed / len(_SN_SEEDS), "invalid": invalid,
+            "control_bad": control_bad, "min_observed_diff": round(min(diffs), 9) if diffs else None}
+
+
+def _sn_family_sn4(cls):
+    passed = invalid = 0
+    errors = {}
+    for seed in _SN_SEEDS:
+        inst = _sn_sn4_instance(seed)
+        names, size = inst["names"], len(inst["names"])
+        want = {f"p{i}": i for i in range(size)}
+        chain = _sn_build(cls, names, inst["props"])
+        for i in range(size - 1):
+            chain.add_relation(names[i], "IS-A", names[i + 1])
+        control_ok = (_sn_sn4_valid(inst) and chain.verify_hierarchy(names[0], names[-1]) is True
+                      and chain.verify_hierarchy(names[0], "Absent") is False
+                      and chain.inherit_properties(names[0]) == want)
+        if not control_ok:
+            invalid += 1
+            continue
+        cyclic = _sn_build(cls, names, inst["props"])
+        for i in range(size):
+            cyclic.add_relation(names[i], "IS-A", names[(i + 1) % size])
+        try:
+            ok = cyclic.verify_hierarchy(names[0], "Absent") is False and cyclic.inherit_properties(names[0]) == want
+            passed += bool(ok)
+        except Exception as exc:
+            errors[type(exc).__name__] = errors.get(type(exc).__name__, 0) + 1
+    return {"seeds": len(_SN_SEEDS), "passed": passed, "rate": passed / len(_SN_SEEDS), "invalid": invalid,
+            "errors": errors}
+
+
+def _sn_spread_items(cls):
+    def chain(reverse, iterations):
+        system = _sn_build(cls, ["A", "B", "C"])
+        relations = [("A", "x", "B", 1.0), ("B", "x", "C", 0.5)]
+        for source, kind, target, strength in (list(reversed(relations)) if reverse else relations):
+            system.add_relation(source, kind, target, strength)
+        system.activate_concept("A", 1.0)
+        return _sn_round(system.spread_activation(iterations))
+
+    edge = _sn_build(cls, ["A", "E"])
+    edge.activate_concept("A", 1.0)
+    edge.activate_concept("E", 0.1)
+    threshold = _sn_build(cls, ["S", "T"])
+    threshold.add_relation("S", "x", "T", 1.0)
+    threshold.activate_concept("S", 0.1)
+    strong = _sn_build(cls, ["A", "B"])
+    strong.add_relation("A", "x", "B", 5.0)
+    strong.activate_concept("A", 1.0)
+    neg = _sn_build(cls, ["V"])
+    neg.activate_concept("V", -0.5)
+    neg.spread_activation(1)
+    return {"forward_1": chain(False, 1), "forward_3": chain(False, 3), "reverse_1": chain(True, 1),
+            "reverse_3": chain(True, 3), "zero": _sn_round(_sn_zero(cls, 0)),
+            "negative": _sn_round(_sn_zero(cls, -1)), "exact_threshold": _sn_round(edge.spread_activation(0)),
+            "source_at_threshold": _sn_round(threshold.spread_activation(1)),
+            "strength_5": _sn_round(strong.spread_activation(1)),
+            "negative_after_spread": neg.concepts[next(iter(neg.concepts))].activation}
+
+
+def _sn_zero(cls, iterations):
+    system = _sn_build(cls, ["A", "B"])
+    system.add_relation("A", "x", "B", 1.0)
+    system.activate_concept("A", 1.0)
+    return system.spread_activation(iterations)
+
+
+def _sn_activation_items(cls):
+    neg = _sn_build(cls, ["V"])
+    neg.activate_concept("V", -0.5)
+    stats = neg.get_statistics()
+    nan = _sn_build(cls, ["N"])
+    nan.activate_concept("N", float("nan"))
+    big = _sn_build(cls, ["B"])
+    big.activate_concept("B", 5)
+    fresh = _sn_build(cls, [])
+    fresh.activate_concept("Fresh", 0.5)
+    bad = _sn_build(cls, ["V2"])
+    kind = _sn_err(lambda: bad.activate_concept("V2", "a"))
+    return {"negative": {"activation": next(iter(neg.concepts.values())).activation,
+                         "avg": stats["avg_activation"], "activated": stats["activated_concepts"]},
+            "nan": next(iter(nan.concepts.values())).activation, "big": next(iter(big.concepts.values())).activation,
+            "creates": _sn_labels(fresh) == ["Fresh"],
+            "str": {"error": kind, "labels": _sn_labels(bad), "performed": bad.activations_performed}}
+
+
+def _sn_inherit_items(cls):
+    system = _sn_system(cls)
+    system.add_concept("Animal", {"alive": True, "legs": 4})
+    system.add_concept("Bird", {"legs": 2, "flies": True})
+    system.add_concept("Tweety", {"name": "t"})
+    system.add_relation("Tweety", "IS-A", "Bird")
+    system.add_relation("Bird", "IS-A", "Animal")
+    q = _sn_system(cls)
+
+    def names(required):
+        return [c.label for c in system.query_by_properties(required)]
+
+    def multi(reverse):
+        net = _sn_system(cls)
+        net.add_concept("P1", {"color": "red"})
+        net.add_concept("P2", {"color": "blue", "size": 1})
+        pairs = [("M", "IS-A", "P1"), ("M", "IS-A", "P2")]
+        for source, kind, target in (list(reversed(pairs)) if reverse else pairs):
+            net.add_relation(source, kind, target)
+        return [list(item) for item in net.inherit_properties("M").items()]
+
+    return {"tweety": [list(item) for item in system.inherit_properties("Tweety").items()],
+            "verify": {"tweety_animal": system.verify_hierarchy("Tweety", "Animal"),
+                       "case": system.verify_hierarchy("tweety", "ANIMAL"),
+                       "reverse": system.verify_hierarchy("Animal", "Tweety"),
+                       "q_same": q.verify_hierarchy("Q", "q"), "q_other": q.verify_hierarchy("Q", "R"),
+                       "labels_after_q": _sn_labels(q)},
+            "query": {"legs2": names({"legs": 2}), "alive": names({"alive": True}),
+                      "legs_flies_false": names({"legs": 2, "flies": False}), "empty": names({}),
+                      "flies": names({"flies": True}), "legs_float": names({"legs": 2.0}),
+                      "alive_one": names({"alive": 1})},
+            "multi_parent": multi(False), "multi_parent_reversed": multi(True)}
+
+
+def _sn_effect_items(cls):
+    ghost = _sn_system(cls)
+    inherited = ghost.inherit_properties("Ghost")
+    dup = _sn_system(cls)
+    dup.add_concept("Dup", {"a": 1})
+    dup.add_concept("Dup", {"a": 2})
+    index = {c.concept_id: i for i, c in enumerate(dup.concepts.values())}
+    alias = _sn_system(cls)
+    full, empty, nested = {"a": 1}, {}, [1]
+    c_full, c_empty = alias.add_concept("X", full), alias.add_concept("Y", empty)
+    props = {"n": nested}
+    alias.add_concept("N", props)
+    copy_ = alias.inherit_properties("N")
+    strengths = _sn_system(cls)
+    for value in (5.0, -2.0, float("nan")):
+        strengths.add_relation("A", "X", "B", strength=value)
+    return {"ghost": {"inherited": inherited, "labels": _sn_labels(ghost)},
+            "dup": {"q1": [index[c.concept_id] for c in dup.query_by_properties({"a": 1})],
+                    "q2": [index[c.concept_id] for c in dup.query_by_properties({"a": 2})]},
+            "alias_nonempty": c_full.properties is full, "alias_empty": c_empty.properties is empty,
+            "inherit_copy": {"new_dict": copy_ is not props, "nested_shared": copy_["n"] is nested},
+            "strengths": [repr(r.strength) for r in strengths.relations]}
+
+
+def _sn_cycle_items(cls):
+    ring = _sn_system(cls)
+    for source, target in (("A", "B"), ("B", "C"), ("C", "A")):
+        ring.add_relation(source, "IS-A", target)
+    loop = _sn_system(cls)
+    loop.add_relation("S", "IS-A", "S")
+    return {"verify_absent": _sn_err(lambda: ring.verify_hierarchy("A", "Z")),
+            "inherit": _sn_err(lambda: ring.inherit_properties("A")),
+            "verify_b": ring.verify_hierarchy("A", "B"), "verify_c": ring.verify_hierarchy("A", "C"),
+            "self_inherit": _sn_err(lambda: loop.inherit_properties("S")),
+            "self_verify_absent": _sn_err(lambda: loop.verify_hierarchy("S", "Z")),
+            "self_verify_self": loop.verify_hierarchy("S", "S")}
+
+
+def _sn_error_items(cls):
+    def spread_str_strength():
+        net = _sn_build(cls, ["A", "B"])
+        net.add_relation("A", "x", "B", "x")
+        net.activate_concept("A", 1.0)
+        net.spread_activation(1)
+
+    def populated():
+        return _sn_build(cls, ["A"])
+
+    def none_label():
+        net = _sn_system(cls)
+        net.add_concept(None)
+        net.add_relation("x", "IS-A", "y")
+
+    partial = _sn_system(cls)
+    _sn_err(lambda: partial.add_relation(1, "IS-A", 2))
+    return {
+        "add_concept_no_args": _sn_err(lambda: _sn_system(cls).add_concept()),
+        "add_relation_missing": _sn_err(lambda: _sn_system(cls).add_relation("A", "IS-A")),
+        "spread_str": _sn_err(lambda: _sn_system(cls).spread_activation("a")),
+        "spread_float": _sn_err(lambda: _sn_system(cls).spread_activation(1.5)),
+        "spread_none": _sn_err(lambda: _sn_system(cls).spread_activation(None)),
+        "spread_str_strength": _sn_err(spread_str_strength),
+        "construct_extra": _sn_err(lambda: cls(1, 2, 3)),
+        "add_relation_int": _sn_err(lambda: _sn_system(cls).add_relation(1, "IS-A", 2)),
+        "get_related_int_populated": _sn_err(lambda: populated().get_related_concepts(5)),
+        "query_none_populated": _sn_err(lambda: populated().query_by_properties(None)),
+        "verify_int": _sn_err(lambda: _sn_system(cls).verify_hierarchy(1, "a")),
+        "inherit_int_empty": _sn_err(lambda: _sn_system(cls).inherit_properties(5)),
+        "find_after_none_label": _sn_err(none_label),
+        "get_related_int_empty": _sn_err(lambda: _sn_system(cls).get_related_concepts(5)),
+        "query_none_empty": _sn_err(lambda: _sn_system(cls).query_by_properties(None)),
+        "add_concept_none": _sn_err(lambda: _sn_system(cls).add_concept(None)),
+        "add_relation_int_partial": {"concepts": len(partial.concepts), "relations": len(partial.relations)}}
+
+
+def _sn_misc_items(cls):
+    import inspect
+    from unittest import mock
+
+    class Boom:
+        def __getattribute__(self, name):
+            raise AssertionError("called " + name)
+
+    boom = Boom()
+    system = _sn_system(cls, knowledge_graph=boom, language=boom)
+    ran = True
+    try:
+        system.add_concept("A", {"k": 1})
+        system.add_relation("A", "IS-A", "B")
+        system.activate_concept("A", 1.0)
+        system.spread_activation(2)
+        system.get_related_concepts("A")
+        system.inherit_properties("A")
+        system.verify_hierarchy("A", "B")
+        system.query_by_properties({"k": 1})
+        system.get_statistics()
+    except AssertionError:
+        ran = False
+    source = inspect.getsource(cls)
+    counters = _sn_system(cls)
+    counters.add_concept("A")
+    counters.add_concept("a")
+    counters.add_relation("A", "IS-A", "B")
+    counters.add_relation("a", "HAS-A", "C")
+    counters.activate_concept("A", 0.5)
+    counters.activate_concept("Z", 2.0)
+    by_id = {c.concept_id: c.label for c in counters.concepts.values()}
+    case = _sn_system(cls)
+    case.add_relation("Cat", "IS-A", "animal")
+    case.add_relation("cat", "HAS-A", "Fur")
+    zzz = case.get_related_concepts("zzz")
+    with mock.patch("time.time", return_value=123.5):
+        stamped = _sn_system(cls).add_concept("T").created_at
+    return {
+        "collaborators": {"kg_is": system.kg is boom, "language_is": system.language is boom, "ran": ran,
+                          "source_reads": {"self.kg": source.count("self.kg"),
+                                           "self.language": source.count("self.language")}},
+        "counters": {"labels": _sn_labels(counters),
+                     "rel_sources": [by_id[r.source_id] for r in counters.relations],
+                     "stats": _sn_round(counters.get_statistics())},
+        "case": {"labels": _sn_labels(case), "cat_all": [c.label for c in case.get_related_concepts("CAT")],
+                 "cat_isa": [c.label for c in case.get_related_concepts("CAT", "IS-A")],
+                 "animal": case.get_related_concepts("animal"), "zzz": zzz, "zzz_created": "zzz" in _sn_labels(case)},
+        "clock": "time.time" if stamped == 123.5 else "outro"}
+
+
+def sn_fingerprint(ns):
+    import copy
+    import inspect
+    if isinstance(ns, dict):
+        def get(name):
+            return ns[name]
+    else:
+        def get(name):
+            return getattr(ns, name)
+    node_cls, rel_cls, cls = get("ConceptNode"), get("SemanticRelation"), get("RealSemanticNetworksSystem")
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        fresh = cls()
+    rows = _sn_grid()
+    refs = [_sn_reference(row) for row in rows]
+    matches = mutated = meta_bad = 0
+    digests = []
+    for row, ref in zip(rows, refs):
+        snapshot = copy.deepcopy(row)
+        view, meta_ok = _sn_run(cls, row)
+        matches += bool(_sn_same(view, ref))
+        mutated += row != snapshot
+        meta_bad += not meta_ok
+        digests.append(_sn_row_digest(view))
+    misc = _sn_misc_items(cls)
+    return {
+        "randomness": "uuid4 (só formato)", "clock": misc["clock"],
+        "init_params": list(inspect.signature(cls.__init__).parameters), "banner": buf.getvalue(),
+        "node_fields": list(inspect.signature(node_cls).parameters),
+        "relation_fields": list(inspect.signature(rel_cls).parameters),
+        "defaults": {"activation_decay": fresh.activation_decay, "spread_factor": fresh.spread_factor},
+        "fresh_stats": fresh.get_statistics(),
+        "grid": {"count": len(digests), "reference_matches": matches, "mutated_inputs": mutated,
+                 "meta_bad": meta_bad, "digests": _ms_sha(digests), "sha": _ms_sha(rows),
+                 "richness": _sn_grid_richness(rows, refs)},
+        "families": {"SN2": _sn_family_sn2(cls), "SN3": _sn_family_sn3(cls), "SN4": _sn_family_sn4(cls)},
+        "collaborators": misc["collaborators"], "counters": misc["counters"], "case": misc["case"],
+        "spread": _sn_spread_items(cls), "activation": _sn_activation_items(cls),
+        "inheritance": _sn_inherit_items(cls), "effects": _sn_effect_items(cls),
+        "cycles": _sn_cycle_items(cls), "errors": _sn_error_items(cls),
+    }
+
+
+def semantic_networks_source_text(src: str) -> str:
+    idx = src.index(_SN_MARKER)
+    line_start = src.rfind("\n", 0, idx - 1) + 1
+    end = src.index(_SN_END, idx) + len(_SN_END)
+    return src[line_start:end]
+
+
+def _semantic_networks_source_sha(path="core/cognitivo/semantic_networks.py") -> str:
+    import hashlib
+    text = (ROOT / path).read_text(encoding="utf-8")
+    return hashlib.sha256(semantic_networks_source_text(text).encode()).hexdigest()
+
+
+def _semantic_networks_standalone() -> bool:
+    """Árvore de imports: constitutional_brain, numpy ou vita no módulo extraído falha SN6."""
+    import ast
+
+    tree = ast.parse((ROOT / "core/cognitivo/semantic_networks.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names = [node.module]
+        for name in names:
+            root = name.split(".")[0]
+            if root in {"numpy", "vita"} or name == "core.constitutional_brain" \
+                    or name.startswith("core.constitutional_brain."):
+                return False
+    return True
+
+
+def eval_semantic_networks(criteria="v1"):
+    """SN1–SN6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    import core.cognitivo.semantic_networks as semantic_networks
+    import core.constitutional_brain as brain
+    import core.cognitivo as package
+
+    payload = sn_fingerprint(semantic_networks)
+    sha_module = _ms_sha(payload)
+    sha_brain = _ms_sha(sn_fingerprint(brain))
+    source_sha = _semantic_networks_source_sha()
+    standalone = _semantic_networks_standalone()
+    identity = all(
+        getattr(brain, name) is getattr(semantic_networks, name) is getattr(package, name)
+        and getattr(semantic_networks, name).__module__ == "core.cognitivo.semantic_networks"
+        for name in _SN_NAMES
+    )
+    grid = payload["grid"]
+    richness_bad = [k for k, minimum in _SN_RICHNESS_MIN.items() if grid["richness"].get(k, 0) < minimum]
+    sn1_invalid = grid["sha"] != _SN_GRID_SHA or bool(richness_bad)
+    sn1 = (not sn1_invalid and grid["count"] == _SN_GRID_SIZE and grid["reference_matches"] == _SN_GRID_SIZE
+           and grid["mutated_inputs"] == 0 and grid["meta_bad"] == 0)
+    fam2, fam3, fam4 = (payload["families"][k] for k in ("SN2", "SN3", "SN4"))
+    sn2_invalid, sn3_invalid, sn4_invalid = fam2["invalid"] > 0, fam3["invalid"] > 0 or fam3["control_bad"] > 0, \
+        fam4["invalid"] > 0
+    sn2 = not sn2_invalid and fam2["rate"] >= _SN_LIMIT
+    sn3 = not sn3_invalid and fam3["rate"] >= _SN_LIMIT
+    sn4 = not sn4_invalid and fam4["rate"] >= _SN_LIMIT
+    sections = {"counters": _SN_COUNTERS_EXPECTED, "collaborators": _SN_COLLAB_EXPECTED, "case": _SN_CASE_EXPECTED,
+                "spread": _SN_SPREAD_EXPECTED, "activation": _SN_ACTIVATION_EXPECTED,
+                "inheritance": _SN_INHERIT_EXPECTED, "effects": _SN_EFFECTS_EXPECTED,
+                "cycles": _SN_CYCLES_EXPECTED, "errors": _SN_ERRORS_EXPECTED}
+    hits = {name: payload[name] == expected for name, expected in sections.items()}
+    sn5 = (all(hits.values()) and payload["fresh_stats"] == _SN_FRESH_STATS
+           and payload["defaults"] == {"activation_decay": 0.1, "spread_factor": 0.7}
+           and payload["node_fields"] == ["concept_id", "label", "properties", "activation", "created_at"]
+           and payload["relation_fields"] == ["relation_id", "relation_type", "source_id", "target_id", "strength"]
+           and payload["init_params"] == ["self", "knowledge_graph", "language"]
+           and payload["banner"] == _SN_BANNER)
+    sn6 = (identity and standalone and source_sha == SN_SOURCE_SHA and sha_module == sha_brain == SN_BEHAVIOR_SHA
+           and payload["clock"] == "time.time")
+    return [
+        _check("SN1", {"reference_matches": grid["reference_matches"], "count": grid["count"],
+                       "mutated_inputs": grid["mutated_inputs"], "meta_bad": grid["meta_bad"],
+                       "richness": grid["richness"], "richness_bad": richness_bad},
+               sn1, "120/120 iguais à referência independente; 0 entradas alteradas; ids e relógio válidos",
+               **({"scenario_invalid": True} if sn1_invalid else {})),
+        _check("SN2", fam2, sn2, "verify_hierarchy e inherit_properties iguais à referência em ≥ 0.90 das 20 seeds",
+               **({"scenario_invalid": True} if sn2_invalid else {})),
+        _check("SN3", fam3, sn3, "ativação independente da ordem das relações em ≥ 0.90 das 20 seeds",
+               **({"scenario_invalid": True} if sn3_invalid else {})),
+        _check("SN4", fam4, sn4, "consultas hierárquicas terminam em ciclo IS-A em ≥ 0.90 das 20 seeds",
+               **({"scenario_invalid": True} if sn4_invalid else {})),
+        _check("SN5", {"fresh_stats": payload["fresh_stats"], "defaults": payload["defaults"], "hits": hits,
+                       **{name: payload[name] for name in sections}},
+               sn5, "contadores, colaboradores, valores exatos, erros e gaps conforme o registrado"),
+        _check("SN6", {"source_sha": source_sha, "sha_module": sha_module, "sha_brain": sha_brain,
+                       "identity": identity, "standalone": standalone, "clock": payload["clock"],
+                       "source_golden": SN_SOURCE_SHA, "behavior_golden": SN_BEHAVIOR_SHA},
+               sn6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+    ]
+
+
 EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts,
               "causal": eval_causal, "counterfactual": eval_counterfactual,
               "working_memory": eval_working_memory,
@@ -6145,7 +7020,8 @@ EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": 
               "mental_simulation": eval_mental_simulation,
               "analogical_reasoning": eval_analogical_reasoning,
               "contextual_memory": eval_contextual_memory,
-              "emotional_memory": eval_emotional_memory}
+              "emotional_memory": eval_emotional_memory,
+              "semantic_networks": eval_semantic_networks}
 
 
 def main(argv=None) -> int:
