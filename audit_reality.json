@@ -90,9 +90,9 @@
       },
       {
         "path": "core/cognitivo/semantic_networks.py",
-        "lines": 359,
+        "lines": 381,
         "classes": 3,
-        "functions": 11
+        "functions": 12
       },
       {
         "path": "core/cognitivo/working_memory.py",
