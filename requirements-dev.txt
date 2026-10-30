@@ -3,7 +3,7 @@
 -r requirements.txt
 numpy==2.4.6
 coverage==7.16.2
-hypothesis==6.170.5
+hypothesis==6.170.12
 bandit==1.9.4
 ruff==0.17.1
 zizmor==1.31.1
