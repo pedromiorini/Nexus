@@ -1,13 +1,14 @@
 """Redes semânticas (POST26) extraídas de core/constitutional_brain.py.
 
-Extração strangler: o código foi movido do monólito, move-only (byte-idêntico,
-SHA-256 da fonte em tools/cognitivo_eval.py::SN_SOURCE_SHA); core.constitutional_brain
-reexporta as classes no ponto original.
+Extração strangler: o código foi movido do monólito (SHA-256 da fonte em
+tools/cognitivo_eval.py::SN_SOURCE_SHA); core.constitutional_brain reexporta as
+classes no ponto original. Depois do move, a errata E1 (pré-registro SN3b/SN4b em
+docs/cognitivo/AUDITORIA_2026-10-22.md) trocou três métodos e o SHA foi re-fixado:
+a propagação de ativação é síncrona (independe da ordem das relações, SN3/SN3b) e
+as consultas IS-A terminam em ciclo (SN4/SN4b).
 Dependências: apenas a biblioteca padrão. O relógio é time.time() (created_at de
 cada conceito) e os ids vêm de uuid.uuid4(). knowledge_graph e language são
-armazenados e nunca lidos. Lacunas declaradas e fora do escopo do move (pré-registro
-SN1–SN6 em docs/cognitivo/AUDITORIA_2026-10-22.md): a ativação depende da ordem das
-relações (SN3) e consultas IS-A em ciclo estouram a recursão (SN4).
+armazenados e nunca lidos.
 """
 
 import time
@@ -202,7 +203,10 @@ n's Semantic Networks (1968)
             Dict de conceitos ativados
         """
         for _ in range(iterations):
-            # Para cada relação
+            # Síncrono: toda relação lê a ativação do início da iteração
+            start = {cid: c.activation for cid, c in self.concepts.items()}
+            incoming: Dict[str, List[float]] = {}
+
             for relation in self.relations:
                 source = self.concepts.get(relation.source_id)
                 target = self.concepts.get(relation.target_id)
@@ -211,9 +215,13 @@ n's Semantic Networks (1968)
                     continue
 
                 # Propagar ativação de source para target
-                if source.activation > 0.1:
-                    spread_amount = source.activation * self.spread_factor * relation.strength
-                    target.activation = min(1.0, target.activation + spread_amount)
+                if start[relation.source_id] > 0.1:
+                    spread_amount = start[relation.source_id] * self.spread_factor * relation.strength
+                    incoming.setdefault(relation.target_id, []).append(spread_amount)
+
+            # Soma em ordem canônica e limite 1.0 uma vez por alvo
+            for target_id, amounts in incoming.items():
+                self.concepts[target_id].activation = min(1.0, start[target_id] + sum(sorted(amounts)))
 
             # Apply decay
             for concept in self.concepts.values():
@@ -274,8 +282,13 @@ n's Semantic Networks (1968)
         Returns:
             Propriedades herdadas
         """
+        return self._inherit(concept_label, frozenset())
+
+    def _inherit(self, concept_label: str, path: frozenset) -> Dict[str, Any]:
+        """Herança com o caminho atual: um nó já no caminho (ciclo IS-A) é pulado."""
         # Encontrar conceito
         concept = self._find_or_create_concept(concept_label)
+        path = path | {concept.concept_id}
 
         # Propriedades próprias
         inherited = concept.properties.copy()
@@ -285,7 +298,9 @@ n's Semantic Networks (1968)
 
         # Herdar recursivamente
         for parent in parent_concepts:
-            parent_props = self.inherit_properties(parent.label)
+            if self._find_or_create_concept(parent.label).concept_id in path:
+                continue
+            parent_props = self._inherit(parent.label, path)
             # Propriedades do pai são default (não sobrescrevem)
             for key, value in parent_props.items():
                 if key not in inherited:
@@ -304,17 +319,24 @@ n's Semantic Networks (1968)
         Returns:
             True se child IS-A ancestor
         """
-        # Base case
-        if child_label.lower() == ancestor_label.lower():
-            return True
+        target = ancestor_label.lower()
+        visited = set()
+        pending = [child_label]
 
-        # Buscar pais
-        parents = self.get_related_concepts(child_label, "IS-A")
+        while pending:
+            label = pending.pop()
 
-        # Recursão
-        for parent in parents:
-            if self.verify_hierarchy(parent.label, ancestor_label):
+            # Base case
+            if label.lower() == target:
                 return True
+
+            # Ciclo IS-A: nó já visitado
+            if label.lower() in visited:
+                continue
+            visited.add(label.lower())
+
+            # Buscar pais
+            pending.extend(parent.label for parent in self.get_related_concepts(label, "IS-A"))
 
         return False
 

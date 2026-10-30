@@ -6138,8 +6138,8 @@ def eval_emotional_memory(criteria="v1"):
 
 # ── Semantic Networks (POST26): amostragem e referência independentes do bloco ──
 
-SN_SOURCE_SHA = "63e1dacce01592338007cd6a408197bd22b7f2a5d55a37f91b966888c0ad2e90"
-SN_BEHAVIOR_SHA = "38c6b6f4dccebf3ede5620b8f0e3d0a8cd7b5c6d71be2c75ec9b9faf183108de"  # capturado uma vez no monólito (3.11 e 3.12 idênticos), antes do move
+SN_SOURCE_SHA = "4ba902140f4d5ee49c34f585ed5961ec0cfb44bcb2453e0b178d6011331575ec"
+SN_BEHAVIOR_SHA = "9e98782252e9b7eab5c57060fb7fb7c21bca50c33448c1efa47dfa8319a5ba02"  # re-fixado uma vez no GREEN da errata E1 (3.11 e 3.12 idênticos)
 _SN_MARKER = "# MÓDULO 26: SEMANTIC NETWORKS SYSTEM (POST 26)"
 _SN_END = '            "avg_activation": sum(c.activation for c in self.concepts.values()) / max(1, len(self.concepts))\n        }'
 _SN_BANNER = "🧠🕸️ POST 26 - RealSemanticNetworksSystem initialized (Conceptual knowledge graph active)\n"
@@ -6211,6 +6211,22 @@ def _sn_ref_spread(acts, rels, iterations, decay=0.1, factor=0.7):
     return acts
 
 
+def _sn_ref_spread_sync(acts, rels, iterations, decay=0.1, factor=0.7):
+    """Propagação síncrona (errata E1): todas as relações leem o início da iteração; soma canônica por alvo,
+    limite 1.0 uma vez, depois decaimento."""
+    for _ in range(iterations):
+        start = list(acts)
+        incoming = {}
+        for source, _kind, target, strength in rels:
+            if start[source] > 0.1:
+                incoming.setdefault(target, []).append(start[source] * factor * strength)
+        for target, amounts in incoming.items():
+            acts[target] = min(1.0, start[target] + sum(sorted(amounts)))
+        for index in range(len(acts)):
+            acts[index] = max(0.0, acts[index] - decay)
+    return acts
+
+
 def _sn_reference(row):
     ops, spreads, related, inherits, verifies, queries = row
     labels, props, acts, rels = [], [], [], []
@@ -6267,7 +6283,7 @@ def _sn_reference(row):
             count["activations"] += 1
     spread_out = []
     for iterations in spreads:
-        _sn_ref_spread(acts, rels, iterations)
+        _sn_ref_spread_sync(acts, rels, iterations)
         spread_out.append({labels[i]: acts[i] for i in range(len(labels)) if acts[i] > 0.1})
     related_out = []
     for label, kind in related:
@@ -6435,7 +6451,7 @@ _SN_COLLAB_EXPECTED = {"kg_is": True, "language_is": True, "ran": True, "source_
 _SN_CASE_EXPECTED = {"labels": ["Cat", "animal", "Fur"], "cat_all": ["animal", "Fur"], "cat_isa": ["animal"],
                      "animal": [], "zzz": [], "zzz_created": False}
 _SN_SPREAD_EXPECTED = {
-    "forward_1": {"A": 0.9, "B": 0.6, "C": 0.145}, "forward_3": {"A": 0.7, "B": 0.9, "C": 0.645},
+    "forward_1": {"A": 0.9, "B": 0.6}, "forward_3": {"A": 0.7, "B": 0.9, "C": 0.325},
     "reverse_1": {"A": 0.9, "B": 0.6}, "reverse_3": {"A": 0.7, "B": 0.9, "C": 0.325},
     "zero": {"A": 1.0}, "negative": {"A": 1.0}, "exact_threshold": {"A": 1.0},
     "source_at_threshold": {}, "strength_5": {"A": 0.9, "B": 0.9}, "negative_after_spread": 0.0}
@@ -6454,8 +6470,8 @@ _SN_EFFECTS_EXPECTED = {
     "ghost": {"inherited": {}, "labels": ["Ghost"]}, "dup": {"q1": [0, 1], "q2": []},
     "alias_nonempty": True, "alias_empty": False, "inherit_copy": {"new_dict": True, "nested_shared": True},
     "strengths": ["5.0", "-2.0", "nan"]}
-_SN_CYCLES_EXPECTED = {"verify_absent": "RecursionError", "inherit": "RecursionError", "verify_b": True,
-                       "verify_c": True, "self_inherit": "RecursionError", "self_verify_absent": "RecursionError",
+_SN_CYCLES_EXPECTED = {"verify_absent": False, "inherit": [], "verify_b": True,
+                       "verify_c": True, "self_inherit": [], "self_verify_absent": False,
                        "self_verify_self": True}
 _SN_ERRORS_EXPECTED = {
     "add_concept_no_args": "TypeError", "add_relation_missing": "TypeError", "spread_str": "TypeError",
@@ -6473,6 +6489,14 @@ def _sn_err(fn):
     except Exception as exc:  # RecursionError herda de Exception
         return type(exc).__name__
     return "no-error"
+
+
+def _sn_value(fn):
+    """Valor devolvido; se houver exceção, o nome do tipo (errata E1: ciclos devolvem valor)."""
+    try:
+        return fn()
+    except Exception as exc:  # RecursionError herda de Exception
+        return type(exc).__name__
 
 
 def _sn_system(cls, **kwargs):
@@ -6631,6 +6655,71 @@ def _sn_family_sn3(cls):
             "control_bad": control_bad, "min_observed_diff": round(min(diffs), 9) if diffs else None}
 
 
+def _sn_sn3_expected(inst):
+    """Estado final esperado (referência síncrona independente), na ordem de criação dos conceitos."""
+    names = inst["concepts"]
+    index = {n: i for i, n in enumerate(names)}
+    rels = [(index[a], k, index[b], w) for a, k, b, w in _sn_sn3_relations(inst)]
+    acts = [0.0] * len(names)
+    acts[index[inst["chain"][0]]] = 1.0
+    if inst["d_edges"]:
+        acts[index[inst["d_edges"][0][0]]] = inst["d_act"]
+    return _sn_ref_spread_sync(acts, rels, inst["iterations"])
+
+
+def _sn_family_sn3b(cls):
+    """SN3b: mesmas instâncias, controle e precondições do SN3; o estado deve igualar a referência síncrona."""
+    passed = invalid = control_bad = 0
+    worst = []
+    for seed in _SN_SEEDS:
+        inst = _sn_sn3_instance(seed)
+        if _sn_sn3_gap(inst) < _SN_MIN_GAP:
+            invalid += 1
+            continue
+        control_a, control_b = (_sn_control_run(cls, inst["iterations"], r) for r in (False, True))
+        if max(abs(x - y) for x, y in zip(control_a, control_b)) > _SN_TOL:
+            control_bad += 1
+            continue
+        want = _sn_sn3_expected(inst)
+        diff = max(max(abs(x - y) for x, y in zip(_sn_spread_run(cls, inst, r), want)) for r in (False, True))
+        worst.append(diff)
+        passed += diff <= _SN_TOL
+    return {"seeds": len(_SN_SEEDS), "passed": passed, "rate": passed / len(_SN_SEEDS), "invalid": invalid,
+            "control_bad": control_bad, "max_observed_diff": round(max(worst), 9) if worst else None}
+
+
+def _sn_family_sn4b(cls):
+    """SN4b: mesmas instâncias, controle e validade do SN4; o ciclo devolve o resultado completo, sem exceção."""
+    passed = invalid = 0
+    errors = {}
+    for seed in _SN_SEEDS:
+        inst = _sn_sn4_instance(seed)
+        names, size = inst["names"], len(inst["names"])
+        chain = _sn_build(cls, names, inst["props"])
+        for i in range(size - 1):
+            chain.add_relation(names[i], "IS-A", names[i + 1])
+        control_ok = (_sn_sn4_valid(inst) and chain.verify_hierarchy(names[0], names[-1]) is True
+                      and chain.verify_hierarchy(names[0], "Absent") is False
+                      and chain.inherit_properties(names[0]) == {f"p{i}": i for i in range(size)})
+        if not control_ok:
+            invalid += 1
+            continue
+        cyclic = _sn_build(cls, names, inst["props"])
+        for i in range(size):
+            cyclic.add_relation(names[i], "IS-A", names[(i + 1) % size])
+        before = [c.label for c in cyclic.concepts.values()]
+        try:
+            verify_ok = all(cyclic.verify_hierarchy(a, b) is (b != "Absent") for a in names for b in names + ["Absent"])
+            inherit_ok = all(list(cyclic.inherit_properties(names[i]).items())
+                             == [(f"p{(i + j) % size}", (i + j) % size) for j in range(size)] for i in range(size))
+            query_ok = [c.label for c in cyclic.query_by_properties({"p0": 0})] == names
+            passed += bool(verify_ok and inherit_ok and query_ok and [c.label for c in cyclic.concepts.values()] == before)
+        except Exception as exc:
+            errors[type(exc).__name__] = errors.get(type(exc).__name__, 0) + 1
+    return {"seeds": len(_SN_SEEDS), "passed": passed, "rate": passed / len(_SN_SEEDS), "invalid": invalid,
+            "errors": errors}
+
+
 def _sn_family_sn4(cls):
     passed = invalid = 0
     errors = {}
@@ -6778,11 +6867,11 @@ def _sn_cycle_items(cls):
         ring.add_relation(source, "IS-A", target)
     loop = _sn_system(cls)
     loop.add_relation("S", "IS-A", "S")
-    return {"verify_absent": _sn_err(lambda: ring.verify_hierarchy("A", "Z")),
-            "inherit": _sn_err(lambda: ring.inherit_properties("A")),
+    return {"verify_absent": _sn_value(lambda: ring.verify_hierarchy("A", "Z")),
+            "inherit": _sn_value(lambda: list(ring.inherit_properties("A").items())),
             "verify_b": ring.verify_hierarchy("A", "B"), "verify_c": ring.verify_hierarchy("A", "C"),
-            "self_inherit": _sn_err(lambda: loop.inherit_properties("S")),
-            "self_verify_absent": _sn_err(lambda: loop.verify_hierarchy("S", "Z")),
+            "self_inherit": _sn_value(lambda: list(loop.inherit_properties("S").items())),
+            "self_verify_absent": _sn_value(lambda: loop.verify_hierarchy("S", "Z")),
             "self_verify_self": loop.verify_hierarchy("S", "S")}
 
 
@@ -6909,7 +6998,8 @@ def sn_fingerprint(ns):
         "grid": {"count": len(digests), "reference_matches": matches, "mutated_inputs": mutated,
                  "meta_bad": meta_bad, "digests": _ms_sha(digests), "sha": _ms_sha(rows),
                  "richness": _sn_grid_richness(rows, refs)},
-        "families": {"SN2": _sn_family_sn2(cls), "SN3": _sn_family_sn3(cls), "SN4": _sn_family_sn4(cls)},
+        "families": {"SN2": _sn_family_sn2(cls), "SN3": _sn_family_sn3(cls), "SN4": _sn_family_sn4(cls),
+                     "SN3b": _sn_family_sn3b(cls), "SN4b": _sn_family_sn4b(cls)},
         "collaborators": misc["collaborators"], "counters": misc["counters"], "case": misc["case"],
         "spread": _sn_spread_items(cls), "activation": _sn_activation_items(cls),
         "inheritance": _sn_inherit_items(cls), "effects": _sn_effect_items(cls),
@@ -6950,7 +7040,7 @@ def _semantic_networks_standalone() -> bool:
 
 
 def eval_semantic_networks(criteria="v1"):
-    """SN1–SN6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    """SN1–SN6 (+ SN3b/SN4b, errata E1). criteria é aceito e ignorado: há um único protocolo pré-registrado."""
     import core.cognitivo.semantic_networks as semantic_networks
     import core.constitutional_brain as brain
     import core.cognitivo as package
@@ -6973,6 +7063,10 @@ def eval_semantic_networks(criteria="v1"):
     fam2, fam3, fam4 = (payload["families"][k] for k in ("SN2", "SN3", "SN4"))
     sn2_invalid, sn3_invalid, sn4_invalid = fam2["invalid"] > 0, fam3["invalid"] > 0 or fam3["control_bad"] > 0, \
         fam4["invalid"] > 0
+    fam3b, fam4b = payload["families"]["SN3b"], payload["families"]["SN4b"]
+    sn3b_invalid, sn4b_invalid = fam3b["invalid"] > 0 or fam3b["control_bad"] > 0, fam4b["invalid"] > 0
+    sn3b = not sn3b_invalid and fam3b["rate"] >= _SN_LIMIT
+    sn4b = not sn4b_invalid and fam4b["rate"] >= _SN_LIMIT
     sn2 = not sn2_invalid and fam2["rate"] >= _SN_LIMIT
     sn3 = not sn3_invalid and fam3["rate"] >= _SN_LIMIT
     sn4 = not sn4_invalid and fam4["rate"] >= _SN_LIMIT
@@ -7001,6 +7095,10 @@ def eval_semantic_networks(criteria="v1"):
                **({"scenario_invalid": True} if sn3_invalid else {})),
         _check("SN4", fam4, sn4, "consultas hierárquicas terminam em ciclo IS-A em ≥ 0.90 das 20 seeds",
                **({"scenario_invalid": True} if sn4_invalid else {})),
+        _check("SN3b", fam3b, sn3b, "estado igual à referência síncrona nas duas ordens em ≥ 0.90 das 20 seeds",
+               **({"scenario_invalid": True} if sn3b_invalid else {})),
+        _check("SN4b", fam4b, sn4b, "ciclo IS-A devolve verificação, herança e consulta completas em ≥ 0.90 das 20 seeds",
+               **({"scenario_invalid": True} if sn4b_invalid else {})),
         _check("SN5", {"fresh_stats": payload["fresh_stats"], "defaults": payload["defaults"], "hits": hits,
                        **{name: payload[name] for name in sections}},
                sn5, "contadores, colaboradores, valores exatos, erros e gaps conforme o registrado"),

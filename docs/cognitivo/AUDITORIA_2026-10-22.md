@@ -2859,3 +2859,83 @@ Sequência no branch `grok/mcts-expected-reward-sequence-20261030`: pré-registr
 **Lacuna residual declarada (H2, segue aberta):** sem modelo de mundo, `expected_reward` continua vindo do melhor filho da raiz, porque o golden do Axis (`test_mcts_planner_extraction_contract.py`, `expected_reward 0.6333` e `success_probability 0.6967` para `["APPLY_PATCH"]`) fixa esse `PlanResult`. Estender o conserto exige decisão do Pedro/Axis para re-fixar o golden. Também continuam: `confidence` do cérebro sobe a 1.0 em planos `secure` (utilidade determinística, não probabilidade calibrada); `alternative_plans[*].expected_reward` (média do filho) e o topo têm semânticas diferentes no modo mundo.
 
 `claims: []` em `docs/agentes/CLAIMS.yaml` neste commit.
+
+## Semantic Networks — fechar os gaps SN3/SN4 (pré-registro SN3b/SN4b e errata E1 de SN5/SN6)
+
+**Autorização do Pedro:** card t150s945 (opção 1: PR com errata pré-registrada que troca só as linhas afetadas de SN5/SN6, critérios novos SN3b/SN4b, revisão do Marcus), com as decisões de desenho abaixo. Este commit só pré-registra: nenhum código, harness ou teste muda nele.
+
+**Por que uma errata.** SN3 e SN4 falham como previsto (a ativação depende da ordem das relações; consulta IS-A em ciclo estoura a recursão). Os valores exatos de SN5 (propagação direta, ciclos) e os SHAs de SN6 foram pré-registrados **como o comportamento do bloco movido**; corrigir SN3/SN4 os altera por construção. A errata abaixo é declarada **antes** da mudança que ela afeta, só lista as linhas substituídas, e não afrouxa nenhum critério: os valores novos saem de derivação independente do código.
+
+### Decisões de desenho (reversíveis; registradas como decisão, não como fato)
+
+1. **Ativação síncrona.** Em cada iteração, toda relação lê a ativação do **início** da iteração; as contribuições que chegam ao mesmo alvo são somadas em ordem canônica (ordenadas, para não depender da ordem das relações nem da associatividade do ponto flutuante), o resultado soma-se à ativação inicial do alvo, **limita-se a 1.0 uma vez** e só então vem o decaimento (0.1) em todos os conceitos; fonte em ≤ 0.1 não propaga. Alternativa descartada: ordem topológica (indefinida em ciclos de relações). Reverter = voltar o laço in-place de `spread_activation`.
+2. **Ciclos IS-A.** `verify_hierarchy(c, a)`: busca com conjunto de visitados (rótulo em caixa baixa); `True` se `a` é alcançável (inclusive `c == a`), `False` se não, sem exceção. `inherit_properties(c)`: propriedades próprias primeiro, depois pais na ordem das relações, como hoje; um nó já presente no caminho atual é pulado (união até a revisita), sem exceção. Em hierarquias acíclicas o resultado, a ordem das chaves e os efeitos colaterais (criação do nó consultado) **não mudam**.
+3. **Escopo.** Só `spread_activation`, `verify_hierarchy`, `inherit_properties` (e um auxiliar privado). Nada de outras capacidades, #79/#115/#116/#131 ou arquivos/testes/contratos do Axis.
+4. **Efeitos colaterais conhecidos, aceitos:** (a) com forças **negativas** a ordem de aplicação do limite 1.0 muda (soma e depois limita, não limita a cada relação); a grade do SN1 só usa forças em `[0, 1]`; (b) um `TypeError` de força `str` agora não deixa a iteração pela metade; (c) a recursão de `inherit_properties` continua limitada pelo limite de recursão do Python em cadeias acíclicas > ~1000 (não é escopo).
+
+### Critérios novos (mesmos protocolos, seeds e instâncias de SN3/SN4; só a comparação é mais forte)
+
+| id | afirmação | protocolo | passa se |
+|---|---|---|---|
+| SN3b | a propagação é correta, não só independente da ordem | As 20 instâncias, controle e precondições de SN3, **inalterados** (seeds `0..19`, ordens A e B). Em cada ordem, as ativações **internas** de todos os conceitos devem ser iguais (`1e-9`) à **referência síncrona independente** do harness (`_sn_ref_spread_sync`: snapshot do início da iteração, soma canônica por alvo, limite 1.0 uma vez, decaimento) | ≥ 0,90 das 20 seeds (**previsto 0/20 no RED**: a ordem A in-place diverge da referência síncrona em todas as seeds, porque a precondição do SN3 exige diferença ≥ 1e-3 entre as ordens e a ordem B coincide com a síncrona em cadeias; **previsto 20/20 no GREEN**) |
+| SN4b | as consultas em ciclo devolvem o resultado completo e correto | As 20 instâncias, controle e validade de SN4, **inalterados** (ciclo `n_0→…→n_{k-1}→n_0`, `k = 2 + seed % 3`, propriedades `{p_i: i}`). Sem exceção: os `k·(k+1)` pares `verify_hierarchy(n_i, x)` com `x ∈ {n_0..n_{k-1}, "Absent"}` iguais ao alcance (`True` para os `k` nós, `False` para `Absent`); `inherit_properties(n_i)` devolve os itens, **na ordem**, `p_i, p_{i+1}, …` (índices módulo `k`: própria primeiro, depois o pai); `query_by_properties({"p0": 0})` devolve os `k` nós; as consultas **não criam** nós (rótulos depois = rótulos antes) | ≥ 0,90 das 20 seeds (**previsto 0/20 no RED**, `RecursionError`; **20/20 no GREEN**) |
+
+SN3 e SN4 (critérios originais) **não mudam de texto**; a previsão deles (0/20) vira o resultado "antes", e o resultado "depois" esperado é 20/20 (≥ 0,90). Negativos do contrato novo (teste negativo + entrada inválida): rede vazia, `spread_activation(0/-1)`, rótulo ausente/vazio/desconhecido em `verify_hierarchy`/`inherit_properties`/`get_related_concepts`, e `TypeError`/`AttributeError` iguais aos de SN5 (a errata não toca em nenhum deles).
+
+### Errata E1 (linhas **exatas** substituídas; tudo o mais de SN1–SN6 fica como registrado)
+
+**SN5, linha "Propagação (9 casas)":**
+- `spread_activation(1)` com `A→B (1.0)`, `B→C (0.5)`, `A = 1.0`: ~~`{A: 0.9, B: 0.6, C: 0.145}`~~ → **`{A: 0.9, B: 0.6}`**.
+- `spread_activation(3)` nessa ordem: ~~`{A: 0.7, B: 0.9, C: 0.645}`~~ → **`{A: 0.7, B: 0.9, C: 0.325}`**.
+- Ordem inversa (`spread_activation(1)` = `{A: 0.9, B: 0.6}`, `spread_activation(3)` = `{A: 0.7, B: 0.9, C: 0.325}`): **valores mantidos**; agora as duas ordens dão o mesmo resultado.
+- Os demais itens da linha (`spread_activation(0)`/`(-1)`, conceito em exatamente `0.1`, força `5.0` → `{A: 0.9, B: 0.9}`, `-0.5` → `0.0`) **não mudam**.
+
+*Derivação à mão (antes do código; decaimento 0.1, fator 0.7, snapshot por iteração).* Iteração 1: `A = 1.0`, `B = C = 0`. `A→B`: `B = 0 + 1.0·0.7·1.0 = 0.7`; `B→C` lê `B = 0` (≤ 0.1, não propaga). Decai: `A 0.9`, `B 0.6`, `C 0.0` (fora do resultado) ⇒ `spread(1) = {A 0.9, B 0.6}`. Iteração 2 (snapshot `A 0.9, B 0.6, C 0`): `B = min(1, 0.6 + 0.9·0.7) = min(1, 1.23) = 1.0`; `C = 0 + 0.6·0.7·0.5 = 0.21`. Decai: `A 0.8`, `B 0.9`, `C 0.11`. Iteração 3 (snapshot `A 0.8, B 0.9, C 0.11`): `B = min(1, 0.9 + 0.56) = 1.0`; `C = 0.11 + 0.9·0.7·0.5 = 0.425`. Decai: `A 0.7`, `B 0.9`, `C 0.325` ⇒ `spread(3) = {A 0.7, B 0.9, C 0.325}`. A ordem das relações não aparece em nenhuma conta, logo a inversa dá o mesmo.
+
+**SN5, linha "Ciclos"** (o `RecursionError` é substituído; `verify_hierarchy("A","B")` e `("A","C")` `True` e `verify_hierarchy("S","S")` `True` **mantidos**). Com `A IS-A B`, `B IS-A C`, `C IS-A A` (sem propriedades próprias) e o auto-laço `S IS-A S`:
+- `verify_hierarchy("A", "Z")`: ~~`RecursionError`~~ → **`False`** (nenhum nó alcança `Z`; visitados `{a, b, c}` esgotam).
+- `inherit_properties("A")`: ~~`RecursionError`~~ → **`{}`** (itens `[]`: nenhum nó do ciclo tem propriedade; termina ao revisitar `A`).
+- `inherit_properties("S")`: ~~`RecursionError`~~ → **`{}`** (itens `[]`).
+- `verify_hierarchy("S", "Z")`: ~~`RecursionError`~~ → **`False`**.
+- No harness, o item passa a registrar o **valor** devolvido (e o nome do tipo só se houver exceção); com propriedades nos nós do ciclo o conteúdo é coberto por SN4b e pelos testes do contrato.
+
+**SN1 (referência, não o critério):** o critério, a grade (`_SN_GRID_SHA`), a tolerância `1e-12`, 120/120 e as contagens mínimas de riqueza **não mudam**. A referência independente que modela a propagação passa da leitura sequencial para a síncrona (`_sn_reference` passa a usar `_sn_ref_spread_sync`; o `_sn_ref_spread` sequencial **fica**, usado só pela precondição de SN3, "a regra antiga diverge entre as ordens"). Medido **só com a referência** (o bloco não participa): das 120 instâncias, **6** (`18, 53, 65, 83, 91, 108`) mudam a saída de `spread_activation` (5 delas, `53, 65, 83, 91, 108`, mudam também a ativação final) e **0** mudam qualquer outra saída (relacionados, herança, verificação, consulta); riqueza igual à de antes (`spread_multi 43 ≥ 35`, demais contagens idênticas). Logo SN1 segue exigindo 120/120, com 6 linhas esperadas diferentes e 114 idênticas.
+
+**SN6:** `SN_SOURCE_SHA` (texto do bloco muda) e `SN_BEHAVIOR_SHA` (fingerprint muda: 6 digests de linha da grade, `families`, `spread`, `cycles`) são **re-fixados uma vez**, depois do GREEN, a partir do código e do fingerprint finais, e só se **todos** os demais critérios passarem. Verificação adicional pré-registrada: o fingerprint do módulo novo × o do `main` (`c9cf359`) difere em **exatamente** os 6 digests de linha acima, em `spread.forward_1/forward_3`, em `cycles` e nas famílias SN3/SN4; todo o resto do fingerprint é idêntico. Reexporte idêntico, ausência de imports proibidos e relógio `time.time` ficam iguais. O texto da condição "capturado uma vez no monólito" passa a "capturado uma vez no GREEN desta errata".
+
+**Linhas de teste/harness substituídas** (todas minhas, do contrato de SN, sem tocar em Axis): `tools/cognitivo_eval.py` (`_sn_reference`, novo `_sn_ref_spread_sync`, `_SN_SPREAD_EXPECTED.forward_*`, `_sn_cycle_items`, `_SN_CYCLES_EXPECTED`, `SN_SOURCE_SHA`, `SN_BEHAVIOR_SHA`, as duas verificações novas SN3b/SN4b em `eval_semantic_networks` e as funções de família delas); `test_semantic_networks_contract.py` (`_ALL`, `_GAPS`, `test_current_behavior_is_recorded_as_gaps`, as asserções de taxa 0.0/`RecursionError` e as de `_family_sn3/_sn4` com o bloco real, `test_cli_reports_only_the_registered_gaps_and_exits_1`, o texto do docstring); `tools/cognitivo_mutation.py` só ganha mutantes novos.
+
+### Previsão do RED
+
+Contrato novo (`test_semantic_networks_sn3b_sn4b_contract.py`) e as linhas de teste da errata falham no código atual: SN3b 0/20, SN4b 0/20 (`RecursionError`), `forward_1` com `C 0.145` (e não ausente), `forward_3` com `C 0.645`, ciclos com `RecursionError`; passam no RED: os negativos, SN2, as demais linhas de SN5 e os testes de erro. SN1 no RED: **114/120** (as 6 linhas em que o código in-place diverge da referência síncrona nova; vira 120/120 no GREEN). SN6 no RED: falha só porque os goldens ainda não foram re-fixados (vermelho esperado até o GREEN).
+
+### Parada
+
+Qualquer critério (SN1, SN2, SN3, SN3b, SN4, SN4b, SN5 não afetado, a verificação do fingerprint, riqueza da grade) que falhar no GREEN: **parar sem push** e reportar opções com a recomendada. A errata não é reaberta depois da mudança.
+
+### Claim
+
+`docs/agentes/CLAIMS.yaml` aberto neste commit (agente `grok-bot`, 72 h); volta a `claims: []` no commit de resultados.
+
+### Resultados (SN1–SN6, SN3b, SN4b; GREEN em 55f8cce)
+
+Todos os critérios pré-registrados passaram no GREEN; nenhuma condição de parada foi acionada e a errata E1 não foi reaberta.
+
+| critério | RED (previsto = obtido) | GREEN |
+|---|---|---|
+| SN1 | 114/120 | **120/120** (referência síncrona; riqueza igual) |
+| SN2 | passa | passa (1,0) |
+| SN3 | 0/20 | **20/20** |
+| SN3b | 0/20 | **20/20** |
+| SN4 | 0/20 (`RecursionError`) | **20/20** |
+| SN4b | 0/20 (`RecursionError`) | **20/20** |
+| SN5 | falhava só em `spread` e `cycles` | passa (valores da errata, `hits` todos verdadeiros) |
+| SN6 | vermelho até re-fixar | passa: `SN_SOURCE_SHA = 4ba90214…`, `SN_BEHAVIOR_SHA = 9e987822…` (3.11 = 3.12) |
+
+Verificação do fingerprint × `main` (`c9cf359`), com o harness novo e a classe antiga carregada de `git show`: difere **exatamente** em 6 digests de linha (`18, 53, 65, 83, 91, 108`), `spread.forward_1/forward_3`, `cycles` (`verify_absent`, `inherit`, `self_inherit`, `self_verify_absent`) e nas famílias SN3/SN4 (mais SN3b/SN4b, que só existem no harness novo). O resto do fingerprint é idêntico.
+
+Mutantes (`tools/cognitivo_mutation.py`): catálogo 697/697 mortos, 0 sobreviventes, 0 não aplicados. 11 âncoras de mutantes `sn_*` existentes foram **reapontadas** para as linhas novas (mesma intenção) e 18 mutantes novos foram adicionados (`sn_spread_snapshot_once`, `_sum_unsorted`, `_sum_keeps_last`, `_sum_keeps_max`, `_incoming_overwritten`, `_cap_per_contribution`, `_applies_in_place`, `_decay_before_apply`, `_target_from_zero`; `sn_inherit_path_not_updated`, `_cycle_check_dropped`, `_cycle_stops_all_parents`, `_path_reset`, `_cycle_skip_by_label`; `sn_verify_cycle_returns_true`, `_cycle_returns_false`, `_first_parent_only`, `_target_case_sensitive`). `targeted_mutation` 80/80 (arquivo não editado). Equivalentes documentados, **fora** do catálogo: ler a ativação da fonte/alvo ao vivo em vez do snapshot (as ativações só mudam depois do laço de relações; equivale ao snapshot) e variantes que removem o conjunto de visitados (não terminam; só morreriam pelo timeout de 180 s).
+
+Desvios: (1) um teste **meu** do arquivo novo (`test_self_loop_and_unknown_relation_endpoints`) tinha a expectativa calculada errada (0.8): a derivação correta com o autolaço é `min(1, 0.9 + 0.63) = 1.0`, menos 0.1 = **0.9**; corrigi o teste (não é critério registrado); (2) 11 âncoras de mutantes reapontadas (acima); (3) o docstring do módulo (fora do bloco hasheado) deixou de dizer "move-only/byte-idêntico".
+
+`claims: []` restaurado neste commit.

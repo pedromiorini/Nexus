@@ -2,9 +2,10 @@
 
 Critérios SN1–SN6 pré-registrados em docs/cognitivo/AUDITORIA_2026-10-22.md
 (commit 4ba5ca1) antes do harness, do contrato e do move. O harness é
-tools/cognitivo_eval.py --capability semantic_networks. SN3 e SN4 falham como
-pré-registrado (a ativação depende da ordem em que as relações foram
-adicionadas; consultas IS-A em ciclo estouram a recursão): o move não os corrige.
+tools/cognitivo_eval.py --capability semantic_networks. SN3 e SN4 falharam como
+pré-registrado no move (a ativação dependia da ordem das relações; consultas IS-A
+em ciclo estouravam a recursão); a errata E1 (card t150s945) os fecha e acrescenta
+SN3b/SN4b, ver a seção "Semantic Networks — fechar os gaps SN3/SN4".
 """
 
 import contextlib
@@ -23,8 +24,8 @@ from core.constitutional_brain import ConceptNode, RealSemanticNetworksSystem, S
 
 ROOT = Path(__file__).resolve().parent
 _NAMES = ("ConceptNode", "SemanticRelation", "RealSemanticNetworksSystem")
-_ALL = ("SN1", "SN2", "SN3", "SN4", "SN5", "SN6")
-_GAPS = {"SN3", "SN4"}
+_ALL = ("SN1", "SN2", "SN3", "SN4", "SN3b", "SN4b", "SN5", "SN6")
+_GAPS = set()
 _BLOCKER = r"""
 import sys
 class _Block:
@@ -181,7 +182,7 @@ class SemanticNetworksInvalidInputContractTests(unittest.TestCase):
         self.assertEqual(system.inherit_properties("Ghost"), {})
         self.assertEqual(len(system.concepts), 4)
 
-    def test_current_behavior_is_recorded_as_gaps(self):
+    def test_the_registered_gaps_are_closed_and_the_rest_of_the_behavior_is_kept(self):
         def chain(reverse):
             system = _quiet()
             for label in "ABC":
@@ -192,15 +193,13 @@ class SemanticNetworksInvalidInputContractTests(unittest.TestCase):
             system.activate_concept("A", 1.0)
             return system.spread_activation(3)
 
-        self.assertAlmostEqual(chain(False)["C"], 0.645, places=9)
-        self.assertAlmostEqual(chain(True)["C"], 0.325, places=9)
+        for reverse in (False, True):
+            self.assertAlmostEqual(chain(reverse)["C"], 0.325, places=9)
         ring = _quiet()
         for source, target in (("A", "B"), ("B", "C"), ("C", "A")):
             ring.add_relation(source, "IS-A", target)
-        with self.assertRaises(RecursionError):
-            ring.inherit_properties("A")
-        with self.assertRaises(RecursionError):
-            ring.verify_hierarchy("A", "Z")
+        self.assertEqual(ring.inherit_properties("A"), {})
+        self.assertFalse(ring.verify_hierarchy("A", "Z"))
         self.assertTrue(ring.verify_hierarchy("A", "C"))
         system = _quiet()
         system.activate_concept("V", -0.5)
@@ -246,10 +245,12 @@ class SemanticNetworksExtractionContractTests(unittest.TestCase):
         self.assertEqual(checks["SN1"]["value"]["reference_matches"], 120)
         self.assertEqual(checks["SN1"]["value"]["mutated_inputs"], 0)
         self.assertEqual(checks["SN2"]["value"]["rate"], 1.0)
-        self.assertEqual(checks["SN3"]["value"]["rate"], 0.0)
+        for cid in ("SN3", "SN3b", "SN4", "SN4b"):
+            self.assertEqual(checks[cid]["value"]["rate"], 1.0, cid)
         self.assertEqual(checks["SN3"]["value"]["control_bad"], 0)
-        self.assertEqual(checks["SN4"]["value"]["rate"], 0.0)
-        self.assertEqual(checks["SN4"]["value"]["errors"], {"RecursionError": 20})
+        self.assertEqual(checks["SN3b"]["value"]["control_bad"], 0)
+        self.assertEqual(checks["SN4"]["value"]["errors"], {})
+        self.assertEqual(checks["SN4b"]["value"]["errors"], {})
         self.assertEqual(checks["SN6"]["value"]["sha_module"], SN_BEHAVIOR_SHA)
         self.assertEqual(checks["SN6"]["value"]["sha_brain"], SN_BEHAVIOR_SHA)
         self.assertEqual(checks["SN6"]["value"]["source_sha"], SN_SOURCE_SHA)
@@ -308,11 +309,11 @@ class SemanticNetworksHarnessNegativeContractTests(unittest.TestCase):
         safe = _acyclic_safe(RealSemanticNetworksSystem)
         self.assertEqual(cognitivo_eval._sn_family_sn4(safe)["rate"], 1.0)
         self.assertEqual(cognitivo_eval._sn_family_sn4(safe)["invalid"], 0)
-        self.assertEqual(cognitivo_eval._sn_family_sn4(RealSemanticNetworksSystem)["rate"], 0.0)
+        self.assertEqual(cognitivo_eval._sn_family_sn4(RealSemanticNetworksSystem)["rate"], 1.0)
         sync = _order_independent(RealSemanticNetworksSystem)
         self.assertEqual(cognitivo_eval._sn_family_sn3(sync)["rate"], 1.0)
         self.assertEqual(cognitivo_eval._sn_family_sn3(sync)["control_bad"], 0)
-        self.assertEqual(cognitivo_eval._sn_family_sn3(RealSemanticNetworksSystem)["rate"], 0.0)
+        self.assertEqual(cognitivo_eval._sn_family_sn3(RealSemanticNetworksSystem)["rate"], 1.0)
 
     def test_wrong_golden_fails_sn6_and_exits_1(self):
         _module()
@@ -367,13 +368,12 @@ class SemanticNetworksHarnessNegativeContractTests(unittest.TestCase):
         self.assertTrue(sn1["scenario_invalid"])
         self.assertTrue(sn1["value"]["richness_bad"])
 
-    def test_cli_reports_only_the_registered_gaps_and_exits_1(self):
+    def test_cli_reports_no_failure_and_exits_0(self):
         _module()
-        from tools import cognitivo_eval
         code, out, _ = self._run(["--capability", "semantic_networks"])
         failed = json.loads(out)["failed"]
         self.assertEqual(set(failed), _GAPS)
-        self.assertEqual(code, cognitivo_eval.EXIT_FAIL)
+        self.assertEqual(code, 0)
 
     def test_source_text_requires_the_marker(self):
         from tools import cognitivo_eval
