@@ -102,13 +102,13 @@ def _plan(texts, seed, actions, goal=GOAL):
     return result, planner, wm
 
 
-def _strip(result):
-    return {k: v for k, v in result.__dict__.items() if k != "planning_time"}
+def _strip(result, *also):
+    return {k: v for k, v in result.__dict__.items() if k not in ("planning_time", *also)}
 
 
 def _invented(k):
     rng = random.Random(20261101 + k)
-    return "ZZ_" + "".join(rng.choice(string.ascii_uppercase + string.digits) for _ in range(rng.randint(5, 10)))
+    return "ZZ_" + "".join(rng.choice(string.ascii_uppercase) for _ in range(rng.randint(5, 10)))
 
 
 class IJ1ClaimIsInertForThePlannerTests(unittest.TestCase):
@@ -124,7 +124,9 @@ class IJ1ClaimIsInertForThePlannerTests(unittest.TestCase):
                 for v_name, texts in INJECTIONS.items():
                     with self.subTest(actions=as_name, variant=v_name, seed=seed):
                         got, _, _ = _plan(texts, seed, actions)
-                        self.assertEqual(_strip(got), _strip(base))
+                        # Errata E1: success_probability só pode cair (aviso de afirmação → fail-closed).
+                        self.assertEqual(_strip(got, "success_probability"), _strip(base, "success_probability"))
+                        self.assertLessEqual(got.success_probability, base.success_probability)
                         self.assertAlmostEqual(got.expected_reward,
                                                round(ref_reward(got.best_action_sequence), 4), places=9)
 
@@ -215,7 +217,8 @@ class OM1UnmodeledActionNeverSucceedsTests(unittest.TestCase):
         for k in range(20):
             x = _invented(k)
             with self.subTest(k=k, action=x):
-                _, wm = _world([f"{x} causes system_status secure"])
+                cr, wm = _world([f"{x} causes system_status secure"])
+                self.assertEqual(cr.causal_graph["adjacency"][x], {"system_status secure"})  # premissa: extraída
                 for seq in ([x], ["APPLY_PATCH", x], [x, "APPLY_PATCH"]):
                     sim = wm.simulate(seq)
                     self.assertIs(sim.success, False, seq)
