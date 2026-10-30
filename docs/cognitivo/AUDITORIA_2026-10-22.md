@@ -3026,3 +3026,24 @@ ajustado depois do registro; mutantes antigos que ancoram a linha trocada de `_e
   "state", None)`); o mesmo canal de texto pode entrar lá. Não tocado.
 - **Resíduo de `compare_futures`:** ranqueia por `(success, utilidade do verified_status)`; uma ação *declarada*
   inventada com status seguro ainda pode superar outras (consequência da E2).
+
+### Errata E1 do P1a (declarada **depois** do GREEN candidato, **antes** de qualquer mudança de teste ou de produção; autorização do Pedro: t154s974, «opção A»)
+
+O GREEN candidato (`verified_status` na recompensa + `success=False` para ação não modelada), aplicado em
+`4ae6b57` sem mudança, passou em tudo menos em dois sub-critérios; a regra de parada foi cumprida (sem push) e o
+Pedro escolheu a opção A. Nenhum golden/contrato muda; o GREEN fica como está. Texto **exato** substituído:
+
+1. **IJ1 — «o plano com o texto é igual (todos os campos, exceto `planning_time`) ao plano sem texto».** Fica:
+   «igual em todos os campos, exceto `planning_time` e `success_probability`; e `success_probability` com o
+   texto é **≤** ao do plano sem texto (a injeção nunca a aumenta)». Motivo medido: em 164 dos 1400 casos a única
+   diferença é `success_probability`, e sempre para **baixo** (ex. 0.3667 → 0.0), porque o `_is_unmodeled` do modo
+   mundo (contrato MW, inalterado) trata qualquer aviso do simulador, inclusive «unverified causal claim», como
+   ação não modelada. Escolha e recompensa permanecem idênticas; o efeito é fail-closed, não um ganho para o
+   atacante. Fica registrado como **risco residual** (afirmação nociva pode rebaixar a confiança de um plano bom).
+2. **OM1 — «20 nomes inventados (`Random(20261101+k)`)».** Passam a ser só letras `A–Z` (`ZZ_` + 5–10 letras,
+   mesma semente). Motivo: o extrator causal não extrai a relação de `ZZ_2OTY9A9` (k=7), então a premissa do teste
+   («a afirmação chega ao simulador») era falsa para esse nome; é defeito do teste, não da produção. O teste
+   também passa a **afirmar** a premissa (a relação é extraída) em vez de assumi-la.
+
+Critérios IJ1 (âncoras `MONITOR`/`APPLY_PATCH`/reward), IJ2 e as demais partes do OM1 ficam como registrados.
+Previsão: com a errata, o GREEN torna os 14 testes verdes e os 105 testes dos contratos existentes seguem verdes.
