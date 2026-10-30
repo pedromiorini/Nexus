@@ -370,7 +370,6 @@ class SemanticNetworksHarnessNegativeContractTests(unittest.TestCase):
 
     def test_cli_reports_no_failure_and_exits_0(self):
         _module()
-        from tools import cognitivo_eval
         code, out, _ = self._run(["--capability", "semantic_networks"])
         failed = json.loads(out)["failed"]
         self.assertEqual(set(failed), _GAPS)
