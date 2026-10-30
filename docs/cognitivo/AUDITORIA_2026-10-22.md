@@ -2441,3 +2441,16 @@ Origem: decisão do Pedro em 30/10/2026 08:15 (America/Sao_Paulo) sobre o item *
 
 ### Previsão do RED
 Falham: SC3R (20 subtestes + sequências), a re-fixação 1 e a re-fixação 2 (o código atual não emite o aviso). Passam sem mudança: SC3N (a), (b), (c), (d), (e), (f), (g) — são negativos que o código atual já cumpre (garantem que a mudança não gere falso positivo). Previsão errada será registrada, sem ajuste dos critérios. Se um critério falhar depois do GREEN, apresento opções ao Pedro em vez de mudar o critério.
+
+### Resultados SC3R/SC3N (GREEN, errata E2)
+Nenhum critério, seed, limite ou protocolo SC-v3 foi alterado depois de rodar: **sem nova errata**. Commits: `19fcb11` (errata E2 + claim) → `7408f37` (contrato RED, produção intacta) → GREEN (este: produção + mutantes + resultados + `claims: []`).
+
+**RED (`7408f37`, código do PR antes do GREEN):** 35 testes nos três arquivos, **61 falhas em subtestes**: SC3R 40 (`test_warns_and_still_applies` 20 + `test_one_warning_per_occurrence` 20), re-fixação 1 (SC3, `test_scm_schema_contract`) 20, re-fixação 2 (`test_scm_intervention_contract`) 1. SC3N passou inteiro. **A previsão acertou** (falham SC3R e as duas re-fixações; SC3N passa por ser negativo que o código já cumpria).
+
+**GREEN (Python 3.11 e 3.12):** SC3R 20/20 (e as sequências `[A, A]`, `["APPLY_PATCH", A]`), SC3N 20/20 + casos fixos, SC3 original (negativos, `ValueError`, `TypeError`, booleano estrito) intacto. Suíte completa **882 testes OK** em 3.11 e em 3.12 (874 + 8 novos). SC1–SC2, SC4–SC14, CF9 (`test_counterfactual_dox_contract.py`), extração causal e ranking de futuros passam **sem edição**.
+
+**Mudança (só `core/cognitivo/causal_world_model.py`, `simulate`):** quando a ação tem par declarado válido e não está em `ACTION_EFFECTS`, acrescenta `declared intervention for action outside ACTION_EFFECTS: <repr(ação)>` (uma vez por ocorrência); a declaração continua aplicada e verificada (`success`, `verified_status`, `verified_state` inalterados; não rejeita). **Re-fixações (grok-bot; nenhum teste do Axis editado):** as duas previstas na errata, só a asserção de avisos.
+
+**Gates:** `ruff` e `compileall` OK; `reality_audit` regenerado só pela ferramenta + `git diff --exit-code` limpo; `validar_registro` OK; cobertura `core/cognitivo/*` 98%; `cognitivo_mutation` **522/522** (4 mutantes novos `sc3r_*`: aviso removido, aviso para ação da tabela, texto do aviso, declaração fora da tabela não verificada; nenhum sobrevivente; agulhas antigas intactas); `targeted_mutation` 80/80 sem edição da ferramenta; Bandit 138 LOW, 0 MEDIUM/HIGH, `security_triage --check`, `embedded_assert_audit` e `implementation_gap_audit` OK.
+
+**Item 1a do adendo: fechado** (opção b). `docs/agentes/CLAIMS.yaml` volta a `claims: []` neste commit.
