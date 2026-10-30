@@ -2833,3 +2833,10 @@ Falhas **comportamentais** (asserções), sem `AttributeError` (nenhuma API nova
 - Sem modelo a lacuna **continua** (H2); decisão do Pedro/Axis: re-fixar o golden para estender o conserto.
 
 `docs/agentes/CLAIMS.yaml` abre um claim com prazo neste commit e volta a `claims: []` no commit de resultados.
+
+### Errata E1 do ER1 (declarada **depois** do GREEN, **antes** de qualquer mudança de teste; autorização do Pedro: pt146u, "opção A")
+- **O que aconteceu:** no primeiro GREEN (`9f426d8`, só a mudança em `_run_plan`), 49 testes rodaram com 11 falhas, **todas** no ER1, casos `subset`, e só em `success_probability`, com diferença de 0,0001 (ex.: `0.7333 != 0.7334` para `['RESTORE_BACKUP']`). O `expected_reward` bateu exato em todos os casos; ER2–ER8 e os contratos do Axis e MW passaram sem edição.
+- **Causa:** o ER1 não dizia se `success_probability` deriva do `expected_reward` arredondado ou do valor não arredondado. O teste (`expected_success`) derivou do valor **arredondado** devolvido (`round(min(1, 1.1·0.6667), 4) = 0.7334`); o código existente deriva do valor **não arredondado** (`1.1·0.66667 = 0.7333`), mesma fórmula e mesma ordem de arredondamento de antes (e do MW5, que compara com `delta=0.0002`). É defeito da referência escrita no teste, não do comportamento.
+- **Errata (única, sobre o ER1):** `success_probability` passa a ser comparado com `0.0` se a sequência contém `ZZ_*`, senão com `min(1, 1.1·ref_reward(sequência))` **não arredondado**, via `assertAlmostEqual(..., delta=0.0002)`, como o MW5. **Não afrouxa o `expected_reward`**, que continua exato (`== round(ref_reward(sequência), 4)`, sequência vazia `0.0`). ER2–ER9, seeds, as 40 execuções do ER1 e os demais critérios **não mudam**; o `success_probability == 1.0` e os negativos do ER3 (`0.0`) continuam exatos.
+- **Alternativa descartada:** derivar do valor arredondado no modo mundo (criaria diferença de fórmula entre caminhos e não seria o que o MW5 aceita).
+- **Verificação independente antes da errata (script avulso, nada commitado):** com a leitura não arredondada, 0 divergências em 40 casos.
