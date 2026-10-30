@@ -102,8 +102,9 @@ class B1AllowedFuturesTests(unittest.TestCase):
             rng = random.Random(seed)
             sequences = [[rng.choice(pool) for _ in range(rng.randint(1, 3))] for _ in range(rng.randint(1, 4))]
             with self.subTest(seed=seed):
-                out = _compare(sequences)
-                ref = _wm().compare_futures(sequences)
+                model = _wm()  # o mesmo modelo nas duas chamadas (o carimbo de tempo do estado inicial é por instância)
+                out = mp.compare_allowed_futures(model, sequences)
+                ref = model.compare_futures(sequences)
                 self.assertEqual(out["best_future_index"], ref["best_future_index"])
                 self.assertEqual(out["best_future"], ref["best_future"])
                 self.assertEqual(out["results"], ref["results"])
