@@ -2404,3 +2404,19 @@ Erros de atributo (`AttributeError`) em SC11 (`unverified_claims`) e SC13 (`veri
 
 ### Aberto (não é corrigido aqui)
 **1a:** `declare_intervention` aceita ação fora de `ACTION_EFFECTS` com `success=True` e sem aviso (SC3 exige). Opções para o Pedro: (a) manter (canal confiável); (b) aviso `declared intervention for action outside ACTION_EFFECTS` (exige reabrir SC3); (c) rejeitar ações fora da tabela em `declare_intervention` (exige reabrir SC3 e quebra o exemplo do contrato).
+
+### Resultados SC10–SC14 (GREEN)
+Nenhum critério, seed, limite ou protocolo SC-v2 foi alterado depois de rodar: **sem errata**. Commits: pré-registro → contrato RED (`test_scm_review_addendum_contract.py`, produção intacta) → GREEN (este: produção + mutantes + resultados + `claims: []`).
+
+**Reprodução dos fatos do Pearl antes de corrigir (`/tmp/repro133*.py`, sobre `main` do PR):** (1b) confirmado: `foo_bar`, `owner`, `owned` e `very high` chegavam à cadeia contrafactual por `_scm_do_steps`; (1c) confirmado: nenhum marcador de «não verificado» no cenário; (2) confirmado: `system_status` saiu `compromised` com `PYTHONHASHSEED` 0, 2, 4, 5 e `secure` com 1, 3, 6, 7; (3) confirmado, e **por desenho** (SC1/CF9 exigem a claim em `final_state.state`); (1a) confirmado, mas **exigido pelo SC3** (ver «Aberto»).
+
+**RED (código do PR, antes do GREEN):** `Ran 12 tests`, 26 falhas e 42 erros em subtestes. **AttributeError: 42** (`verified_state`/`claim_items` ×40 em SC13, `unverified_claims` ×2 em SC11); **comportamentais: 26 falhas + os erros restantes** (vazamento SC10 ×20, conflito/não-determinismo SC12 ×5, benchmark `1.0 != 0.0`). A previsão acertou nas duas classes.
+
+**GREEN:** `classify_text_effects` (ordenado, conflito excluído com aviso `conflicting causal claims: <ação> -> <chave> in <valores ordenados>`), `_split_do` com 4 saídas, `SimulationResult.verified_state`/`claim_items` (`{action, key, value, source: "free_text", confidence: None}`; `confidence` fica `None` porque a adjacência não guarda confiança), `CounterfactualEngine.unverified_claims` por `scenario_id`, `_scm_do_steps` filtrado por `_schema_pair`, benchmark lendo `verified_state`. **Desvio do texto planejado:** o outcome contrafactual continua montado a partir de `final_state.state` (verificado + claim), porque CF9 (Axis, sem edição) exige `system_status=secure` no outcome e o hash do contrato de extração usa `asdict` do dataclass (`CounterfactualScenario` não ganhou campo); a marcação de «não verificado» vai em `unverified_claims`. `final_state.state` não mudou.
+
+**Testes acrescentados depois do 1º mutation run** (516/518, 2 sobreviventes, não declarados equivalentes): `SC11.test_claims_do_not_leak_into_the_next_scenario` (mata `sr_claims_stale_across_scenarios`) e `SC12.test_ignored_claim_warnings_are_ordered_across_hash_seeds` (mata `sr_effects_unsorted`). O contrato passa de 12 para 14 testes; nenhum critério mudou.
+
+**Resultados:** suíte 874 testes OK em Python 3.11 e 3.12; `ruff`, `compileall`, `reality_audit` regenerado só pela ferramenta + `git diff --exit-code`, `validar_registro` OK; Bandit sem MEDIUM/HIGH, `security_triage --check`, `embedded_assert_audit`, `implementation_gap_audit` OK; cobertura `core/cognitivo/*` 98%, monólito 68%; `cognitivo_mutation` 518/518 (15 novos `sr_*`; 3 agulhas antigas atualizadas só nas linhas movidas: `c4_do_skips_split`, `c4_adjacency_wrong_key`, `sc_text_overrides_declared`); `targeted_mutation` 80/80 sem edição da ferramenta. Axis (`test_counterfactual_extraction_contract` e CF9) sem edição.
+
+`docs/agentes/CLAIMS.yaml` volta a `claims: []` neste commit.
+

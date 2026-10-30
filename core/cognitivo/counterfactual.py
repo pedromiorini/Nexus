@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from core.cognitivo.action_effects import ACTION_EFFECTS
+from core.cognitivo.causal_world_model import _schema_pair, classify_text_effects
 
 # Sonda ao planner injetado. Não é o default 200 de RealMCTSPlanner.plan
 # e não calibra plausibilidade.
@@ -146,6 +147,10 @@ class RealCounterfactualReasoningEngine:
         # Insights learned
         self.insights: List[str] = []
         
+        # Claims de texto livre (não verificadas) por cenário: scenario_id -> ["ação: chave=valor"]
+        self.unverified_claims: Dict[str, List[str]] = {}
+        self._pending_claims: List[str] = []
+
         # Estatísticas
         self.total_scenarios_generated = 0
         self.total_interventions_modeled = 0
@@ -174,6 +179,8 @@ class RealCounterfactualReasoningEngine:
         
         # Predizer outcome contrafactual (com intervenção)
         counterfactual_outcome = self._predict_outcome(situation, intervention=intervention)
+        claims_seen = list(self._pending_claims)
+        self._pending_claims = []
         
         # Construir causal chain. Passos do planner, se houver, vêm depois.
         causal_chain = list(self._build_causal_chain(situation, intervention))
@@ -194,6 +201,8 @@ class RealCounterfactualReasoningEngine:
         )
         
         self.scenarios.append(scenario)
+        if claims_seen:
+            self.unverified_claims[scenario.scenario_id] = claims_seen
         self.total_scenarios_generated += 1
         
         return scenario
@@ -282,10 +291,15 @@ class RealCounterfactualReasoningEngine:
         effects = self._adjacency().get(action)
         if not effects:
             return []
+        members = _effect_members(effects)
+        claims, _, _ = classify_text_effects(members)
         pairs = []
-        for effect in effects:
+        for effect in members:
             parts = str(effect).strip().split(None, 1)
-            if len(parts) == 2:
+            if len(parts) != 2:
+                continue
+            pair = _schema_pair(parts[0], parts[1])
+            if pair is not None and pair[0] in claims:
                 pairs.append((parts[0], parts[1]))
         pairs.sort()
         return [f"do({action}): {key}={value}" for key, value in pairs]
@@ -301,6 +315,13 @@ class RealCounterfactualReasoningEngine:
             result = simulate([action])
             state = getattr(getattr(result, "final_state", None), "state", None)
             if isinstance(state, dict):
+                items = getattr(result, "claim_items", None)
+                if isinstance(items, list):
+                    self._pending_claims = [
+                        f"{item['action']}: {item['key']}={item['value']}"
+                        for item in items
+                        if isinstance(item, dict) and {"action", "key", "value"} <= set(item)
+                    ]
                 return _serialize_state(state)
             return None
         for hook_name in ("do", "_do"):

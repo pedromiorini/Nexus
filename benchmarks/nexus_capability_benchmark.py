@@ -222,7 +222,7 @@ def _score_composition(cases: list[dict[str, Any]]) -> dict[str, Any]:
     simulator = RealWorldModelSimulator()
     outcomes: dict[str, list[bool]] = {"seen_length_1_2": [], "held_out_length_3": []}
     for case in cases:
-        actual = simulator.simulate(case["actions"]).final_state.state
+        actual = simulator.simulate(case["actions"]).verified_state
         target = case["target_state"]
         exact_match = all(actual.get(key) == value for key, value in target.items())
         outcomes[case["split"]].append(exact_match)

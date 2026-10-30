@@ -42,6 +42,31 @@ def _schema_pair(key: Any, value: Any) -> Optional[Tuple[str, Any]]:
     return None
 
 
+def classify_text_effects(
+    effects: Any, skip: Any = ()
+) -> Tuple[Dict[str, object], Dict[str, List[str]], List[str]]:
+    """Classifica os efeitos de texto de uma ação: (claims, conflitos, ignorados), em ordem determinística.
+
+    Cada efeito é ``"chave valor"``. Par do WORLD_SCHEMA vira claim; fora do schema é ignorado; chave em
+    ``skip`` (declarada) é pulada. Chave com mais de um valor canônico é conflito e não vira claim (a
+    ordem de iteração do conjunto de arestas não decide nada).
+    """
+    seen: Dict[str, set] = {}
+    ignored: List[str] = []
+    for effect in sorted(str(item).strip() for item in (effects or ())):
+        parts = effect.split(None, 1)
+        if len(parts) != 2:
+            continue
+        pair = _schema_pair(parts[0], parts[1])
+        if pair is None:
+            ignored.append(f"{parts[0]}={parts[1]}")
+        elif pair[0] not in skip:
+            seen.setdefault(pair[0], set()).add(pair[1])
+    claims = {key: next(iter(values)) for key, values in sorted(seen.items()) if len(values) == 1}
+    conflicts = {key: sorted(values) for key, values in sorted(seen.items()) if len(values) > 1}
+    return claims, conflicts, ignored
+
+
 @dataclass
 class CausalRelation:
     cause: str
@@ -138,6 +163,8 @@ class SimulationResult:
     warnings: List[str]
     claims: List[str] = field(default_factory=list)  # afirmações de texto livre aplicadas, não verificadas
     verified_status: Optional[str] = None  # system_status só com tabela + intervenções declaradas
+    verified_state: Dict[str, Any] = field(default_factory=dict)  # inicial + tabela + declaradas, sem claims
+    claim_items: List[Dict[str, Any]] = field(default_factory=list)  # claims estruturadas (fonte, confiança)
 
 class RealWorldModelSimulator:
     """POST13: World Model & Simulation - CONSOLIDADO"""
@@ -153,11 +180,11 @@ class RealWorldModelSimulator:
             timestamp=time.time()
         )
 
-    def _split_do(self, action: str) -> Tuple[Dict[str, object], Dict[str, object], List[str]]:
-        """Separa os efeitos de do(ação): (declarados e verificados, claims de texto válidas, ignorados)."""
+    def _split_do(self, action: str) -> Tuple[Dict[str, object], Dict[str, object], List[str], Dict[str, List[str]]]:
+        """Separa os efeitos de do(ação): (declarados e verificados, claims válidas, ignorados, conflitos)."""
         cr = self.causal_reasoning
         if cr is None:
-            return {}, {}, []
+            return {}, {}, [], {}
         declared_raw = getattr(cr, "declared_interventions", None)
         declared: Dict[str, object] = {}
         if isinstance(declared_raw, dict):
@@ -166,22 +193,12 @@ class RealWorldModelSimulator:
                 if pair is not None:
                     declared[pair[0]] = pair[1]
         adjacency = getattr(cr, "causal_graph", {}).get("adjacency") or {}
-        claims: Dict[str, object] = {}
-        ignored: List[str] = []
-        for effect in adjacency.get(action, ()):
-            parts = str(effect).strip().split(None, 1)
-            if len(parts) != 2:
-                continue
-            pair = _schema_pair(parts[0], parts[1])
-            if pair is None:
-                ignored.append(f"{parts[0]}={parts[1]}")
-            elif pair[0] not in declared:
-                claims[pair[0]] = pair[1]
-        return declared, claims, ignored
+        claims, conflicts, ignored = classify_text_effects(adjacency.get(action, ()), skip=declared)
+        return declared, claims, ignored, conflicts
 
     def _do(self, action: str) -> Dict[str, object]:
         """Intervenção do(ação): só pares do WORLD_SCHEMA; declarado vence texto na mesma chave."""
-        declared, claims, _ = self._split_do(action)
+        declared, claims, _, _ = self._split_do(action)
         effects = dict(claims)
         effects.update(declared)
         return effects
@@ -198,6 +215,8 @@ class RealWorldModelSimulator:
         warnings = []
         claim_log: List[str] = []
 
+        claim_items: List[Dict[str, Any]] = []
+
         for action in actions:
             applied = False
             entry = ACTION_EFFECTS.get(action)
@@ -205,7 +224,7 @@ class RealWorldModelSimulator:
                 state.state.update(entry["world"])
                 verified.update(entry["world"])
                 applied = True
-            declared, claims, ignored = self._split_do(action)
+            declared, claims, ignored, conflicts = self._split_do(action)
             if declared:
                 state.state.update(declared)
                 verified.update(declared)
@@ -215,7 +234,11 @@ class RealWorldModelSimulator:
                 applied = True
                 for key, value in claims.items():
                     claim_log.append(f"{action}: {key}={value}")
+                    claim_items.append({"action": action, "key": key, "value": value,
+                                        "source": "free_text", "confidence": None})
                     warnings.append(f"unverified causal claim (free text): {action!r} -> {key}={value}")
+            for key, values in conflicts.items():
+                warnings.append(f"conflicting causal claims: {action!r} -> {key} in {', '.join(values)}")
             for pair in ignored:
                 warnings.append(f"ignored causal claim outside WORLD_SCHEMA: {action!r} -> {pair}")
             if not applied:
@@ -231,6 +254,8 @@ class RealWorldModelSimulator:
             warnings=warnings,
             claims=claim_log,
             verified_status=verified.get("system_status"),
+            verified_state=verified,
+            claim_items=claim_items,
         )
 
     def compare_futures(self, action_sequences: List[List[str]]) -> Dict:

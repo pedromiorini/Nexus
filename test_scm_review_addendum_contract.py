@@ -88,6 +88,17 @@ class SC11ClaimsAreMarkedUnverified(unittest.TestCase):
             scenario = engine.generate_counterfactual_scenario("system vulnerable", action)
             self.assertEqual(engine.unverified_claims.get(scenario.scenario_id, []), [], action)
 
+    def test_claims_do_not_leak_into_the_next_scenario(self):
+        # Acrescentado após o 1º mutation run (sr_claims_stale_across_scenarios sobreviveu); critérios SC10–SC13 intactos.
+        causal = RealCausalReasoning()
+        causal.extract_causal_relations("DEPLOY_FIX causes system_status secure")
+        engine = _engine(causal)
+        first = engine.generate_counterfactual_scenario("system vulnerable", "DEPLOY_FIX")
+        self.assertEqual(engine.unverified_claims[first.scenario_id], ["DEPLOY_FIX: system_status=secure"])
+        for intervention in ("zzz unrelated words", "APPLY_PATCH"):
+            second = engine.generate_counterfactual_scenario("system vulnerable", intervention)
+            self.assertEqual(engine.unverified_claims.get(second.scenario_id, []), [], intervention)
+
 
 CHILD = r"""
 import json, sys, io, contextlib
@@ -123,6 +134,23 @@ class SC12ConflictingClaimsAreDeterministic(unittest.TestCase):
         texts.append(f"{action} causes alert_level low")
         texts.append(f"{action} causes logging_level verbose")
         return action, statuses, texts
+
+    def test_ignored_claim_warnings_are_ordered_across_hash_seeds(self):
+        # Acrescentado após o 1º mutation run (sr_effects_unsorted sobreviveu); critérios SC10–SC13 intactos.
+        for k in range(3):
+            rng = SEEDS[k + 10]
+            action = _name(rng)
+            texts = [f"{action} causes {key} {value}" for key, value in
+                     rng.sample([("zeta_key", "one"), ("alpha_key", "two"), ("mid_key", "three"), ("beta_key", "four")], 4)]
+            texts.append(f"{action} causes system_status secure")
+            spec = {"action": action, "texts": texts}
+            with self.subTest(k=k):
+                runs = [_run_child(spec, seed) for seed in range(5)]
+                ignored = [w for w in runs[0]["warnings"] if w.startswith("ignored causal claim")]
+                self.assertEqual(len(ignored), 4)
+                self.assertEqual(ignored, sorted(ignored))
+                for run in runs[1:]:
+                    self.assertEqual(run, runs[0])
 
     def test_five_hash_seeds_give_identical_results_and_conflict_is_excluded(self):
         for k in range(4):

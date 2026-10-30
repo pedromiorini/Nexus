@@ -1,15 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "SCM do(X): adendo da revisão do Pearl (SC10–SC14): vazamento no contrafactual, conflito de claims determinístico, estado verificado separado"
-    arquivos:
-      - core/cognitivo/causal_world_model.py
-      - core/cognitivo/counterfactual.py
-      - benchmarks/nexus_capability_benchmark.py
-      - test_scm_review_addendum_contract.py
-      - tools/cognitivo_mutation.py
-      - docs/cognitivo/AUDITORIA_2026-10-22.md
-      - docs/agentes/CLAIMS.yaml
-    expira_em: "2026-11-02T12:00:00Z"
+claims: []
