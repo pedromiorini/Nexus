@@ -1,4 +1,16 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "Guarda artefatos_drift.sh (L-010): tipo drift do replay, contrato hermético e lição (pré-registro AD1–AD9)"
+    arquivos:
+      - tools/agente/artefatos_drift.sh
+      - tools/agente/replay/run_replay.sh
+      - tools/agente/replay/casos_drift.tsv
+      - tools/agente/README.md
+      - test_artefatos_drift_contract.py
+      - docs/agentes/ARTEFATOS_DRIFT.md
+      - docs/agentes/LICOES_APRENDIDAS.md
+      - docs/agentes/CLAIMS.yaml
+    expira_em: "2026-11-01T12:00:00Z"
