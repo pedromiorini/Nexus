@@ -14,6 +14,7 @@ from numbers import Real
 from typing import Any, Dict, List, Optional
 
 from core.cognitivo.action_effects import planner_deltas
+from core.cognitivo.causal_world_model import STATUS_UTILITY
 
 __all__ = ["MCTSNode", "PlanResult", "RealMCTSPlanner"]
 
@@ -133,6 +134,27 @@ class RealMCTSPlanner:
         self._plan_actions: Optional[List[str]] = None
         self._plan_effects: Dict[str, Dict] = {}
         self._best_found: Optional[tuple] = None
+        # Cache de recompensas do modo mundo (sequência -> recompensa); vale só dentro de um plan().
+        self._world_rewards: Dict[tuple, float] = {}
+
+    def _uses_world_effects(self) -> bool:
+        """Modo mundo: o modelo injetado sabe simular sequências de ações."""
+        return self.world_model is not None and callable(getattr(self.world_model, "simulate", None))
+
+    def _evaluate_world(self, state: Dict) -> float:
+        """Recompensa do estado = utilidade do status final simulado pelo modelo, em [0, 1]."""
+        steps = tuple(state.get("steps_taken", []))
+        if steps not in self._world_rewards:
+            final = self.world_model.simulate(list(steps)).final_state.state
+            utility = STATUS_UTILITY.get(final.get("system_status"), 0)
+            self._world_rewards[steps] = utility / 3.0
+        return self._world_rewards[steps]
+
+    def _is_unmodeled(self, action: str) -> bool:
+        """Ação sem efeito conhecido: fora da tabela (sem modelo) ou aviso do simulador (com modelo)."""
+        if self._uses_world_effects():
+            return bool(getattr(self.world_model.simulate([action]), "warnings", []))
+        return action not in self._action_effects
 
     # ─── Fase 1: SELEÇÃO ────────────────────────────────────────────────────
 
@@ -196,7 +218,14 @@ class RealMCTSPlanner:
         return reward
 
     def _record_found(self, reward: float, state: Dict) -> None:
-        if reward > 0 and (self._best_found is None or reward > self._best_found[0]):
+        if reward <= 0:
+            return
+        if self._best_found is not None and reward == self._best_found[0] and self._uses_world_effects():
+            # modo mundo: entre planos de mesma recompensa, o de menos passos
+            if len(state.get("steps_taken", [])) < len(self._best_found[1]):
+                self._best_found = (reward, list(state.get("steps_taken", [])))
+            return
+        if self._best_found is None or reward > self._best_found[0]:
             self._best_found = (reward, list(state.get("steps_taken", [])))
 
     # ─── Fase 4: RETROPROPAGAÇÃO ─────────────────────────────────────────────
@@ -270,6 +299,9 @@ class RealMCTSPlanner:
         Avaliar qualidade de um estado em relação ao goal.
         Retorna recompensa entre 0.0 e 1.0.
         """
+        if self._uses_world_effects():
+            return self._evaluate_world(state)
+
         reward = 0.0
         goal_lower = goal.lower()
 
@@ -379,6 +411,7 @@ class RealMCTSPlanner:
             self._plan_actions = None
             self._plan_effects = {}
             self._best_found = None
+            self._world_rewards = {}
 
     def _run_plan(self, goal: str, initial_state: Dict[str, Any], allowed: Optional[List[str]],
                   max_iterations: int, start_time: float) -> PlanResult:
@@ -420,6 +453,10 @@ class RealMCTSPlanner:
         alternatives = self._extract_alternatives(root)
 
         planning_time = time.time() - start_time
+        if any(self._is_unmodeled(a) for a in best_sequence):
+            success_probability = 0.0  # ação sem efeito conhecido não ganha confiança
+        else:
+            success_probability = round(min(1.0, expected_reward * 1.1), 4)
 
         return PlanResult(
             goal=goal,
@@ -429,7 +466,7 @@ class RealMCTSPlanner:
             tree_nodes_created=self.total_nodes_created,
             alternative_plans=alternatives,
             planning_time=round(planning_time, 4),
-            success_probability=round(min(1.0, expected_reward * 1.1), 4)
+            success_probability=success_probability
         )
 
     def get_statistics(self) -> Dict:

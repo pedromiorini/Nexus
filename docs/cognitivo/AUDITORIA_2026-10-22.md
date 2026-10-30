@@ -2544,3 +2544,51 @@ Harness: exit 1 (SN3 e SN4), igual em 3.11 e 3.12. SN3 e SN4 **não** foram corr
 - Correção pós-CI (`1c4970d`): o job «Final state attestation» falhou em `tools/state_consistency_audit.py` com exatamente 4 conflitos `bandit_low` (documento 138, manifesto 139) em `NEXUS_KNOWLEDGE.md`, `NEXUS_EVIDENCE.md`, `SECURITY_TRIAGE.md` (já em 139) e `CONTINUATION.md`. Faltou atualizar o marcador `bandit_low` nos três documentos de estado ao regenerar o `SECURITY_TRIAGE.md`; corrigido para 139 (só a linha 7 de cada). Nenhum critério ou seed mudou.
 
 **Errata do commit `99f5c94` (sincronização do contador Bandit):** o commit atualizou `bandit_low` só em três documentos de estado (139) e o teste `test_state_stray_marker_contract` (fixture com 138) falhou no gate hospedado. A sincronização completa, como no precedente de `23fde14` (131→138), cobre também o marcador de `SECURITY_TRIAGE.md` e a fixture do contrato (`SYNCED` e `"LOW"`), agora 139. Nenhum critério da extração mudou.
+## MCTS com os efeitos reais do modelo de mundo (pré-registro MW1–MW9)
+Pré-registrado em commit próprio, **antes** de qualquer teste ou código novo. Autorização do Pedro: t141u. Item P3/M4 da lista de falhas conhecidas.
+
+### Fatos reproduzidos antes de escrever (`/tmp/repro_mcts.py`, `main` `23fde14`)
+Com `RealMCTSPlanner(world_model=RealWorldModelSimulator(), max_depth=3)` e `plan("secure the system", max_iterations=200)`, 5 seeds: `expected_reward == 0.5` e `success_probability == 0.55` em todas; a melhor sequência é uma ação qualquer (`RESTORE_BACKUP`, `ROLLBACK`, `APPLY_PATCH`, `ESCALATE`, `ESCALATE`) e os `alternative_plans` empatam em 0.5. Causa: `_get_initial_state` copia o estado **simbólico** do modelo (`system_status`, `alert_level`, `security_patch_applied`), mas `_apply_action` só move métricas numéricas (`security`, `stability`, `cost`) que esse estado não tem, e `_evaluate_state` cai no valor padrão `(0.5+0.5+0.5)/3`. É o caminho **real** do cérebro: `CompleteNexusBrain` constrói o planejador com `world_model=self.world_model`. Sem modelo de mundo (default) o planejador funciona (`APPLY_PATCH`, 0.62–0.67). Ação sem efeito conhecido (`available_actions=["FOO"]`) devolve `success_probability` inflada por `min(1, 1.1·r)` (0.55 com modelo, 0.7333 sem).
+
+### Hipóteses
+- **H1:** com modelo de mundo injetado, a recompensa passa a vir do estado final que `world_model.simulate(sequência)` calcula (efeitos reais da tabela `ACTION_EFFECTS` e do `do(ação)`), em vez de um estado numérico que o modelo não tem.
+- **H2:** a probabilidade de sucesso não deve ser inflada por ações sem efeito conhecido.
+- Alternativas excluídas: importar métricas numéricas para dentro do estado do modelo (inventa uma ponte `status → security`); mudar o caminho sem modelo (coberto por golden e M1–M5 do Axis).
+
+### Mudança permitida (só `core/cognitivo/mcts_planner.py`)
+1. **Modo mundo:** `world_model` com `simulate` chamável. Recompensa do estado = `max(0, STATUS_UTILITY[system_status]) / 3` do estado final de `world_model.simulate(steps_taken)` (`STATUS_UTILITY` de `causal_world_model`; status desconhecido vale 0); cache por sequência, zerado ao fim de cada `plan()`. Sem `simulate` (dublê só com `current_state`) ou sem modelo: caminho atual, **byte a byte**.
+2. **Desempate no modo mundo:** entre planos de mesma recompensa, vence o de menos passos (`_record_found`; o caminho sem modelo não muda).
+3. **`success_probability`:** `0.0` se a melhor sequência contém ação sem efeito conhecido (fora de `_action_effects` sem modelo; com modelo, `simulate([ação])` devolve aviso); senão a fórmula atual `round(min(1, 1.1·r), 4)`. `expected_reward` não muda (o Axis `test_unknown_custom_action_has_neutral_effects` o exige). `PlanResult` não ganha campo (o golden usa `asdict`).
+4. Fora do escopo, declarado: a constante 1.1; o teto do M3 v2; `plan()` que levanta se `simulate` levantar (propaga, sem engolir).
+
+### Critérios (protocolo MW-v1; seeds `random.Random(20261101 + k)`, k = 0..19, passadas a `random.seed` antes de cada `plan`; referência independente escrita no teste, sem chamar o módulo para calcular o esperado)
+Planejador: `RealMCTSPlanner(world_model=RealWorldModelSimulator(), max_depth=3)`, `plan("secure the system", max_iterations=300)`, salvo indicação.
+- **MW1 recompensa não travada (20/20):** `expected_reward` do melhor filho > 0.3334 (valor de `vulnerable`, sem ação) e os `alternative_plans` têm ≥ 2 `expected_reward` distintos.
+- **MW2 plano segue os efeitos (20/20):** referência exaustiva no teste (todas as sequências até 3 passos sobre as 10 ações, aplicando `ACTION_EFFECTS[...]["world"]` no teste): a recompensa da melhor sequência do planejador, pela referência, é o máximo (1.0).
+- **MW3 mais curto (20/20):** `best_action_sequence` ∈ `[["APPLY_PATCH"], ["DEPLOY_UPDATE"]]`.
+- **MW4 ação nociva e subconjunto (20/20 cada):** `available_actions=["IGNORE_ALERT","MONITOR","APPLY_PATCH"]` → `["APPLY_PATCH"]`; `["IGNORE_ALERT","MONITOR"]` → `["MONITOR"]`.
+- **MW5 ação sem efeito (nome aleatório `ZZ_<n>`; com e sem modelo; 20/20 cada):** `available_actions=[ação]` → `best_action_sequence == [ação]`, `expected_reward ==` o valor-base (com modelo 0.3333; sem modelo `round(planner._evaluate_state(planner._get_initial_state(goal), goal), 4)` com `goal="improve stability"`), `success_probability == 0.0`. Com modelo, `["APPLY_PATCH", ação]` → `["APPLY_PATCH"]` e `success_probability == round(min(1, 1.1·expected_reward), 4)`. Sem modelo, ações padrão → `success_probability == round(min(1, 1.1·expected_reward), 4)` (não regressão).
+- **MW6 integrado (5 seeds):** o `mcts_planner` de um `CompleteNexusBrain` real (modelo de mundo ligado) planeja `"secure the system"` com `expected_reward != 0.5` e a sequência, simulada no `world_model` do cérebro, dá `success is True`.
+- **MW7 sem efeitos colaterais (20/20):** `plan` não altera `world_model.current_state.state`, nem `_action_effects`; duas execuções com a mesma seed dão o mesmo `PlanResult` (sem `planning_time`); depois de mudar o status do modelo para `compromised`, um novo `plan(available_actions=["MONITOR"])` dá `expected_reward == 0.0` (cache não vaza entre planos).
+- **MW8 tempo:** p95 de `plan(200)` com o modelo, `max_depth=5`, 20 execuções, ≤ 0.10 s (mesmo limite do M5).
+- **MW9 não regressão:** `test_mcts_planner_quality_contract.py`, `test_mcts_action_contract.py`, `test_mcts_planner_extraction_contract.py` (golden) e `test_mcts_planner_input_contract.py` passam **sem edição**; M1, M2, M4, M5 de `eval_mcts`; suíte em 3.11 e 3.12; `cognitivo_mutation` e `targeted_mutation` (80/80, ferramenta sem edição) sem sobreviventes; `claims: []` ao final.
+
+### Previsão do RED
+Falhas **comportamentais** (asserções), sem `AttributeError` (nenhuma API nova): MW1 (0.5 e empate), MW2/MW3/MW4 (sequências arbitrárias), MW5 `success_probability` 0.55/0.7333 em vez de 0.0, MW6, MW7 (a parte do cache só falha depois da correção sem o reset, então passa no RED). MW8 e a parte de não regressão do MW5 passam no RED.
+
+### Risco declarado (não é critério)
+Com modelo, `success_probability` continua `min(1, 1.1·r)` para planos conhecidos; um plano que o simulador dá como sucesso pode sair com < 1.0. Valor `0.0` para ação sem efeito é escolha conservadora e fica à vista do Pedro; alternativas: `None` (muda o tipo) ou manter `expected_reward` apenas.
+
+### Resultados (MW1–MW9; critérios não reajustados)
+**RED** (`09e4fdf`, contra `main` inalterado): 8 testes, 149 falhas, 0 erros, 0 `AttributeError` (todas comportamentais: MW1 20, MW2 16, MW3 16, MW4 27, MW5 47, MW6 3, MW7 20). MW8 e o caso "ações padrão sem modelo" do MW5 passaram, como previsto. **Previsão errada do pré-registro:** a parte do cache do MW7 também falhou no RED (a expectativa `0.0` não vale com a recompensa travada em 0.5), em vez de passar.
+
+**GREEN** (`mcts_planner.py`, +40/−2 linhas; só esse módulo de produção): MW1–MW8 passam com as 20 seeds. MW8: p95 0.0091 s com modelo (limite 0.10 s). MW6 usa o `CompleteNexusBrain` real. Reprodução depois: com modelo, as 5 seeds dão `APPLY_PATCH` ou `DEPLOY_UPDATE` (antes: ação arbitrária); `FOO` dá `success_probability` 0.0 (antes 0.55/0.7333); caminho sem modelo igual ao de `main` (`APPLY_PATCH`, 0.62–0.67).
+
+**Acréscimos depois do RED, guiados por mutantes (não alteram critérios):** MW9 (dublê só com `current_state` mantém o caminho numérico), MW10 (status desconhecido vale 0), MW11 (desempate por menos passos só no modo mundo), MW12 (qualquer ação sem efeito zera `success_probability`) e, no MW7, `best_action_sequence == []` (o cache vazado só aparecia no plano, não no `expected_reward`). Mutante `mcts_keeps_strictly_better_found` precisou de agulha nova (a linha mudou); mesma troca, mesmo teste. Sem `max(0, …)` na utilidade e sem o reset de cache antes do plano (equivalentes: nenhum status tem utilidade negativa e o `finally` já zera).
+
+**Gates:** `cognitivo_mutation` 496/496 (13 `mw_*` novos); `targeted_mutation` 80/80 (ferramenta sem edição); suíte 850 testes OK em 3.11 e 3.12; ruff, compileall, bandit/triage/asserts/gaps e `validar_registro` OK; `reality_audit` + `git diff --exit-code` limpos (relatórios só via ferramenta); cobertura `core/cognitivo/*` 97% (≥ 90; `mcts_planner` 92%), brain 68% (≥ 62); `python core/constitutional_brain.py` rc 0; `cognitivo_eval --capability mcts`: M1, M2, M4, M5 passam, M3 v2 segue falhando como em `main` (teto, fora do escopo). Contratos do Axis (`quality`, `action`, `input`, `extraction`/golden) passam sem edição.
+
+**Lacunas residuais, declaradas:** `expected_reward` e `success_probability` vêm da média do **melhor filho da raiz** (rollouts aleatórios), não da sequência escolhida; com modelo, o filho de maior média pode ser outro (p.ex. `ESCALATE`) enquanto o plano escolhido é `APPLY_PATCH` (visto em `alternative_plans`). A constante 1.1 e o teto do M3 ficam. O custo de passos não entra na recompensa do modo mundo (só o desempate). `0.0` para ação sem efeito é decisão a confirmar pelo Pedro.
+
+`docs/agentes/CLAIMS.yaml` volta a `claims: []` neste commit.
+
