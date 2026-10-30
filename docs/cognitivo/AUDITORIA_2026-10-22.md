@@ -3047,3 +3047,26 @@ Pedro escolheu a opção A. Nenhum golden/contrato muda; o GREEN fica como está
 
 Critérios IJ1 (âncoras `MONITOR`/`APPLY_PATCH`/reward), IJ2 e as demais partes do OM1 ficam como registrados.
 Previsão: com a errata, o GREEN torna os 14 testes verdes e os 105 testes dos contratos existentes seguem verdes.
+
+### Resultados (IJ1–IJ2, OM1 com a errata E1; protocolo P1a-v1, seeds `20261101+k`, k=0..19)
+
+- **RED** (`4ae6b57`, depois do ajuste da errata em teste): 9 dos 14 testes falham (1140 sub-testes), 5 guardas
+  passam — igual à previsão. Com a errata: igualdade de plano (exceto `success_probability`) 800/1400, âncora
+  `MONITOR` 100/100, âncora `APPLY_PATCH` 136/280, inventada 20/20, sequência mista 20/20, afirmação em ação
+  inventada 20/20, declarada+não declarada 20/20, `compare_futures` 20/20, não-str 4/4.
+- **GREEN** (mesmo patch do GREEN candidato, sem mudança): 14/14 verdes; 1039 testes na suíte completa
+  (py3.11 e py3.12); nenhum golden/contrato alterado (MW1–MW12, ER1–ER9, golden `36d0f00a…`, SC*, futures,
+  counterfactual, `test_mcts_action_contract.py` verdes sem edição).
+- **Efeito medido (IJ1):** das 1400 combinações, 164 diferem do plano sem texto, **só** em `success_probability`,
+  **sempre para baixo** (≤); escolha, alternativas, recompensa e demais campos idênticos. Risco residual: uma
+  afirmação textual pode rebaixar a confiança de um plano bom (fail-closed), ver errata E1.
+- **Mutantes:** 11 novos (`ij_*`, `om_*`), todos mortos; catálogo completo 708/708 mortos, 0 sobreviventes,
+  0 não aplicados; `targeted_mutation` 80/80.
+- **Desvios:** (1) `mw_unknown_status_scores_high` e `mw_reads_wrong_world_key` reapontados para a linha trocada
+  de `_evaluate_world` (mesma intenção); (2) `sc_claim_promotes_success` perdeu a morte nos testes SC (suas
+  afirmações são sobre ação desconhecida, hoje já `success=False` por OM1); âncora e mutação idênticas, `tests`
+  ampliado para `SC_TESTS + IJ_TESTS`, onde o IJ2 mata o mutante; (3) `AUDIT_REALITY_REPORT.md` e
+  `audit_reality.json` regenerados pela ferramenta (só contagem de linhas).
+- **Claim:** devolvido a `claims: []` (idêntico ao da `main`).
+- **Pendências (inalteradas):** P1b (veto padrão, errata própria, aguarda), E2 da ação declarada,
+  `core/cognitivo/counterfactual.py:316`, resíduo de `compare_futures` (ação declarada inventada).

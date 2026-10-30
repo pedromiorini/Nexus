@@ -1,16 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "MCTS P1a: recompensa do modo mundo por verified_status e success=False para ação não modelada (branch grok/mcts-p1-prompt-injection-20261030)"
-    arquivos:
-      - core/cognitivo/mcts_planner.py
-      - core/cognitivo/causal_world_model.py
-      - test_mcts_prompt_injection_contract.py
-      - tools/cognitivo_mutation.py
-      - docs/cognitivo/AUDITORIA_2026-10-22.md
-      - AUDIT_REALITY_REPORT.md
-      - audit_reality.json
-    expira_em: "2026-11-02T12:00:00Z"
-    Agent-Id: grok-bot
+claims: []
