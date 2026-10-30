@@ -196,6 +196,11 @@ class RealWorldModelSimulator:
         claims, conflicts, ignored = classify_text_effects(adjacency.get(action, ()), skip=declared)
         return declared, claims, ignored, conflicts
 
+    def is_modeled(self, action: str) -> bool:
+        """A ação tem efeito conhecido? Só a tabela ACTION_EFFECTS ou uma intervenção declarada contam;
+        afirmação de texto livre sobre a ação não a torna modelada."""
+        return action in ACTION_EFFECTS or bool(self._split_do(action)[0])
+
     def _do(self, action: str) -> Dict[str, object]:
         """Intervenção do(ação): só pares do WORLD_SCHEMA; declarado vence texto na mesma chave."""
         declared, claims, _, _ = self._split_do(action)
