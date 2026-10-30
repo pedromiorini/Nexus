@@ -42,9 +42,11 @@ def _plan(seed, actions=None, model=True, depth=3, iterations=None, planner=None
 
 
 def expected_success(result):
-    if any(a.startswith("ZZ_") for a in result.best_action_sequence):
+    """Errata E1: derivado do valor NÃO arredondado (como o código e o MW5)."""
+    seq = result.best_action_sequence
+    if any(a.startswith("ZZ_") for a in seq):
         return 0.0
-    return round(min(1.0, 1.1 * result.expected_reward), 4)
+    return min(1.0, 1.1 * (ref_reward(seq) if seq else 0.0))
 
 
 class MCTSExpectedRewardContractTests(unittest.TestCase):
@@ -52,7 +54,7 @@ class MCTSExpectedRewardContractTests(unittest.TestCase):
         seq = result.best_action_sequence
         want = round(ref_reward(seq), 4) if seq else 0.0
         self.assertEqual(result.expected_reward, want, seq)
-        self.assertEqual(result.success_probability, expected_success(result), seq)
+        self.assertAlmostEqual(result.success_probability, expected_success(result), delta=0.0002, msg=seq)
 
     def test_er1_reward_and_success_reflect_the_returned_sequence(self):
         for seed in SEEDS:
