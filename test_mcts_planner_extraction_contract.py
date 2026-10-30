@@ -6,6 +6,8 @@ Teste dos três casos (critérios escritos antes da extração):
 (b) não regressão: com random.seed(20261016), o PlanResult (sem planning_time) tem o
     SHA-256 fixado; re-fixado na auditoria funcional 2026-10-22 (melhor sequência encontrada,
     prefixos incluídos — antes ['ESCALATE', 'IGNORE_ALERT'], valor 0.367; agora ['APPLY_PATCH'], 0.867);
+    re-fixado de novo no P1b (veto padrão de IGNORE_ALERT/SHUTDOWN_SERVICE muda o espaço de busca e o fluxo de
+    sorteios; errata E1-P1b, autorização t155s983; antes 36d0f00a…73a80, sequência continua ['APPLY_PATCH']);
 (c) caso incompatível: entrada ausente (goal=None) levanta ValueError; max_depth<=0,
     exploration_constant=NaN e max_iterations<0 foram endurecidos (ValueError) em PR
     próprio; max_iterations=0 e goal vazio seguem aceitos.
@@ -22,7 +24,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-GOLDEN_SHA256 = "36d0f00a1ce3d451be52c3ea61b05706cced9b37b35b04b145514ffe4d873a80"
+GOLDEN_SHA256 = "776cfd6e0ddb2053206ad0e25c8409b9892fe623cf992eb20ea1df8f25e81f6a"
 SEED = 20261016
 GOAL = "secure the system"
 
