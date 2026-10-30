@@ -75,6 +75,8 @@ CM = "core/cognitivo/contextual_memory.py"
 CM_TESTS = ("test_contextual_memory_contract.py",)
 EW = "core/cognitivo/emotional_memory_weighting.py"
 EW_TESTS = ("test_emotional_memory_weighting_contract.py",)
+SN = "core/cognitivo/semantic_networks.py"
+SN_TESTS = ("test_semantic_networks_contract.py",)
 
 MUTATIONS = [
     Mutation("episodic_fts_ranks_by_bm25", EPISODIC, "ORDER BY bm25(episodic_fts), m.start_timestamp DESC",
@@ -1213,6 +1215,98 @@ MUTATIONS = [
     Mutation('rv_detail_dropped', BRAIN, 'final_result["failed_modules_detail"] = self._failed_module_details(all_results)', 'final_result["failed_modules_detail"] = []', tests=RV_TESTS),
     Mutation('rv_detail_duplicates', BRAIN, 'if not result.success and result.module.value not in seen:\n                seen.append', 'if not result.success:\n                seen.append', tests=RV_TESTS),
     Mutation('rv_detail_includes_success', BRAIN, 'if not result.success and result.module.value not in seen:\n                seen.append', 'if result.module.value not in seen:\n                seen.append', tests=RV_TESTS),
+    Mutation('sn_banner_dropped', SN, 'print("🧠🕸️ POST 26', 'pass  # print("🧠🕸️ POST 26', tests=SN_TESTS),
+    Mutation('sn_kg_not_stored', SN, 'self.kg = knowledge_graph', 'self.kg = None', tests=SN_TESTS),
+    Mutation('sn_language_not_stored', SN, 'self.language = language', 'self.language = None', tests=SN_TESTS),
+    Mutation('sn_decay_changed', SN, 'self.activation_decay = 0.1', 'self.activation_decay = 0.2', tests=SN_TESTS),
+    Mutation('sn_spread_factor_changed', SN, 'self.spread_factor = 0.7', 'self.spread_factor = 0.8', tests=SN_TESTS),
+    Mutation('sn_concept_counter_dropped', SN, 'self.total_concepts += 1', 'self.total_concepts += 0', tests=SN_TESTS),
+    Mutation('sn_relation_counter_dropped', SN, 'self.total_relations += 1', 'self.total_relations += 0', tests=SN_TESTS),
+    Mutation('sn_activation_counter_dropped', SN, 'self.activations_performed += 1', 'self.activations_performed += 0', tests=SN_TESTS),
+    Mutation('sn_properties_default_dropped', SN, 'properties = properties or {}', 'properties = properties', tests=SN_TESTS),
+    Mutation('sn_properties_copied_on_add', SN, 'properties = properties or {}', 'properties = dict(properties or {})', tests=SN_TESTS),
+    Mutation('sn_concept_id_truncated', SN, 'concept_id=str(uuid.uuid4())', 'concept_id=str(uuid.uuid4())[:8]', tests=SN_TESTS),
+    Mutation('sn_relation_id_truncated', SN, 'relation_id=str(uuid.uuid4())', 'relation_id=str(uuid.uuid4())[:8]', tests=SN_TESTS),
+    Mutation('sn_created_at_monotonic', SN, 'created_at=time.time()', 'created_at=time.monotonic()', tests=SN_TESTS),
+    Mutation('sn_created_at_zero', SN, 'created_at=time.time()', 'created_at=0.0', tests=SN_TESTS),
+    Mutation('sn_initial_activation_changed', SN, 'activation=0.0,', 'activation=0.1,', tests=SN_TESTS),
+    Mutation('sn_concept_not_stored', SN, 'self.concepts[concept.concept_id] = concept', 'pass', tests=SN_TESTS),
+    Mutation('sn_relation_not_stored', SN, 'self.relations.append(relation)', 'pass', tests=SN_TESTS),
+    Mutation('sn_relation_strength_ignored', SN, 'strength=strength', 'strength=1.0', tests=SN_TESTS),
+    Mutation('sn_relation_type_ignored', SN, 'relation_type=relation_type,', 'relation_type="IS-A",', tests=SN_TESTS),
+    Mutation('sn_relation_ends_swapped', SN, 'source_id=source.concept_id,\n            target_id=target.concept_id,', 'source_id=target.concept_id,\n            target_id=source.concept_id,', tests=SN_TESTS),
+    Mutation('sn_strength_default_changed', SN, 'strength: float = 1.0', 'strength: float = 0.5', tests=SN_TESTS),
+    Mutation('sn_find_case_sensitive', SN, 'if concept.label.lower() == label.lower():\n                return concept', 'if concept.label == label:\n                return concept', tests=SN_TESTS),
+    Mutation('sn_find_never_reuses', SN, 'if concept.label.lower() == label.lower():\n                return concept', 'if False:\n                return concept', tests=SN_TESTS),
+    Mutation('sn_activation_not_clamped', SN, 'concept.activation = min(1.0, activation)', 'concept.activation = activation', tests=SN_TESTS),
+    Mutation('sn_activation_clamp_changed', SN, 'concept.activation = min(1.0, activation)', 'concept.activation = min(0.9, activation)', tests=SN_TESTS),
+    Mutation('sn_spread_threshold_inclusive', SN, 'if source.activation > 0.1:', 'if source.activation >= 0.1:', tests=SN_TESTS),
+    Mutation('sn_spread_threshold_raised', SN, 'if source.activation > 0.1:', 'if source.activation > 0.2:', tests=SN_TESTS),
+    Mutation('sn_spread_factor_unused', SN, 'source.activation * self.spread_factor * relation.strength', 'source.activation * relation.strength', tests=SN_TESTS),
+    Mutation('sn_spread_strength_unused', SN, 'source.activation * self.spread_factor * relation.strength', 'source.activation * self.spread_factor', tests=SN_TESTS),
+    Mutation('sn_spread_target_unclamped', SN, 'target.activation = min(1.0, target.activation + spread_amount)', 'target.activation = target.activation + spread_amount', tests=SN_TESTS),
+    Mutation('sn_spread_overwrites_target', SN, 'target.activation = min(1.0, target.activation + spread_amount)', 'target.activation = min(1.0, spread_amount)', tests=SN_TESTS),
+    Mutation('sn_spread_decay_unused', SN, 'concept.activation = max(0.0, concept.activation - self.activation_decay)', 'pass', tests=SN_TESTS),
+    Mutation('sn_spread_decay_floor_dropped', SN, 'concept.activation = max(0.0, concept.activation - self.activation_decay)', 'concept.activation = concept.activation - self.activation_decay', tests=SN_TESTS),
+    Mutation('sn_spread_iterations_ignored', SN, 'for _ in range(iterations):', 'for _ in range(1):', tests=SN_TESTS),
+    Mutation('sn_spread_result_inclusive', SN, 'if c.activation > 0.1\n        }', 'if c.activation >= 0.1\n        }', tests=SN_TESTS),
+    Mutation('sn_spread_result_keyed_by_id', SN, 'c.label: c.activation', 'c.concept_id: c.activation', tests=SN_TESTS),
+    Mutation('sn_related_case_sensitive', SN, 'if c.label.lower() == label.lower():\n                source = c', 'if c.label == label:\n                source = c', tests=SN_TESTS),
+    Mutation('sn_related_type_ignored', SN, 'if relation_type is None or relation.relation_type == relation_type:', 'if True:', tests=SN_TESTS),
+    Mutation('sn_related_none_matches_nothing', SN, 'if relation_type is None or relation.relation_type == relation_type:', 'if relation_type is not None and relation.relation_type == relation_type:', tests=SN_TESTS),
+    Mutation('sn_related_reversed_direction', SN, 'if relation.source_id == source.concept_id:', 'if relation.target_id == source.concept_id:', tests=SN_TESTS),
+    Mutation('sn_related_returns_sources', SN, 'related_ids.append(relation.target_id)', 'related_ids.append(relation.source_id)', tests=SN_TESTS),
+    Mutation('sn_related_creates_missing', SN, 'if not source:\n            return []', 'if not source:\n            self.add_concept(label)\n            return []', tests=SN_TESTS),
+    Mutation('sn_inherit_mutates_own_properties', SN, 'inherited = concept.properties.copy()', 'inherited = concept.properties', tests=SN_TESTS),
+    Mutation('sn_inherit_deep_copies', SN, 'inherited = concept.properties.copy()', "inherited = __import__('copy').deepcopy(concept.properties)", tests=SN_TESTS),
+    Mutation('sn_inherit_parent_overrides', SN, 'if key not in inherited:', 'if True:', tests=SN_TESTS),
+    Mutation('sn_inherit_ignores_parents', SN, 'parent_concepts = self.get_related_concepts(concept_label, "IS-A")', 'parent_concepts = []', tests=SN_TESTS),
+    Mutation('sn_inherit_any_relation', SN, 'parent_concepts = self.get_related_concepts(concept_label, "IS-A")', 'parent_concepts = self.get_related_concepts(concept_label)', tests=SN_TESTS),
+    Mutation('sn_inherit_not_recursive', SN, 'parent_props = self.inherit_properties(parent.label)', 'parent_props = parent.properties', tests=SN_TESTS),
+    Mutation('sn_verify_case_sensitive', SN, 'if child_label.lower() == ancestor_label.lower():', 'if child_label == ancestor_label:', tests=SN_TESTS),
+    Mutation('sn_verify_identity_false', SN, 'return True\n\n        # Buscar pais', 'return False\n\n        # Buscar pais', tests=SN_TESTS),
+    Mutation('sn_verify_any_relation', SN, 'parents = self.get_related_concepts(child_label, "IS-A")', 'parents = self.get_related_concepts(child_label)', tests=SN_TESTS),
+    Mutation('sn_verify_not_recursive', SN, 'if self.verify_hierarchy(parent.label, ancestor_label):', 'if parent.label.lower() == ancestor_label.lower():', tests=SN_TESTS),
+    Mutation('sn_verify_default_true', SN, 'return False\n\n    def query_by_properties', 'return True\n\n    def query_by_properties', tests=SN_TESTS),
+    Mutation('sn_query_uses_own_properties', SN, 'all_props = self.inherit_properties(concept.label)', 'all_props = concept.properties', tests=SN_TESTS),
+    Mutation('sn_query_value_not_compared', SN, 'if key not in all_props or all_props[key] != value:', 'if key not in all_props:', tests=SN_TESTS),
+    Mutation('sn_query_value_equality_inverted', SN, 'all_props[key] != value', 'all_props[key] == value', tests=SN_TESTS),
+    Mutation('sn_query_mismatch_ignored', SN, 'match = False\n                    break', 'match = True\n                    break', tests=SN_TESTS),
+    Mutation('sn_stats_activated_inclusive', SN, 'if c.activation > 0.1)', 'if c.activation >= 0.1)', tests=SN_TESTS),
+    Mutation('sn_stats_activated_threshold_raised', SN, 'if c.activation > 0.1)', 'if c.activation > 0.2)', tests=SN_TESTS),
+    Mutation('sn_stats_activated_zero', SN, '"activated_concepts": activated_concepts,', '"activated_concepts": 0,', tests=SN_TESTS),
+    Mutation('sn_stats_activation_count_zero', SN, '"activations_performed": self.activations_performed,', '"activations_performed": 0,', tests=SN_TESTS),
+    Mutation('sn_stats_avg_floor_two', SN, 'max(1, len(self.concepts))', 'max(2, len(self.concepts))', tests=SN_TESTS),
+    Mutation('sn_stats_avg_unguarded', SN, 'max(1, len(self.concepts))', 'len(self.concepts)', tests=SN_TESTS),
+    Mutation('sn_stats_avg_only_active', SN, 'sum(c.activation for c in self.concepts.values())', 'sum(c.activation for c in self.concepts.values() if c.activation > 0.1)', tests=SN_TESTS),
+    Mutation("sn_module_pulls_monolith", SN, "import uuid\n",
+             "import uuid\nimport core.constitutional_brain  # noqa: F401\n", tests=SN_TESTS),
+    Mutation("sn_monolith_stops_reexporting", "core/constitutional_brain.py",
+             "from core.cognitivo.semantic_networks import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    ConceptNode,\n"
+             "    RealSemanticNetworksSystem,\n"
+             "    SemanticRelation,\n"
+             ")\n",
+             "from core.cognitivo.semantic_networks import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
+             "    ConceptNode,\n"
+             "    RealSemanticNetworksSystem as _RealSemanticNetworksSystem,\n"
+             "    SemanticRelation,\n"
+             ")\n"
+             "RealSemanticNetworksSystem = type(\"RealSemanticNetworksSystem\", (_RealSemanticNetworksSystem,), {})\n",
+             tests=SN_TESTS),
+    Mutation("sn_package_stops_reexporting", "core/cognitivo/__init__.py",
+             "from core.cognitivo.semantic_networks import (\n"
+             "    ConceptNode,\n"
+             "    RealSemanticNetworksSystem,\n"
+             "    SemanticRelation,\n"
+             ")\n",
+             "from core.cognitivo.semantic_networks import (\n"
+             "    ConceptNode,\n"
+             "    RealSemanticNetworksSystem as _RealSemanticNetworksSystem,\n"
+             "    SemanticRelation,\n"
+             ")\n"
+             "RealSemanticNetworksSystem = type(\"RealSemanticNetworksSystem\", (_RealSemanticNetworksSystem,), {})\n",
+             tests=SN_TESTS),
 ]
 
 

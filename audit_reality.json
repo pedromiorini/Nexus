@@ -6,7 +6,7 @@
     "extracted_modules": [
       {
         "path": "core/cognitivo/__init__.py",
-        "lines": 83,
+        "lines": 91,
         "classes": 0,
         "functions": 0
       },
@@ -89,15 +89,21 @@
         "functions": 17
       },
       {
+        "path": "core/cognitivo/semantic_networks.py",
+        "lines": 359,
+        "classes": 3,
+        "functions": 11
+      },
+      {
         "path": "core/cognitivo/working_memory.py",
         "lines": 438,
         "classes": 6,
         "functions": 25
       }
     ],
-    "core_lines": 23602,
-    "classes": 221,
-    "functions": 707,
+    "core_lines": 23276,
+    "classes": 218,
+    "functions": 696,
     "pass_only_functions": [],
     "constant_return_functions": [
       {

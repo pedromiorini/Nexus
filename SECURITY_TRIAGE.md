@@ -4,13 +4,13 @@
 commit: HEAD
 ci_run: CURRENT_RUN
 tests: CURRENT_TESTS
-bandit_low: 138
+bandit_low: 139
 -->
 
 > This is a conservative inventory, not a clearance report. Findings remain open until reviewed and fixed or explicitly justified.
 
-- Total findings: **138**
-- Severity counts: LOW=138
+- Total findings: **139**
+- Severity counts: LOW=139
 
 ## Dispositions
 
@@ -19,6 +19,7 @@ bandit_low: 138
 | `controlled_subprocess_review` | 8 | Mutation harness subprocess; keep inputs fixed and review execution boundaries. |
 | `embedded_demo_assert_review` | 111 | Assertions inside the legacy __main__ demonstration block; keep them out of production contracts and migrate incrementally. |
 | `manual_review` | 3 | No project-specific disposition; manual review required. |
+| `silent_exception_review` | 1 | Silent exception handling; review whether fallback behavior hides failures. |
 | `simulation_only_random_review` | 16 | Randomness reviewed as simulation/heuristic behavior; keep it out of secrets and security decisions. |
 
 ## Findings
@@ -28,6 +29,7 @@ Agrupados por escopo (sem números de linha, que mudam a cada edição).
 | ID | Severity | File | Scope | Count | Disposition |
 |---|---|---|---|---:|---|
 | `B101` | LOW | `core/constitutional_brain.py` | `<__main__ block>` | 111 | `embedded_demo_assert_review` |
+| `B110` | LOW | `tools/cognitivo_eval.py` | `_sn_family_sn2` | 1 | `silent_exception_review` |
 | `B311` | LOW | `core/cognitivo/mcts_planner.py` | `RealMCTSPlanner._expand` | 1 | `simulation_only_random_review` |
 | `B311` | LOW | `core/cognitivo/mcts_planner.py` | `RealMCTSPlanner._simulate` | 1 | `simulation_only_random_review` |
 | `B311` | LOW | `core/cognitivo/mental_simulation.py` | `RealMentalSimulationSystem.rollout_planning` | 1 | `simulation_only_random_review` |
