@@ -1374,16 +1374,28 @@ MUTATIONS = [
              '"request_type": _audit_request_type_code(request_type),\n                })',
              '"request_type": "x",\n                })', tests=RV_TESTS),
     Mutation('rv_audit_module_value_unvalidated', BRAIN,
-             'return module.value if isinstance(module, ModuleType) else "unknown"',
-             'return getattr(module, "value", "unknown")',
+             '    for member in ModuleType:\n'
+             '        if module is member:\n'
+             '            return member.value\n'
+             '    return "unknown"',
+             '    return getattr(module, "value", "unknown")',
              tests=("test_audit_event_payload_privacy_contract.py",)),
     Mutation('rv_audit_request_type_unvalidated', BRAIN,
-             'return request_type.value if isinstance(request_type, RequestType) else "unknown"',
-             'return getattr(request_type, "value", "unknown")',
+             '    for member in RequestType:\n'
+             '        if request_type is member:\n'
+             '            return member.value\n'
+             '    return "unknown"',
+             '    return getattr(request_type, "value", "unknown")',
              tests=("test_audit_event_payload_privacy_contract.py",)),
     Mutation('rv_audit_block_code_unvalidated', BRAIN,
-             'if isinstance(error, str) and error in _ROUTER_BLOCK_ERROR_CODES:\n        return error\n    return "UNKNOWN_BLOCK"',
-             'if isinstance(error, str):\n        return error\n    return "UNKNOWN_BLOCK"',
+             '    if type(error) is str:\n'
+             '        for code in _ROUTER_BLOCK_ERROR_CODES:\n'
+             '            if error == code:\n'
+             '                return code\n'
+             '    return "UNKNOWN_BLOCK"',
+             '    if isinstance(error, str):\n'
+             '        return error\n'
+             '    return "UNKNOWN_BLOCK"',
              tests=("test_audit_event_payload_privacy_contract.py",)),
     Mutation('rv_block_stats_not_updated', BRAIN, '        self._update_statistics((time.time() - start_time) * 1000, plan, results)\n        return response', '        return response', tests=RV_TESTS),
     Mutation('rv_block_not_counted', BRAIN, 'self.stats["blocked_requests"] = self.stats.get("blocked_requests", 0) + 1', 'pass', tests=RV_TESTS),
