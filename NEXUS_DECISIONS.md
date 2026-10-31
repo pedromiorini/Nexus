@@ -276,3 +276,12 @@
 - **Evidência:** sete novos métodos de regressão, incluindo nove contextos aninhados com/sem B101 e com/sem demonstração legítima adicional; o mutante `embedded_assert_only_module_level_guards` restaura `ast.walk` e é morto. Comandos, resultados locais e limites estão em `CONTINUATION.md` e `NEXUS_EVIDENCE.md` na rodada de 2026-10-20.
 - **Limites:** verificação sintática de localização, não análise de fluxo, segurança dos asserts ou validação do schema/filename do relatório Bandit. Conteúdo dentro da faixa de uma guarda legítima mantém a exceção anterior; `else` fica fora. Não se ampliam as formas de comparação aceitas, nem se altera a triagem separada de escopos de `tools/security_triage.py`.
 - **Reversibilidade:** simples; uma troca de iteração, acompanhada das regressões e do mutante. Não muda workflow, núcleo, dependências ou API pública.
+
+## D-030 — Eventos constitucionais usam allowlists versionadas de metadados
+
+- **Decisão:** `ETHICS_PRE_CHECK_PASSED`, `ETHICS_POST_REJECTION`, `ETHICS_POST_VIOLATION`, `CONSTITUTIONAL_VIOLATION`, `ROUTER_BLOCKED` e `ROUTED_REQUEST` persistem somente metadados não sensíveis em payloads `schema_version: 1`; não armazenam prompt/pergunta/resposta, trechos de conteúdo de memória nem mensagens livres de exceção. Campos de módulo/tipo de requisição aceitam apenas os enums conhecidos; erros de bloqueio aceitam apenas códigos estáveis. Valores inválidos viram marcadores fixos, sem alterar retornos funcionais.
+- **Contexto:** o encadeamento hash do `RealImmutableLog` preserva a integridade dos dados recebidos, mas não os inspeciona nem os redige.
+- **Motivo:** reter utilidade de auditoria com códigos de política/resultado, módulos, tipo da requisição, contagens e horário, sem persistir conteúdo da interação.
+- **Limites:** a redação acontece nos produtores, não no logger genérico; schema SQLite, envelope/cadeia, `violation_history` e retornos funcionais permanecem inalterados. `COMPLETE_INTERACTION`, stdout, respostas da API, memória episódica, filas e snapshots estão fora desta decisão.
+- **Evidência:** `test_audit_event_payload_privacy_contract.py` verifica os seis caminhos com canários curtos/longos, valores de módulo/tipo/código adulterados e metadados preservados; `test_router_review_addendum_contract.py` preserva a cardinalidade única do bloqueio. Seis mutantes diretos foram mortos. A rodada, comandos e limitações estão em `CONTINUATION.md`.
+- **Reversibilidade:** simples; basta reverter a allowlist versionada e seus contratos sem migrar o banco.
