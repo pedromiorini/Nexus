@@ -9162,6 +9162,7 @@ _ROUTER_BLOCK_ERROR_CODES = frozenset({
     "BUDGET_DENIED",
     "MANDATORY_MODULE_FAILED",
 })
+_AUDIT_PRINCIPLE_CODES = frozenset({"P2", "P4", "P6", "P11", "P13", "P15"})
 
 
 def _audit_module_code(module: Any) -> str:
@@ -9176,9 +9177,20 @@ def _audit_request_type_code(request_type: Any) -> str:
 
 def _audit_router_block_code(error: Any) -> str:
     """Keep only stable router error codes in audit payloads."""
-    if isinstance(error, str) and error in _ROUTER_BLOCK_ERROR_CODES:
-        return error
+    if type(error) is str:
+        for code in _ROUTER_BLOCK_ERROR_CODES:
+            if error == code:
+                return code
     return "UNKNOWN_BLOCK"
+
+
+def _audit_principle_code(principle: Any) -> str:
+    """Return only a canonical constitutional principle code for audit payloads."""
+    if type(principle) is str:
+        for code in _AUDIT_PRINCIPLE_CODES:
+            if principle == code:
+                return code
+    return "UNKNOWN"
 
 
 @dataclass
@@ -9447,11 +9459,7 @@ class EthicsGuard:
         }
         self.violation_history.append(violation)
 
-        principle_code = (
-            principle
-            if isinstance(principle, str) and principle in self.absolute_principles
-            else "UNKNOWN"
-        )
+        principle_code = _audit_principle_code(principle)
         self.log.log_event("CONSTITUTIONAL_VIOLATION", {
             "schema_version": 1,
             "timestamp": violation["timestamp"],

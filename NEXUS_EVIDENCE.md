@@ -7,6 +7,12 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Allowlists de auditoria resistentes a subclasses de `str` — validação local 2026-10-30
+
+Na base exata `d439c5efd14de980070eb95b54e442533ccbb74f`, duas regressões reproduziram vazamento de canários em `ROUTER_BLOCKED` e `CONSTITUTIONAL_VIOLATION`: subclasses de `str` redefiniam `__hash__`/`__eq__` para imitar `BUDGET_DENIED` e `P13`, mas mantinham o texto livre ao serializar. Com validação por tipo built-in exato e retorno do membro canônico do allowlist, as regressões passaram 2/2. Os cinco contratos focados passaram 65/65; suíte completa: 1.096 testes, 2 skips, 3 expected failures. Dois mutantes dirigidos que reintroduziam o bypass foram mortos (2/2).
+
+Ruff e compilação passaram. Bandit encontrou 139 LOW, nenhum MEDIUM/HIGH; triagem, auditoria de asserts e de lacunas passaram. O teste verifica que o retorno de bloqueio e `violation_history` preservam os valores funcionais, enquanto os seis contratos de payload continuam passando. Limites: sem CI hospedada; `psutil` e FAISS/SentenceTransformers opcionais ausentes. Os relatórios gerados pela reality audit já divergiam na base e foram preservados sem regeneração; detalhes e comandos em `CONTINUATION.md`. Esta é evidência local de contrato, não certificação de segurança.
+
 ## Allowlists de payloads de auditoria — validação local 2026-10-30
 
 Branch `fix/no-prompt-audit-20261030`, baseada no commit local `be295473570273d6cf7c10eca6456a02ac951132`, que já contém a correção do stdout de debug; `origin/main` foi reconfirmada em `af28cc1abba5a4ff19930afb74daef7e4d3e4ed5`. O contrato novo cobre `ETHICS_PRE_CHECK_PASSED`, `ETHICS_POST_REJECTION`, `ETHICS_POST_VIOLATION`, `CONSTITUTIONAL_VIOLATION`, `ROUTER_BLOCKED` e `ROUTED_REQUEST` com payloads `schema_version: 1`, canários curtos/longos e valores adversariais em metadados. Módulo/tipo desconhecidos e códigos de bloqueio não enumerados viram marcadores estáticos; o logger genérico, schema SQLite, envelope/hash-chain, histórico de violações e respostas funcionais não foram modificados.
