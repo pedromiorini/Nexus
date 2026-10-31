@@ -9,6 +9,14 @@ bandit_low: 139
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
+## Revalidação local do preflight — Python 3.11 — 2026-10-31
+
+- **Alvo:** commit validado `f2ae7dc1ccf685f418d37d2e5d2cd629754ca444`, branch `improve/cognitive-mutation-preflight-20261031`, worktree isolada `/workspace/Nexus-mutation-preflight-20261031`.
+- **Runtime:** Python 3.11.16 em `/tmp/nexus-ci311/bin/python`. `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-mutation-preflight-audit-311-focused.sqlite3 /tmp/nexus-ci311/bin/python -m unittest -v test_cognitivo_mutation_parallel_contract` → **22/22**, OK (3,396 s). `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-mutation-preflight-audit-311-full.sqlite3 /tmp/nexus-ci311/bin/python -m unittest discover -p 'test_*.py'` → **1.116 testes**, 77,955 s, OK (3 expected failures).
+- **Outros gates:** `/tmp/nexus-ci311/bin/ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py` → todos passaram; `/tmp/nexus-ci311/bin/python -m compileall -q core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py` → OK. `PYTHONPATH=. /tmp/nexus-ci311/bin/python -c 'from tools import cognitivo_mutation as cm; d = cm.preflight_catalog(cm.MUTATIONS); print(f"entries={len(cm.MUTATIONS)} diagnostics={len(d)}"); print(d); raise SystemExit(0 if len(cm.MUTATIONS) == 779 and not d else 1)'` → **779 entradas, 0 diagnósticos**; não iniciou campanha.
+- **Reality audit:** `tools/reality_audit.py` saiu 0 numa cópia descartável criada de `git archive HEAD`; `cmp` confirmou `AUDIT_REALITY_REPORT.md` e `audit_reality.json` idênticos byte a byte aos versionados.
+- **Distinção de runtime:** a campanha completa anterior de **779/779 mortos** foi executada em Python **3.12.3** e não foi repetida nesta revalidação. O focused e a suíte completa acima foram executados em Python **3.11.16**.
+
 ## Rodada local — pré-validação do catálogo cognitivo antes da campanha — 2026-10-31
 
 - **Base e isolamento:** base exata `9c152b65df0960eec73cd4a8220516f5ae5a9dad` (head da #149), branch nova `improve/cognitive-mutation-preflight-20261031`, worktree `/workspace/Nexus-mutation-preflight-20261031`. Commit local de código/testes: `40ad1157b88af3af3eef72a60b4e308b8d6e6137`. `/workspace/Nexus` permaneceu no HEAD `a676ee600e03fd377386cd05adbe20b01908103b`, com as edições que já existiam no início; a worktree da #149 permaneceu em `9c152b65df0960eec73cd4a8220516f5ae5a9dad`. Sem push, nova PR, comentário, merge, mudança de `main`, catálogo, `tools/targeted_mutation.py` ou workflow.
