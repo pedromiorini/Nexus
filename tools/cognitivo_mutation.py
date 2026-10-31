@@ -639,6 +639,18 @@ MUTATIONS = [
     Mutation("wm_module_pulls_monolith", WM,
              "import time\n",
              "import time\nimport core.constitutional_brain  # noqa: F401\n", tests=WM_TESTS),
+    Mutation("wm_restore_requires_capacity", WM,
+             '    if not capacity_values:\n        raise ValueError("working memory state must include capacity")\n',
+             "", tests=WM_TESTS),
+    Mutation("wm_restore_rejects_non_string_dict_keys", WM,
+             "    if any(type(name) is not str for name in restored_state):",
+             "    if False:", tests=WM_TESTS),
+    Mutation("wm_restore_rejects_non_string_slot_keys", WM,
+             "    if any(type(name) is not str for name in restored_slots):",
+             "    if False:", tests=WM_TESTS),
+    Mutation("wm_restore_rejects_unsupported_slots", WM,
+             "    if any(name not in valid_slots for name in restored_slots):",
+             "    if False:", tests=WM_TESTS),
     Mutation("wm_monolith_stops_reexporting", "core/constitutional_brain.py",
              "from core.cognitivo.working_memory import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)\n"
              "    CentralExecutive,\n"
