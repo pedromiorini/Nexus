@@ -460,6 +460,52 @@ class AuditEventPayloadPrivacyContract(unittest.TestCase):
             self.assertEqual(payloads[0]["principle"], "UNKNOWN")
             self.assertNotIn(marker, json.dumps(payloads[0], sort_keys=True))
 
+    def test_ethics_pre_check_uses_canonical_module_code_after_value_mutation(self):
+        marker = "CANARY_MUTATED_MODULE_VALUE"
+        original_value = ModuleType.LOG._value_
+        ModuleType.LOG._value_ = marker
+        try:
+            with self._new_log() as log:
+                guard = self._guard(log)
+                plan = ExecutionPlan(RequestType.QUERY, [ModuleType.LOG], [], 0)
+                result = guard.pre_execution_check(PROMPTS[0], plan)
+                self.assertTrue(result["cleared"])
+                payloads = self._payloads(log, "ETHICS_PRE_CHECK_PASSED")
+                self.assertEqual(len(payloads), 1)
+                self.assertEqual(payloads[0]["modules"], ["log"])
+                self.assertNotIn(marker, json.dumps(payloads[0], sort_keys=True))
+        finally:
+            ModuleType.LOG._value_ = original_value
+
+    def test_router_blocked_uses_canonical_request_code_after_value_mutation(self):
+        marker = "CANARY_MUTATED_REQUEST_TYPE_VALUE"
+        original_value = RequestType.QUERY._value_
+        RequestType.QUERY._value_ = marker
+        try:
+            with self._new_log() as log:
+                router = _router([], LOG=log)
+                plan = ExecutionPlan(RequestType.QUERY, [], [], 0)
+                router.stats["total_requests"] = 1
+                response = router._finish_blocked(
+                    PROMPTS[0],
+                    RequestType.QUERY,
+                    {
+                        "error": "BUDGET_DENIED",
+                        "module": ModuleType.BUDGET,
+                        "reason": "resource budget denied",
+                    },
+                    plan,
+                    [],
+                    0.0,
+                )
+                self.assertEqual(response["request_type"], marker)
+                payloads = self._payloads(log, "ROUTER_BLOCKED")
+                self.assertEqual(len(payloads), 1)
+                self.assertEqual(payloads[0]["request_type"], "query")
+                self.assertNotIn(marker, json.dumps(payloads[0], sort_keys=True))
+        finally:
+            RequestType.QUERY._value_ = original_value
+
 
 if __name__ == "__main__":
     unittest.main()

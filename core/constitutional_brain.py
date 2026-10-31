@@ -9155,6 +9155,31 @@ class ModuleType(Enum):
     EPISODIC = "episodic"             # POST1 sub
 
 
+_AUDIT_REQUEST_TYPE_CODES = (
+    (RequestType.QUERY, "query"),
+    (RequestType.PLANNING, "planning"),
+    (RequestType.LEARNING, "learning"),
+    (RequestType.MEMORY_RECALL, "recall"),
+    (RequestType.ETHICAL_DECISION, "ethical"),
+    (RequestType.ANALYSIS, "analysis"),
+    (RequestType.CREATIVE, "creative"),
+)
+_AUDIT_MODULE_CODES = (
+    (ModuleType.MEMORY, "memory"),
+    (ModuleType.REASONING, "reasoning"),
+    (ModuleType.SWARM, "swarm"),
+    (ModuleType.KNOWLEDGE_GRAPH, "kg"),
+    (ModuleType.MCTS_PLANNER, "mcts"),
+    (ModuleType.INCREMENTAL_LEARNER, "learner"),
+    (ModuleType.CAUSAL, "causal"),
+    (ModuleType.WORLD_MODEL, "world_model"),
+    (ModuleType.BUDGET, "budget"),
+    (ModuleType.LOG, "log"),
+    (ModuleType.JAILBREAK, "jailbreak"),
+    (ModuleType.EPISODIC, "episodic"),
+)
+
+
 _ROUTER_BLOCK_ERROR_CODES = frozenset({
     "JAILBREAK_CHECK_FAILED",
     "JAILBREAK_DETECTED",
@@ -9166,18 +9191,18 @@ _AUDIT_PRINCIPLE_CODES = frozenset({"P2", "P4", "P6", "P11", "P13", "P15"})
 
 
 def _audit_module_code(module: Any) -> str:
-    """Return only a canonical ModuleType value for an audit payload."""
-    for member in ModuleType:
+    """Return a fixed schema code only for an identical ModuleType member."""
+    for member, code in _AUDIT_MODULE_CODES:
         if module is member:
-            return member.value
+            return code
     return "unknown"
 
 
 def _audit_request_type_code(request_type: Any) -> str:
-    """Return only a canonical RequestType value for an audit payload."""
-    for member in RequestType:
+    """Return a fixed schema code only for an identical RequestType member."""
+    for member, code in _AUDIT_REQUEST_TYPE_CODES:
         if request_type is member:
-            return member.value
+            return code
     return "unknown"
 
 
