@@ -9,6 +9,13 @@ bandit_low: 139
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
+## Rodada local — alcance documental das allowlists de logs — 2026-10-31
+
+- **Base e isolamento:** worktree `/workspace/Nexus-audit-sanitizer-exact-20261031`, branch `fix/audit-sanitizer-exact-members-20261031`, iniciado limpo em `ac35ba8e325825c2a5bacd6a517111ef480b9bd9`. Alteração limitada a `NEXUS_DECISIONS.md`, `NEXUS_EVIDENCE.md` e este registro; sem alteração de `main` ou refs remotas.
+- **Ajuste documental:** D-030 agora declara no título e na decisão que cobre exclusivamente os seis eventos nomeados. A evidência registra que `_log_violation` mantém `principle`, `reason` e `prompt[:100]` em `violation_history`, e que o tratamento genérico de exceção em `execute_tool` pode gravar `str(e)` em `TOOL_EXECUTION_FAILED`; privacidade global dos logs não está resolvida.
+- **Inspeção e verificação:** `rg -n -C 4 'violation_history|TOOL_EXECUTION_FAILED' core vita test_*.py` localizou os caminhos; a leitura de `core/constitutional_brain.py` confirmou os campos e o `str(e)`. O diff final foi revisado e `git diff --check` passou. Testes, lint e compilação não foram executados por ser uma alteração exclusivamente documental.
+- **Limites:** nenhum código, teste ou evento fora de escopo foi modificado; esta rodada não testa nem resolve privacidade global dos logs. Sem push, PR, comentário, merge ou alteração de `main`.
+
 ## Rodada local — identidade exata nos sanitizadores de eventos de auditoria — 2026-10-31
 
 - **Base e isolamento:** worktree novo `/workspace/Nexus-audit-sanitizer-exact-20261031`, branch `fix/audit-sanitizer-exact-members-20261031`, criado limpo em `00c9ea0c6440cd4a64ff1835e24ed4a0e086bc66`. O checkout `/workspace/Nexus` já tinha alterações não relacionadas e foi preservado; `main` e refs remotas não foram alterados.

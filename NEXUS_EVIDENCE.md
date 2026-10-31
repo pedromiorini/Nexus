@@ -7,6 +7,10 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Limite de alcance das allowlists de privacidade — revisão documental 2026-10-31
+
+Na base `ac35ba8e325825c2a5bacd6a517111ef480b9bd9`, D-030 cobre somente `ETHICS_PRE_CHECK_PASSED`, `ETHICS_POST_REJECTION`, `ETHICS_POST_VIOLATION`, `CONSTITUTIONAL_VIOLATION`, `ROUTER_BLOCKED` e `ROUTED_REQUEST`. A inspeção de `core/constitutional_brain.py` confirma que `_log_violation` ainda mantém `principle`, `reason` e `prompt[:100]` em `violation_history`; o tratamento genérico de exceção em `execute_tool` pode persistir `str(e)` no evento irmão `TOOL_EXECUTION_FAILED`. Portanto, privacidade global dos logs não está resolvida. Esta é uma revisão documental do estado existente, não uma mitigação nem um teste de privacidade global; os caminhos fora do escopo não foram alterados.
+
 ## Sanitizadores de enum resistentes a `__class__` falsificada — validação local 2026-10-31
 
 Na base `00c9ea0c6440cd4a64ff1835e24ed4a0e086bc66`, três regressões reproduziram canários JSON persistidos em `ETHICS_PRE_CHECK_PASSED`, `ETHICS_POST_VIOLATION` e `ROUTER_BLOCKED`: objetos com propriedade `__class__` alegando ser `ModuleType`/`RequestType` passavam em `isinstance`, e `.value` era emitido diretamente. Os sanitizadores agora comparam identidade com membros reais dos enums e retornam os valores canônicos; os objetos forjados viram `unknown` somente no payload do log.
