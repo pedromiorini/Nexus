@@ -53,6 +53,10 @@ def synthetic_catalog():
     ]
 
 
+def valid_synthetic_catalog():
+    return [m for m in synthetic_catalog() if m.name not in ("absent", "ambiguous")]
+
+
 class Project:
     def __enter__(self):
         self._tmp = tempfile.TemporaryDirectory(prefix="cm-par-")
@@ -117,21 +121,22 @@ class MainInvalidInputRunsNothing(unittest.TestCase):
 class EquivalenceAcrossJobs(unittest.TestCase):
     def test_serial_and_parallel_report_are_identical_and_ordered(self):
         runs = {}
+        catalog = valid_synthetic_catalog()
         for jobs in (1, 3, 8):
             with Project() as p:
                 report = p.root / "report.json"
-                code = cm.main(["--jobs", str(jobs)], mutations=synthetic_catalog(), root=p.root, report=report)
+                code = cm.main(["--jobs", str(jobs)], mutations=catalog, root=p.root, report=report)
                 data = json.loads(report.read_text(encoding="utf-8"))
                 runs[jobs] = (code, norm(data["mutations"]), data["summary"], list(data))
         base = runs[1]
-        names = [m.name for m in synthetic_catalog()]
+        names = [m.name for m in catalog]
         self.assertEqual([r["name"] for r in base[1]], names)
         self.assertEqual(
             {r["name"]: r["status"] for r in base[1]},
-            {"kills-f": "killed", "survives-g": "survived", "absent": "not_applied",
-             "ambiguous": "not_applied", "syntax-error": "killed", "kills-f-again": "killed"},
+            {"kills-f": "killed", "survives-g": "survived", "syntax-error": "killed",
+             "kills-f-again": "killed"},
         )
-        self.assertEqual(base[2], {"declared": 6, "killed": 3, "survived": 1, "not_applied": 2})
+        self.assertEqual(base[2], {"declared": 4, "killed": 3, "survived": 1, "not_applied": 0})
         self.assertEqual(base[0], 1)
         for jobs in (3, 8):
             self.assertEqual(runs[jobs], base, jobs)
@@ -139,7 +144,7 @@ class EquivalenceAcrossJobs(unittest.TestCase):
     def test_report_shape_is_unchanged(self):
         with Project() as p:
             report = p.root / "report.json"
-            cm.main(["--jobs", "2"], mutations=synthetic_catalog(), root=p.root, report=report)
+            cm.main(["--jobs", "2"], mutations=valid_synthetic_catalog(), root=p.root, report=report)
             data = json.loads(report.read_text(encoding="utf-8"))
         self.assertEqual(list(data), ["tool", "mutations", "summary"])
         self.assertEqual(data["tool"], "nexus-cognitivo-mutation")
@@ -147,14 +152,14 @@ class EquivalenceAcrossJobs(unittest.TestCase):
         self.assertEqual(
             set(killed), {"name", "target", "tests", "status", "exit_code", "duration_seconds", "output_tail"}
         )
-        self.assertEqual(set(data["mutations"][2]), {"name", "target", "status", "matches"})
+        self.assertEqual(data["summary"]["not_applied"], 0)
 
     def test_repeated_parallel_runs_are_deterministic(self):
         seen = []
         for _ in range(2):
             with Project() as p:
                 report = p.root / "report.json"
-                cm.main(["--jobs", "4"], mutations=synthetic_catalog(), root=p.root, report=report)
+                cm.main(["--jobs", "4"], mutations=valid_synthetic_catalog(), root=p.root, report=report)
                 seen.append(norm(json.loads(report.read_text(encoding="utf-8"))["mutations"]))
         self.assertEqual(seen[0], seen[1])
 
@@ -174,7 +179,7 @@ class GateIsNotWeakened(unittest.TestCase):
         return code, err, data
 
     def test_all_killed_exits_0(self):
-        cat = [m for m in synthetic_catalog() if m.name in ("kills-f", "syntax-error", "kills-f-again")]
+        cat = [m for m in valid_synthetic_catalog() if m.name in ("kills-f", "syntax-error", "kills-f-again")]
         code, _, data = self.run_main(cat)
         self.assertEqual(code, 0)
         self.assertEqual(data["summary"], {"declared": 3, "killed": 3, "survived": 0, "not_applied": 0})
@@ -185,16 +190,26 @@ class GateIsNotWeakened(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(data["summary"]["survived"], 1)
 
-    def test_not_applied_exits_1_for_zero_and_multiple_matches(self):
+    def test_not_applied_catalog_exits_2_before_baseline_for_zero_and_multiple_matches(self):
         for name, matches in (("absent", 0), ("ambiguous", 2)):
             with self.subTest(name=name):
-                cat = [m for m in synthetic_catalog() if m.name in ("kills-f", name)]
-                code, _, data = self.run_main(cat)
-                self.assertEqual(code, 1)
-                self.assertEqual(data["mutations"][1]["matches"], matches)
+                with Project() as p:
+                    report = p.root / "report.json"
+                    previous = b"prior report\n"
+                    report.write_bytes(previous)
+                    cat = [m for m in synthetic_catalog() if m.name in ("kills-f", name)]
+                    with mock.patch.object(cm, "run_tests", wraps=cm.run_tests) as run, mock.patch("sys.stderr"):
+                        code = cm.main(["--jobs", "2"], mutations=cat, root=p.root, report=report)
+                    self.assertEqual(code, 2)
+                    run.assert_not_called()
+                    self.assertEqual(report.read_bytes(), previous)
+                with Project() as p:
+                    mutation = next(m for m in synthetic_catalog() if m.name == name)
+                    result = cm.evaluate_mutation(p.root, mutation)
+                    self.assertEqual((result["status"], result["matches"]), ("not_applied", matches))
 
     def test_broken_baseline_aborts_before_report(self):
-        code, err, data = self.run_main(synthetic_catalog(), broken_baseline=True)
+        code, err, data = self.run_main(valid_synthetic_catalog(), broken_baseline=True)
         self.assertIsNone(code)
         self.assertIn("Baseline failed before mutation", str(err))
         self.assertIsNone(data)
@@ -265,6 +280,113 @@ class WorkerIsolationAndConcurrency(unittest.TestCase):
                 # baseline passaria só com 3 simultâneos também; todos concorrentes -> survived
                 results = cm.run_catalog(muts, root, jobs=3, skip_baseline=True)
             self.assertEqual([r["status"] for r in results], ["survived"] * 3, results)
+
+
+class MutationCatalogPreflightContract(unittest.TestCase):
+    def historical_catalog(self):
+        """As quatro âncoras de #149 antes da reancoragem; todas são ausentes hoje."""
+        return [
+            Mutation(
+                "p1b_veto_nonmapping_accepted", cm.MCTS,
+                '            if not isinstance(vetoes, Mapping):\n'
+                '                raise TypeError("vetoes must be a mapping of action -> reason")\n'
+                '            for name',
+                "if False:", cm.P1B_TESTS,
+            ),
+            Mutation(
+                "p1c_cmp_no_veto", cm.MCTS,
+                "hits = [a for a in steps if _veto_key(a) in table]", "hits = []", cm.P1C_TESTS,
+            ),
+            Mutation(
+                "p1c_cmp_veto_first_only", cm.MCTS,
+                "hits = [a for a in steps if _veto_key(a) in table]",
+                "hits = [a for a in steps[:1] if _veto_key(a) in table]", cm.P1C_TESTS,
+            ),
+            Mutation(
+                "p1c_cmp_nonmapping_accepted", cm.MCTS,
+                '    if vetoes is not None and not isinstance(vetoes, Mapping):\n'
+                '        raise TypeError("vetoes must be a mapping of action -> reason")\n'
+                '    table',
+                "    table", cm.P1C_TESTS,
+            ),
+        ]
+
+    def test_historical_missing_anchors_abort_before_workers_and_report_write(self):
+        with Project() as p:
+            report = p.root / "report.json"
+            old_report = b'{"previous":"result"}\n'
+            report.write_bytes(old_report)
+            with mock.patch.object(cm, "run_tests", wraps=cm.run_tests) as run, mock.patch("sys.stderr"):
+                code = cm.main(["--jobs", "2"], mutations=self.historical_catalog(), root=ROOT, report=report)
+            self.assertEqual(code, 2)
+            run.assert_not_called()
+            self.assertEqual(report.read_bytes(), old_report)
+
+    def test_diagnostics_are_stable_and_identify_mutation_file_and_failure(self):
+        first = cm.preflight_catalog(self.historical_catalog(), ROOT)
+        second = cm.preflight_catalog(self.historical_catalog(), ROOT)
+        self.assertEqual(first, second)
+        self.assertEqual(
+            [(d["mutation"], d["file"], d["field"], d["code"]) for d in first],
+            [(m.name, m.target, "needle", "needle_matches_0") for m in self.historical_catalog()],
+        )
+
+    def test_ambiguous_empty_and_identical_replacements_are_rejected(self):
+        catalog = [
+            Mutation("ambiguous", "mod.py", "return", "return  ", TESTS),
+            Mutation("empty-needle", "mod.py", "", "replacement", TESTS),
+            Mutation("identical", "mod.py", "return x + 1", "return x + 1", TESTS),
+        ]
+        with Project() as p:
+            diagnostics = cm.preflight_catalog(catalog, p.root)
+        self.assertEqual(
+            {(d["mutation"], d["code"]) for d in diagnostics},
+            {("ambiguous", "needle_matches_2"), ("empty-needle", "needle_empty"),
+             ("identical", "replacement_identical")},
+        )
+
+    def test_structural_and_path_errors_are_diagnosed_without_running_tests(self):
+        catalog = [
+            Mutation("", "mod.py", "return x + 1", "return x - 1", TESTS),
+            Mutation("duplicate", "mod.py", "return x + 1", "return x - 1", TESTS),
+            Mutation("duplicate", "mod.py", "return 1", "return 2", TESTS),
+            Mutation("outside-target", "../outside.py", "x", "y", TESTS),
+            Mutation("missing-target", "missing.py", "x", "y", TESTS),
+            Mutation("outside-test", "mod.py", "x", "y", ("../outside_test.py",)),
+            Mutation("missing-test", "mod.py", "x", "y", ("missing_test.py",)),
+            Mutation("bad-target-type", None, "x", "y", TESTS),
+            Mutation("bad-tests-shape", "mod.py", "x", "y", "test_mod.py"),
+            Mutation("bad-needle-type", "mod.py", 7, "y", TESTS),
+            Mutation("bad-replacement-type", "mod.py", "x", None, TESTS),
+        ]
+        with Project() as p, tempfile.TemporaryDirectory(prefix="cm-outside-") as outside_dir:
+            outside_file = Path(outside_dir) / "outside.py"
+            outside_file.write_text("x\n", encoding="utf-8")
+            (p.root / "outside-link.py").symlink_to(outside_file)
+            catalog.append(Mutation("symlink-escape", "outside-link.py", "x", "y", TESTS))
+            catalog.append(object())
+            report = p.root / "report.json"
+            before = b"untouched\n"
+            report.write_bytes(before)
+            with mock.patch.object(cm, "run_tests", wraps=cm.run_tests) as run, mock.patch("sys.stderr"):
+                code = cm.main(["--jobs", "1"], mutations=catalog, root=p.root, report=report)
+            self.assertEqual(code, 2)
+            run.assert_not_called()
+            self.assertEqual(report.read_bytes(), before)
+            diagnostics = cm.preflight_catalog(catalog, p.root)
+        self.assertTrue({"name_empty", "name_duplicate", "path_outside_root", "path_missing",
+                         "target_type", "tests_shape", "needle_type", "replacement_type",
+                         "mutation_type"}.issubset(
+                             {d["code"] for d in diagnostics}
+                         ))
+
+    def test_current_full_catalog_has_zero_preflight_diagnostics(self):
+        self.assertEqual(len(cm.MUTATIONS), 779)
+        self.assertEqual(cm.preflight_catalog(cm.MUTATIONS, ROOT), [])
+
+    def test_empty_or_wrong_catalog_container_is_rejected(self):
+        self.assertEqual(cm.preflight_catalog([], ROOT)[0]["code"], "catalog_empty")
+        self.assertEqual(cm.preflight_catalog((), ROOT)[0]["code"], "catalog_type")
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ import shutil
 import sys
 import tempfile
 import time
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -1746,6 +1746,111 @@ def parse_jobs(argv: list[str]) -> int:
     return jobs
 
 
+def preflight_catalog(mutations: list[Mutation], root: Path = ROOT) -> list[dict[str, str | None]]:
+    """Valida a estrutura e as âncoras do catálogo sem executar testes ou escrever arquivos."""
+    diagnostics: list[dict[str, str | None]] = []
+
+    def add(mutation: str, file: str | None, field: str, code: str) -> None:
+        diagnostics.append({"mutation": mutation, "file": file, "field": field, "code": code})
+
+    if not isinstance(mutations, list):
+        add("catalog", None, "catalog", "catalog_type")
+        return diagnostics
+    if not mutations:
+        add("catalog", None, "catalog", "catalog_empty")
+        return diagnostics
+
+    try:
+        resolved_root = Path(root).resolve(strict=True)
+        if not resolved_root.is_dir():
+            raise NotADirectoryError(str(resolved_root))
+    except (OSError, RuntimeError, TypeError, ValueError):
+        add("catalog", str(root), "root", "root_unavailable")
+        return diagnostics
+
+    names: set[str] = set()
+    contents: dict[Path, str] = {}
+
+    def catalog_file(value: object, *, mutation: str, field: str) -> Path | None:
+        if not isinstance(value, str):
+            add(mutation, None, field, f"{field}_type")
+            return None
+        if not value or not value.strip() or "\x00" in value:
+            add(mutation, value, field, f"{field}_empty")
+            return None
+        candidate = Path(value)
+        windows = PureWindowsPath(value)
+        if candidate.is_absolute() or windows.is_absolute() or windows.drive:
+            add(mutation, value, field, "path_absolute")
+            return None
+        if "\\" in value:
+            add(mutation, value, field, "path_separator_invalid")
+            return None
+        if ".." in candidate.parts:
+            add(mutation, value, field, "path_outside_root")
+            return None
+        try:
+            resolved = (resolved_root / candidate).resolve(strict=False)
+            resolved.relative_to(resolved_root)
+        except (OSError, RuntimeError, ValueError):
+            add(mutation, value, field, "path_outside_root")
+            return None
+        if not resolved.is_file():
+            add(mutation, value, field, "path_missing" if not resolved.exists() else "path_not_file")
+            return None
+        return resolved
+
+    for index, mutation in enumerate(mutations):
+        if not isinstance(mutation, Mutation):
+            add(f"index:{index}", None, "mutation", "mutation_type")
+            continue
+
+        raw_name = mutation.name
+        name = raw_name if isinstance(raw_name, str) and raw_name else f"index:{index}"
+        if not isinstance(raw_name, str):
+            add(name, mutation.target if isinstance(mutation.target, str) else None, "name", "name_type")
+        elif not raw_name.strip():
+            add(name, mutation.target if isinstance(mutation.target, str) else None, "name", "name_empty")
+        elif raw_name in names:
+            add(raw_name, mutation.target if isinstance(mutation.target, str) else None, "name", "name_duplicate")
+        else:
+            names.add(raw_name)
+
+        target = catalog_file(mutation.target, mutation=name, field="target")
+
+        if not isinstance(mutation.tests, tuple):
+            add(name, mutation.target if isinstance(mutation.target, str) else None, "tests", "tests_shape")
+        elif not mutation.tests:
+            add(name, mutation.target if isinstance(mutation.target, str) else None, "tests", "tests_empty")
+        else:
+            for test_path in mutation.tests:
+                catalog_file(test_path, mutation=name, field="tests")
+
+        if not isinstance(mutation.needle, str):
+            add(name, mutation.target if isinstance(mutation.target, str) else None, "needle", "needle_type")
+        elif not mutation.needle:
+            add(name, mutation.target if isinstance(mutation.target, str) else None, "needle", "needle_empty")
+
+        if not isinstance(mutation.replacement, str):
+            add(name, mutation.target if isinstance(mutation.target, str) else None, "replacement", "replacement_type")
+        elif isinstance(mutation.needle, str) and mutation.needle == mutation.replacement:
+            add(name, mutation.target if isinstance(mutation.target, str) else None,
+                "replacement", "replacement_identical")
+
+        if target is not None and isinstance(mutation.needle, str) and mutation.needle:
+            try:
+                if target not in contents:
+                    contents[target] = target.read_text(encoding="utf-8")
+                matches = contents[target].count(mutation.needle)
+            except (OSError, UnicodeError):
+                add(name, mutation.target, "target", "target_unreadable")
+            else:
+                if matches != 1:
+                    add(name, mutation.target, "needle", f"needle_matches_{matches}")
+
+    return diagnostics
+
+
 def evaluate_mutation(workdir: Path, m: Mutation) -> dict:
     """Aplica o mutante na cópia `workdir`, roda seus testes e restaura o arquivo."""
     target = workdir / m.target
@@ -1810,6 +1915,15 @@ def main(argv: list[str] | None = None, *, mutations: list[Mutation] | None = No
     except SystemExit as exc:
         return int(exc.code)
     catalog = MUTATIONS if mutations is None else mutations
+    diagnostics = preflight_catalog(catalog, root)
+    if diagnostics:
+        print(
+            f"mutation catalog preflight failed ({len(diagnostics)} diagnostic(s)); no tests run",
+            file=sys.stderr,
+        )
+        for diagnostic in diagnostics:
+            print(json.dumps(diagnostic, ensure_ascii=False, sort_keys=True), file=sys.stderr)
+        return 2
     results = run_catalog(catalog, root, jobs)
     killed = sum(r["status"] == "killed" for r in results)
     summary = {
