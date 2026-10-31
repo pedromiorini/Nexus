@@ -1374,17 +1374,23 @@ MUTATIONS = [
              '"request_type": _audit_request_type_code(request_type),\n                })',
              '"request_type": "x",\n                })', tests=RV_TESTS),
     Mutation('rv_audit_module_value_unvalidated', BRAIN,
-             '    for member in ModuleType:\n'
+             'def _audit_module_code(module: Any) -> str:\n'
+             '    """Return a fixed schema code only for an identical ModuleType member."""\n'
+             '    for member, code in _AUDIT_MODULE_CODES:\n'
              '        if module is member:\n'
-             '            return member.value\n'
+             '            return code\n'
              '    return "unknown"',
+             'def _audit_module_code(module: Any) -> str:\n'
              '    return getattr(module, "value", "unknown")',
              tests=("test_audit_event_payload_privacy_contract.py",)),
     Mutation('rv_audit_request_type_unvalidated', BRAIN,
-             '    for member in RequestType:\n'
+             'def _audit_request_type_code(request_type: Any) -> str:\n'
+             '    """Return a fixed schema code only for an identical RequestType member."""\n'
+             '    for member, code in _AUDIT_REQUEST_TYPE_CODES:\n'
              '        if request_type is member:\n'
-             '            return member.value\n'
+             '            return code\n'
              '    return "unknown"',
+             'def _audit_request_type_code(request_type: Any) -> str:\n'
              '    return getattr(request_type, "value", "unknown")',
              tests=("test_audit_event_payload_privacy_contract.py",)),
     Mutation('rv_audit_block_code_unvalidated', BRAIN,
