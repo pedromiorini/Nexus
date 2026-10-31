@@ -1,6 +1,9 @@
+import io
 import unittest
 from collections import defaultdict
+from contextlib import redirect_stdout
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from core.constitutional_brain import CentralRouter, ModuleType, RequestType
 from core.deferred_task_queue import DeferredTaskQueue
@@ -83,6 +86,36 @@ class CentralRouterContractTests(unittest.TestCase):
         cached["nested_output"]["values"].append(3)
         cached_again = router.route("plan without explicit context")
         self.assertEqual(cached_again["nested_output"]["values"], [1])
+
+    def test_debug_logging_never_includes_user_prompt(self):
+        prompt = "USER_PROMPT_SECRET: " + "x" * (50 - len("USER_PROMPT_SECRET: "))
+        router = CentralRouter.__new__(CentralRouter)
+        router.modules = {}
+        router.stats = {"total_requests": 0}
+        router.deferred_queue = DeferredTaskQueue()
+
+        class Guard:
+            def __init__(self):
+                self.actions = iter(("emergency_release", "normal"))
+
+            def evaluate(self):
+                return SimpleNamespace(action=next(self.actions), reason="critical_vram")
+
+            def execute_mitigation(self, _decision):
+                return SimpleNamespace(applied=True)
+
+            def mitigation_plan(self, _decision):
+                return {}
+
+        router.vram_guard = Guard()
+        output = io.StringIO()
+
+        with patch("core.constitutional_brain._NEXUS_DEBUG", True), redirect_stdout(output):
+            router._route(prompt, _deferred_reprocess=True)
+
+        logs = output.getvalue()
+        self.assertIn("Router.route() CALLED", logs)
+        self.assertNotIn(prompt, logs)
 
     def test_caller_context_cannot_suppress_emergency_deferral_enqueue(self):
         router = CentralRouter.__new__(CentralRouter)

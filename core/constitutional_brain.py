@@ -9155,6 +9155,50 @@ class ModuleType(Enum):
     EPISODIC = "episodic"             # POST1 sub
 
 
+_ROUTER_BLOCK_ERROR_CODES = frozenset({
+    "JAILBREAK_CHECK_FAILED",
+    "JAILBREAK_DETECTED",
+    "BUDGET_CHECK_FAILED",
+    "BUDGET_DENIED",
+    "MANDATORY_MODULE_FAILED",
+})
+_AUDIT_PRINCIPLE_CODES = frozenset({"P2", "P4", "P6", "P11", "P13", "P15"})
+
+
+def _audit_module_code(module: Any) -> str:
+    """Return only a canonical ModuleType value for an audit payload."""
+    for member in ModuleType:
+        if module is member:
+            return member.value
+    return "unknown"
+
+
+def _audit_request_type_code(request_type: Any) -> str:
+    """Return only a canonical RequestType value for an audit payload."""
+    for member in RequestType:
+        if request_type is member:
+            return member.value
+    return "unknown"
+
+
+def _audit_router_block_code(error: Any) -> str:
+    """Keep only stable router error codes in audit payloads."""
+    if type(error) is str:
+        for code in _ROUTER_BLOCK_ERROR_CODES:
+            if error == code:
+                return code
+    return "UNKNOWN_BLOCK"
+
+
+def _audit_principle_code(principle: Any) -> str:
+    """Return only a canonical constitutional principle code for audit payloads."""
+    if type(principle) is str:
+        for code in _AUDIT_PRINCIPLE_CODES:
+            if principle == code:
+                return code
+    return "UNKNOWN"
+
+
 @dataclass
 class ExecutionPlan:
     """Plano de execução criado pelo CentralRouter"""
@@ -9311,10 +9355,16 @@ class EthicsGuard:
             }
 
         # ─── APROVAÇÃO ────────────────────────────────────────────────────
+        policy_codes = [
+            code
+            for code in ("P4", "P11")
+            if any(warning.startswith(f"{code} ENFORCEMENT:") for warning in warnings)
+        ]
         self.log.log_event("ETHICS_PRE_CHECK_PASSED", {
-            "prompt": prompt[:100],
-            "modules": [m.value for m in execution_plan.modules_required],
-            "warnings": warnings
+            "schema_version": 1,
+            "modules": [_audit_module_code(module) for module in execution_plan.modules_required],
+            "module_count": len(execution_plan.modules_required),
+            "policy_codes": policy_codes,
         })
 
         execution_plan.ethical_clearance = True
@@ -9360,12 +9410,15 @@ class EthicsGuard:
 
                 if ethical_rejection:
                     self.log.log_event("ETHICS_POST_REJECTION", {
-                        "prompt": prompt[:100],
-                        "reason": "Swarm rejected on ethical grounds"
+                        "schema_version": 1,
+                        "policy_code": "P4",
+                        "reason_code": "SWARM_ETHICAL_REJECTION",
+                        "result": "rejected",
                     })
                     violations.append("P4: Swarm rejected due to ethical concerns")
 
         # ─── Validar que nenhum módulo tentou autoexpansão ────────────────
+        violation_modules = []
         for result in results:
             if not result.success:
                 continue
@@ -9375,12 +9428,20 @@ class EthicsGuard:
                 data_str = str(result.data).lower()
                 if "modify system" in data_str or "change architecture" in data_str:
                     violations.append(f"P6: {result.module.value} attempted self-modification")
+                    violation_modules.append(_audit_module_code(result.module))
 
         # ─── Resultado ────────────────────────────────────────────────────
         if violations:
+            policy_codes = sorted({
+                code
+                for code in ("P4", "P6")
+                if any(violation.startswith(f"{code}:") for violation in violations)
+            })
             self.log.log_event("ETHICS_POST_VIOLATION", {
-                "prompt": prompt[:100],
-                "violations": violations
+                "schema_version": 1,
+                "policy_codes": policy_codes,
+                "modules": sorted(set(violation_modules)),
+                "violation_count": len(violations),
             })
             return {
                 "validated": False,
@@ -9404,7 +9465,13 @@ class EthicsGuard:
         }
         self.violation_history.append(violation)
 
-        self.log.log_event("CONSTITUTIONAL_VIOLATION", violation)
+        principle_code = _audit_principle_code(principle)
+        self.log.log_event("CONSTITUTIONAL_VIOLATION", {
+            "schema_version": 1,
+            "timestamp": violation["timestamp"],
+            "principle": principle_code,
+            "result": "blocked",
+        })
 
     def get_statistics(self) -> Dict:
         """Estatísticas de violações"""
@@ -9698,7 +9765,7 @@ class CentralRouter:
             context.pop("_deferred_reprocess", None)
         # DEBUG v3.70: Log entry
         _dbg("🔍 DEBUG v3.70: Router.route() CALLED")
-        _dbg(f"🔍 DEBUG v3.70: prompt = '{prompt[:50]}...'")
+        _dbg("🔍 DEBUG v3.70: Router.route() received request")
         _dbg(f"🔍 DEBUG v3.70: self.modules has {len(self.modules)} registered modules")
         
         start_time = time.time()
@@ -9901,10 +9968,10 @@ class CentralRouter:
         if log_module is not None:
             try:
                 log_module.log_event("ROUTER_BLOCKED", {
-                    "error": blocked["error"],
-                    "module": blocked["module"].value,
-                    "request_type": request_type.value,
-                    "prompt": prompt[:100],
+                    "schema_version": 1,
+                    "error": _audit_router_block_code(blocked["error"]),
+                    "module": _audit_module_code(blocked["module"]),
+                    "request_type": _audit_request_type_code(request_type),
                 })
             except Exception as exc:  # o log não pode desfazer nem mascarar o bloqueio
                 _dbg(f"🔍 DEBUG: ROUTER_BLOCKED log failed: {exc}")
@@ -10200,7 +10267,7 @@ class CentralRouter:
             return {"allowed": module.request_budget(ResourceType.REASONING_CYCLES, 1)}
 
         elif module_name == ModuleType.LOG:
-            return {"hash": module.log_event("ROUTED_REQUEST", {"prompt": prompt[:100]})}
+            return {"hash": module.log_event("ROUTED_REQUEST", {"schema_version": 1})}
 
         elif module_name == ModuleType.EPISODIC:
             return module.search_episodes(query=prompt, limit=3)

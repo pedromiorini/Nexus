@@ -134,13 +134,19 @@ class RT11BlockIsLoggedOnce(unittest.TestCase):
                 self.assertEqual(data["error"], code)
                 self.assertEqual(data["module"], name)
                 self.assertEqual(data["request_type"], result["request_type"])
-                self.assertEqual(data["prompt"], prompt[:100])
+                self.assertEqual(data["schema_version"], 1)
+                self.assertNotIn("prompt", data)
 
-    def test_prompt_is_cut_at_100_chars(self):
+    def test_long_prompt_is_not_persisted_in_router_block_event(self):
         log = _Recorder()
-        prompt = "Tell me about " + "x" * 300
+        prompt = "ROUTER_BLOCKED_CANARY:" + "x" * 300
         self._route(CAUSES[0][2], prompt, log)
-        self.assertEqual(log.blocked()[0][1]["prompt"], prompt[:100])
+        blocked = log.blocked()
+        self.assertEqual(len(blocked), 1, log.events)
+        data = blocked[0][1]
+        self.assertEqual(data["schema_version"], 1)
+        self.assertNotIn("prompt", data)
+        self.assertNotIn("ROUTER_BLOCKED_CANARY", repr(data))
 
     def test_success_logs_no_router_blocked(self):
         for seed in SEEDS[:5]:
