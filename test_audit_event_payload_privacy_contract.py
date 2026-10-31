@@ -322,6 +322,48 @@ class AuditEventPayloadPrivacyContract(unittest.TestCase):
             self.assertEqual(payloads[0]["request_type"], "unknown")
             self.assertNotIn(marker, json.dumps(payloads[0], sort_keys=True))
 
+    def test_router_blocked_rejects_forged_module_class_in_persisted_json(self):
+        marker = "CANARY_FORGED_ROUTER_BLOCKED_MODULE"
+        spoofed_module = _SpoofedEnumMember(ModuleType, marker)
+        self.assertTrue(isinstance(spoofed_module, ModuleType))
+        self.assertIsNot(type(spoofed_module), ModuleType)
+        with self._new_log() as log:
+            router = _router([], LOG=log)
+            plan = ExecutionPlan(RequestType.QUERY, [], [], 0)
+            router.stats["total_requests"] = 1
+            response = router._finish_blocked(
+                PROMPTS[0],
+                RequestType.QUERY,
+                {
+                    "error": "BUDGET_DENIED",
+                    "module": spoofed_module,
+                    "reason": "resource budget denied",
+                },
+                plan,
+                [],
+                0.0,
+            )
+            self.assertIs(response["success"], False)
+            self.assertEqual(response["error"], "BUDGET_DENIED")
+            self.assertEqual(response["reason"], "resource budget denied")
+            self.assertEqual(response["failed_modules"], [marker])
+            self.assertEqual(
+                response["failed_modules_detail"],
+                [{"module": marker, "error": "resource budget denied"}],
+            )
+            payloads = self._payloads(log, "ROUTER_BLOCKED")
+            self.assertEqual(len(payloads), 1)
+            self.assertEqual(
+                payloads[0],
+                {
+                    "schema_version": 1,
+                    "error": "BUDGET_DENIED",
+                    "module": "unknown",
+                    "request_type": "query",
+                },
+            )
+            self.assertNotIn(marker, json.dumps(payloads[0], sort_keys=True))
+
     def test_router_blocked_rejects_str_subclass_that_mimics_allowlisted_error(self):
         marker = "CANARY_FREEFORM_ERROR_CODE"
         spoofed_error = _SpoofedAllowlistString(marker, "BUDGET_DENIED")
