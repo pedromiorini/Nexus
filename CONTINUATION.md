@@ -9,6 +9,13 @@ bandit_low: 139
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
+## Rebase e revalidação da PR #79 sobre main `af28cc1` (#145/#144/#146) — 2026-10-31
+
+- **Base e estado pré-publicação:** main `af28cc1abba5a4ff19930afb74daef7e4d3e4ed5`; branch local `work/pr79-test-fix`; snapshot de código validado `b615721c86bf063015ac956028fd2c074cd46336`. Antes da publicação, #79 seguia OPEN/draft no head remoto `67f2d86d6c9b4e839f47078311f454ea181e580b`, com base `51ffa974a7c06d0e3377c3b81cbf546c3a4f67d9`. Nenhuma PR foi mesclada e `main` não foi alterada.
+- **Preservação:** rebase sem conflitos; diff própria continua em 12 caminhos. `CLAIMS.yaml` permanece `claims: []`. O snapshot do Grok 3.4.2 manteve o SHA-256 `8f03762d2a2d128eea955597f1b55210e387c08385bdc5544514ea2f39701b5d`, idêntico ao blob anterior ao rebase; Grok segue aceitando 3.4.2 e Axis/Cursor 3.4.1, com seus hashes de instruções verificados. Nenhum lease expirado foi restaurado nem aceite alterado.
+- **Validação local:** Python 3.11.16, Ruff 0.17.1 e `requirements-ci.lock`. Contratos focados de versão/registro/composição/aceite → 53/53; suíte integral `python -m unittest discover -p 'test_*.py'` → 1.088 testes em 76,250 s, OK (3 expected failures, 0 skips). Ruff e compileall passaram. `tools/agente/validar_registro.py --expirados aviso` → registro OK, com apenas os dois avisos históricos de aceite anterior (Axis e Cursor); `tools/agente/replay/run_replay.sh` → 17/17.
+- **Limites:** `git diff --check` aponta somente a linha vazia final já contida no snapshot versionado 3.4.2; o blob foi preservado para manter seu SHA exato. A suíte integral passou em Python 3.11, o runtime do workflow; CI hospedado ainda deve ser conferido no head publicado.
+
 ## Rebase e validação da PR #79 sobre main `51ffa974` (#143) — 2026-10-30
 
 - **Base e estado:** main `51ffa974a7c06d0e3377c3b81cbf546c3a4f67d9`; branch local `work/pr79-test-fix`, código verificado em `347656620a03008d1e2bf95170e3a1ae56a7509f`. Antes do push, a PR #79 continuava OPEN/draft no head remoto original `521b5231700221e036008181c3b8d316a5a84a8a`; nenhuma PR foi mesclada.
