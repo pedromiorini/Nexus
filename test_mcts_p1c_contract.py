@@ -118,12 +118,42 @@ class B1AllowedFuturesTests(unittest.TestCase):
         out = _compare([["APPLY_PATCH"], ["MONITOR"]], vetoes={"APPLY_PATCH": "x"})
         self.assertEqual(out["best_future_index"], 1)
         self.assertEqual(out["vetoed_actions"], [{"action": "APPLY_PATCH", "reason": "x"}])
+        out = _compare([["IGNORE_ALERT"], ["MONITOR"]], vetoes={"MONITOR": "custom"})
+        self.assertEqual(out["best_future_index"], 0)
+        self.assertEqual(out["vetoed_actions"], [{"action": "MONITOR", "reason": "custom"}])
         with self.assertRaises(TypeError):
             _compare(sequences, vetoes=["IGNORE_ALERT"])
         before_defaults, before_input = dict(DEFAULT_VETOES), copy.deepcopy(sequences)
         _compare(sequences)
         self.assertEqual(DEFAULT_VETOES, before_defaults)
         self.assertEqual(sequences, before_input)
+
+    def test_compare_rejects_invalid_veto_entries(self):
+        cases = [
+            ({"MONITOR": "custom", 1: "invalid key"}, TypeError),
+            ({"IGNORE_ALERT": 1}, TypeError),
+            ({"  ": "empty normalized key"}, ValueError),
+        ]
+        for vetoes, error in cases:
+            with self.subTest(vetoes=vetoes), self.assertRaises(error):
+                _compare([["IGNORE_ALERT"]], vetoes=vetoes)
+
+    def test_compare_rejects_malformed_future_element(self):
+        for sequences in (["IGNORE_ALERT"], [["MONITOR", None]]):
+            with self.subTest(sequences=sequences), self.assertRaises(TypeError):
+                _compare(sequences)
+
+        class RecordingModel:
+            called = False
+
+            def compare_futures(self, sequences):
+                self.called = True
+                return {"results": []}
+
+        model = RecordingModel()
+        with self.assertRaises(TypeError):
+            mp.compare_allowed_futures(model, [["MONITOR"], "IGNORE_ALERT"])
+        self.assertFalse(model.called)
 
     def test_exported(self):
         self.assertIn("compare_allowed_futures", mp.__all__)
@@ -168,6 +198,13 @@ class BrainTests(unittest.TestCase):
         self.assertEqual([v["action"] for v in r["vetoed_actions"]], ["SHUTDOWN_SERVICE"])
         r = self._think([["MONITOR", "IGNORE_ALERT"], ["MONITOR"]])  # só a comparação vê o passo vetado
         self.assertEqual(r["best_future"], 1)
+        self.assertEqual([v["action"] for v in r["vetoed_actions"]], ["IGNORE_ALERT"])
+
+    def test_b5_think_compares_a_single_candidate_sequence(self):
+        r = self._think([["MONITOR", "IGNORE_ALERT"]])
+        self.assertIn("world_comparison", r)
+        self.assertIsNone(r["best_future"])
+        self.assertEqual(r["world_comparison"]["vetoed_futures"], [0])
         self.assertEqual([v["action"] for v in r["vetoed_actions"]], ["IGNORE_ALERT"])
 
     def test_b5_disabled_vetoes_in_the_brain_planner(self):

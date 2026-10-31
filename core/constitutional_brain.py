@@ -20760,7 +20760,7 @@ class CompleteNexusBrain:
                             "evidence": [],
                             "vetoed_actions": [dict(v) for v in getattr(mcts_result, "vetoed_actions", ())]
                         }
-                        if possible_actions and len(possible_actions) > 1:
+                        if possible_actions:
                             modules_activated.append("world_model")
                             # P1c: o veto do planejador vale também na comparação de futuros.
                             comparison = compare_allowed_futures(

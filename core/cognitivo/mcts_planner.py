@@ -36,6 +36,19 @@ def _veto_key(action: Any) -> Optional[str]:
     return _normalize_action_key(action) if isinstance(action, str) else None
 
 
+def _validate_vetoes(vetoes: Optional[Mapping[Any, Any]]) -> None:
+    """Validar o mapa conforme o contrato público do construtor do planner."""
+    if vetoes is None:
+        return
+    if not isinstance(vetoes, Mapping):
+        raise TypeError("vetoes must be a mapping of action -> reason")
+    for name, reason in vetoes.items():
+        if not isinstance(name, str) or not isinstance(reason, str):
+            raise TypeError("vetoes must map action names (str) to reasons (str)")
+        if not _veto_key(name):
+            raise ValueError("veto action name must not be empty")
+
+
 def _veto_table(vetoes: Mapping[Any, Any]) -> Dict[str, str]:
     """Mapa chave normalizada → motivo; com duas chaves iguais depois de normalizar, vence a primeira."""
     table: Dict[str, str] = {}
@@ -55,15 +68,20 @@ def compare_allowed_futures(world_model: Any, sequences: List[List[str]],
     lista os índices das vetadas e ``vetoed_actions`` as ações vetadas (``[{"action", "reason"}]``, ordem de
     aparição, sem repetir o mesmo texto). ``vetoes=None`` usa ``DEFAULT_VETOES``; ``{}`` desliga.
     """
-    if vetoes is not None and not isinstance(vetoes, Mapping):
-        raise TypeError("vetoes must be a mapping of action -> reason")
+    if not isinstance(sequences, (list, tuple)):
+        raise TypeError("sequences must be a list or tuple of action sequences")
+    for index, sequence in enumerate(sequences):
+        if not isinstance(sequence, (list, tuple)):
+            raise TypeError(f"sequences[{index}] must be a list or tuple of action names")
+        if any(not isinstance(action, str) for action in sequence):
+            raise TypeError(f"sequences[{index}] must contain only action names (str)")
+    _validate_vetoes(vetoes)
     table = _veto_table(DEFAULT_VETOES if vetoes is None else vetoes)
     allowed: List[int] = []
     vetoed_futures: List[int] = []
     vetoed_actions: List[Dict[str, str]] = []
     for index, sequence in enumerate(sequences):
-        steps = sequence if isinstance(sequence, (list, tuple)) else ()
-        hits = [a for a in steps if _veto_key(a) in table]
+        hits = [a for a in sequence if _veto_key(a) in table]
         if not hits:
             allowed.append(index)
             continue
@@ -190,14 +208,7 @@ class RealMCTSPlanner:
             raise TypeError("max_depth must be an integer")
         if max_depth <= 0:
             raise ValueError("max_depth must be positive")
-        if vetoes is not None:
-            if not isinstance(vetoes, Mapping):
-                raise TypeError("vetoes must be a mapping of action -> reason")
-            for name, reason in vetoes.items():
-                if not isinstance(name, str) or not isinstance(reason, str):
-                    raise TypeError("vetoes must map action names (str) to reasons (str)")
-                if not _veto_key(name):
-                    raise ValueError("veto action name must not be empty")
+        _validate_vetoes(vetoes)
         self.vetoes: Dict[str, str] = dict(DEFAULT_VETOES if vetoes is None else vetoes)
         self.world_model = world_model
         self.causal_reasoning = causal_reasoning
