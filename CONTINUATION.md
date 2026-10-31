@@ -9,6 +9,14 @@ bandit_low: 139
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
+## Rodada local — prompt do usuário fora dos logs de debug do CentralRouter — 2026-10-30
+
+- **Base e isolamento:** `origin/main` foi reconfirmada por `git ls-remote` em `af28cc1abba5a4ff19930afb74daef7e4d3e4ed5`. Trabalho isolado na worktree `/workspace/Nexus-no-prompt-debug-20261030`, branch `fix/no-prompt-debug-20261030`, criada limpa nessa base. O checkout original `/workspace/Nexus` permaneceu separado e sujo; nenhuma publicação, PR, merge ou alteração de `main` foi feita.
+- **Contrato:** mesmo com `_NEXUS_DEBUG` habilitado, nenhum trecho do prompt fornecido pelo usuário aparece no stdout de debug; mensagens estáticas de progresso podem permanecer. A mudança substitui somente a interpolação do prompt no call site por uma mensagem estática; `_dbg` e o fluxo do roteador permanecem inalterados.
+- **RED → GREEN:** antes da correção, `PYTHONPATH=. python -m unittest -v test_central_router_contract.CentralRouterContractTests.test_debug_logging_never_includes_user_prompt` falhou (1 teste) porque o stdout capturado continha o prefixo de 50 caracteres do prompt. Depois, o mesmo comando passou (1/1), confirmando também a mensagem estática `Router.route() CALLED`. `PYTHONPATH=. python -m unittest -v test_central_router_contract` passou 5/5.
+- **Verificação:** `ruff check core/constitutional_brain.py test_central_router_contract.py` passou; `python -m py_compile core/constitutional_brain.py test_central_router_contract.py` passou em Python 3.12.3. A suíte `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-no-prompt-debug-audit.sqlite3 python -m unittest discover -p 'test_*.py'` passou: 1.083 testes, 2 skips e 3 expected failures.
+- **Limitações:** validação local, sem CI hospedada. `psutil` e FAISS/SentenceTransformers não estavam instalados, então os caminhos opcionais usaram fallbacks nos testes aplicáveis. O retorno funcional do roteador e payloads adiados não foram alterados; o contrato desta rodada cobre o log de debug em stdout.
+
 ## Rodada — `limit==0` e barra invertida na busca episódica — 2026-10-29
 
 - **Base:** `4215c4e` (`origin/main` depois do #126). Branch `grok/episodic-limit0-backslash-20261029`. Código novo só em `core/cognitivo/episodic_memory.py`, `test_episodic_like_literal_contract.py` e `tools/cognitivo_mutation.py`; `tools/targeted_mutation.py` e os testes do Axis intactos. Pré-registro EL1–EL8 em `docs/cognitivo/AUDITORIA_2026-10-22.md` (commit `1874de4`, antes do RED). O claim foi aberto no pré-registro e removido no último commit; `CLAIMS.yaml` volta a `claims: []`.

@@ -9698,7 +9698,7 @@ class CentralRouter:
             context.pop("_deferred_reprocess", None)
         # DEBUG v3.70: Log entry
         _dbg("🔍 DEBUG v3.70: Router.route() CALLED")
-        _dbg(f"🔍 DEBUG v3.70: prompt = '{prompt[:50]}...'")
+        _dbg("🔍 DEBUG v3.70: Router.route() received request")
         _dbg(f"🔍 DEBUG v3.70: self.modules has {len(self.modules)} registered modules")
         
         start_time = time.time()
