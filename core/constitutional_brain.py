@@ -2002,7 +2002,8 @@ from core.cognitivo.episodic_memory import Episode, RealEpisodicMemory  # noqa: 
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-from core.cognitivo.mcts_planner import MCTSNode, PlanResult, RealMCTSPlanner  # noqa: E402,F401  (strangler: extraído, reexportado aqui)
+from core.cognitivo.mcts_planner import (  # noqa: E402,F401  (strangler: extraído, reexportado aqui)
+    DEFAULT_VETOES, MCTSNode, PlanResult, RealMCTSPlanner, compare_allowed_futures)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -10191,7 +10192,10 @@ class CentralRouter:
 
         elif module_name == ModuleType.WORLD_MODEL:
             actions = context.get("possible_actions", [["default_action"]])
-            return module.compare_futures(actions)
+            # P1c: o veto do planejador vale também aqui; best_future_index nunca indexa sequência vetada.
+            planner = self.modules.get(ModuleType.MCTS_PLANNER)
+            vetoes = getattr(planner, "vetoes", None)
+            return compare_allowed_futures(module, actions, vetoes if isinstance(vetoes, dict) else None)
 
         elif module_name == ModuleType.JAILBREAK:
             return module.detect(prompt)
@@ -20753,13 +20757,19 @@ class CompleteNexusBrain:
                             "mcts_success_probability": mcts_result.success_probability,
                             "answer": f"Plano recomendado: {' → '.join(mcts_result.best_action_sequence)}",
                             "confidence": mcts_result.expected_reward,
-                            "evidence": []
+                            "evidence": [],
+                            "vetoed_actions": [dict(v) for v in getattr(mcts_result, "vetoed_actions", ())]
                         }
                         if possible_actions and len(possible_actions) > 1:
                             modules_activated.append("world_model")
-                            comparison = self.world_model.compare_futures(possible_actions)
+                            # P1c: o veto do planejador vale também na comparação de futuros.
+                            comparison = compare_allowed_futures(
+                                self.world_model, possible_actions, self.mcts_planner.vetoes)
                             reasoning_result["world_comparison"] = comparison
-                            reasoning_result["best_future"] = comparison.get("best_future_index", 0)
+                            reasoning_result["best_future"] = comparison["best_future_index"]
+                            known = {v["action"] for v in reasoning_result["vetoed_actions"]}
+                            reasoning_result["vetoed_actions"] += [
+                                v for v in comparison["vetoed_actions"] if v["action"] not in known]
                     except Exception as e:
                         print(f"⚠️ WARNING: MCTS failed: {str(e)[:200]}")
                         modules_activated.append("reasoning")
@@ -21073,7 +21083,7 @@ class CompleteNexusBrain:
             # Lista completa de campos MCTS que devem ser preservados
             mcts_fields = [
                 "mcts_plan", "mcts_expected_reward", "mcts_success_probability",
-                "mcts_tree", "world_comparison", "best_future", "mcts_depth"
+                "mcts_tree", "world_comparison", "best_future", "mcts_depth", "vetoed_actions"
             ]
             
             # PRIORIDADE 1: reasoning_result (fonte original onde MCTS cria os campos)
