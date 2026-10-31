@@ -7,6 +7,30 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Limite de alcance das allowlists de privacidade — revisão documental 2026-10-31
+
+Na base `ac35ba8e325825c2a5bacd6a517111ef480b9bd9`, D-030 cobre somente `ETHICS_PRE_CHECK_PASSED`, `ETHICS_POST_REJECTION`, `ETHICS_POST_VIOLATION`, `CONSTITUTIONAL_VIOLATION`, `ROUTER_BLOCKED` e `ROUTED_REQUEST`. A inspeção de `core/constitutional_brain.py` confirma que `_log_violation` ainda mantém `principle`, `reason` e `prompt[:100]` em `violation_history`; o tratamento genérico de exceção em `execute_tool` pode persistir `str(e)` no evento irmão `TOOL_EXECUTION_FAILED`. Portanto, privacidade global dos logs não está resolvida. Esta é uma revisão documental do estado existente, não uma mitigação nem um teste de privacidade global; os caminhos fora do escopo não foram alterados.
+
+## Sanitizadores de enum resistentes a `__class__` falsificada — validação local 2026-10-31
+
+Na base `00c9ea0c6440cd4a64ff1835e24ed4a0e086bc66`, três regressões reproduziram canários JSON persistidos em `ETHICS_PRE_CHECK_PASSED`, `ETHICS_POST_VIOLATION` e `ROUTER_BLOCKED`: objetos com propriedade `__class__` alegando ser `ModuleType`/`RequestType` passavam em `isinstance`, e `.value` era emitido diretamente. Os sanitizadores agora comparam identidade com membros reais dos enums e retornam os valores canônicos; os objetos forjados viram `unknown` somente no payload do log.
+
+RED: 3/3 novas regressões falharam na implementação da base. GREEN: passaram 3/3; cinco contratos focados passaram 68/68 e a suíte completa passou 1.099 testes, com 2 skips e 3 expected failures. Ruff e `compileall` passaram. Os testes verificam o JSON lido do SQLite e a preservação dos valores funcionais. Limites: sem CI hospedada, Bandit ou mutation harness nesta rodada; dependências opcionais `psutil` e FAISS/SentenceTransformers ausentes. Evidência local de contrato, não certificação de segurança.
+
+## Allowlists de auditoria resistentes a subclasses de `str` — validação local 2026-10-30
+
+Na base exata `d439c5efd14de980070eb95b54e442533ccbb74f`, duas regressões reproduziram vazamento de canários em `ROUTER_BLOCKED` e `CONSTITUTIONAL_VIOLATION`: subclasses de `str` redefiniam `__hash__`/`__eq__` para imitar `BUDGET_DENIED` e `P13`, mas mantinham o texto livre ao serializar. Com validação por tipo built-in exato e retorno do membro canônico do allowlist, as regressões passaram 2/2. Os cinco contratos focados passaram 65/65; suíte completa: 1.096 testes, 2 skips, 3 expected failures. Dois mutantes dirigidos que reintroduziam o bypass foram mortos (2/2).
+
+Ruff e compilação passaram. Bandit encontrou 139 LOW, nenhum MEDIUM/HIGH; triagem, auditoria de asserts e de lacunas passaram. O teste verifica que o retorno de bloqueio e `violation_history` preservam os valores funcionais, enquanto os seis contratos de payload continuam passando. Limites: sem CI hospedada; `psutil` e FAISS/SentenceTransformers opcionais ausentes. Os relatórios gerados pela reality audit já divergiam na base e foram preservados sem regeneração; detalhes e comandos em `CONTINUATION.md`. Esta é evidência local de contrato, não certificação de segurança.
+
+## Allowlists de payloads de auditoria — validação local 2026-10-30
+
+Branch `fix/no-prompt-audit-20261030`, baseada no commit local `be295473570273d6cf7c10eca6456a02ac951132`, que já contém a correção do stdout de debug; `origin/main` foi reconfirmada em `af28cc1abba5a4ff19930afb74daef7e4d3e4ed5`. O contrato novo cobre `ETHICS_PRE_CHECK_PASSED`, `ETHICS_POST_REJECTION`, `ETHICS_POST_VIOLATION`, `CONSTITUTIONAL_VIOLATION`, `ROUTER_BLOCKED` e `ROUTED_REQUEST` com payloads `schema_version: 1`, canários curtos/longos e valores adversariais em metadados. Módulo/tipo desconhecidos e códigos de bloqueio não enumerados viram marcadores estáticos; o logger genérico, schema SQLite, envelope/hash-chain, histórico de violações e respostas funcionais não foram modificados.
+
+RED inicial: 8 testes, 14 falhas por presença dos campos livres nos seis produtores. GREEN focado: 63/63 em `test_audit_event_payload_privacy_contract`, `test_router_review_addendum_contract`, `test_router_fail_closed_contract`, `test_central_router_contract` e `test_immutable_log_contract`; o teste de privacidade isolado passou 11/11. Seis mutantes de prompt, módulo, tipo e código foram mortos (0 sobreviventes, 0 não aplicados). A suíte completa passou 1.094 testes, com 2 skips e 3 expected failures. Ruff e `compileall` completos passaram. Bandit: 139 LOW, zero MEDIUM/HIGH; `security_triage.py --check`, `embedded_assert_audit.py` e `implementation_gap_audit.py` passaram.
+
+Limites: sem CI hospedada. `psutil` e FAISS/SentenceTransformers opcionais ausentes; testes aplicáveis usaram fallback. O gate amplo `targeted_mutation.py` foi interrompido antes de terminar após uma chamada exploratória de ajuda, sem alterações no worktree; os seis mutantes diretos foram executados em cópias temporárias. Esta evidência cobre os seis eventos listados, não `COMPLETE_INTERACTION`, stdout, respostas da API, memória episódica, filas ou snapshots.
+
 ## LIKE literal na busca episódica — validação local 2026-10-29
 
 Base `616a9b2217bace790aeb39bf08e3bb717d7d4318`, branch `cursor/episodic-like-literal-2c0b`. O contrato `test_episodic_like_literal_contract.py` falhou na produção intacta (10 testes, 17 falhas, exit 1) e, com o fallback `LIKE ... ESCAPE '\'` e a rejeição de query vazia ou não-string, passou 10/10 (exit 0). A ausência documentada continua sendo `None`. Descoberta: 770 testes, exit 0. Bandit não acrescentou achado sobre a baseline de 131 LOW. Comandos e limites estão na rodada de 2026-10-29 de `CONTINUATION.md`. Isto é evidência de contrato local, não de capacidade de memória nem de CI hospedado.

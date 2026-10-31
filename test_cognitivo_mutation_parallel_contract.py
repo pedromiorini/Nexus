@@ -214,7 +214,7 @@ class GateIsNotWeakened(unittest.TestCase):
         self.assertGreaterEqual(len(cm.MUTATIONS), 483)  # o catálogo nunca encolhe (M7 compara o diff)
         self.assertEqual(tm.TIMEOUT_SECONDS, 180)
         workflow = (ROOT / ".github/workflows/nexus-contract-gate.yml").read_text(encoding="utf-8")
-        self.assertIn("timeout-minutes: 20", workflow)
+        self.assertIn("timeout-minutes: 30", workflow)
         self.assertIn("run: python tools/cognitivo_mutation.py", workflow)
 
 

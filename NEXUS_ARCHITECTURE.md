@@ -32,6 +32,7 @@ Ferramentas de auditoria e CI
 
 - O `CentralRouter` coordena componentes, mas não transforma seus nomes em capacidades gerais.
 - O SQLite fornece persistência local para Vita e episódios; concorrência e durabilidade são responsabilidades do consumidor.
+- O `RealImmutableLog` encadeia por hash o payload recebido sem inspecioná-lo ou redigi-lo; allowlists de privacidade pertencem aos produtores dos eventos.
 - Backends opcionais são injetados por protocolos pequenos e devem manter estado de disponibilidade explícito.
 - O CI compila módulos, executa contratos, cobertura, mutation testing, Bandit e auditorias.
 
