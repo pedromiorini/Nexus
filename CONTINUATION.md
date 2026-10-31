@@ -9,6 +9,14 @@ bandit_low: 139
 
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
+## Rodada local — identidade exata nos sanitizadores de eventos de auditoria — 2026-10-31
+
+- **Base e isolamento:** worktree novo `/workspace/Nexus-audit-sanitizer-exact-20261031`, branch `fix/audit-sanitizer-exact-members-20261031`, criado limpo em `00c9ea0c6440cd4a64ff1835e24ed4a0e086bc66`. O checkout `/workspace/Nexus` já tinha alterações não relacionadas e foi preservado; `main` e refs remotas não foram alterados.
+- **Contrato/correção:** `_audit_module_code` e `_audit_request_type_code` aceitam somente objetos idênticos a membros reais dos enums e devolvem `member.value` canônico; falsificações de `__class__` resultam em `unknown` no JSON persistido de `ETHICS_PRE_CHECK_PASSED`, `ETHICS_POST_VIOLATION` e `ROUTER_BLOCKED`. As regressões confirmam que os resultados/respostas funcionais continuam preservando os valores originais. Nenhum schema, logger genérico ou envelope foi alterado.
+- **RED → GREEN:** os três testes novos falharam juntos na base (3/3 falhas), mostrando os canários no JSON persistido; após o patch passaram 3/3. O comando focado `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-audit-sanitizer-focused-20261031.sqlite3 python -m unittest -v test_audit_event_payload_privacy_contract test_router_review_addendum_contract test_router_fail_closed_contract test_central_router_contract test_immutable_log_contract` passou 68/68.
+- **Verificação ampla:** `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-audit-sanitizer-full-20261031.sqlite3 python -m unittest discover -p 'test_*.py'` passou 1.099 testes, 2 skips e 3 expected failures. `ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py` e `python -m compileall -q core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py` passaram.
+- **Limites:** validação local; CI hospedada, Bandit e o executor de mutation testing não foram executados. `psutil` e FAISS/SentenceTransformers opcionais estão ausentes; os caminhos aplicáveis usaram fallback, além dos 2 skips e 3 expected failures já contados. Sem push, PR, comentário ou merge.
+
 ## Rodada local — subclasses de `str` não contornam allowlists de auditoria — 2026-10-30
 
 - **Base e isolamento:** worktree novo `/workspace/Nexus-audit-allowlist-20261030`, branch `fix/audit-allowlist-20261030`, criado limpo em `d439c5efd14de980070eb95b54e442533ccbb74f`. O worktree anterior `/workspace/Nexus-no-prompt-audit-20261030`, `/workspace/Nexus` e `main` permaneceram intocados; nenhuma ref remota foi alterada.

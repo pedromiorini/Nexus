@@ -37,6 +37,16 @@ class _SpoofedAllowlistString(str):
         return NotImplemented
 
 
+class _SpoofedEnumMember:
+    def __init__(self, enum_type, value):
+        self._enum_type = enum_type
+        self.value = value
+
+    @property
+    def __class__(self):
+        return self._enum_type
+
+
 class AuditEventPayloadPrivacyContract(unittest.TestCase):
     def _new_log(self):
         return RealImmutableLog(":memory:")
@@ -106,6 +116,22 @@ class AuditEventPayloadPrivacyContract(unittest.TestCase):
             )
             self.assertNotIn(marker, json.dumps(payloads[0], sort_keys=True))
 
+    def test_ethics_pre_check_rejects_forged_module_class_in_persisted_json(self):
+        marker = "CANARY_FORGED_MODULE_CLASS"
+        spoofed_module = _SpoofedEnumMember(ModuleType, marker)
+        self.assertTrue(isinstance(spoofed_module, ModuleType))
+        self.assertIsNot(type(spoofed_module), ModuleType)
+        with self._new_log() as log:
+            guard = self._guard(log)
+            plan = ExecutionPlan(RequestType.QUERY, [spoofed_module], [], 0)
+            result = guard.pre_execution_check(PROMPTS[0], plan)
+            self.assertTrue(result["cleared"])
+            self.assertIs(plan.modules_required[0], spoofed_module)
+            payloads = self._payloads(log, "ETHICS_PRE_CHECK_PASSED")
+            self.assertEqual(len(payloads), 1)
+            self.assertEqual(payloads[0]["modules"], ["unknown", "log"])
+            self.assertNotIn(marker, json.dumps(payloads[0], sort_keys=True))
+
     def test_ethics_post_rejection_keeps_policy_and_result_codes(self):
         swarm = NS(
             final_decision=NS(value="reject"),
@@ -166,6 +192,26 @@ class AuditEventPayloadPrivacyContract(unittest.TestCase):
             self.assertEqual(
                 validation["reason"], f"P6: {marker} attempted self-modification"
             )
+            payloads = self._payloads(log, "ETHICS_POST_VIOLATION")
+            self.assertEqual(len(payloads), 1)
+            self.assertEqual(payloads[0]["modules"], ["unknown"])
+            self.assertNotIn(marker, json.dumps(payloads[0], sort_keys=True))
+
+    def test_ethics_post_violation_rejects_forged_module_class_in_persisted_json(self):
+        marker = "CANARY_FORGED_MODULE_CLASS"
+        spoofed_module = _SpoofedEnumMember(ModuleType, marker)
+        self.assertTrue(isinstance(spoofed_module, ModuleType))
+        self.assertIsNot(type(spoofed_module), ModuleType)
+        result = ModuleResult(
+            spoofed_module,
+            True,
+            {"note": "Please modify system settings."},
+            0.0,
+        )
+        with self._new_log() as log:
+            validation = self._guard(log).post_execution_validation(PROMPTS[0], [result])
+            self.assertFalse(validation["validated"])
+            self.assertEqual(validation["reason"], f"P6: {marker} attempted self-modification")
             payloads = self._payloads(log, "ETHICS_POST_VIOLATION")
             self.assertEqual(len(payloads), 1)
             self.assertEqual(payloads[0]["modules"], ["unknown"])
@@ -246,6 +292,34 @@ class AuditEventPayloadPrivacyContract(unittest.TestCase):
                     "request_type": "unknown",
                 },
             )
+            self.assertNotIn(marker, json.dumps(payloads[0], sort_keys=True))
+
+    def test_router_blocked_rejects_forged_request_type_class_in_persisted_json(self):
+        marker = "CANARY_FORGED_REQUEST_CLASS"
+        spoofed_request_type = _SpoofedEnumMember(RequestType, marker)
+        self.assertTrue(isinstance(spoofed_request_type, RequestType))
+        self.assertIsNot(type(spoofed_request_type), RequestType)
+        with self._new_log() as log:
+            router = _router([], LOG=log)
+            plan = ExecutionPlan(RequestType.QUERY, [], [], 0)
+            router.stats["total_requests"] = 1
+            response = router._finish_blocked(
+                PROMPTS[0],
+                spoofed_request_type,
+                {
+                    "error": "BUDGET_DENIED",
+                    "module": ModuleType.BUDGET,
+                    "reason": "resource budget denied",
+                },
+                plan,
+                [],
+                0.0,
+            )
+            self.assertIs(response["success"], False)
+            self.assertEqual(response["request_type"], marker)
+            payloads = self._payloads(log, "ROUTER_BLOCKED")
+            self.assertEqual(len(payloads), 1)
+            self.assertEqual(payloads[0]["request_type"], "unknown")
             self.assertNotIn(marker, json.dumps(payloads[0], sort_keys=True))
 
     def test_router_blocked_rejects_str_subclass_that_mimics_allowlisted_error(self):

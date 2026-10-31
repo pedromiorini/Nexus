@@ -9167,12 +9167,18 @@ _AUDIT_PRINCIPLE_CODES = frozenset({"P2", "P4", "P6", "P11", "P13", "P15"})
 
 def _audit_module_code(module: Any) -> str:
     """Return only a canonical ModuleType value for an audit payload."""
-    return module.value if isinstance(module, ModuleType) else "unknown"
+    for member in ModuleType:
+        if module is member:
+            return member.value
+    return "unknown"
 
 
 def _audit_request_type_code(request_type: Any) -> str:
     """Return only a canonical RequestType value for an audit payload."""
-    return request_type.value if isinstance(request_type, RequestType) else "unknown"
+    for member in RequestType:
+        if request_type is member:
+            return member.value
+    return "unknown"
 
 
 def _audit_router_block_code(error: Any) -> str:

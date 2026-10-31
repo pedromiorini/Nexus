@@ -7,6 +7,12 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Sanitizadores de enum resistentes a `__class__` falsificada — validação local 2026-10-31
+
+Na base `00c9ea0c6440cd4a64ff1835e24ed4a0e086bc66`, três regressões reproduziram canários JSON persistidos em `ETHICS_PRE_CHECK_PASSED`, `ETHICS_POST_VIOLATION` e `ROUTER_BLOCKED`: objetos com propriedade `__class__` alegando ser `ModuleType`/`RequestType` passavam em `isinstance`, e `.value` era emitido diretamente. Os sanitizadores agora comparam identidade com membros reais dos enums e retornam os valores canônicos; os objetos forjados viram `unknown` somente no payload do log.
+
+RED: 3/3 novas regressões falharam na implementação da base. GREEN: passaram 3/3; cinco contratos focados passaram 68/68 e a suíte completa passou 1.099 testes, com 2 skips e 3 expected failures. Ruff e `compileall` passaram. Os testes verificam o JSON lido do SQLite e a preservação dos valores funcionais. Limites: sem CI hospedada, Bandit ou mutation harness nesta rodada; dependências opcionais `psutil` e FAISS/SentenceTransformers ausentes. Evidência local de contrato, não certificação de segurança.
+
 ## Allowlists de auditoria resistentes a subclasses de `str` — validação local 2026-10-30
 
 Na base exata `d439c5efd14de980070eb95b54e442533ccbb74f`, duas regressões reproduziram vazamento de canários em `ROUTER_BLOCKED` e `CONSTITUTIONAL_VIOLATION`: subclasses de `str` redefiniam `__hash__`/`__eq__` para imitar `BUDGET_DENIED` e `P13`, mas mantinham o texto livre ao serializar. Com validação por tipo built-in exato e retorno do membro canônico do allowlist, as regressões passaram 2/2. Os cinco contratos focados passaram 65/65; suíte completa: 1.096 testes, 2 skips, 3 expected failures. Dois mutantes dirigidos que reintroduziam o bypass foram mortos (2/2).
