@@ -623,16 +623,27 @@ class RealKnowledgeGraph:
                      *, source: str = "observation",
                      valid_from: Optional[float] = None) -> Relation:
         """Adicionar relação direcionada entre entidades."""
-        # Valide os kwargs do backend antes de gravar o ledger ou a projeção.
-        # O fallback não usa kwargs e preserva seu contrato legado de propriedades.
+        # Prepare and validate the NetworkX projection before ledger or graph mutation.
+        # Fallback mode does not use kwargs and preserves its legacy property contract.
         if self.nx:
-            properties = dict(properties or {})
-            if any(not isinstance(key, str) for key in properties):
+            # Temporal integration has always detached caller properties; without a
+            # store, preserve Relation.properties identity while staging a safe copy.
+            if self.temporal_store is not None:
+                properties = dict(properties or {})
+            existing = self.graph.get_edge_data(source_id, target_id)
+            relations = list(existing.get("relations", [existing.get("relation")])) if existing else []
+            relations.append(relation_type)
+            edge_attributes = dict(properties or {})
+            edge_attributes.update({
+                "relation": relation_type,
+                "relations": relations,
+                "confidence": confidence,
+            })
+            if any(not isinstance(key, str) for key in edge_attributes):
                 raise TypeError("NetworkX relation property keys must be strings")
-            if any(key in properties for key in ("self", "u_of_edge", "v_of_edge")):
+            if any(key in edge_attributes for key in ("self", "u_of_edge", "v_of_edge")):
                 raise TypeError("NetworkX relation properties collide with edge parameters")
-        # A integração é opt-in. Registre antes de criar entidades ou alterar índices,
-        # para que entradas temporais inválidas não deixem uma projeção parcial.
+        # The temporal append remains opt-in and follows projection preflight.
         if self.temporal_store is not None:
             self.temporal_store.assert_fact(
                 source_id,
@@ -663,18 +674,8 @@ class RealKnowledgeGraph:
         self.relation_index[relation_type].append(relation)
 
         if self.nx:
-            # DiGraph guarda uma aresta por par de nós: acumular os tipos em "relations"
-            # evita que uma segunda relação sobrescreva a primeira (``relation`` = a última).
-            existing = self.graph.get_edge_data(source_id, target_id)
-            relations = list(existing.get("relations", [existing.get("relation")])) if existing else []
-            relations.append(relation_type)
-            edge_attributes = dict(relation.properties)
-            edge_attributes.update({
-                "relation": relation_type,
-                "relations": relations,
-                "timestamp": relation.timestamp,
-                "confidence": confidence,
-            })
+            # DiGraph acumula os tipos por par; os atributos estruturais prevalecem.
+            edge_attributes["timestamp"] = relation.timestamp
             self.graph.add_edge(source_id, target_id, **edge_attributes)
         else:
             self.graph["edges"][source_id].append((target_id, relation_type))
