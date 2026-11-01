@@ -7,6 +7,34 @@ tests: CURRENT_TESTS
 bandit_low: 135
 -->
 
+## Follow-up local de QA da pilha — 2026-11-01
+Na cópia isolada `/workspace/Nexus-stack-rebuild-20261031`, branch
+`local/rebuild-pr115-20261031`, partindo do commit
+`1c98e06f677b61b7587e7c3f7db1ec1a0146ed8e` (base da pilha
+`995f3d7db87de007ffc499fb07534207894c32ad`), foram executados 24 contratos
+focados e a suíte completa local em Python 3.12.3: **24/24** e **642/642**,
+respectivamente; a suíte completa teve zero skips. `psutil`, FAISS e
+SentenceTransformers estavam ausentes, com avisos/fallbacks opcionais. Não houve
+CI hospedado nem execução nesta rodada de cobertura, suíte integrada separada,
+Ruff, Bandit, actionlint ou zizmor.
+
+O gate de mutação encerrou com sucesso: **131/131 entradas do catálogo** aplicáveis
+mortas, 0 sobreviventes, 0 timeouts e 0 não aplicadas. Esse total conta uma entrada
+`Mutation` por teste de sua tupla declarada, não 131 edições independentes; há
+**128 alterações-fonte únicas**, identificadas por `(target, needle, replacement)`.
+O mutante `kg_projection_preflight_without_temporal_store` agora remove somente
+a validação não-string no caso sem store e mantém o staging de `edge_attributes`.
+Relatório local: `/tmp/nexus-pr115-followup-mutation-20261101.json`, SHA-256
+`84b1a7ace9aca484d9e766adaaaf5e9ad2882e411d55c319bd1a3441ec78da34`.
+
+O comentário/teste de `Relation.properties` distingue identidade preservada para
+dict não vazio sem store da normalização de `{}`; o teste de profundidade explicita
+atomicidade em memória, não round-trip extremo. O preflight de realidade em memória
+foi byte a byte idêntico aos dois artefatos versionados e não escreveu saídas.
+A limitação de `RecursionError` no round-trip/exportação de metadados com 490 níveis
+no runner Python 3.12.3 continua aberta; nenhum teto ou correção foi introduzido.
+Ver comandos e escopo em [CONTINUATION.md](CONTINUATION.md).
+
 ## Evidência da reconstrução local #47 → #48 → #49 → #50 → #115 — 2026-10-31 a 2026-11-01
 
 Candidato em `/workspace/Nexus-stack-rebuild-20261031`, branch

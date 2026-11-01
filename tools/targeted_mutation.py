@@ -644,6 +644,11 @@ def main() -> int:
     report = {
         "tool": "nexus-targeted-mutation",
         "isolated_copy": True,
+        "mutation_count_unit": "Mutation catalog entries (one entry tested against its declared unittest tuple)",
+        "unique_source_changes": len({
+            (mutation.target, mutation.needle, mutation.replacement)
+            for mutation in MUTATIONS
+        }),
         "tests": sorted({test for mutation in MUTATIONS for test in mutation.tests}),
         "mutations": results,
         "summary": {
@@ -657,7 +662,11 @@ def main() -> int:
         },
     }
     REPORT.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(json.dumps(report["summary"], ensure_ascii=False))
+    print(json.dumps({
+        **report["summary"],
+        "unit": report["mutation_count_unit"],
+        "unique_source_changes": report["unique_source_changes"],
+    }, ensure_ascii=False))
     for item in results:
         if item["status"] != "killed":
             print(f"  {item['status']}: {item['name']} ({item['target']})", file=sys.stderr)

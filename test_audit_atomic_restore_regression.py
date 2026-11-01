@@ -90,7 +90,7 @@ class IndependentAtomicityTests(unittest.TestCase):
 
 
 class IndependentBoundaryTests(unittest.TestCase):
-    def test_runtime_depth_failure_does_not_leave_a_partial_ledger(self):
+    def test_runtime_depth_failure_is_atomic_in_memory_not_extreme_round_trip(self):
         for levels in (100, 450, 490, 600, 900):
             with self.subTest(levels=levels):
                 store = ledger()

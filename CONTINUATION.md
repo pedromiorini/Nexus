@@ -7,6 +7,33 @@ tests: CURRENT_TESTS
 bandit_low: 135
 -->
 
+## Follow-up local de QA da pilha — 2026-11-01
+
+**Identidade/escopo:** somente a cópia `/workspace/Nexus-stack-rebuild-20261031`, branch `local/rebuild-pr115-20261031`; base do follow-up `1c98e06f677b61b7587e7c3f7db1ec1a0146ed8e`, árvore inicial `2a2b60aae81918d800449ce6bdfe91ad43fcb78e`, sobre `995f3d7db87de007ffc499fb07534207894c32ad`. Alterações limitadas a `tools/targeted_mutation.py`, `core/constitutional_brain.py`, `test_knowledge_graph_projection_preflight_contract.py`, `test_audit_atomic_restore_regression.py`, `CONTINUATION.md` e `NEXUS_EVIDENCE.md`; `/workspace/Nexus` permaneceu intocado.
+
+**Correções estreitas:** `kg_projection_preflight_without_temporal_store` agora condiciona somente a validação de chaves não-string à presença do store temporal; o staging de `edge_attributes` e as demais etapas permanecem no mutante. O relatório explicita que `declared`/`applicable`/`killed` contam entradas do catálogo (cada entrada testada com sua tupla unittest), não alterações-fonte distintas; a contagem única usa `(target, needle, replacement)` e é 128. O comentário de produção distingue dict não vazio, cuja identidade é preservada sem store, de `{}`, normalizado por `properties or {}`; o teste já existente agora afirma que `{}` não conserva identidade. O teste de profundidade foi renomeado para indicar atomicidade em memória, não round-trip extremo.
+
+**Verificação local (Python 3.12.3):** contratos focados, `PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 $PY -m unittest -v test_knowledge_graph_projection_preflight_contract test_graph_relation_preflight_contract test_audit_atomic_restore_regression test_targeted_mutation_contract`: 24/24 aprovados. Suíte integral, `PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 $PY -m unittest discover -p 'test_*.py'`: 642/642 aprovados, zero skips. Houve avisos de dependências opcionais ausentes (`psutil`, FAISS/SentenceTransformers); os caminhos disponíveis usaram fallback. Não foram executados nesta rodada: cobertura, suíte integrada separada, Ruff, Bandit, actionlint/zizmor ou CI hospedado.
+
+Comandos executados (na raiz da cópia):
+
+```sh
+PY=/workspace/.isolated/pr47-ci-venv/bin/python
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 $PY -m unittest -v test_knowledge_graph_projection_preflight_contract test_graph_relation_preflight_contract test_audit_atomic_restore_regression test_targeted_mutation_contract
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 $PY -m unittest discover -p 'test_*.py'
+REPORT=/tmp/nexus-pr115-followup-mutation-20261101.json PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 $PY - <<'PY'
+import os
+from pathlib import Path
+from tools import targeted_mutation
+targeted_mutation.REPORT = Path(os.environ["REPORT"])
+raise SystemExit(targeted_mutation.main())
+PY
+```
+
+**Mutation gate:** `tools.targeted_mutation.main()` rodou com a cópia temporária própria do harness e relatório redirecionado para `/tmp/nexus-pr115-followup-mutation-20261101.json`, fora do checkout. Resultado: 131/131 entradas aplicáveis mortas, 0 sobreviventes, 0 timeouts, 0 não aplicadas; 128 alterações-fonte únicas. O mutante `kg_projection_preflight_without_temporal_store` foi morto pelo teste designado. Relatório SHA-256 `84b1a7ace9aca484d9e766adaaaf5e9ad2882e411d55c319bd1a3441ec78da34`.
+
+**Artefatos e limites:** o preflight pós-alteração calculou em memória `AUDIT_REALITY_REPORT.md` e `audit_reality.json`; ambos ficaram byte a byte idênticos aos rastreados, sem escrita. A limitação já documentada permanece: round-trip/exportação de metadados com 490 níveis pode emitir `RecursionError` no runner Python 3.12.3; este follow-up não adiciona teto, não corrige essa limitação e não promete round-trip extremo. O teste renomeado cobre atomicidade/estado em memória, não restauração de metadados extremos. Nenhuma publicação, push, atualização de PR, merge ou mudança de `main` ocorreu.
+
 ## Reconstrução local da pilha sobre a #47 atualizada — 2026-10-31 a 2026-11-01
 
 **Identidade e isolamento:** cópia independente `/workspace/Nexus-stack-rebuild-20261031`,
