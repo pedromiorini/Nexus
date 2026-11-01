@@ -12,6 +12,12 @@ O Nexus Constitutional é um **protótipo experimental de arquitetura neuro-simb
 
 Na branch local `fix/audit-atomic-restore-20261019`, derivada de `f025204339b3dc5ae1f345e98be7f6f7fbcb2498`, a correção temporal em `e8af0ac3da71fa62bebdbcae2f110a7365af2535` mede **433/433 testes**, sem falhas/skips, em Python 3.11.16 com lock; integração separada 30 aprovações + 1 skip FAISS. Gates e limites estão em [CONTINUATION.md](CONTINUATION.md#auditoria-temporal-local--2026-10-19). Não há teto 64 novo: D-030 permanece, e o problema de contexto profundo da fila continua aberto. É um follow-up não publicado, com revisão final de Segurança pendente; não altera os resultados históricos abaixo nem o candidato #46.
 
+> Proveniência: histórico da cadeia original sobre a base antiga `2ba63f3`; não descreve os heads remotos atuais nem o estado desta composição reconstruída.
+
+## Checkpoint histórico da pilha original #48–#49 — 2026-10-19
+
+No checkpoint documental de origem, a PR #48 (`fix/reasoning-budget-completion-20261019`) era registrada como OPEN/draft no head `b2f5bd16cb8b529b8b1df2a61576037837912e39`, baseada na #47 em `2ba63f3041a7f8e001b69c8363856a5178d8a308`. A continuação local acrescenta A06 (`9fea97cd188b8f7212eb88455747ca8a1b3bb220`), A07 (`8c4f6a8057ee4d6a5497fa2df54c26725d9ef66d`) e a atualização documental do inventário (`0683251bea8902521bdc4d055b97c60ba1954e5a`); naquele registro, esses commits seguintes permaneciam locais, sem publicação ou merge. Comandos, medições e limites por checkpoint estão em [CONTINUATION.md](CONTINUATION.md). Esta cadeia local não altera `main` nem substitui o CI remoto.
+
 ## Evidências locais da composição — 2026-10-18
 
 Resultados medidos no candidato `3ddc68d06853ba211bb6c04a02743565c28bd19c`, branch `audit/consolidated-38-45-20261018`, em Python 3.11.16 com o lock instalado com hashes. Inventário, comandos, ambiente e limites estão em [AUDIT_COMPOSITION.md](AUDIT_COMPOSITION.md#evidência-combinada); logs e manifesto desse commit estão em `/workspace/nexus-consolidation-evidence/`. Esta é uma validação local (`ci_run=not_ci`), não uma execução de CI remoto nem o estado publicado de `main`.

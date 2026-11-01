@@ -52,6 +52,9 @@ class DeferredTaskQueue:
         self._lock = threading.RLock()
 
     def enqueue(self, prompt: str, context: Optional[Dict[str, Any]] = None, priority: int = 0, reason: str = "") -> DeferredTask:
+        """Exige prioridade int built-in; contexto mantém deepcopy arbitrário em memória."""
+        if type(priority) is not int:
+            raise ValueError("priority deve ser um inteiro built-in")
         with self._lock:
             if len(self._heap) >= self.max_size:
                 self._stats["discarded"] += 1
