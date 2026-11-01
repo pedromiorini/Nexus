@@ -51,6 +51,14 @@ class StateConsistencyAuditTests(unittest.TestCase):
         self.assertEqual(report["status"], "pass")
         self.assertTrue(report["historical_text_ignored"])
 
+        local_directory, local_manifest = self._write_fixture()
+        local_payload = json.loads(local_manifest.read_text(encoding="utf-8"))
+        local_payload["ci"]["run_id"] = "not_ci"
+        local_manifest.write_text(json.dumps(local_payload), encoding="utf-8")
+        local_report = audit(local_manifest, local_directory)
+        self.assertEqual(local_report["status"], "pass")
+        self.assertEqual(local_report["manifest"]["ci_run"], "not_ci")
+
     def test_divergent_test_count_is_a_conflict(self):
         directory, manifest = self._write_fixture(
             marker_overrides={"NEXUS_EVIDENCE.md": {"tests": "105"}}
@@ -107,6 +115,15 @@ class StateConsistencyAuditTests(unittest.TestCase):
         self.assertEqual(report["status"], "fail")
         fields = {item["field"] for item in report["conflicts"]}
         self.assertEqual(fields, {"bandit_low", "commit"})
+
+        overrides = {name: {"ci_run": "not_ci"} for name in DOCUMENTS}
+        directory, manifest = self._write_fixture(marker_overrides=overrides)
+        report = audit(manifest, directory)
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(
+            {(item["document"], item["field"]) for item in report["conflicts"]},
+            {(name, "ci_run") for name in DOCUMENTS},
+        )
 
     def test_marker_contract_fails_closed_for_missing_or_duplicate_claims(self):
         directory, manifest = self._write_fixture()
