@@ -4,9 +4,9 @@
 # Versões diretas alinhadas ao lock; atualizações devem regenerá-lo.
 numpy==2.4.6
 coverage==7.16.2
-hypothesis==6.170.0
+hypothesis==6.170.5
 bandit==1.9.4
-ruff==0.16.10
+ruff==0.17.1
 # Opcional em runtime; instalado aqui para não pular os contratos desse backend.
 networkx==3.6.1
 # Atualização controlada: uv pip compile --generate-hashes --python-version 3.11 \

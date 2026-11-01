@@ -44,6 +44,7 @@ TOOL_CACHE_HIT = ("test_tool_cache_hit_contract.py",)
 MEMORY_SQL = ("test_memory_sql_contract.py",)
 EPISODIC_SEARCH_LIMIT = ("test_episodic_memory_search_limits_contract.py",)
 TEMPORAL_GRAPH = ("test_temporal_graph_integration_contract.py",)
+DASHBOARD_NUMBERS = ("test_recovery_diagnostics_contract.py",)
 COPY_IGNORE = shutil.ignore_patterns(
     ".git", "__pycache__", ".venv", "venv", ".hypothesis", ".ruff_cache", ".mypy_cache",
     "*.sqlite3", "*.db", ".coverage*", "coverage.xml", "targeted_mutation_report.json",
@@ -62,8 +63,159 @@ class Mutation:
 
 MUTATIONS = [
     Mutation(
+        "registry_glob_class_scanner_budget", "tools/agente/validar_registro.py",
+        "budget.charge(1)  # Unclosed '[' atoms can repeatedly scan a suffix.", "pass",
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_glob_budget_enforced", "tools/agente/validar_registro.py",
+        "if amount > self.remaining:", "if False:",
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_glob_budget_shared", "tools/agente/validar_registro.py",
+        "conflict = overlaps(a, b, _budget=budget)",
+        "conflict = overlaps(a, b)",
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_glob_text_comparison_regression", "tools/agente/validar_registro.py",
+        "return any(_glob_intersects(x, y, budget) for x in left for y in right)",
+        "return a == b or fnmatch.fnmatchcase(a, b) or fnmatch.fnmatchcase(b, a)",
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_glob_symbolic_successors", "tools/agente/validar_registro.py",
+        "points.add(ord(char) + 1)", "pass",
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_glob_consumption_intersection", "tools/agente/validar_registro.py",
+        "if lm & rm:", "if True:",
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_glob_left_star_epsilon", "tools/agente/validar_registro.py",
+        "pending.append((i + 1, j))", "pass",
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_glob_right_star_epsilon", "tools/agente/validar_registro.py",
+        "pending.append((i, j + 1))", "pass",
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_glob_recursive_parent", "tools/agente/validar_registro.py",
+        'left = (a, a[:-3]) if a.endswith("/**") else (a,)', 'left = (a,)',
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "predeleg_operational_exit_fail_closed", "tools/agente/predeleg.sh",
+        "if [[ $merge_rc -ne 1 ]]; then", "if false; then",
+        tests=("test_agent_guards_contract.py",),
+    ),
+    Mutation(
+        "predeleg_conflict_tree_required", "tools/agente/predeleg.sh",
+        'if [[ ! $tree =~ ^([[:xdigit:]]{40}|[[:xdigit:]]{64})$ || ${#lines[@]} -lt 2 ]]; then',
+        "if false; then", tests=("test_agent_guards_contract.py",),
+    ),
+    Mutation(
+        "predeleg_conflict_paths_validated", "tools/agente/predeleg.sh",
+        'if [[ -z $path || $path == /* || $path =~ [[:cntrl:]] || "/$path/" == *"/../"* || "/$path/" == *"/./"* ]]; then',
+        "if false; then", tests=("test_agent_guards_contract.py",),
+    ),
+    Mutation(
+        "preflight_status_failure_nonzero", "tools/agente/preflight_rotina.sh",
+        'echo "MODO=abortar motivo=status"; exit 3',
+        'echo "MODO=abortar motivo=status"; exit 0', tests=("test_agent_guards_contract.py",),
+    ),
+    Mutation(
+        "preflight_unknown_cloud_status_rejected", "tools/agente/preflight_rotina.sh",
+        "if [[ $NUVEM_STATUS != ok && $NUVEM_STATUS != blocked ]]; then",
+        "if false; then", tests=("test_agent_guards_contract.py",),
+    ),
+    Mutation(
+        "graph_relation_keyword_key_preflight", "core/constitutional_brain.py",
+        "if any(not isinstance(key, str) for key in properties):", "if False:",
+        tests=("test_graph_relation_preflight_contract.py",),
+    ),
+    Mutation(
+        "graph_relation_keyword_collision_preflight", "core/constitutional_brain.py",
+        'if any(key in properties for key in ("self", "u_of_edge", "v_of_edge")):', "if False:",
+        tests=("test_graph_relation_preflight_contract.py",),
+    ),
+    Mutation(
+        "graph_relation_self_collision_preflight", "core/constitutional_brain.py",
+        'if any(key in properties for key in ("self", "u_of_edge", "v_of_edge")):',
+        'if any(key in properties for key in ("u_of_edge", "v_of_edge")):',
+        tests=("test_graph_relation_preflight_contract.py",),
+    ),
+    Mutation(
         "queue_max_attempts_positive",
         "core/deferred_task_queue.py",
+        "type(max_attempts) is not int\n            or max_attempts < 1\n            or type(max_size) is not int",
+        "type(max_attempts) is not int\n            or max_attempts < 0\n            or type(max_size) is not int",
+    ),
+    Mutation(
+        "registry_last_seen_calendar", "tools/agente/validar_registro.py",
+        "date.fromisoformat(last_seen)", "pass",
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_last_seen_canonical_format", "tools/agente/validar_registro.py",
+        're.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", last_seen)', 'True',
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_last_seen_string_type", "tools/agente/validar_registro.py",
+        'not isinstance(last_seen, str)', 'False',
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_optional_uid_type", "tools/agente/validar_registro.py",
+        'not isinstance(ag["uid"], str)', 'False',
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "registry_optional_uid_nonempty", "tools/agente/validar_registro.py",
+        'or not ag["uid"]', 'or False',
+        tests=("test_agent_registry_contract.py",),
+    ),
+    Mutation(
+        "dashboard_float_finiteness_guard", "tools/diagnostics_dashboard.py",
+        "if not math.isfinite(value):", "if False:", tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "dashboard_stdin_float_decoder", "tools/diagnostics_dashboard.py",
+        "json.load(sys.stdin, parse_float=_parse_finite_float,",
+        "json.load(sys.stdin, parse_float=float,", tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "dashboard_file_float_decoder", "tools/diagnostics_dashboard.py",
+        "        parse_float=_parse_finite_float, parse_constant=_reject_json_constant,",
+        "        parse_float=float, parse_constant=_reject_json_constant,", tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "dashboard_stdin_constant_decoder", "tools/diagnostics_dashboard.py",
+        "json.load(sys.stdin, parse_float=_parse_finite_float, parse_constant=_reject_json_constant)",
+        "json.load(sys.stdin, parse_float=_parse_finite_float)", tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "dashboard_file_constant_decoder", "tools/diagnostics_dashboard.py",
+        "        parse_float=_parse_finite_float, parse_constant=_reject_json_constant,",
+        "        parse_float=_parse_finite_float,", tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "embedded_assert_only_module_level_guards",
+        "tools/embedded_assert_audit.py",
+        "for node in tree.body:",
+        "for node in ast.walk(tree):",
+        tests=("test_embedded_assert_audit.py",),
+    ),
+    # Historical main alias of queue_max_attempts_positive; same semantic mutant.
+    # Narrow the anchor to the constructor: restore also contains max_attempts < 1.
+    Mutation(
+        "queue_capacity_guard", "core/deferred_task_queue.py",
         "type(max_attempts) is not int\n            or max_attempts < 1\n            or type(max_size) is not int",
         "type(max_attempts) is not int\n            or max_attempts < 0\n            or type(max_size) is not int",
     ),

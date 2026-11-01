@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -26,14 +27,17 @@ class IntegratedSuiteTally:
         self._buffer = ""
         self.passed: set[str] = set()
         self.skipped: set[str] = set()
+        self._terminal_counts: Counter[str] = Counter()
 
     def _record_line(self, line: str) -> None:
         passed = _PASS_LINE.search(line)
         if passed:
             self.passed.add(passed.group(1))
+            self._terminal_counts[passed.group(1)] += 1
         skipped = _SKIP_LINE.search(line)
         if skipped:
             self.skipped.add(skipped.group(1))
+            self._terminal_counts[skipped.group(1)] += 1
 
     def write(self, text: str) -> int:
         written = self._stream.write(text)
@@ -67,7 +71,8 @@ class IntegratedSuiteTally:
         missing = expected - passed - skipped
         unexpected = (self.passed | self.skipped) - expected
         conflicting = passed & skipped
-        failed = bool(missing or unexpected or conflicting)
+        duplicates = {check_id for check_id, count in self._terminal_counts.items() if count > 1}
+        failed = bool(missing or unexpected or conflicting or duplicates)
         return {
             "schema_version": 1,
             "scope": "embedded checks of core/constitutional_brain.py (integrated suite)",
@@ -77,6 +82,7 @@ class IntegratedSuiteTally:
             "missing": _sort_check_ids(missing),
             "unexpected": _sort_check_ids(unexpected),
             "conflicting": _sort_check_ids(conflicting),
+            "duplicates": _sort_check_ids(duplicates),
             "result": "failed" if failed else "passed",
         }
 

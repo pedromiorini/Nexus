@@ -35,7 +35,7 @@ class SummaryResult(unittest.TextTestResult):
             "failed": failed,
             "skipped": skipped,
             "unexpected_successes": len(unexpected_successes),
-            "result": "passed" if self.wasSuccessful() else "failed",
+            "result": "passed" if self.testsRun > 0 and self.wasSuccessful() else "failed",
         }
 
 

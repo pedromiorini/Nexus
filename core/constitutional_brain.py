@@ -623,11 +623,17 @@ class RealKnowledgeGraph:
                      *, source: str = "observation",
                      valid_from: Optional[float] = None) -> Relation:
         """Adicionar relação direcionada entre entidades."""
+        # Valide os kwargs do backend antes de gravar o ledger ou a projeção.
+        # O fallback não usa kwargs e preserva seu contrato legado de propriedades.
+        if self.nx:
+            properties = dict(properties or {})
+            if any(not isinstance(key, str) for key in properties):
+                raise TypeError("NetworkX relation property keys must be strings")
+            if any(key in properties for key in ("self", "u_of_edge", "v_of_edge")):
+                raise TypeError("NetworkX relation properties collide with edge parameters")
         # A integração é opt-in. Registre antes de criar entidades ou alterar índices,
         # para que entradas temporais inválidas não deixem uma projeção parcial.
         if self.temporal_store is not None:
-            if self.nx:
-                properties = dict(properties or {})
             self.temporal_store.assert_fact(
                 source_id,
                 relation_type,
@@ -16351,14 +16357,43 @@ class MetaKnowledge:
     adaptation_speed: float  # How fast it adapts to new tasks
     generalization_score: float  # How well it generalizes
     
+def _require_finite_real(value: Any, field_name: str, upper: Optional[float] = None) -> None:
+    """Rejeita bool, não-reais, NaN, infinitos e valores fora do intervalo.
+
+    O valor armazenado não é convertido. ``upper is None`` impõe apenas ``>= 0``.
+    """
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise TypeError(
+            f"{field_name} must be a real number, not {type(value).__name__}"
+        )
+    try:
+        number = float(value)
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise TypeError(f"{field_name} must be a real number") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{field_name} must be finite")
+    if number < 0.0:
+        raise ValueError(f"{field_name} must be non-negative")
+    if upper is not None and number > upper:
+        raise ValueError(f"{field_name} must be in [0, {upper}]")
+
+
 @dataclass
-class TransferMapping:
-    """Mapeamento de transferência entre domínios"""
+class MetaTransferMapping:
+    """Mapeamento de transferência entre domínios (POST 38).
+
+    Classe distinta de TransferMapping (POST 48). As duas formas ocupavam o
+    mesmo nome e a definição posterior sombreava esta na busca global.
+    """
     source_domain: str
     target_domain: str
     transfer_strength: float  # 0-1
     shared_features: List[str]
     adaptation_required: float  # 0-1
+
+    def __post_init__(self) -> None:
+        _require_finite_real(self.transfer_strength, "transfer_strength", upper=1.0)
+        _require_finite_real(self.adaptation_required, "adaptation_required", upper=1.0)
 
 class RealMetaLearningStrategies:
     """
@@ -16407,7 +16442,7 @@ class RealMetaLearningStrategies:
         self.task_performance: Dict[str, float] = {}
         
         # Transfer mappings
-        self.transfer_mappings: List[TransferMapping] = []
+        self.transfer_mappings: List[MetaTransferMapping] = []
         
         # Learning strategies
         self.active_strategies: Dict[str, float] = {
@@ -16560,7 +16595,7 @@ class RealMetaLearningStrategies:
         else:
             return 0.4
     
-    def transfer_knowledge(self, source_domain: str, target_domain: str) -> TransferMapping:
+    def transfer_knowledge(self, source_domain: str, target_domain: str) -> MetaTransferMapping:
         """
         Transferir conhecimento entre domínios.
         
@@ -16569,8 +16604,13 @@ class RealMetaLearningStrategies:
             target_domain: Domínio alvo
         
         Returns:
-            TransferMapping criado
+            MetaTransferMapping criado
         """
+        if not isinstance(source_domain, str):
+            raise TypeError("source_domain must be a string")
+        if not isinstance(target_domain, str):
+            raise TypeError("target_domain must be a string")
+
         # Identificar features compartilhadas
         shared_features = self._identify_shared_features(source_domain, target_domain)
         
@@ -16581,7 +16621,7 @@ class RealMetaLearningStrategies:
         # Calcular adaptação necessária
         adaptation_required = 1.0 - transfer_strength
         
-        mapping = TransferMapping(
+        mapping = MetaTransferMapping(
             source_domain=source_domain,
             target_domain=target_domain,
             transfer_strength=transfer_strength,
@@ -20535,12 +20575,20 @@ class SourceDomain:
     
 @dataclass
 class TransferMapping:
-    """Mapeamento de transferência"""
+    """Mapeamento de transferência (POST 48).
+
+    O nome público permanece esta forma, que já era a ligação do módulo
+    depois do import. ``transfer_quality`` é finito e não negativo; a
+    heurística de cobertura pode ultrapassar 1.
+    """
     mapping_id: str
     source_domain: str
     target_domain: str
     transferable_knowledge: List[str]
-    transfer_quality: float  # 0-1
+    transfer_quality: float
+
+    def __post_init__(self) -> None:
+        _require_finite_real(self.transfer_quality, "transfer_quality")
     
 @dataclass
 class TransferResult:

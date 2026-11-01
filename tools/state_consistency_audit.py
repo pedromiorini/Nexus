@@ -26,6 +26,10 @@ MARKER_RE = re.compile(
 MARKER_START_RE = re.compile(r"<!--\s*NEXUS-CURRENT-STATE\b")
 LINE_RE = re.compile(r"^\s*(?P<key>[a-z][a-z0-9_]*)\s*:\s*(?P<value>\S+)\s*$")
 REQUIRED = {"commit", "ci_run", "tests", "bandit_low"}
+# Sentinelas resolvidas a partir do manifesto do CI. Cada uma só é válida no próprio
+# campo; números literais continuam exigindo igualdade exata. ``CURRENT_TESTS`` evita
+# que cada PR que adiciona testes edite o contador nos quatro documentos (decisão D1).
+SENTINELS = {"commit": "HEAD", "ci_run": "CURRENT_RUN", "tests": "CURRENT_TESTS"}
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -150,14 +154,20 @@ def audit(manifest_path: Path, root: Path = ROOT) -> dict[str, Any]:
     documents: dict[str, dict[str, str]] = {}
     conflicts: list[dict[str, str]] = []
     errors = _operational_errors(manifest)
+    bandit_low = manifest["security"]["bandit"]["severity"]["LOW"]
+    bandit_low_valid = type(bandit_low) is int and bandit_low >= 0
+    if not bandit_low_valid:
+        errors.append("manifesto: security.bandit.severity.LOW deve ser inteiro built-in não negativo")
     for name in DOCUMENTS:
         path = root / name
         try:
             claims = _parse_marker(path.read_text(encoding="utf-8"), name)
             documents[name] = claims
             for field in sorted(REQUIRED):
+                if field == "bandit_low" and not bandit_low_valid:
+                    continue
                 value = claims[field]
-                resolved = expected[field] if value in {"HEAD", "CURRENT_RUN"} else value
+                resolved = expected[field] if value == SENTINELS.get(field) else value
                 if resolved != expected[field]:
                     conflicts.append({
                         "document": name,

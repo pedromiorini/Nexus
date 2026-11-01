@@ -3,8 +3,9 @@
 <!-- NEXUS-CURRENT-STATE
 commit: HEAD
 ci_run: CURRENT_RUN
-tests: 439
+tests: CURRENT_TESTS
 bandit_low: 135
+pr47_source_marker_tests: 439
 -->
 
 > This is a conservative inventory, not a clearance report. Findings remain open until reviewed and fixed or explicitly justified.

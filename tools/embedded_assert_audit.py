@@ -2,7 +2,8 @@
 
 O auditor não declara os asserts seguros nem os suprime. Ele apenas evita que
 novos asserts de demonstração apareçam fora do bloco ``if __name__ == '__main__'``
-e fornece um inventário reproduzível para a migração incremental.
+no corpo direto do módulo e fornece um inventário reproduzível para a migração
+incremental. Guardas aninhadas não criam faixas de exceção.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from typing import Any
 def _main_block_ranges(source: str) -> list[tuple[int, int]]:
     tree = ast.parse(source)
     ranges: list[tuple[int, int]] = []
-    for node in ast.walk(tree):
+    for node in tree.body:
         if not isinstance(node, ast.If) or not isinstance(node.test, ast.Compare):
             continue
         test = node.test

@@ -17,8 +17,8 @@ def audit(source: str, filename: str) -> dict[str, Any]:
             body = [item for item in node.body if not isinstance(item, ast.Expr) or not isinstance(getattr(item, "value", None), ast.Constant)]
             if len(body) == 1 and isinstance(body[0], ast.Pass):
                 pass_only.append({"name": node.name, "line": node.lineno})
-        if isinstance(node, ast.Raise) and isinstance(node.exc, ast.Call):
-            func = node.exc.func
+        if isinstance(node, ast.Raise):
+            func = node.exc.func if isinstance(node.exc, ast.Call) else node.exc
             if isinstance(func, ast.Name) and func.id == "NotImplementedError":
                 not_implemented.append({"line": node.lineno})
             elif isinstance(func, ast.Attribute) and func.attr == "NotImplementedError":
