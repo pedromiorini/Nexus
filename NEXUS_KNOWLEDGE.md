@@ -286,6 +286,10 @@ No baseline deste checkout, isolamento de referências aninhadas, timestamps fin
 
 Não inferir isolamento geral da fila: `enqueue()` ainda usa `deepcopy` sobre o contexto recebido e tarefas podem continuar mutáveis fora da fronteira de snapshot. Não foi criado limite de bytes/profundidade; o parser/encoder padrão pode rejeitar aninhamento extremo. A origem do dict/list deve ser sincronizada durante snapshot se exigir consistência contra escrita concorrente. Não há callsite de produção de restore encontrado neste checkout; a branch não foi publicada e ainda não tem CI oficial.
 
+## Histórico: follow-up F-04 local — 2026-10-19 (não é estado atual)
+
+Uma WIP anterior baseada em `6d145ccb7a7b2cb50ea0c1bbd1a5b38034d854e1` preservou D-030 sem impor teto fixo de profundidade, inclusive 64, e adicionou preflight JSON antes de publicar estado. A suíte então reportada foi 439/439; esse número é histórico, não o estado desta branch. Compatibilidade com snapshots externos, corpus e migração não foram avaliados. Ver o [registro histórico de evidências](NEXUS_EVIDENCE.md) e o apêndice de `CONTINUATION.md`.
+
 ## Inventário de `NotImplementedError` como classe — 2026-10-21
 
 `tools/implementation_gap_audit.py` reconhece alvos explícitos de `raise` com nome `NotImplementedError` ou atributo final `.NotImplementedError`, com ou sem chamada. Contabiliza o alvo uma vez e não a causa `from`; não executa fonte, resolve aliases ou distingue shadowing. O schema/retorno CLI e a classificação pass-only permanecem intactos. Cinco métodos em `test_implementation_gap_raise_class_contract.py` protegem positivos e negativos; na base `d435083bb4c893a58128cee6cfa00f65bba7fe02` quatro falham e após a correção passam.

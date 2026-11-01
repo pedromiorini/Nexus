@@ -7,6 +7,13 @@ log; ``known_at`` reconstrói o que o sistema acreditava em um instante passado.
 Predicados funcionais (um valor por vez, ex.: "mora_em") substituem o valor
 anterior; os demais são multivalorados e apenas acumulam.
 
+Domínio numérico: tempos (incluindo relógio, escrita, snapshots e consultas)
+aceitam floats finitos e inteiros exatamente representáveis como float, isto é,
+int(float(x)) == x. Bool, inteiros não exatos e fora da faixa float geram
+ValueError antes de alterar o estado; não há arredondamento silencioso de int.
+Confidence mantém o domínio finito [0, 1]. Compatibilidade com snapshots externos
+é desconhecida: inteiros temporais antes aceitos com perda agora são rejeitados.
+
 Limites: a substituição é determinística ("o mais recente vence"), sem arbitragem
 por confiança; a cadeia de hash detecta edição e remoção no meio, mas truncamento
 final só é detectado com ``expected_head`` guardado fora do arquivo; as consultas
@@ -20,6 +27,8 @@ import json
 import math
 import threading
 import time
+from bisect import bisect_left
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -27,6 +36,14 @@ SCHEMA = "nexus.temporal_facts.v1"
 GENESIS = "0" * 64
 _FACT_KEYS = frozenset({"fact_id", "subject", "predicate", "object", "valid_from", "valid_to",
                         "recorded_at", "confidence", "source", "superseded_by", "metadata"})
+
+
+_EVENT_KEYS = {
+    "assert": frozenset({"seq", "prev", "hash", "kind", "recorded_at", "fact"}),
+    "close": frozenset({"seq", "prev", "hash", "kind", "recorded_at", "fact_id", "valid_to",
+                        "superseded_by"}),
+    "corroborate": frozenset({"seq", "prev", "hash", "kind", "recorded_at", "fact_id", "source"}),
+}
 
 
 @dataclass(frozen=True)
@@ -57,9 +74,18 @@ def _reject_constant(name: str) -> Any:
 
 
 def _number(value: Any, name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    """Converte somente números finitos, sem perda de precisão de inteiros."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{name} deve ser um número finito")
-    return float(value)
+    try:
+        number = float(value)
+    except OverflowError as exc:
+        raise ValueError(f"{name} fora da faixa de float finito") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{name} deve ser um número finito")
+    if isinstance(value, int) and int(number) != value:
+        raise ValueError(f"{name} deve ser um inteiro exatamente representável como float")
+    return number
 
 
 def _text(value: Any, name: str) -> str:
@@ -107,6 +133,26 @@ class TemporalFactStore:
         self._last_recorded = now
         return now
 
+    @contextmanager
+    def _transaction(self):
+        """Operação composta tudo-ou-nada: qualquer exceção desfaz eventos já anexados.
+
+        Chamar somente com ``self._lock`` adquirido. Cópias rasas da projeção custam
+        O(fatos + índice) por escrita; fatos são substituídos, nunca editados aqui.
+        A reversão não chama replay/deepcopy, que podem ter causado a falha original.
+        """
+        mark = (len(self._events), self._head, self._seq, self._last_recorded)
+        facts = self._facts.copy()
+        index = {key: list(ids) for key, ids in self._index.items()}
+        try:
+            yield
+        except BaseException:
+            count, head, seq, last_recorded = mark
+            del self._events[count:]
+            self._head, self._seq, self._last_recorded = head, seq, last_recorded
+            self._facts, self._index = facts, index
+            raise
+
     # ── log → projeção ───────────────────────────────────────────────────
     def _apply(self, event: Dict[str, Any]) -> None:
         kind = event["kind"]
@@ -130,7 +176,8 @@ class TemporalFactStore:
         event["seq"] = len(self._events) + 1
         event["prev"] = self._head
         event["hash"] = _digest(event)
-        self._events.append(copy.deepcopy(event))
+        stored = copy.deepcopy(event)  # pode falhar: antes de qualquer mutação do log
+        self._events.append(stored)
         self._head = event["hash"]
         self._apply(event)
 
@@ -164,7 +211,7 @@ class TemporalFactStore:
         except (OverflowError, RecursionError, TypeError, ValueError) as exc:
             raise ValueError("metadata não é serializável como JSON estrito") from exc
         requested_valid_from = None if valid_from is None else _number(valid_from, "valid_from")
-        with self._lock:
+        with self._lock, self._transaction():
             now = self._now()
             vf = now if requested_valid_from is None else requested_valid_from
             same = self._versions(subject, predicate)
@@ -203,7 +250,7 @@ class TemporalFactStore:
         if obj is not None:
             _text(obj, "object")
         requested_valid_to = None if valid_to is None else _number(valid_to, "valid_to")
-        with self._lock:
+        with self._lock, self._transaction():
             now = self._now()
             vt = now if requested_valid_to is None else requested_valid_to
             closed: List[TemporalFact] = []
@@ -270,11 +317,16 @@ class TemporalFactStore:
     def from_snapshot(cls, snapshot: Union[Dict[str, Any], str], *,
                       clock: Callable[[], float] = time.time,
                       expected_head: Optional[str] = None) -> "TemporalFactStore":
-        """Valida todo o payload (schema, cadeia, tipos, referências, invariantes) antes de devolver."""
+        """Valida payload e cada corte completo de recorded_at observável por known_at.
+
+        O índice local ordena intervalos não vazios por chave funcional. Busca de
+        vizinhos custa O(log m); inserção/remoção em lista custa O(m) no pior
+        caso, com m intervalos na chave, sem varrer o ledger a cada corte.
+        """
         if isinstance(snapshot, str):
             try:
                 snapshot = json.loads(snapshot, parse_constant=_reject_constant)
-            except ValueError as exc:
+            except (ValueError, RecursionError) as exc:
                 raise ValueError("snapshot JSON inválido") from exc
         if not isinstance(snapshot, dict) or snapshot.get("schema") != SCHEMA:
             raise ValueError("schema incompatível")
@@ -284,20 +336,57 @@ class TemporalFactStore:
         if not isinstance(events, list):
             raise ValueError("events inválido")
         store = cls(functional_predicates=funcs, clock=clock)
+        windows: Dict[Tuple[str, str], List[Tuple[float, str]]] = {}
+        indexed = set()
+        dirty = set()
+
+        def validate_cut() -> None:
+            # Remover TODOS os alterados antes de reinserir a projeção final:
+            # assert/close no mesmo timestamp pode ter overlap intermediário.
+            changed = [store._facts[i] for i in sorted(dirty)]
+            for fact in changed:
+                if fact.fact_id in indexed:
+                    entries = windows[(fact.subject, fact.predicate)]
+                    entries.pop(bisect_left(entries, (fact.valid_from, fact.fact_id)))
+                    indexed.remove(fact.fact_id)
+            for fact in changed:
+                if fact.valid_to == fact.valid_from:
+                    continue  # [t, t) é vazio, inclusive dentro de outra janela
+                entries = windows.setdefault((fact.subject, fact.predicate), [])
+                entry = (fact.valid_from, fact.fact_id)
+                pos = bisect_left(entries, entry)
+                neighbors = entries[max(0, pos - 1):pos + 1]
+                for _, other_id in neighbors:
+                    other = store._facts[other_id]
+                    if ((other.valid_to is None or fact.valid_from < other.valid_to)
+                            and (fact.valid_to is None or other.valid_from < fact.valid_to)):
+                        raise ValueError("invariantes violadas: janelas sobrepostas em "
+                                         f"({fact.subject}, {fact.predicate}) no corte "
+                                         f"recorded_at={store._last_recorded}")
+                entries.insert(pos, entry)
+                indexed.add(fact.fact_id)
+            dirty.clear()
+
         for n, raw in enumerate(events, 1):
             if not isinstance(raw, dict):
                 raise ValueError(f"evento {n} inválido")
             try:
                 chain_ok = raw.get("seq") == n and raw.get("prev") == store._head \
                     and raw.get("hash") == _digest(raw)
-            except (TypeError, ValueError) as exc:
+            except (TypeError, ValueError, RecursionError) as exc:
                 raise ValueError(f"evento {n} não serializável") from exc
             if not chain_ok:
                 raise ValueError(f"cadeia de hash inválida no evento {n}")
             recorded = _number(raw.get("recorded_at"), "recorded_at")
             if recorded < store._last_recorded:
                 raise ValueError(f"recorded_at regride no evento {n}")
+            if recorded > store._last_recorded:
+                validate_cut()
             kind = raw.get("kind")
+            if type(kind) is not str or kind not in _EVENT_KEYS:
+                raise ValueError(f"tipo de evento desconhecido no evento {n}")
+            if set(raw) != _EVENT_KEYS[kind]:
+                raise ValueError(f"campos do evento {n} inválidos para o tipo {kind!r}")
             if kind == "assert":
                 fact = raw.get("fact")
                 if not isinstance(fact, dict) or set(fact) != _FACT_KEYS:
@@ -342,10 +431,19 @@ class TemporalFactStore:
                     _text(raw.get("source"), "source")
             else:
                 raise ValueError(f"tipo de evento desconhecido no evento {n}")
-            store._events.append(copy.deepcopy(raw))
+            try:
+                stored = copy.deepcopy(raw)
+                store._apply(stored)
+            except RecursionError as exc:
+                raise ValueError(f"evento {n} excede a capacidade de cópia/replay") from exc
+            store._events.append(stored)
             store._head = raw["hash"]
             store._last_recorded = recorded
-            store._apply(raw)
+            if kind in ("assert", "close"):
+                fact_id = stored["fact"]["fact_id"] if kind == "assert" else stored["fact_id"]
+                if store._facts[fact_id].predicate in store._functional:
+                    dirty.add(fact_id)
+        validate_cut()
         for event in store._events:
             target_id = event.get("superseded_by") if event["kind"] == "close" else None
             if target_id is None:

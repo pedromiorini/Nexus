@@ -7,6 +7,22 @@ tests: CURRENT_TESTS
 bandit_low: 135
 -->
 
+## Evidência local da composição completa da PR #47 — 2026-10-31
+
+Proposta local na branch `proposal/pr47-complete-20261031`, head PR
+`4b09299a20d2752e26dafcb268d942300df5f2c8` sobre base
+`ad2f25e93a81fcb02a3a35e33a2cb0c897e82378` (merge-base
+`f025204339b3dc5ae1f345e98be7f6f7fbcb2498`). `ci_run=not_ci`: não é um run
+remoto. Suíte focada 44/44; unittest completa 596/596; suíte integrada 29
+aprovadas + 1 skip FAISS; cobertura branch 91% na fila e 96% no ledger temporal.
+Ruff, compileall, actionlint, zizmor e triagem passaram; Bandit encontrou 135
+LOW e nenhum MEDIUM/HIGH/erro. Mutação: 113/113 mortos, zero sobreviventes,
+timeouts ou não aplicados. O preflight em cópia isolada deixou ambos os relatórios
+de realidade idênticos aos da base. Resoluções, comandos, identidade e limites
+estão em [CONTINUATION.md](CONTINUATION.md#composição-local-completa-da-pr-47--2026-10-31).
+Os testes e métricas são evidência local desta árvore, não garantia de produção;
+compatibilidade de snapshots externos permanece desconhecida.
+
 ## Revalidação local sobre a3f929f — 2026-10-22
 
 Composição não commitada do head #46 `f3044bad` com a main exata `a3f929f`;
@@ -374,6 +390,16 @@ Base `d435083bb4c893a58128cee6cfa00f65bba7fe02`; branch local `fix/gap-audit-exc
 RED na base: cinco métodos novos executados, quatro afetados por oito falhas de assertivas/subcasos, um aprovado. GREEN: 24/24 contratos focados e suíte 308/308 em Python 3.11.16 e 3.12.3; integração 30 aprovadas + 1 skip opcional em ambas. Em 3.11: cobertura do auditor 94%; pisos de fila/VRAM/temporal/Vita/core aprovados (95/94/93/76/68%); mutation existente 58/58 mortas, sem sobreviventes/não aplicadas; Bandit 131 LOW, zero MEDIUM/HIGH/erros. Ruff, compileall, actionlint, zizmor, requirements dry-run, auditorias e benchmarks CLI existentes aprovados. Inventário do núcleo permanece zero pass-only e zero NotImplementedError. Não é evidência de ausência geral de lacunas, segurança completa ou capacidade cognitiva.
 
 Comandos, ambientes, limites e inventário de sobreposição estão em `CONTINUATION.md`; logs e comandos brutos em `/workspace/nexus-gap-audit-class-evidence-20261021/validation.json`, `red.log`, `green311.log`, `green312.log` e `run_gates.py`. Ambientes anteriores do lock reutilizados, sem reinstalação. Nenhum CI hospedado/push/PR/merge foi executado. WIP `window_seconds` não incorporada; `known_at` permanece pendente. Nenhuma decisão anterior foi refutada.
+
+## Registros históricos exclusivos recuperados da PR #47 — não são estado atual
+
+Estes checkpoints aparecem nos documentos do head `4b09299a20d2752e26dafcb268d942300df5f2c8`, mas não na base `ad2f25e93a81fcb02a3a35e33a2cb0c897e82378`. São WIPs/execuções locais de 2026-10-19/20, não CI hospedado nem evidência do head/base atuais. Os números abaixo são preservados apenas para proveniência; os detalhes, limitações e referências de execução estão no apêndice histórico de `CONTINUATION.md`.
+
+- **Conversão temporal int→float exata (2026-10-20):** WIP sobre `2ba63f3041a7f8e001b69c8363856a5178d8a308`; 7 regressões red (28 falhas de subcasos/20 erros) e green 7/7 em Python 3.11/3.12; suíte local 460/460, integração 30 + 1 skip FAISS, mutation 84 + 8 + 4 mortos. Compatibilidade de snapshots externos não avaliada.
+- **Restore em cada corte temporal (2026-10-19):** 14 regressões com oráculo determinístico, red com 10 falhas de subcasos e green 14/14 em 3.11/3.12; suíte local 453/453 e suplemento de mutation 8/8. Benchmark sintético e limites de custo estão descritos em `CONTINUATION.md`.
+- **Follow-up F-04 sem limite fixo (2026-10-19):** decisão D-030 sem teto de profundidade (inclusive 64); suíte local 439/439, regressões focadas 77/77 em 3.11/3.12 e suplemento 5/5. Não houve corpus externo/migração.
+- **Atomicidade temporal (2026-10-19):** implementação identificada como `e8af0ac3da71fa62bebdbcae2f110a7365af2535`; 17 testes red/green em 3.11/3.12 e suíte local 433/433 em 3.11. Sem CI hospedado nessa rodada.
+
 ## Guarda demonstrativa direta do módulo — 2026-10-20
 
 Base exata: `d435083bb4c893a58128cee6cfa00f65bba7fe02`; branch local `fix/embedded-assert-module-guard-20261020`. A regressão de função usa exatamente `def helper():\n    if __name__ == '__main__':\n        assert False\n`. Antes do patch, a faixa aninhada era aceita. Depois, nenhuma faixa é criada para essa guarda, a linha 3 fica em `assert_lines_outside_main` e `ok=False`, inclusive sem finding.

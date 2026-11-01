@@ -7,6 +7,49 @@ tests: CURRENT_TESTS
 bandit_low: 135
 -->
 
+## Composição local completa da PR #47 — 2026-10-31
+
+**Identidade:** branch local `proposal/pr47-complete-20261031`; head PR
+`4b09299a20d2752e26dafcb268d942300df5f2c8`; base remota observada
+`ad2f25e93a81fcb02a3a35e33a2cb0c897e82378`; merge-base
+`f025204339b3dc5ae1f345e98be7f6f7fbcb2498`. O commit local de composição tem
+o head da PR e a base como pais. O delta final versus a base contém somente os
+12 paths autorizados; o ajuste de workflow da PR já coincide com a base. Nenhuma
+ref remota, PR, `main` ou o checkout protegido foi alterada; não houve publicação.
+
+**Resolução documental:** `CONTINUATION.md`, `NEXUS_EVIDENCE.md` e
+`NEXUS_KNOWLEDGE.md` preservam o estado da base e mantêm checkpoints da PR como
+históricos, sem substituir contagens atuais. `SECURITY_TRIAGE.md` mantém
+`tests: CURRENT_TESTS` e `bandit_low: 135`; a contagem `439` da origem aparece
+somente em `pr47_source_marker_tests`. No `README.md`, o registro 433/433 da
+branch de 19-10 foi rotulado explicitamente como histórico, não estado da #47.
+
+**Verificações locais:** os quatro módulos focados passaram (44/44); a suíte
+completa passou (596/596) com a venv temporária baseada no `requirements-ci.lock`
+em Python 3.12.3. A suíte integrada passou 29 verificações e ignorou uma
+verificação opcional de FAISS. Cobertura branch: fila 91%, fatos temporais 96%
+(pisos 90%). Passaram `ruff check`, `compileall`, o gate Bandit/triagem (135 LOW,
+0 MEDIUM/HIGH/erros), `actionlint`, `zizmor` e mutação (113/113 aplicados e
+mortos; zero sobreviventes, timeouts ou não aplicados). Comandos principais:
+`coverage run --branch -m unittest discover -p 'test_*.py'`,
+`coverage run --append --branch core/constitutional_brain.py`,
+`coverage report --include=core/deferred_task_queue.py` e
+`coverage report --include=core/temporal_facts.py`,
+`ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`,
+`python -m compileall -q core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`,
+`python tools/targeted_mutation.py`, `actionlint .github/workflows/*.yml` e
+`zizmor --offline --no-progress .github/workflows`.
+
+**Artefatos e limites:** o preflight isolado de `tools/reality_audit.py` gerou
+`AUDIT_REALITY_REPORT.md` e `audit_reality.json` byte a byte idênticos à base;
+portanto o delta final não contém atualização desses artefatos. O check de whitespace do delta contra a
+base passa. O check bruto do índice, relativo ao head da PR, também aponta uma
+linha vazia final em `docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md:235`, arquivo
+importado sem mudança da base; não foi tocado. Não havia Python 3.11 neste
+ambiente e não foi executado CI remoto. Compatibilidade com snapshots externos
+não foi avaliada; o preflight JSON continua limitado pela capacidade do encoder,
+sem um teto novo de bytes/nós ou garantia de latência.
+
 ## Revalidação local da composição sobre a3f929f — 2026-10-22
 
 **Identidade:** clone independente `/workspace/Nexus-pr46-revalidation-a3f929f-20261022`,
@@ -933,6 +976,26 @@ Entregar a integração VRAM local para aprovação posterior. Não há autoriza
 - **Reprodução:** evidência em `/workspace/nexus-gap-audit-class-evidence-20261021/`: contrato prévio, inventário, RED/GREEN, logs, `run_gates.py` e `validation.json` com comandos/saídas/durações. `PY=/workspace/nexus-window-exact-evidence/venv311/bin/python`; `PYTHONPATH=.`; audit DB e cobertura externos. Focado: `$PY -m unittest -v test_implementation_gap_raise_class_contract.py test_implementation_gap_audit.py test_reality_audit.py`; amplo: `$PY /workspace/nexus-gap-audit-class-evidence-20261021/run_gates.py`.
 - **Limites e decisão:** o falso negativo foi concretamente demonstrado; nenhuma decisão anterior foi refutada. Sem revisão independente final adicional: correção AST de duas linhas, sem execução do fonte, dependência ou mudança operacional. Hash final, diff congelado e verificação pós-commit ficam no handoff externo para evitar autorreferência. CI hospedado não foi executado; publicação exige autorização do owner para o diff/hash exatos.
 - **Atestação local:** `tools/state_manifest.py --output /workspace/nexus-gap-audit-class-evidence-20261021/STATE_MANIFEST-local.json --test-result passed --test-command 'python tools/test_summary.py --output test-summary.json'` retornou 0; `tools/state_consistency_audit.py --manifest .../STATE_MANIFEST-local.json --output .../state-consistency.json` retornou 1, com zero conflitos documentais e exatamente `manifesto: ci.gates_status deve ser 'success'`. O valor real é `not_ci`; não se fabricou run nem status de gates hospedados. Checagem separada dos quatro marcadores confirmou `tests=308` e `bandit_low=131`. O manifesto pré-commit identifica a base, não um commit contendo a WIP.
+
+## Histórico exclusivo preservado da PR #47 (não é estado atual)
+
+Os registros abaixo foram recuperados do conteúdo documental no head da PR #47 (`4b09299a20d2752e26dafcb268d942300df5f2c8`) e não constam na base `ad2f25e93a81fcb02a3a35e33a2cb0c897e82378`. Descrevem WIPs e medições locais de 2026-10-19/20, não o código do head da PR, a base corrente ou esta proposta; não são CI hospedado. As contagens são históricas e não substituem o bloco `NEXUS-CURRENT-STATE` nem o manifesto do commit validado.
+
+### Domínio temporal int→float exato — checkpoint local de 2026-10-20
+
+A WIP `fix/audit-json-preflight-20261019` partia de `2ba63f3041a7f8e001b69c8363856a5178d8a308` (pai `6d145ccb7a7b2cb50ea0c1bbd1a5b38034d854e1`). `_number` passou a rejeitar conversões de inteiros para `float` que perdem exatidão, além de overflow e valores não finitos, antes de mutar estado; `bool` continuou inválido. `2**53`, `2**53+2` e `2**100` eram aceitos; `2**53+1`, inteiro negativo inexato e `10**400` eram rejeitados. Sete métodos de regressão produziram 28 falhas de subcasos/20 erros na WIP anterior e passaram 7/7 em Python 3.11.16 e 3.12.3; focados 71/71 no 3.11 e 65/65 no 3.12 (sem integração do grafo nesta última execução). A rodada local `20261020T044513Z-733506` registrou 460/460 testes, integração 30 aprovados + 1 skip FAISS, mutação canônica 84/84, suplementos 8/8 e 4/4, e Bandit 135 LOW/0 MEDIUM/HIGH. A compatibilidade com snapshots externos permaneceu desconhecida; não houve corpus externo ou migração. Logs declarados então: `/workspace/nexus-temporal-exact-int-20261020-evidence/`.
+
+### Restore temporal consistente em todo corte — checkpoint local de 2026-10-19
+
+Na WIP baseada em `2ba63f3041a7f8e001b69c8363856a5178d8a308`, o restore passou a verificar sobreposição funcional após cada grupo completo de `recorded_at`, pois `known_at` inclui eventos até o corte; eventos no mesmo timestamp não são validados em ordem interna. Quatorze regressões, incluindo 80 ledgers determinísticos com seed `20261019`, tiveram 10 falhas de subcasos na base e passaram 14/14 em Python 3.11.16 e 3.12.3. A rodada ampla local reportou 453/453, integração 30 + 1 skip FAISS e 8/8 mutantes suplementares mortos. Benchmark sintético para 4.000 chaves distintas mediu medianas terminal/local/global de 0,186/0,217/15,588 s; para 4.000 intervalos adjacentes de uma chave, 0,187/0,213/4,133 s em ordem crescente e 0,207/0,223/4,261 s em ordem reversa. A referência global por evento também rejeitava incorretamente assert+close no mesmo timestamp; esses números não garantem latência e não são uma solução alternativa correta. Compatibilidade externa e migração não foram avaliadas. Evidência externa então apontada em `/workspace/nexus-temporal-cuts-20261019-evidence/`.
+
+### Follow-up F-04 sem teto fixo — checkpoint local de 2026-10-19
+
+O follow-up baseado em `6d145ccb7a7b2cb50ea0c1bbd1a5b38034d854e1` preservou D-030: sem novo limite fixo de profundidade, inclusive 64. O restore executava preflight de serialização JSON antes de publicar tarefas/estado, e o export convertia falhas de recursão em `ValueError`. O caso de 5.000 níveis falhava no encoder Python 3.11.16 e era aceito no 3.12.3; 10.000 níveis falhavam controladamente em ambos. Seis regressões passaram 77/77 focados em 3.11 e 3.12; a suíte local foi 439/439, integração 30 + 1 skip FAISS e suplemento F-04 5/5 mutantes mortos. Isso não estabeleceu limite de bytes/nós nem compatibilidade geral; nenhum corpus externo ou migração foi avaliado. Logs declarados então: `/workspace/nexus-json-preflight-20261019-evidence/`.
+
+### Atomicidade temporal local — checkpoint de 2026-10-19
+
+O registro descrevia a branch `fix/audit-atomic-restore-20261019`, derivada de `f025204339b3dc5ae1f345e98be7f6f7fbcb2498`, com implementação `e8af0ac3da71fa62bebdbcae2f110a7365af2535`. `assert_fact`/`retract` revertiam eventos, head, sequência, watermark, fatos e índice diante de exceções; o restore validava cortes temporais e rejeitava campos extras. Dezessete testes finais passaram em Python 3.11.16/3.12.3 (na base, 10 falhas/6 erros em 3.11 e 11 falhas/6 erros em 3.12); a suíte local 3.11 foi 433/433, com integração 30 + 1 skip FAISS e suplemento temporal 12/12 mutantes mortos. Não houve CI hospedado nessa rodada. As limitações de compatibilidade externa, recursos extremos e concorrência permaneciam abertas; logs declarados então: `/workspace/nexus-audit-20261019-evidence/`.
 
 
 ## Proveniência histórica dos inventários de segurança reconciliados
