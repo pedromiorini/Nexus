@@ -7,6 +7,46 @@ tests: CURRENT_TESTS
 bandit_low: 135
 -->
 
+## Reflow local das âncoras do mutation gate — 2026-11-01
+Na cópia isolada `/workspace/Nexus-stack-rebuild-20261031`, sobre a #47
+`995f3d7db87de007ffc499fb07534207894c32ad`, #48 permanece em
+`0998445d3598f9c4cacb64214f307d0626325471`; #49 foi reconstruída em
+`1aa56fb62334e4328eaba7cf513536e46d76bd7a`, #50 em
+`09b9889241405fb611ad3b89e2cb25ab1d108d27` e o commit funcional de #115 em
+`69a786fa5c36e5f434a911d81f51080cf60bd19`. O candidato QA final anterior a este
+registro foi `1941dfbd24b9fdb51c27e7653b6c0d776c986702`. Os novos commits de
+reconstrução foram assinados localmente como Axis.
+
+A diferença entre #49 anterior (`dba3c527406515b2f353ef505f60916d126618e7`) e
+novo #49 é só `tools/targeted_mutation.py`: **7 inserções/7 remoções** para
+reposicionar exatamente cinco âncoras. Nenhuma delas foi reaplicada em #50 ou
+#115; em cada catálogo, as cinco entradas aparecem uma vez. A instrumentação de
+128 alterações-fonte únicas permaneceu no follow-up de #115; os outros cinco
+paths desse follow-up foram mantidos. O candidate tree final antes deste adendo
+era idêntico ao antigo `29725ad…`.
+
+Em worktrees separadas, Python 3.12.3, os contratos focados passaram em #49
+**22/22**, #50 **25/25** e #115 **78/78**. Cada mutation gate executou
+**131/131 entradas aplicáveis mortas**, sem sobreviventes, timeouts ou entradas
+não aplicadas; cada estágio tem **128 alterações-fonte únicas**. `reality_audit.py`
+regenerou `AUDIT_REALITY_REPORT.md` e `audit_reality.json` sem drift, e
+`git diff --check` passou nos três estágios.
+
+Relatórios externos ao checkout e hashes: #49
+`/tmp/nexus-anchor-reflow-20261101/pr49-mutation.json` — SHA-256
+`4044d61618d1f12c44221f100ccfe64697c22767141909acb3883f9bd88fbe4c`; #50
+`/tmp/nexus-anchor-reflow-20261101/pr50-mutation.json` —
+`82ddb96919ea120df608f0215c2db1c31b4a8d6565a53b3e0672f39ba0a940be`; #115
+`/tmp/nexus-anchor-reflow-20261101/pr115-mutation.json` —
+`b8f5898ae076abb3b02d859344aa591bbb9624061335aa6b5a70ea1c153ebc6b`.
+
+Resultados são evidência local dos contratos e do mutation harness, não CI
+hospedado nem validação geral. A suíte completa não foi repetida; `psutil`, FAISS
+e SentenceTransformers estavam ausentes e emitiram avisos/fallbacks opcionais.
+A limitação de `RecursionError` em round-trip de metadata com 490 níveis permanece
+aberta. Nenhuma publicação, push, atualização de PR, merge ou mudança de `main`
+ocorreu. Comandos e listas de testes estão em [CONTINUATION.md](CONTINUATION.md).
+
 ## Follow-up local de QA da pilha — 2026-11-01
 Na cópia isolada `/workspace/Nexus-stack-rebuild-20261031`, branch
 `local/rebuild-pr115-20261031`, partindo do commit

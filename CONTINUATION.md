@@ -7,6 +7,24 @@ tests: CURRENT_TESTS
 bandit_low: 135
 -->
 
+## Reflow local das âncoras do mutation gate — 2026-11-01
+
+**Escopo:** somente `/workspace/Nexus-stack-rebuild-20261031` e worktrees detached em `/tmp/nexus-anchor-reflow-20261101/`; base #47 `995f3d7db87de007ffc499fb07534207894c32ad`. #48 permaneceu no SHA `0998445d3598f9c4cacb64214f307d0626325471`. Os novos degraus Axis (`Axis <axis603@bot.cue.im>` como autor e committer) são #49 `1aa56fb62334e4328eaba7cf513536e46d76bd7a` (pai #48), #50 `09b9889241405fb611ad3b89e2cb25ab1d108d27` (pai #49) e o funcional de #115 `69a786fa5c36e5f434a911d81f51080cf60bd19` (pai #50). O candidato QA final antes deste registro é `1941dfbd24b9fdb51c27e7653b6c0d776c986702`; o commit final deste adendo é somente documental. Branches locais propostas: `local/rebuild-pr48-20261031`, `local/rebuild-pr49-20261031`, `local/rebuild-pr50-20261031` e `local/rebuild-pr115-20261031`.
+
+**Distribuição exata do delta:** comparando #49 anterior `dba3c527406515b2f353ef505f60916d126618e7` ao novo #49, a única diferença é `tools/targeted_mutation.py`, **7 inserções e 7 remoções**, nas cinco entradas `graph_relation_keyword_key_preflight`, `graph_relation_keyword_collision_preflight`, `graph_relation_self_collision_preflight`, `kg_projection_rejects_argument_collisions` e `kg_projection_preflight_without_temporal_store`. Cada entrada ocorre exatamente uma vez em #49, #50 e #115. #50 não modifica esse arquivo. Em #115, o follow-up retém somente a instrumentação de contagem (`Mutation` entries versus alterações-fonte únicas: 128); os demais cinco paths do follow-up anterior permanecem. A árvore reconstruída antes deste adendo era byte a byte idêntica à antiga `29725ad…`; o antigo alinhamento `f8590df…` não é ancestral, pois sua alteração foi movida para #49.
+
+**Verificação por estágio (Python 3.12.3):** gates executados separadamente em cada worktree. Todos os três mutation gates reportaram 131/131 entradas aplicáveis mortas, 0 sobreviventes, 0 timeouts, 0 não aplicadas e 128 alterações-fonte únicas. Os relatórios foram redirecionados para `/tmp/nexus-anchor-reflow-20261101/<stage>-mutation.json`.
+
+| Estágio | Contratos focados aprovados | Mutation gate | Reality audit e `git diff --check` | SHA-256 do relatório |
+|---|---:|---|---|---|
+| #49 | 22/22 | 131/131 mortas; 0 restantes | Artefatos idênticos; passou | `4044d61618d1f12c44221f100ccfe64697c22767141909acb3883f9bd88fbe4c` |
+| #50 | 25/25 | 131/131 mortas; 0 restantes | Artefatos idênticos; passou | `82ddb96919ea120df608f0215c2db1c31b4a8d6565a53b3e0672f39ba0a940be` |
+| #115 | 78/78 | 131/131 mortas; 0 restantes | Artefatos idênticos; passou | `b8f5898ae076abb3b02d859344aa591bbb9624061335aa6b5a70ea1c153ebc6b` |
+
+Os módulos focados foram, respectivamente: #49 `test_knowledge_graph_projection_preflight_contract`, `test_graph_relation_preflight_contract`, `test_queue_priority_contract` e `test_targeted_mutation_contract`; #50 acrescentou `test_temporal_head_hash_concurrency_contract`; #115 acrescentou `test_temporal_facts_contract`, `test_audit_atomic_restore_regression` e `test_state_consistency_audit`. Em todos os estágios, `python tools/reality_audit.py` seguido por `git diff --exit-code -- AUDIT_REALITY_REPORT.md audit_reality.json` confirmou que os dois artefatos versionados não mudaram; `git diff --check` passou.
+
+**Limites:** não foi repetida a suíte completa nem CI hospedado. Houve avisos de `psutil` e FAISS/SentenceTransformers ausentes; os testes disponíveis usaram fallback opcional. A limitação já documentada de `RecursionError` em round-trip/exportação de metadados com 490 níveis permanece sem correção ou novo teto. Nenhum push, atualização de PR, merge, alteração de refs remotas ou mudança de `main` foi feito; `/workspace/Nexus` não foi usado.
+
 ## Follow-up local de QA da pilha — 2026-11-01
 
 **Identidade/escopo:** somente a cópia `/workspace/Nexus-stack-rebuild-20261031`, branch `local/rebuild-pr115-20261031`; base do follow-up `1c98e06f677b61b7587e7c3f7db1ec1a0146ed8e`, árvore inicial `2a2b60aae81918d800449ce6bdfe91ad43fcb78e`, sobre `995f3d7db87de007ffc499fb07534207894c32ad`. Alterações limitadas a `tools/targeted_mutation.py`, `core/constitutional_brain.py`, `test_knowledge_graph_projection_preflight_contract.py`, `test_audit_atomic_restore_regression.py`, `CONTINUATION.md` e `NEXUS_EVIDENCE.md`; `/workspace/Nexus` permaneceu intocado.
