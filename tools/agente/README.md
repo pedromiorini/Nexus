@@ -11,6 +11,7 @@ Scripts shell usados pelos agentes antes de agir no GitHub. Não fazem parte do 
 | `artefatos_drift.sh <repo_dir>` | Antes do push: numa cópia do repo, a triagem Bandit (`security_triage.py --check`) e os relatórios de `reality_audit` continuam iguais ao commitado? Requer `bandit`; não cobre o marcador `bandit_low` dos documentos de estado | 0 atuais; 7 algum diverge; 3 entrada inválida |
 | `timeout_margin.sh <timeout_min> <duracoes.txt>` | Guarda de margem de timeout do CI: bloqueia se a maior duração (s, uma por linha) passa de 85 % de `timeout_min·60` | 0 dentro da margem; 6 acima de 85 %; 3 entrada inválida |
 | `timeout_margin_backtest.py coletar\|avaliar\|atual` | Retroprojeção da guarda sobre o histórico real do `nexus-contract-gate` (`docs/agentes/timeout_margin_historico.json`); `atual` é só relatório | `avaliar`: 0 critérios TM1–TM5 ok; 1 falha; 3 dado inválido. `atual`/`coletar`: 0 (3 se dado inválido) |
+| `correio.py <subcomando>` | Correio dos agentes (branch `agentes/correio`): validar, ler, resumo, enviar, iniciar, ancora, ausente. Ver `docs/agentes/CORREIO.md` | 0 ok; 1 erro de validação ou envio |
 
 `replay/old.sh` é **intencionalmente defeituoso** (reproduz o pipe que engoliu o código de saída — L-003) e só é usado pelos casos do replay; `replay/fakegh` é um `gh` falso que registra ações sem tocar o GitHub. `replay/new.sh` é o fluxo correto.
 

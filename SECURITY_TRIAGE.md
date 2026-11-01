@@ -9,16 +9,16 @@ bandit_low: 139
 
 > This is a conservative inventory, not a clearance report. Findings remain open until reviewed and fixed or explicitly justified.
 
-- Total findings: **139**
-- Severity counts: LOW=139
+- Total findings: **147**
+- Severity counts: LOW=147
 
 ## Dispositions
 
 | Disposition | Count | Meaning |
 |---|---:|---|
-| `controlled_subprocess_review` | 8 | Mutation harness subprocess; keep inputs fixed and review execution boundaries. |
+| `controlled_subprocess_review` | 13 | Mutation harness subprocess; keep inputs fixed and review execution boundaries. |
 | `embedded_demo_assert_review` | 111 | Assertions inside the legacy __main__ demonstration block; keep them out of production contracts and migrate incrementally. |
-| `manual_review` | 3 | No project-specific disposition; manual review required. |
+| `manual_review` | 6 | No project-specific disposition; manual review required. |
 | `silent_exception_review` | 1 | Silent exception handling; review whether fallback behavior hides failures. |
 | `simulation_only_random_review` | 16 | Randomness reviewed as simulation/heuristic behavior; keep it out of secrets and security decisions. |
 
@@ -44,14 +44,22 @@ Agrupados por escopo (sem números de linha, que mudam a cada edição).
 | `B311` | LOW | `core/constitutional_brain.py` | `QuestionGenerator.generate_question` | 1 | `simulation_only_random_review` |
 | `B311` | LOW | `core/constitutional_brain.py` | `RealCreativitySystem.generate_creative_idea` | 1 | `simulation_only_random_review` |
 | `B311` | LOW | `core/constitutional_brain.py` | `RealRSI.optimize_step` | 1 | `simulation_only_random_review` |
+| `B404` | LOW | `tools/agente/correio.py` | `<module>` | 1 | `controlled_subprocess_review` |
 | `B404` | LOW | `tools/agente/timeout_margin_backtest.py` | `<module>` | 1 | `controlled_subprocess_review` |
 | `B404` | LOW | `tools/state_manifest.py` | `<module>` | 1 | `controlled_subprocess_review` |
 | `B404` | LOW | `tools/targeted_mutation.py` | `<module>` | 1 | `controlled_subprocess_review` |
+| `B603` | LOW | `tools/agente/correio.py` | `_git` | 1 | `controlled_subprocess_review` |
+| `B603` | LOW | `tools/agente/correio.py` | `_git_bytes` | 1 | `controlled_subprocess_review` |
+| `B603` | LOW | `tools/agente/correio.py` | `_git_ok` | 1 | `controlled_subprocess_review` |
+| `B603` | LOW | `tools/agente/correio.py` | `cmd_enviar` | 1 | `controlled_subprocess_review` |
 | `B603` | LOW | `tools/agente/timeout_margin_backtest.py` | `gh_json` | 1 | `controlled_subprocess_review` |
 | `B603` | LOW | `tools/agente/timeout_margin_backtest.py` | `guard` | 1 | `controlled_subprocess_review` |
 | `B603` | LOW | `tools/agente/timeout_margin_backtest.py` | `workflow_timeout` | 1 | `controlled_subprocess_review` |
 | `B603` | LOW | `tools/state_manifest.py` | `_git` | 1 | `controlled_subprocess_review` |
 | `B603` | LOW | `tools/targeted_mutation.py` | `run_tests` | 1 | `controlled_subprocess_review` |
+| `B607` | LOW | `tools/agente/correio.py` | `_git_bytes` | 1 | `manual_review` |
+| `B607` | LOW | `tools/agente/correio.py` | `_git_ok` | 1 | `manual_review` |
+| `B607` | LOW | `tools/agente/correio.py` | `cmd_enviar` | 1 | `manual_review` |
 | `B607` | LOW | `tools/agente/timeout_margin_backtest.py` | `gh_json` | 1 | `manual_review` |
 | `B607` | LOW | `tools/agente/timeout_margin_backtest.py` | `guard` | 1 | `manual_review` |
 | `B607` | LOW | `tools/agente/timeout_margin_backtest.py` | `workflow_timeout` | 1 | `manual_review` |
