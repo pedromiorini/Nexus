@@ -12,6 +12,19 @@ def state(store):
             copy.deepcopy(store._facts), copy.deepcopy(store._index))
 
 
+def nested_dict_depth(value):
+    """Conta iterativamente o formato usado por nested_dict, sem recursão."""
+    depth = 0
+    while type(value) is dict:
+        depth += 1
+        if not value:
+            return depth
+        if tuple(value) != ("k",):
+            return -1
+        value = value["k"]
+    return -1
+
+
 class IndependentAtomicityTests(unittest.TestCase):
     def test_apply_failure_after_projection_change_restores_all_state(self):
         store = ledger()
@@ -77,18 +90,34 @@ class IndependentAtomicityTests(unittest.TestCase):
 
 
 class IndependentBoundaryTests(unittest.TestCase):
-    def test_runtime_depth_failure_does_not_leave_a_partial_ledger(self):
+    def test_runtime_depth_failure_is_atomic_in_memory_not_extreme_round_trip(self):
         for levels in (100, 450, 490, 600, 900):
-            store = ledger()
-            before = state(store)
-            try:
-                store.assert_fact("ana", "lives_in", "B", valid_from=10.,
-                                  metadata=nested_dict(levels))
-            except (ValueError, RecursionError):
-                self.assertEqual(state(store), before)
-            else:
-                replay = TemporalFactStore.from_snapshot(store.export_snapshot(as_json=True))
-                self.assertEqual(replay.head_hash, store.head_hash)
+            with self.subTest(levels=levels):
+                store = ledger()
+                before = state(store)
+                before_head = store.head_hash
+                before_seq = store._seq
+                before_event_count = len(store._events)
+                metadata = nested_dict(levels)
+                try:
+                    fact = store.assert_fact("ana", "lives_in", "B", valid_from=10.,
+                                             metadata=metadata)
+                except (ValueError, RecursionError):
+                    self.assertEqual(state(store), before)
+                else:
+                    self.assertEqual(fact.fact_id, f"tf-{before_seq + 1:06d}")
+                    self.assertNotEqual(store.head_hash, before_head)
+                    self.assertEqual(store._seq, before_seq + 1)
+                    self.assertEqual(len(store._events), before_event_count + 2)
+                    self.assertEqual(store._events[-1]["kind"], "assert")
+                    self.assertEqual(store._index[("ana", "lives_in")],
+                                     ["tf-000001", fact.fact_id])
+                    self.assertEqual(nested_dict_depth(fact.metadata), levels)
+                    self.assertEqual(nested_dict_depth(
+                        store._events[-1]["fact"]["metadata"]), levels)
+                    self.assertEqual(nested_dict_depth(
+                        store._facts[fact.fact_id].metadata), levels)
+                    self.assertEqual(store.check_invariants(), [])
 
     def test_restore_copy_recursion_is_reported_as_value_error(self):
         snapshot = ledger().export_snapshot()

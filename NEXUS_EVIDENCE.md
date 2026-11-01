@@ -7,21 +7,139 @@ tests: CURRENT_TESTS
 bandit_low: 135
 -->
 
-## Evidência local da composição completa da PR #47 — 2026-10-31
+## Reflow local das âncoras do mutation gate — 2026-11-01
+Na cópia isolada `/workspace/Nexus-stack-rebuild-20261031`, sobre a #47
+`995f3d7db87de007ffc499fb07534207894c32ad`, #48 permanece em
+`0998445d3598f9c4cacb64214f307d0626325471`; #49 foi reconstruída em
+`1aa56fb62334e4328eaba7cf513536e46d76bd7a`, #50 em
+`09b9889241405fb611ad3b89e2cb25ab1d108d27` e o commit funcional de #115 em
+`69a786fa5c36e5f434a911d81f51080cf60bd19`. O candidato QA final anterior a este
+registro foi `1941dfbd24b9fdb51c27e7653b6c0d776c986702`. Os novos commits de
+reconstrução foram assinados localmente como Axis.
 
-Proposta local na branch `proposal/pr47-complete-20261031`, head PR
-`4b09299a20d2752e26dafcb268d942300df5f2c8` sobre base
-`ad2f25e93a81fcb02a3a35e33a2cb0c897e82378` (merge-base
-`f025204339b3dc5ae1f345e98be7f6f7fbcb2498`). `ci_run=not_ci`: não é um run
-remoto. Suíte focada 44/44; unittest completa 596/596; suíte integrada 29
-aprovadas + 1 skip FAISS; cobertura branch 91% na fila e 96% no ledger temporal.
-Ruff, compileall, actionlint, zizmor e triagem passaram; Bandit encontrou 135
-LOW e nenhum MEDIUM/HIGH/erro. Mutação: 113/113 mortos, zero sobreviventes,
-timeouts ou não aplicados. O preflight em cópia isolada deixou ambos os relatórios
-de realidade idênticos aos da base. Resoluções, comandos, identidade e limites
-estão em [CONTINUATION.md](CONTINUATION.md#composição-local-completa-da-pr-47--2026-10-31).
-Os testes e métricas são evidência local desta árvore, não garantia de produção;
-compatibilidade de snapshots externos permanece desconhecida.
+A diferença entre #49 anterior (`dba3c527406515b2f353ef505f60916d126618e7`) e
+novo #49 é só `tools/targeted_mutation.py`: **7 inserções/7 remoções** para
+reposicionar exatamente cinco âncoras. Nenhuma delas foi reaplicada em #50 ou
+#115; em cada catálogo, as cinco entradas aparecem uma vez. A instrumentação de
+128 alterações-fonte únicas permaneceu no follow-up de #115; os outros cinco
+paths desse follow-up foram mantidos. O candidate tree final antes deste adendo
+era idêntico ao antigo `29725ad…`.
+
+Em worktrees separadas, Python 3.12.3, os contratos focados passaram em #49
+**22/22**, #50 **25/25** e #115 **78/78**. Cada mutation gate executou
+**131/131 entradas aplicáveis mortas**, sem sobreviventes, timeouts ou entradas
+não aplicadas; cada estágio tem **128 alterações-fonte únicas**. `reality_audit.py`
+regenerou `AUDIT_REALITY_REPORT.md` e `audit_reality.json` sem drift, e
+`git diff --check` passou nos três estágios.
+
+Relatórios externos ao checkout e hashes: #49
+`/tmp/nexus-anchor-reflow-20261101/pr49-mutation.json` — SHA-256
+`4044d61618d1f12c44221f100ccfe64697c22767141909acb3883f9bd88fbe4c`; #50
+`/tmp/nexus-anchor-reflow-20261101/pr50-mutation.json` —
+`82ddb96919ea120df608f0215c2db1c31b4a8d6565a53b3e0672f39ba0a940be`; #115
+`/tmp/nexus-anchor-reflow-20261101/pr115-mutation.json` —
+`b8f5898ae076abb3b02d859344aa591bbb9624061335aa6b5a70ea1c153ebc6b`.
+
+Resultados são evidência local dos contratos e do mutation harness, não CI
+hospedado nem validação geral. A suíte completa não foi repetida; `psutil`, FAISS
+e SentenceTransformers estavam ausentes e emitiram avisos/fallbacks opcionais.
+A limitação de `RecursionError` em round-trip de metadata com 490 níveis permanece
+aberta. Nenhuma publicação, push, atualização de PR, merge ou mudança de `main`
+ocorreu. Comandos e listas de testes estão em [CONTINUATION.md](CONTINUATION.md).
+
+## Follow-up local de QA da pilha — 2026-11-01
+Na cópia isolada `/workspace/Nexus-stack-rebuild-20261031`, branch
+`local/rebuild-pr115-20261031`, partindo do commit
+`1c98e06f677b61b7587e7c3f7db1ec1a0146ed8e` (base da pilha
+`995f3d7db87de007ffc499fb07534207894c32ad`), foram executados 24 contratos
+focados e a suíte completa local em Python 3.12.3: **24/24** e **642/642**,
+respectivamente; a suíte completa teve zero skips. `psutil`, FAISS e
+SentenceTransformers estavam ausentes, com avisos/fallbacks opcionais. Não houve
+CI hospedado nem execução nesta rodada de cobertura, suíte integrada separada,
+Ruff, Bandit, actionlint ou zizmor.
+
+O gate de mutação encerrou com sucesso: **131/131 entradas do catálogo** aplicáveis
+mortas, 0 sobreviventes, 0 timeouts e 0 não aplicadas. Esse total conta uma entrada
+`Mutation` por teste de sua tupla declarada, não 131 edições independentes; há
+**128 alterações-fonte únicas**, identificadas por `(target, needle, replacement)`.
+O mutante `kg_projection_preflight_without_temporal_store` agora remove somente
+a validação não-string no caso sem store e mantém o staging de `edge_attributes`.
+Relatório local: `/tmp/nexus-pr115-followup-mutation-20261101.json`, SHA-256
+`84b1a7ace9aca484d9e766adaaaf5e9ad2882e411d55c319bd1a3441ec78da34`.
+
+O comentário/teste de `Relation.properties` distingue identidade preservada para
+dict não vazio sem store da normalização de `{}`; o teste de profundidade explicita
+atomicidade em memória, não round-trip extremo. O preflight de realidade em memória
+foi byte a byte idêntico aos dois artefatos versionados e não escreveu saídas.
+A limitação de `RecursionError` no round-trip/exportação de metadados com 490 níveis
+no runner Python 3.12.3 continua aberta; nenhum teto ou correção foi introduzido.
+Ver comandos e escopo em [CONTINUATION.md](CONTINUATION.md).
+
+## Evidência da reconstrução local #47 → #48 → #49 → #50 → #115 — 2026-10-31 a 2026-11-01
+
+Candidato em `/workspace/Nexus-stack-rebuild-20261031`, branch
+`local/rebuild-pr115-20261031`, código/testes no commit
+`f8590df7ab31fb2a8743e56189f1e89055ac8054`, sobre a nova #47
+`995f3d7db87de007ffc499fb07534207894c32ad`. Esta é evidência local
+(`ci_run=not_ci`), não um run hospedado. Identidade, commits, diffs, comandos e
+limitações estão na [continuidade da reconstrução](CONTINUATION.md).
+
+Contagens abaixo são somente `unittest discover`; a suíte integrada é reportada
+separadamente e não entra em `CURRENT_TESTS`.
+
+| Degrau | Executados | Aprovados | Erros | Skips |
+|---|---:|---:|---:|---:|
+| #47 primeiro parent (`4b09299a…`) | 460 | 448 | 12 | 0 |
+| #47 atualizado | 596 | 595 | 1 | 0 |
+| #48 composto | 622 | 621 | 1 | 0 |
+| #49 composto | 633 | 632 | 1 | 0 |
+| #50 composto | 636 | 635 | 1 | 0 |
+| #115 final | 642 | 642 | 0 | 0 |
+
+O merge da #47 acrescentou 136 testes executados e substituiu os quatro literais
+de `tests` por `CURRENT_TESTS`; o `439` antigo ficou apenas como
+`pr47_source_marker_tests`. Entre #47 atualizado e #50, o único erro repetido era
+`RecursionError` ao exportar/reproduzir metadata profundamente aninhada. O teste
+da #115 foi alterado para verificar atomicidade
+em memória sem exigir round-trip; a regressão antiga continua reproduzível no
+caso de 490 níveis dentro do runner. Portanto, 642/642 não significa que esse
+round-trip foi corrigido. `CURRENT_TESTS` usa os 642 testes efetivamente
+executados, não as 631 definições AST; os 11 casos adicionais vêm de métodos
+herdados descobertos nos contratos de grafo.
+
+**Preflights e gates:** `CURRENT_TESTS` usa os 642 testes unittest efetivamente
+executados. No merge 4b→995, os artefatos rastreados mudaram: reality report 2
+linhas, JSON 4 e triagem Bandit 3; o reality-audit regenera byte a byte no
+primeiro parent e na pilha final. Reality-audit não teve drift em #47 atualizado;
+#48 atualizou somente evidência estrutural derivada
+do núcleo (`core_lines` 27847→27917, funções 887→890, retornos dinâmicos 57→56;
+classes 269); #49 elevou `core_lines` para 27918; #50/#115 não acrescentaram
+drift. O preflight final regenerou `AUDIT_REALITY_REPORT.md` e `audit_reality.json`
+byte a byte. Ruff/compileall passaram nos arquivos alterados.
+
+Bandit: 135 LOW, 0 MEDIUM/HIGH; triagem, auditoria de asserts e gaps passaram.
+Mutation gate: 131/131 mortos, zero sobreviventes, timeouts ou não aplicados.
+POMDP v2 no source revision `f8590df7ab31fb2a8743e56189f1e89055ac8054`, seed
+`20261016`, taskset SHA-256
+`232371d0e8e948f4b0a004261e3d271b1003aed8d0de8c931d3439f9d370d025`: 128/128
+casos dentro da tolerância e 4/4 controles rejeitados. Benchmark de capacidade,
+mesma revisão/seed, taskset SHA-256
+`f2cbc785470b5e4018c08512c436e65f98fb26ab2d6b62e2f2c23d8bfd08c5c1`: 39 casos
+de composição, 24 de extração causal, 24 de intervenção, 8 de observação parcial
+e 1.152 de incerteza; extração causal precisão 0.50/recall 1.00; observabilidade
+parcial `unsupported_interface`. O `base_commit=5f53a9922b71d6ef3c565a31630f56091a454671`
+do artefato é separado de `source_revision`. Quatro testes contratuais passaram;
+esses tasksets sintéticos não demonstram capacidade geral.
+
+A suíte integrada teve 31 checks esperados, 30 aprovados e um skip (`0`, caminho
+FAISS opcional), sem faltantes/inesperados/conflitos. Cobertura passou os limites:
+fila 91%/90%, VRAM 94%/90%, ledger temporal 96%/90%, bridge 76%/70% e cérebro
+constitucional 70%/62%. `psutil`, FAISS e SentenceTransformers estavam ausentes;
+a unittest não teve skips e os caminhos opcionais usaram fallback. `actionlint`
+e `zizmor` não estão instalados e não foram executados. O CI informado para a
+nova #47 (`41264906276`) passou; os últimos CI downstream precedem essa
+atualização. Nada remoto ou `main` foi alterado; publicar/atualizar exige nova
+autorização humana.
 
 ## Revalidação local sobre a3f929f — 2026-10-22
 

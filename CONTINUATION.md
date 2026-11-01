@@ -7,48 +7,181 @@ tests: CURRENT_TESTS
 bandit_low: 135
 -->
 
-## Composição local completa da PR #47 — 2026-10-31
+## Reflow local das âncoras do mutation gate — 2026-11-01
 
-**Identidade:** branch local `proposal/pr47-complete-20261031`; head PR
-`4b09299a20d2752e26dafcb268d942300df5f2c8`; base remota observada
-`ad2f25e93a81fcb02a3a35e33a2cb0c897e82378`; merge-base
-`f025204339b3dc5ae1f345e98be7f6f7fbcb2498`. O commit local de composição tem
-o head da PR e a base como pais. O delta final versus a base contém somente os
-12 paths autorizados; o ajuste de workflow da PR já coincide com a base. Nenhuma
-ref remota, PR, `main` ou o checkout protegido foi alterada; não houve publicação.
+**Escopo:** somente `/workspace/Nexus-stack-rebuild-20261031` e worktrees detached em `/tmp/nexus-anchor-reflow-20261101/`; base #47 `995f3d7db87de007ffc499fb07534207894c32ad`. #48 permaneceu no SHA `0998445d3598f9c4cacb64214f307d0626325471`. Os novos degraus Axis (`Axis <axis603@bot.cue.im>` como autor e committer) são #49 `1aa56fb62334e4328eaba7cf513536e46d76bd7a` (pai #48), #50 `09b9889241405fb611ad3b89e2cb25ab1d108d27` (pai #49) e o funcional de #115 `69a786fa5c36e5f434a911d81f51080cf60bd19` (pai #50). O candidato QA final antes deste registro é `1941dfbd24b9fdb51c27e7653b6c0d776c986702`; o commit final deste adendo é somente documental. Branches locais propostas: `local/rebuild-pr48-20261031`, `local/rebuild-pr49-20261031`, `local/rebuild-pr50-20261031` e `local/rebuild-pr115-20261031`.
 
-**Resolução documental:** `CONTINUATION.md`, `NEXUS_EVIDENCE.md` e
-`NEXUS_KNOWLEDGE.md` preservam o estado da base e mantêm checkpoints da PR como
-históricos, sem substituir contagens atuais. `SECURITY_TRIAGE.md` mantém
-`tests: CURRENT_TESTS` e `bandit_low: 135`; a contagem `439` da origem aparece
-somente em `pr47_source_marker_tests`. No `README.md`, o registro 433/433 da
-branch de 19-10 foi rotulado explicitamente como histórico, não estado da #47.
+**Distribuição exata do delta:** comparando #49 anterior `dba3c527406515b2f353ef505f60916d126618e7` ao novo #49, a única diferença é `tools/targeted_mutation.py`, **7 inserções e 7 remoções**, nas cinco entradas `graph_relation_keyword_key_preflight`, `graph_relation_keyword_collision_preflight`, `graph_relation_self_collision_preflight`, `kg_projection_rejects_argument_collisions` e `kg_projection_preflight_without_temporal_store`. Cada entrada ocorre exatamente uma vez em #49, #50 e #115. #50 não modifica esse arquivo. Em #115, o follow-up retém somente a instrumentação de contagem (`Mutation` entries versus alterações-fonte únicas: 128); os demais cinco paths do follow-up anterior permanecem. A árvore reconstruída antes deste adendo era byte a byte idêntica à antiga `29725ad…`; o antigo alinhamento `f8590df…` não é ancestral, pois sua alteração foi movida para #49.
 
-**Verificações locais:** os quatro módulos focados passaram (44/44); a suíte
-completa passou (596/596) com a venv temporária baseada no `requirements-ci.lock`
-em Python 3.12.3. A suíte integrada passou 29 verificações e ignorou uma
-verificação opcional de FAISS. Cobertura branch: fila 91%, fatos temporais 96%
-(pisos 90%). Passaram `ruff check`, `compileall`, o gate Bandit/triagem (135 LOW,
-0 MEDIUM/HIGH/erros), `actionlint`, `zizmor` e mutação (113/113 aplicados e
-mortos; zero sobreviventes, timeouts ou não aplicados). Comandos principais:
-`coverage run --branch -m unittest discover -p 'test_*.py'`,
-`coverage run --append --branch core/constitutional_brain.py`,
-`coverage report --include=core/deferred_task_queue.py` e
-`coverage report --include=core/temporal_facts.py`,
-`ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`,
-`python -m compileall -q core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`,
-`python tools/targeted_mutation.py`, `actionlint .github/workflows/*.yml` e
-`zizmor --offline --no-progress .github/workflows`.
+**Verificação por estágio (Python 3.12.3):** gates executados separadamente em cada worktree. Todos os três mutation gates reportaram 131/131 entradas aplicáveis mortas, 0 sobreviventes, 0 timeouts, 0 não aplicadas e 128 alterações-fonte únicas. Os relatórios foram redirecionados para `/tmp/nexus-anchor-reflow-20261101/<stage>-mutation.json`.
 
-**Artefatos e limites:** o preflight isolado de `tools/reality_audit.py` gerou
-`AUDIT_REALITY_REPORT.md` e `audit_reality.json` byte a byte idênticos à base;
-portanto o delta final não contém atualização desses artefatos. O check de whitespace do delta contra a
-base passa. O check bruto do índice, relativo ao head da PR, também aponta uma
-linha vazia final em `docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md:235`, arquivo
-importado sem mudança da base; não foi tocado. Não havia Python 3.11 neste
-ambiente e não foi executado CI remoto. Compatibilidade com snapshots externos
-não foi avaliada; o preflight JSON continua limitado pela capacidade do encoder,
-sem um teto novo de bytes/nós ou garantia de latência.
+| Estágio | Contratos focados aprovados | Mutation gate | Reality audit e `git diff --check` | SHA-256 do relatório |
+|---|---:|---|---|---|
+| #49 | 22/22 | 131/131 mortas; 0 restantes | Artefatos idênticos; passou | `4044d61618d1f12c44221f100ccfe64697c22767141909acb3883f9bd88fbe4c` |
+| #50 | 25/25 | 131/131 mortas; 0 restantes | Artefatos idênticos; passou | `82ddb96919ea120df608f0215c2db1c31b4a8d6565a53b3e0672f39ba0a940be` |
+| #115 | 78/78 | 131/131 mortas; 0 restantes | Artefatos idênticos; passou | `b8f5898ae076abb3b02d859344aa591bbb9624061335aa6b5a70ea1c153ebc6b` |
+
+Os módulos focados foram, respectivamente: #49 `test_knowledge_graph_projection_preflight_contract`, `test_graph_relation_preflight_contract`, `test_queue_priority_contract` e `test_targeted_mutation_contract`; #50 acrescentou `test_temporal_head_hash_concurrency_contract`; #115 acrescentou `test_temporal_facts_contract`, `test_audit_atomic_restore_regression` e `test_state_consistency_audit`. Em todos os estágios, `python tools/reality_audit.py` seguido por `git diff --exit-code -- AUDIT_REALITY_REPORT.md audit_reality.json` confirmou que os dois artefatos versionados não mudaram; `git diff --check` passou.
+
+**Limites:** não foi repetida a suíte completa nem CI hospedado. Houve avisos de `psutil` e FAISS/SentenceTransformers ausentes; os testes disponíveis usaram fallback opcional. A limitação já documentada de `RecursionError` em round-trip/exportação de metadados com 490 níveis permanece sem correção ou novo teto. Nenhum push, atualização de PR, merge, alteração de refs remotas ou mudança de `main` foi feito; `/workspace/Nexus` não foi usado.
+
+## Follow-up local de QA da pilha — 2026-11-01
+
+**Identidade/escopo:** somente a cópia `/workspace/Nexus-stack-rebuild-20261031`, branch `local/rebuild-pr115-20261031`; base do follow-up `1c98e06f677b61b7587e7c3f7db1ec1a0146ed8e`, árvore inicial `2a2b60aae81918d800449ce6bdfe91ad43fcb78e`, sobre `995f3d7db87de007ffc499fb07534207894c32ad`. Alterações limitadas a `tools/targeted_mutation.py`, `core/constitutional_brain.py`, `test_knowledge_graph_projection_preflight_contract.py`, `test_audit_atomic_restore_regression.py`, `CONTINUATION.md` e `NEXUS_EVIDENCE.md`; `/workspace/Nexus` permaneceu intocado.
+
+**Correções estreitas:** `kg_projection_preflight_without_temporal_store` agora condiciona somente a validação de chaves não-string à presença do store temporal; o staging de `edge_attributes` e as demais etapas permanecem no mutante. O relatório explicita que `declared`/`applicable`/`killed` contam entradas do catálogo (cada entrada testada com sua tupla unittest), não alterações-fonte distintas; a contagem única usa `(target, needle, replacement)` e é 128. O comentário de produção distingue dict não vazio, cuja identidade é preservada sem store, de `{}`, normalizado por `properties or {}`; o teste já existente agora afirma que `{}` não conserva identidade. O teste de profundidade foi renomeado para indicar atomicidade em memória, não round-trip extremo.
+
+**Verificação local (Python 3.12.3):** contratos focados, `PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 $PY -m unittest -v test_knowledge_graph_projection_preflight_contract test_graph_relation_preflight_contract test_audit_atomic_restore_regression test_targeted_mutation_contract`: 24/24 aprovados. Suíte integral, `PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 $PY -m unittest discover -p 'test_*.py'`: 642/642 aprovados, zero skips. Houve avisos de dependências opcionais ausentes (`psutil`, FAISS/SentenceTransformers); os caminhos disponíveis usaram fallback. Não foram executados nesta rodada: cobertura, suíte integrada separada, Ruff, Bandit, actionlint/zizmor ou CI hospedado.
+
+Comandos executados (na raiz da cópia):
+
+```sh
+PY=/workspace/.isolated/pr47-ci-venv/bin/python
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 $PY -m unittest -v test_knowledge_graph_projection_preflight_contract test_graph_relation_preflight_contract test_audit_atomic_restore_regression test_targeted_mutation_contract
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 $PY -m unittest discover -p 'test_*.py'
+REPORT=/tmp/nexus-pr115-followup-mutation-20261101.json PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 $PY - <<'PY'
+import os
+from pathlib import Path
+from tools import targeted_mutation
+targeted_mutation.REPORT = Path(os.environ["REPORT"])
+raise SystemExit(targeted_mutation.main())
+PY
+```
+
+**Mutation gate:** `tools.targeted_mutation.main()` rodou com a cópia temporária própria do harness e relatório redirecionado para `/tmp/nexus-pr115-followup-mutation-20261101.json`, fora do checkout. Resultado: 131/131 entradas aplicáveis mortas, 0 sobreviventes, 0 timeouts, 0 não aplicadas; 128 alterações-fonte únicas. O mutante `kg_projection_preflight_without_temporal_store` foi morto pelo teste designado. Relatório SHA-256 `84b1a7ace9aca484d9e766adaaaf5e9ad2882e411d55c319bd1a3441ec78da34`.
+
+**Artefatos e limites:** o preflight pós-alteração calculou em memória `AUDIT_REALITY_REPORT.md` e `audit_reality.json`; ambos ficaram byte a byte idênticos aos rastreados, sem escrita. A limitação já documentada permanece: round-trip/exportação de metadados com 490 níveis pode emitir `RecursionError` no runner Python 3.12.3; este follow-up não adiciona teto, não corrige essa limitação e não promete round-trip extremo. O teste renomeado cobre atomicidade/estado em memória, não restauração de metadados extremos. Nenhuma publicação, push, atualização de PR, merge ou mudança de `main` ocorreu.
+
+## Reconstrução local da pilha sobre a #47 atualizada — 2026-10-31 a 2026-11-01
+
+**Identidade e isolamento:** cópia independente `/workspace/Nexus-stack-rebuild-20261031`,
+branch `local/rebuild-pr115-20261031`, sobre a #47 atualizada
+`995f3d7db87de007ffc499fb07534207894c32ad` (pais informados:
+`4b09299a20d2752e26dafcb268d942300df5f2c8` e
+`ad2f25e93a81fcb02a3a35e33a2cb0c897e82378`). A cadeia local proposta é #48
+`0998445d3598f9c4cacb64214f307d0626325471`, #49
+`dba3c527406515b2f353ef505f60916d126618e7`, #50
+`9c1c0c25e0204290654cd183dacc46e7df6f6cea` e #115
+`24a6a93f9db8fdd74641ab9529d3f5416682c941` + teste de estado
+`e6a104ac5baef2126bffef78ad3df04eeca312ce`; o follow-up local do harness é
+`f8590df7ab31fb2a8743e56189f1e89055ac8054`. O checkout protegido
+`/workspace/Nexus` já estava sujo e atrasado na inspeção inicial; não foi limpo nem
+recebeu escritas nesta tarefa. `main`, refs remotas e PRs não foram alteradas; não
+houve push nem publicação.
+
+**Deltas preservados:** #48 completa a conclusão por orçamento e prioridade
+estrita da fila; #49 prepara a projeção NetworkX antes de mutações e combina o
+preflight de chaves/colisões com o staging de `edge_attributes`; #50 sincroniza
+`head_hash` com o lock transacional; #115 normaliza subclasses de `str` nas
+fronteiras do ledger e rejeita corroborações duplicadas no replay. Os conflitos
+documentais mantêm métricas da origem apenas como histórico. O teste de estado da
+#115 foi mantido, mas seus antigos literais `506` não foram copiados: os quatro
+blocos `NEXUS-CURRENT-STATE` continuam com `tests: CURRENT_TESTS`.
+
+**Efeito medido da atualização da #47:** o primeiro parent `4b09299a20d2752e26dafcb268d942300df5f2c8`
+executou `460` testes (`448` aprovados, `12` erros); o merge `995f3d7db87de007ffc499fb07534207894c32ad`
+executou `596` (`595` aprovados, `1` erro), ou `+136` testes executados. No
+primeiro parent, `tests` ainda era literal (`460` em `CONTINUATION.md` e
+`NEXUS_EVIDENCE.md`, `439` em `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md`); o
+merge trocou os quatro por `CURRENT_TESTS`, preservando `439` somente como
+`pr47_source_marker_tests`. Entre esses commits mudaram `AUDIT_REALITY_REPORT.md`
+(2 linhas), `audit_reality.json` (4) e `SECURITY_TRIAGE.md` (3). Os relatórios de
+realidade do primeiro parent e da pilha final regeneram byte a byte contra seus
+respectivos arquivos rastreados; a triagem Bandit atual também confere.
+
+**Diffs por degrau** (estatísticas de `git diff` entre o head anterior e o
+candidato; incluem a resolução documental e os relatórios derivados locais):
+
+| PR / degrau | Ref local / commit | Arquivos principais e delta |
+|---|---|---|
+| #47 base atualizada | `local/rebuild-pr47-20261031` / `995f3d7db87de007ffc499fb07534207894c32ad` | merge autorizado com pais `4b09299a…` e `ad2f25e9…` |
+| #48 | `local/rebuild-pr48-20261031` / `0998445d3598f9c4cacb64214f307d0626325471` | 10 arquivos, +582/−34; `core/constitutional_brain.py`, roteador/testes de orçamento, mutation harness, decisões e reality artifacts |
+| #49 | `local/rebuild-pr49-20261031` / `dba3c527406515b2f353ef505f60916d126618e7` | 10 arquivos, +367/−25; projeção NetworkX, fila/prioridade, mutation harness, README/decisões e reality artifacts |
+| #50 | `local/rebuild-pr50-20261031` / `9c1c0c25e0204290654cd183dacc46e7df6f6cea` | 3 arquivos, +138/−1; `core/temporal_facts.py`, teste de concorrência de `head_hash`, decisão |
+| #115 funcional | commit `24a6a93f9db8fdd74641ab9529d3f5416682c941` | 3 arquivos, +249/−22; ledger temporal e contratos de atomicidade/replay |
+| #115 estado | commit `e6a104ac5baef2126bffef78ad3df04eeca312ce` | 1 arquivo, +17; sem literais antigos no marcador atual |
+| Follow-up local, não parte do diff publicado de PR | `f8590df7ab31fb2a8743e56189f1e89055ac8054` | 1 arquivo, `tools/targeted_mutation.py`, +7/−7; alinhamento de cinco âncoras NetworkX |
+
+**Suítes completas por degrau (Python 3.12.3):** #47 `596` executados / `595`
+aprovados / `1` erro; #48 `622/621/1`; #49 `633/632/1`; #50 `636/635/1`; #115
+`642/642/0`, sem skips. O erro único da #47 atualizada e dos degraus #48–#50 era o
+round-trip de metadados aninhados no teste de atomicidade. A validação final também incluiu
+focados: #49 `92/92`, #50 `85/85`, #115 `79/79` antes do commit de testes de
+estado. `CURRENT_TESTS` resolve para `verification.tests.executed` (`642`), não
+para o inventário AST (`631`); os 11 casos adicionais são métodos herdados
+descobertos em subclasses nos contratos de grafo.
+
+**Auditoria e gates locais:** reality-audit #47 não teve drift; no #48 o artefato
+registrou `core_lines` `27847→27917`, classes `269`, funções `887→890`, retornos
+dinâmicos `57→56` e deixou de classificar
+`RealCognitiveBudgetEnforcer.get_status` como retorno constante. No #49 mudou
+somente `core_lines` `27917→27918`; #50 e #115 não acrescentaram drift. Ruff e
+compileall passaram nos arquivos alterados. Bandit encontrou 135 LOW e zero
+MEDIUM/HIGH; `security_triage.py --check`, `embedded_assert_audit.py` e
+`implementation_gap_audit.py` passaram. O mutation gate, após corrigir cinco
+âncoras antigas do harness, matou 131/131 mutantes aplicáveis; zero sobreviventes,
+timeouts ou não aplicados.
+
+**Benchmarks reproduzidos:** ambos foram executados no código `f8590df` com seed
+`20261016`, sem rede externa. POMDP v2: taskset SHA-256
+`232371d0e8e948f4b0a004261e3d271b1003aed8d0de8c931d3439f9d370d025`, 128/128
+casos dentro da tolerância e 4/4 controles de rejeição. Benchmark de capacidade:
+taskset SHA-256 `f2cbc785470b5e4018c08512c436e65f98fb26ab2d6b62e2f2c23d8bfd08c5c1`;
+39 casos de composição, 24 de extração causal, 24 de intervenção, 8 de observação
+parcial e 1.152 de incerteza. Extração causal reporta precisão `0.50` e recall
+`1.00`; observabilidade parcial consta como `unsupported_interface` (a API não
+expõe posterior comparável). O campo `base_commit=5f53a9922b71d6ef3c565a31630f56091a454671`
+é separado do `source_revision=f8590df7ab31fb2a8743e56189f1e89055ac8054`.
+Os quatro testes contratuais do benchmark passaram; os números sintéticos não
+são evidência de capacidade geral.
+
+**Suíte integrada e cobertura:** 31 checks esperados, 30 aprovados, 1 skip (`0`,
+modo FAISS; backend opcional indisponível), zero faltantes/inesperados/conflitos.
+Limites de branch coverage passaram: fila `91%` (mín. 90), VRAM `94%` (90),
+ledger temporal `96%` (90), bridge `76%` (70) e constitutional brain `70%` (62).
+A unittest completa terminou `642/642`, sem skips. `psutil`, FAISS e
+SentenceTransformers estavam ausentes; caminhos opcionais usaram fallback.
+`actionlint` e `zizmor` não estão instalados e não foram executados; esta
+composição não tem CI hospedado próprio.
+
+**Reprodução principal:** os comandos foram executados na raiz da cópia; saídas
+temporárias ficaram em `/tmp`, não no checkout protegido nem nos artefatos do
+repositório.
+
+```sh
+PY=/workspace/.isolated/pr47-ci-venv/bin/python
+export PYTHONPATH=/workspace/Nexus-stack-rebuild-20261031
+export COVERAGE_FILE=/tmp/nexus-rebuild-pr115.coverage
+export NEXUS_INTEGRATED_SUMMARY=/tmp/nexus-rebuild-pr115-integrated-summary.json
+$PY -m coverage run --branch -m unittest discover -p 'test_*.py'
+$PY -m coverage run --append --branch core/constitutional_brain.py
+GITHUB_SHA=f8590df7ab31fb2a8743e56189f1e89055ac8054 PYTHONPATH=. $PY -m benchmarks.nexus_pomdp_benchmark_v2 --seed 20261016 --output /tmp/nexus-rebuild-pr115-pomdp-verified.json
+GITHUB_SHA=f8590df7ab31fb2a8743e56189f1e89055ac8054 PYTHONPATH=. $PY -m benchmarks.nexus_capability_benchmark --seed 20261016 --output /tmp/nexus-rebuild-pr115-capability-verified.json
+```
+
+Bandit foi executado com caminhos relativos, como no workflow:
+`bandit -r core vita tools -f json -o /tmp/nexus-rebuild-pr115-bandit-relative.json`;
+o exit code reflete os achados LOW, mas o relatório não tem MEDIUM/HIGH e a
+política de severidade passou. A triagem usou esse JSON; o reality-audit foi
+rodado numa cópia descartável e comparado byte a byte com os dois artefatos
+rastreados.
+
+**Limitação aberta de profundidade:** restaurar temporariamente o teste de
+round-trip anterior reproduz `RecursionError` em `export_snapshot(as_json=True)`
+no caso de 490 níveis dentro do runner Python 3.12.3. Fora do runner, a mesma
+profundidade passou; isso confirma dependência da pilha de chamadas, não um limite
+estável. Este ambiente não tinha Python 3.11, versão usada pelo workflow; a
+validação local não substitui novo CI hospedado da pilha downstream. O commit #115 alterou o teste para verificar atomicidade do ledger em
+memória sem exigir export/replay; não corrigiu nem garante round-trip para esse
+caso. Nos casos 600 e 900, a inserção foi rejeitada sem mutação parcial. Decidir
+se esse contrato é aceitável ou se o export precisa de hardening antes de qualquer
+publicação.
+
+**CI e autorização:** o CI hospedado informado para a #47 atualizada (`41264906276`)
+passou; os resultados CI das downstream precedem essa atualização. A composição
+local não tem CI hospedado próprio. Qualquer publicação/atualização das PRs
+downstream, novo CI hospedado, merge ou alteração de `main` exige autorização
+humana nova.
 
 ## Revalidação local da composição sobre a3f929f — 2026-10-22
 

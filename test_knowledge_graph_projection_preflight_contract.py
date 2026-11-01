@@ -111,6 +111,8 @@ class KnowledgeGraphProjectionPreflightContract(unittest.TestCase):
                 for properties in (None, {}):
                     relation = graph.add_relation("a", "links", "b", properties)
                     self.assertEqual(relation.properties, {})
+                    if properties is not None:
+                        self.assertIsNot(relation.properties, properties)
                 self.assertEqual(graph.graph["a"]["b"]["relations"], ["links", "links"])
 
     def test_fallback_keeps_non_string_keys_without_kwargs_restrictions(self):

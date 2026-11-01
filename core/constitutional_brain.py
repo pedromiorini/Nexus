@@ -626,8 +626,8 @@ class RealKnowledgeGraph:
         # Prepare and validate the NetworkX projection before ledger or graph mutation.
         # Fallback mode does not use kwargs and preserves its legacy property contract.
         if self.nx:
-            # Temporal integration has always detached caller properties; without a
-            # store, preserve Relation.properties identity while staging a safe copy.
+            # Temporal mode detaches caller data; without a store, non-empty dicts
+            # retain identity, but `properties or {}` still normalizes an empty dict.
             if self.temporal_store is not None:
                 properties = dict(properties or {})
             existing = self.graph.get_edge_data(source_id, target_id)
