@@ -14,6 +14,12 @@ class Clock:
         return self.t
 
 
+class ClassScopedString(str):
+    def __eq__(self, other):
+        return type(other) is type(self) and str.__eq__(self, other)
+    __hash__ = str.__hash__
+
+
 def store(clock=None, functional=("mora_em",)):
     return TemporalFactStore(functional_predicates=functional, clock=clock or Clock())
 
@@ -229,6 +235,65 @@ class RetractionAndCorroboration(unittest.TestCase):
         self.assertEqual(len(s.export_snapshot()["events"]), n)
         self.assertEqual(len(s.history("ana", "mora_em")), 1)
 
+    def test_string_subclass_source_is_normalized_before_writing(self):
+        class Loose(str):
+            def __eq__(self, other):
+                return False
+            __hash__ = str.__hash__
+
+        s = store()
+        s.assert_fact("ana", "conhece", "bia", source="user")
+        corroborated = s.assert_fact("ana", "conhece", "bia", source=Loose("tool:crm"))
+        self.assertEqual(corroborated.corroborated_by, ("tool:crm",))
+        self.assertIs(type(corroborated.corroborated_by[0]), str)
+        event_count = len(s.export_snapshot()["events"])
+        s.assert_fact("ana", "conhece", "bia", source="tool:crm")
+        self.assertEqual(len(s.export_snapshot()["events"]), event_count)
+
+
+class StringSubclassNormalizationContract(unittest.TestCase):
+    def test_functional_predicates_are_normalized_without_mutating_input(self):
+        configured = ClassScopedString("mora_em")
+        functional_predicates = [configured]
+        clock = Clock(10.0)
+        s = TemporalFactStore(functional_predicates=functional_predicates, clock=clock)
+
+        first = s.assert_fact("ana", "mora_em", "A")
+        clock.t = 20.0
+        second = s.assert_fact("ana", "mora_em", "B")
+
+        self.assertIs(functional_predicates[0], configured)
+        history = s.history("ana", "mora_em")
+        self.assertEqual([(fact.object, fact.valid_to) for fact in history],
+                         [("A", 20.0), ("B", None)])
+        self.assertEqual([fact.fact_id for fact in s.facts_as_of(15)], [first.fact_id])
+        self.assertEqual([fact.fact_id for fact in s.facts_as_of(20)], [second.fact_id])
+        self.assertEqual(s.check_invariants(), [])
+
+    def test_queries_normalize_string_subclass_filters(self):
+        clock = Clock(100.0)
+        s = TemporalFactStore(clock=clock)
+        fact = s.assert_fact("ana", "mora_em", "A")
+        subject = ClassScopedString("ana")
+        predicate = ClassScopedString("mora_em")
+
+        self.assertEqual(s.history(subject, predicate), [fact])
+        self.assertEqual(s.facts_as_of(100.0, subject=subject, predicate=predicate), [fact])
+        self.assertEqual(s.facts_as_of(100.0, known_at=100.0, subject=subject,
+                                       predicate=predicate), [fact])
+        self.assertEqual(s.get_current_facts(subject=subject, predicate=predicate), [fact])
+        with self.assertRaises(ValueError):
+            s.history("", "mora_em")
+        with self.assertRaises(ValueError):
+            s.facts_as_of(100.0, predicate="")
+
+        clock.t = 200.0
+        with self.assertRaises(ValueError):
+            s.get_current_facts(subject="")
+        clock.t = 150.0
+        next_fact = s.assert_fact("bia", "knows", "caio")
+        self.assertEqual(next_fact.recorded_at, 150.0)
+
 
 class SnapshotContract(unittest.TestCase):
     def build(self):
@@ -325,6 +390,56 @@ class SnapshotContract(unittest.TestCase):
         for edit in cases:
             with self.assertRaises(ValueError):
                 TemporalFactStore.from_snapshot(forge(edit), clock=c)
+
+    def test_loader_normalizes_str_subclasses_before_corroboration_checks(self):
+        from core import temporal_facts as tf
+
+        class Loose(str):
+            def __eq__(self, other):
+                return False
+            __hash__ = str.__hash__
+
+        def snapshot(primary_source, corroborated_sources):
+            c = Clock(100.0)
+            source = store(c)
+            fact = source.assert_fact("ana", "mora_em", "A", source="user")
+            snap = source.export_snapshot()
+            snap["events"][0]["fact"]["source"] = primary_source
+            for corroborated_source in corroborated_sources:
+                snap["events"].append({
+                    "kind": "corroborate",
+                    "fact_id": fact.fact_id,
+                    "source": corroborated_source,
+                    "recorded_at": 100.0,
+                })
+            previous = tf.GENESIS
+            for sequence, event in enumerate(snap["events"], 1):
+                event["seq"], event["prev"] = sequence, previous
+                event["hash"] = tf._digest(event)
+                previous = event["hash"]
+            snap["head"] = previous
+            return snap, c
+
+        cases = (
+            (Loose("tool:x"), ("tool:x",)),
+            ("user", (Loose("tool:x"), "tool:x")),
+            ("user", ("tool:x", Loose("tool:x"))),
+        )
+        for primary_source, corroborated_sources in cases:
+            with self.subTest(primary=type(primary_source).__name__,
+                              corroborations=tuple(type(x).__name__ for x in corroborated_sources)):
+                snap, c = snapshot(primary_source, corroborated_sources)
+                with self.assertRaises(ValueError):
+                    TemporalFactStore.from_snapshot(snap, clock=c)
+                with self.assertRaises(ValueError):
+                    TemporalFactStore.from_snapshot(json.dumps(snap), clock=c)
+
+        snap, c = snapshot("user", (Loose("tool:new"),))
+        restored = TemporalFactStore.from_snapshot(snap, clock=c)
+        self.assertIs(type(snap["events"][1]["source"]), Loose)
+        self.assertEqual(restored.history("ana", "mora_em")[0].corroborated_by,
+                         ("tool:new",))
+        self.assertIs(type(restored.history("ana", "mora_em")[0].corroborated_by[0]), str)
 
     def test_wrong_prev_link_on_last_event_is_rejected_even_if_self_hash_is_valid(self):
         from core import temporal_facts as tf
@@ -444,6 +559,61 @@ class SnapshotContract(unittest.TestCase):
         restored_prior = restored.history("ana", "mora_em")[0]
         self.assertEqual(restored_prior.valid_to, 11.0)
         self.assertIsNone(restored_prior.superseded_by)
+
+    def test_loader_rejects_duplicate_or_primary_source_corroboration(self):
+        from core import temporal_facts as tf
+
+        c = Clock(100.0)
+        s = store(c, functional=())
+        s.assert_fact("ana", "tag", "A", valid_from=10.0, source="observation")
+        c.t = 101.0
+        s.assert_fact("ana", "tag", "A", valid_from=10.0, source="tool:crm")
+        base = s.export_snapshot()
+        self.assertEqual(s.history("ana", "tag")[0].corroborated_by, ("tool:crm",))
+
+        def append_corroboration(source):
+            snap = copy.deepcopy(base)
+            snap["events"].append({
+                "kind": "corroborate", "fact_id": "tf-000001", "source": source,
+                "recorded_at": 102.0,
+            })
+            previous = tf.GENESIS
+            for sequence, event in enumerate(snap["events"], 1):
+                event["seq"], event["prev"] = sequence, previous
+                event["hash"] = tf._digest(event)
+                previous = event["hash"]
+            snap["head"] = previous
+            return snap
+
+        for source in ("tool:crm", "observation"):
+            with self.subTest(source=source), self.assertRaises(ValueError):
+                TemporalFactStore.from_snapshot(append_corroboration(source), clock=c)
+
+        fresh = TemporalFactStore.from_snapshot(append_corroboration("user"), clock=c)
+        self.assertEqual(fresh.history("ana", "tag")[0].corroborated_by,
+                         ("tool:crm", "user"))
+
+    def test_loader_rejects_unhashable_fact_id_without_leaking_typeerror(self):
+        from core import temporal_facts as tf
+
+        s, c = self.build()
+
+        class UnhashableString(str):
+            __hash__ = None
+
+        for invalid_id in (["tf-000001"], UnhashableString("tf-000001")):
+            with self.subTest(invalid_type=type(invalid_id).__name__):
+                malformed = s.export_snapshot()
+                malformed["events"][1]["fact_id"] = invalid_id
+                previous = tf.GENESIS
+                for sequence, event in enumerate(malformed["events"], 1):
+                    event["seq"], event["prev"] = sequence, previous
+                    event["hash"] = tf._digest(event)
+                    previous = event["hash"]
+                malformed["head"] = previous
+
+                with self.assertRaises(ValueError):
+                    TemporalFactStore.from_snapshot(malformed, clock=c)
 
 
 if __name__ == "__main__":

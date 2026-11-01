@@ -89,9 +89,12 @@ def _number(value: Any, name: str) -> float:
 
 
 def _text(value: Any, name: str) -> str:
-    if not isinstance(value, str) or not value.strip():
+    if not isinstance(value, str):
         raise ValueError(f"{name} deve ser uma string não vazia")
-    return value
+    text = str.__str__(value)
+    if not text.strip():
+        raise ValueError(f"{name} deve ser uma string não vazia")
+    return text
 
 
 def _json_value(value: Any) -> Any:
@@ -114,7 +117,10 @@ def _json_value(value: Any) -> Any:
 class TemporalFactStore:
     def __init__(self, *, functional_predicates: Iterable[str] = (),
                  clock: Callable[[], float] = time.time) -> None:
-        self._functional = frozenset(functional_predicates)
+        self._functional = frozenset(
+            _text(predicate, "functional_predicates")
+            for predicate in functional_predicates
+        )
         self._clock = clock
         self._lock = threading.RLock()
         self._facts: Dict[str, TemporalFact] = {}
@@ -196,8 +202,10 @@ class TemporalFactStore:
                     valid_from: Optional[float] = None, confidence: float = 0.9,
                     source: str = "observation",
                     metadata: Optional[Dict[str, Any]] = None) -> TemporalFact:
-        _text(subject, "subject"), _text(predicate, "predicate"), _text(obj, "object")
-        _text(source, "source")
+        subject = _text(subject, "subject")
+        predicate = _text(predicate, "predicate")
+        obj = _text(obj, "object")
+        source = _text(source, "source")
         conf = _number(confidence, "confidence")
         if not 0.0 <= conf <= 1.0:
             raise ValueError("confidence deve estar em [0, 1]")
@@ -246,9 +254,10 @@ class TemporalFactStore:
     def retract(self, subject: str, predicate: str, obj: Optional[str] = None, *,
                 valid_to: Optional[float] = None) -> List[TemporalFact]:
         """Encerra fatos válidos em ``valid_to`` (padrão: agora) sem substituí-los."""
-        _text(subject, "subject"), _text(predicate, "predicate")
+        subject = _text(subject, "subject")
+        predicate = _text(predicate, "predicate")
         if obj is not None:
-            _text(obj, "object")
+            obj = _text(obj, "object")
         requested_valid_to = None if valid_to is None else _number(valid_to, "valid_to")
         with self._lock, self._transaction():
             now = self._now()
@@ -265,9 +274,12 @@ class TemporalFactStore:
     def facts_as_of(self, valid_at: float, *, known_at: Optional[float] = None,
                     subject: Optional[str] = None,
                     predicate: Optional[str] = None) -> List[TemporalFact]:
+        subject = None if subject is None else _text(subject, "subject")
+        predicate = None if predicate is None else _text(predicate, "predicate")
         t = _number(valid_at, "valid_at")
+        k = None if known_at is None else _number(known_at, "known_at")
         with self._lock:
-            source = self._facts if known_at is None else self._project(_number(known_at, "known_at"))
+            source = self._facts if k is None else self._project(k)
             hits = [f for f in source.values() if self._covers(f, t)
                     and (subject is None or f.subject == subject)
                     and (predicate is None or f.predicate == predicate)]
@@ -275,10 +287,14 @@ class TemporalFactStore:
 
     def get_current_facts(self, subject: Optional[str] = None,
                           predicate: Optional[str] = None) -> List[TemporalFact]:
+        subject = None if subject is None else _text(subject, "subject")
+        predicate = None if predicate is None else _text(predicate, "predicate")
         with self._lock:
             return self.facts_as_of(self._now(), subject=subject, predicate=predicate)
 
     def history(self, subject: str, predicate: str) -> List[TemporalFact]:
+        subject = _text(subject, "subject")
+        predicate = _text(predicate, "predicate")
         with self._lock:
             hits = sorted(self._versions(subject, predicate), key=lambda f: (f.valid_from, f.fact_id))
             return copy.deepcopy(hits)
@@ -392,8 +408,10 @@ class TemporalFactStore:
                 fact = raw.get("fact")
                 if not isinstance(fact, dict) or set(fact) != _FACT_KEYS:
                     raise ValueError(f"fato inválido no evento {n}")
-                for name in ("subject", "predicate", "object", "source"):
-                    _text(fact[name], name)
+                normalized_text = {
+                    name: _text(fact[name], name)
+                    for name in ("subject", "predicate", "object", "source")
+                }
                 vf = _number(fact["valid_from"], "valid_from")
                 if fact["valid_to"] is not None and _number(fact["valid_to"], "valid_to") < vf:
                     raise ValueError(f"janela invertida no evento {n}")
@@ -412,7 +430,8 @@ class TemporalFactStore:
                     raise ValueError(f"fact_id ou superseded_by inválido no evento {n}")
                 store._seq += 1
             elif kind in ("close", "corroborate"):
-                if raw.get("fact_id") not in store._facts:
+                fact_id = raw.get("fact_id")
+                if type(fact_id) is not str or fact_id not in store._facts:
                     raise ValueError(f"referência inexistente no evento {n}")
                 if kind == "close":
                     close_at = _number(raw.get("valid_to"), "valid_to")
@@ -429,11 +448,20 @@ class TemporalFactStore:
                     ):
                         raise ValueError(f"superseded_by inválido no evento {n}")
                 else:
-                    _text(raw.get("source"), "source")
+                    source = _text(raw.get("source"), "source")
+                    normalized_text = {"source": source}
+                    fact = store._facts[raw["fact_id"]]
+                    if source == fact.source or source in fact.corroborated_by:
+                        raise ValueError(f"fonte de corroboração repetida no evento {n}")
             else:
                 raise ValueError(f"tipo de evento desconhecido no evento {n}")
             try:
                 stored = copy.deepcopy(raw)
+                if kind == "assert":
+                    for name, value in normalized_text.items():
+                        stored["fact"][name] = value
+                elif kind == "corroborate":
+                    stored["source"] = normalized_text["source"]
                 store._apply(stored)
             except RecursionError as exc:
                 raise ValueError(f"evento {n} excede a capacidade de cópia/replay") from exc
