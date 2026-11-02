@@ -20,8 +20,22 @@ class VramSnapshot:
     total_bytes: int = 0
     timestamp: float = field(default_factory=time)
 
+    def __post_init__(self) -> None:
+        """Rejeita counters inválidos antes de cálculo ou decisão do guard."""
+        self._validate_counters()
+
+    def _validate_counters(self) -> None:
+        """Revalida counters porque snapshots válidos continuam mutáveis."""
+        for name in ("allocated_bytes", "reserved_bytes", "total_bytes"):
+            value = getattr(self, name)
+            if type(value) is not int:
+                raise TypeError(f"{name} deve ser um inteiro built-in não negativo")
+            if value < 0:
+                raise ValueError(f"{name} deve ser não negativo")
+
     @property
     def utilization(self) -> float:
+        self._validate_counters()
         if not self.total_bytes:
             return 0.0
         return min(1.0, self.reserved_bytes / self.total_bytes)
@@ -52,6 +66,8 @@ class VramDefenseGuard:
     """Observa pressão de memória e aplica respostas graduais e auditáveis."""
 
     def __init__(self, soft_limit: float = 0.80, hard_limit: float = 0.92) -> None:
+        if isinstance(soft_limit, bool) or isinstance(hard_limit, bool):
+            raise TypeError("limites não podem ser booleanos")
         if not 0 < soft_limit < hard_limit <= 1:
             raise ValueError("limites devem satisfazer 0 < soft < hard <= 1")
         self.soft_limit = soft_limit
@@ -71,28 +87,36 @@ class VramDefenseGuard:
             total_bytes=int(torch.cuda.get_device_properties(device).total_memory),
         )
 
+    def _classify_snapshot(self, current: VramSnapshot) -> tuple[str, str, str]:
+        """Classifica os valores atuais do snapshot, sem registrar uma amostra."""
+        current._validate_counters()
+        if not current.available:
+            action, severity, reason = "observe", "info", "GPU indisponível; execução permanece em modo CPU"
+        elif current.utilization >= self.hard_limit:
+            action, severity, reason = "emergency_release", "critical", "pressão de VRAM acima do limite rígido"
+        elif current.utilization >= self.soft_limit:
+            action, severity, reason = "defer_and_release", "warning", "pressão de VRAM acima do limite suave"
+        else:
+            action, severity, reason = "continue", "normal", "pressão de VRAM dentro do orçamento"
+        return action, severity, reason
+
     def evaluate(self, snapshot: Optional[VramSnapshot] = None) -> DefenseDecision:
         current = snapshot or self.snapshot()
-        if not current.available:
-            decision = DefenseDecision("observe", "info", "GPU indisponível; execução permanece em modo CPU", current)
-        elif current.utilization >= self.hard_limit:
-            decision = DefenseDecision("emergency_release", "critical", "pressão de VRAM acima do limite rígido", current)
-        elif current.utilization >= self.soft_limit:
-            decision = DefenseDecision("defer_and_release", "warning", "pressão de VRAM acima do limite suave", current)
-        else:
-            decision = DefenseDecision("continue", "normal", "pressão de VRAM dentro do orçamento", current)
+        action, severity, reason = self._classify_snapshot(current)
+        decision = DefenseDecision(action, severity, reason, current)
         self.history.append(decision)
         return decision
 
     def mitigation_plan(self, decision: Optional[DefenseDecision] = None) -> Dict[str, Any]:
         current = decision or self.evaluate()
+        action, severity, _reason = self._classify_snapshot(current.snapshot)
         actions = {
             "continue": ["admit_next_task"],
             "defer_and_release": ["defer_next_task", "release_cached_tensors", "gc_collect"],
             "emergency_release": ["stop_noncritical_tasks", "release_cached_tensors", "gc_collect", "require_recheck"],
             "observe": ["use_cpu_fallback"],
-        }[current.action]
-        return {"action": current.action, "severity": current.severity, "steps": actions, "utilization": current.snapshot.utilization}
+        }[action]
+        return {"action": action, "severity": severity, "steps": actions, "utilization": current.snapshot.utilization}
 
     def execute_mitigation(
         self,
@@ -102,8 +126,9 @@ class VramDefenseGuard:
     ) -> MitigationResult:
         """Executa somente ações locais e reversíveis; callbacks são opcionais e explícitos."""
         current = decision or self.evaluate()
-        result = MitigationResult(current.action, [], [], [])
-        steps = self.mitigation_plan(current)["steps"]
+        plan = self.mitigation_plan(current)
+        result = MitigationResult(plan["action"], [], [], [])
+        steps = plan["steps"]
         for step in steps:
             try:
                 if step == "release_cached_tensors":
