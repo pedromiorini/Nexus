@@ -40,6 +40,10 @@ def _veto_table(vetoes: Mapping[Any, Any]) -> Dict[str, str]:
     """Mapa chave normalizada → motivo; com duas chaves iguais depois de normalizar, vence a primeira."""
     table: Dict[str, str] = {}
     for name, reason in vetoes.items():
+        if not isinstance(name, str) or not isinstance(reason, str):
+            raise TypeError("vetoes must map action names (str) to reasons (str)")
+        if not _veto_key(name):
+            raise ValueError("veto action name must not be empty")
         key = _veto_key(name)
         if key and key not in table:
             table[key] = reason

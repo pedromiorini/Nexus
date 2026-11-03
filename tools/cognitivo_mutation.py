@@ -73,7 +73,7 @@ MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
 MW_TESTS = ("test_mcts_world_effects_contract.py",)
 IJ_TESTS = ("test_mcts_prompt_injection_contract.py",)
 P1B_TESTS = ("test_mcts_p1b_contract.py",)
-P1C_TESTS = ("test_mcts_p1c_contract.py",)
+P1C_TESTS = ("test_mcts_p1c_contract.py", "test_mcts_compare_veto_contract.py")
 ER_TESTS = ("test_mcts_expected_reward_contract.py",)
 
 PC_LEARNING = ("test_predictive_learning_contract.py",)
@@ -2280,14 +2280,20 @@ MUTATIONS = [
              'if key and key not in table:',
              'if key:', tests=P1C_TESTS),
     Mutation("p1c_ctor_empty_key_accepted", MCTS,
-             'if not _veto_key(name):',
-             'if False:', tests=P1C_TESTS),
+             '            for name, reason in vetoes.items():\n                if not isinstance(name, str) or not isinstance(reason, str):\n                    raise TypeError("vetoes must map action names (str) to reasons (str)")\n                if not _veto_key(name):\n                    raise ValueError("veto action name must not be empty")',
+             '            for name, reason in vetoes.items():\n                if not isinstance(name, str) or not isinstance(reason, str):\n                    raise TypeError("vetoes must map action names (str) to reasons (str)")\n                if False:\n                    raise ValueError("veto action name must not be empty")', tests=P1C_TESTS),
     Mutation("p1c_ctor_nonstr_accepted", MCTS,
-             'if not isinstance(name, str) or not isinstance(reason, str):',
-             'if False:', tests=P1C_TESTS),
+             '            for name, reason in vetoes.items():\n                if not isinstance(name, str) or not isinstance(reason, str):\n                    raise TypeError("vetoes must map action names (str) to reasons (str)")',
+             '            for name, reason in vetoes.items():\n                if False:\n                    raise TypeError("vetoes must map action names (str) to reasons (str)")', tests=P1C_TESTS),
     Mutation("p1c_ctor_reason_unchecked", MCTS,
-             'if not isinstance(name, str) or not isinstance(reason, str):',
-             'if not isinstance(name, str):', tests=P1C_TESTS),
+             '            for name, reason in vetoes.items():\n                if not isinstance(name, str) or not isinstance(reason, str):\n                    raise TypeError("vetoes must map action names (str) to reasons (str)")',
+             '            for name, reason in vetoes.items():\n                if not isinstance(name, str):\n                    raise TypeError("vetoes must map action names (str) to reasons (str)")', tests=P1C_TESTS),
+    Mutation("p1c_table_type_unchecked", MCTS,
+             '    for name, reason in vetoes.items():\n        if not isinstance(name, str) or not isinstance(reason, str):\n            raise TypeError("vetoes must map action names (str) to reasons (str)")',
+             '    for name, reason in vetoes.items():\n        if not isinstance(name, str) or not isinstance(reason, str):\n            pass', tests=P1C_TESTS),
+    Mutation("p1c_table_empty_key_accepted", MCTS,
+             '    for name, reason in vetoes.items():\n        if not isinstance(name, str) or not isinstance(reason, str):\n            raise TypeError("vetoes must map action names (str) to reasons (str)")\n        if not _veto_key(name):\n            raise ValueError("veto action name must not be empty")',
+             '    for name, reason in vetoes.items():\n        if not isinstance(name, str) or not isinstance(reason, str):\n            raise TypeError("vetoes must map action names (str) to reasons (str)")\n        if False:\n            raise ValueError("veto action name must not be empty")', tests=P1C_TESTS),
     Mutation("p1c_cap_off", MCTS,
              'min(DECLARED_SUCCESS_CAP, expected_reward * 1.1)',
              'min(1.0, expected_reward * 1.1)', tests=P1C_TESTS),
