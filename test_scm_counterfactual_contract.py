@@ -218,6 +218,15 @@ class RankAlternativesTests(unittest.TestCase):
         self.assertEqual(out["unidentified"], [["MONITOR"]])
         self.assertEqual(out["unmodeled"], [["INVENTED"]])
 
+    def test_b7_gain_is_signed(self):
+        """Ganho negativo existe: observado `secure`, alternativa que degrada o status (lacuna achada pelo mutante `scm_cf_rank_gain_unsigned`)."""
+        obs = {"system_status": "secure"}
+        out = scm().rank_alternatives(obs, [], [["ISOLATE_SYSTEM"], ["IGNORE_ALERT"]])
+        gains = {tuple(r["actions"]): (r["utility"], r["gain"]) for r in out["ranking"]}
+        self.assertEqual(out["factual_utility"], 3)
+        self.assertEqual(gains[("ISOLATE_SYSTEM",)], (1, -2))
+        self.assertEqual(gains[("IGNORE_ALERT",)], (0, -3))
+
     def test_b2_order_of_alternatives_does_not_matter(self):
         for k in range(30):
             rng = random.Random(SEED + 500 + k)
