@@ -17,16 +17,39 @@ valores às chaves do ``WORLD_SCHEMA``, e nenhuma chave é função de outra; a 
 causal aceita é do(ação). Os nomes de ação exatos são exigidos (``apply_patch`` não vira
 ``APPLY_PATCH``). O veto de ``rank_alternatives`` compara os mesmos nomes exatos: se um dia os
 nomes forem normalizados, o veto deve ser normalizado junto (hoje não é).
+
+Limitação conhecida (veto por nome, não por efeito): um alias declarado com ``declare_intervention``
+(por exemplo ``shutdown_service`` com o mesmo efeito de ``SHUTDOWN_SERVICE``) tem outro nome e,
+portanto, não é vetado pelo ``DEFAULT_VETOES``; para vetá-lo, passe o nome do alias em ``vetoes``.
+Não há veto por efeito. O ``DEFAULT_VETOES`` é copiado no import: alterá-lo depois não muda este módulo.
 """
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from core.cognitivo.action_effects import ACTION_EFFECTS
 from core.cognitivo.causal_world_model import STATUS_UTILITY, WORLD_SCHEMA, _schema_pair
 from core.cognitivo.mcts_planner import DEFAULT_VETOES
+
+# Cópia congelada no import: um ``DEFAULT_VETOES.clear()`` externo não desliga o veto em silêncio.
+_FROZEN_DEFAULT_VETOES: Mapping = MappingProxyType(dict(DEFAULT_VETOES))
+
+
+def _freeze_vetoes(vetoes: Optional[Mapping]) -> Mapping:
+    """Valida (mapa str -> str) e copia ``vetoes``; ``None`` usa a cópia congelada do padrão."""
+    if vetoes is None:
+        return _FROZEN_DEFAULT_VETOES
+    if not isinstance(vetoes, Mapping):
+        raise TypeError("vetoes deve ser um mapa ação -> motivo")
+    frozen: Dict[str, str] = {}
+    for action, reason in dict(vetoes).items():
+        if not isinstance(action, str) or not isinstance(reason, str):
+            raise TypeError("vetoes: ação e motivo devem ser str")
+        frozen[str.__str__(action)] = str.__str__(reason)
+    return MappingProxyType(frozen)
 
 
 class ScmInputError(ValueError):
@@ -159,13 +182,14 @@ def rank_alternatives(
     traz ``vetoed``, lista de ``{"action", "reason"}``, vazia se não vetada) e ``vetoed`` lista as
     vetadas. ``best`` é a primeira não vetada; ``tied_best`` reúne os itens com a utilidade de
     ``best`` (os vetados aparecem marcados). ``vetoes=None`` usa ``DEFAULT_VETOES``; ``{}`` desliga.
+
+    A decisão é ``best``, não ``ranking[0]``: o primeiro do ranking pode estar vetado. ``best=None``
+    significa todas vetadas (ou nenhuma alternativa identificada); então não há recomendação.
+    ``vetoes`` é validado (mapa str -> str, senão ``TypeError`` antes de rankear) e copiado na entrada.
     """
     evidence = _canonical_observation(observed)
     factual = _actions(factual_actions, name="factual_actions")
-    if vetoes is None:
-        vetoes = DEFAULT_VETOES
-    elif not isinstance(vetoes, Mapping):
-        raise TypeError("vetoes deve ser um mapa ação -> motivo")
+    vetoes = _freeze_vetoes(vetoes)
     if alternatives is None or (isinstance(alternatives, (list, tuple)) and not alternatives):
         raise ScmInputError("SCM_NO_ALTERNATIVES", "alternatives ausente ou vazia")
     if isinstance(alternatives, (str, bytes)) or not isinstance(alternatives, (list, tuple)):
