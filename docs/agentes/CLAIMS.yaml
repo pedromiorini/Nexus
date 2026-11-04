@@ -1,4 +1,16 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "extração move-only do Temporal Reasoning Engine (POST41) para core/cognitivo (t157u)"
+    arquivos:
+      - core/cognitivo/temporal_reasoning.py
+      - core/cognitivo/__init__.py
+      - core/constitutional_brain.py
+      - test_temporal_reasoning_contract.py
+      - tools/cognitivo_eval.py
+      - tools/cognitivo_mutation.py
+      - docs/cognitivo/AUDITORIA_2026-10-22.md
+    pr: null
+    expira_em: "2026-11-07T04:30:00-03:00"
