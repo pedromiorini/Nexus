@@ -44,6 +44,12 @@ from core.cognitivo.semantic_networks import (
     RealSemanticNetworksSystem,
     SemanticRelation,
 )
+from core.cognitivo.temporal_reasoning import (
+    RealTemporalReasoningEngine,
+    TemporalEvent,
+    TemporalRelation,
+    TemporalSequence,
+)
 from core.cognitivo.working_memory import (
     CentralExecutive,
     PhonologicalLoop,
@@ -81,10 +87,14 @@ __all__ = [
     "RealIncrementalLearner",
     "RealMentalSimulationSystem",
     "RealSemanticNetworksSystem",
+    "RealTemporalReasoningEngine",
     "RealWorkingMemorySystem",
     "RehearsalEvent",
     "SemanticRelation",
     "StimulusItem",
+    "TemporalEvent",
+    "TemporalRelation",
+    "TemporalSequence",
     "TopDownAttention",
     "VisuospatialSketchpad",
     "WorkingMemoryItem",
