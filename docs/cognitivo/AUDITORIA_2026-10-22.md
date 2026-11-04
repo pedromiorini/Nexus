@@ -3237,3 +3237,10 @@ Ligar `rank_alternatives` ao `plan()` do MCTS (ponte, seguimento após #147); ru
 
 ### Regra de parada
 Se um critério acima falhar no GREEN, se qualquer teste existente falhar, ou se um mutante sobreviver sem justificativa registrada: **parar sem push** e reportar opções com uma recomendada.
+
+### Resultados (SCM-A/B/N/E; medidos em 2026-11-04, fuso America/Sao_Paulo)
+- **RED na `main`** (commit `e2a0475`): 27 testes, nenhum passou (356 erros — `ModuleNotFoundError`/`AttributeError` — e 1 falha, a asserção de cobertura da amostra A1, que só dispara porque todas as instâncias deram erro). Previsão confirmada.
+- **GREEN** (commit `feat`): 27/27 em py3.11 e py3.12 como previsto; amostra A1: 25/200 inconsistentes e 106/200 com `unidentified` (limites do critério: ≥ 10 e ≥ 60). Nenhum critério pré-registrado falhou, nenhum foi ajustado depois do RED.
+- **Desvio declarado (único):** os 33 mutantes `scm_cf_*` foram registrados *depois* do GREEN (o pré-registro previa ≥ 24 e dava a lista só por categoria). Primeira rodada 32/33; sobreviveu `scm_cf_rank_gain_unsigned`, pois nenhum teste exercia ganho **negativo**. Em vez de justificar o sobrevivente, acrescentei **B7** (`gain` com sinal: observado `secure`; `[ISOLATE_SYSTEM]` → utilidade 1, ganho −2; `[IGNORE_ALERT]` → 0, −3), que não relaxa nem altera A/B/N/E; contagem passa a 28 testes. Segunda rodada: 33/33.
+- **Gates (py3.11 e py3.12):** ruff; compileall; suíte inteira 1110 testes OK (3 falhas esperadas, pré-existentes); `validar_registro` OK; `reality_audit` regenerado só pela ferramenta; cobertura `core/cognitivo/*` ≥ 90 (módulo novo 98%, 1 linha e 2 ramos não cobertos); `cognitivo_mutation` 776/776; `targeted_mutation` 80/80 (arquivo intocado); bandit + `security_triage` + `embedded_assert_audit` OK. `cognitivo_eval --capability all` falha só em M3, como na `main` antes deste PR.
+- **Claims:** `claims: []`.
