@@ -1,4 +1,15 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "Ciclo de decisão do roteador (propor→rejeitar→selecionar→aplicar, impasse) em módulo novo core/cognitivo/decision_cycle.py, DC1–DC10"
+    arquivos:
+      - core/cognitivo/decision_cycle.py
+      - test_decision_cycle_contract.py
+      - tools/cognitivo_mutation.py
+      - docs/cognitivo/AUDITORIA_2026-10-22.md
+      - docs/agentes/CLAIMS.yaml
+      - AUDIT_REALITY_REPORT.md
+      - audit_reality.json
+    expira_em: "2026-11-05T18:00:00Z"
