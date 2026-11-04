@@ -48,9 +48,9 @@
       },
       {
         "path": "core/cognitivo/decision_cycle.py",
-        "lines": 234,
+        "lines": 300,
         "classes": 4,
-        "functions": 9
+        "functions": 11
       },
       {
         "path": "core/cognitivo/emotional_memory_weighting.py",
