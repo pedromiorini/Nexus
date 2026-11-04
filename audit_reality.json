@@ -90,9 +90,9 @@
       },
       {
         "path": "core/cognitivo/scm_counterfactual.py",
-        "lines": 218,
+        "lines": 243,
         "classes": 2,
-        "functions": 7
+        "functions": 8
       },
       {
         "path": "core/cognitivo/semantic_networks.py",
