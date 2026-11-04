@@ -102,10 +102,29 @@ class NexusConstitutionalBridge:
             )
             self._audit_db.commit()
 
+    @staticmethod
+    def _require_positive_int(value: Any, name: str) -> int:
+        """Rejeita bool e não inteiros antes de comparar ou consultar."""
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError(f"{name} deve ser inteiro")
+        if value < 1:
+            raise ValueError(f"{name} deve ser positivo")
+        return value
+
+    @staticmethod
+    def _require_optional_positive_window(value: Any) -> Optional[float]:
+        """None é a janela ausente. Vazio, bool e não finito não filtram em silêncio."""
+        if value is None:
+            return None
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError("window_seconds deve ser número real")
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError("window_seconds deve ser positivo e finito")
+        return float(value)
+
     def get_policy_audit(self, limit: int = 128) -> List[Dict[str, Any]]:
         """Retorna eventos recentes de auditoria em ordem cronológica."""
-        if limit < 1:
-            raise ValueError("limit deve ser positivo")
+        limit = self._require_positive_int(limit, "limit")
         with self._audit_db_lock:
             rows = self._audit_db.execute(
                 "SELECT event_type, timestamp, payload FROM policy_audit ORDER BY id DESC LIMIT ?", (limit,)
@@ -114,8 +133,7 @@ class NexusConstitutionalBridge:
 
     def get_recovery_analysis(self, limit: int = 128, window_seconds: Optional[float] = None) -> Dict[str, Any]:
         """Calcula recuperação em uma janela opcional e classifica a severidade dos eventos."""
-        if window_seconds is not None and window_seconds <= 0:
-            raise ValueError("window_seconds deve ser positivo")
+        window_seconds = self._require_optional_positive_window(window_seconds)
         events = self.get_policy_audit(limit)
         if window_seconds is not None:
             cutoff = time.time() - window_seconds
