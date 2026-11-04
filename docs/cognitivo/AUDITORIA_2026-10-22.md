@@ -3283,6 +3283,26 @@ Capturado no monólito (`af28cc1`, antes do move) com `tools.cognitivo_eval._ms_
 
 18 testes: 10 passam (caracterização do monólito: entradas inválidas, gaps, colaboradores, saídas 2 e 3 do CLI) e 8 falham **apenas** com `ModuleNotFoundError: No module named 'core.cognitivo.temporal_reasoning'` (reexport, standalone, fingerprint congelado, negativos de golden/TR5/adulteração e CLI exit 0). `tools/cognitivo_eval.py --capability temporal_reasoning` sai com 1 no mesmo ponto. Como previsto: nenhum critério de propósito (TR1–TR5) falha no monólito.
 
+## Resultados (Temporal Reasoning, POST41)
+
+Escritos depois do move; nenhum critério pré-registrado foi alterado, nenhum falhou.
+
+| Critério | Monólito (`af28cc1`) | Módulo novo `core/cognitivo/temporal_reasoning.py` |
+|---|---|---|
+| TR1 (120 instâncias contra a referência independente, entradas não alteradas) | 120/120, 0 alteradas | 120/120, 0 alteradas |
+| TR2 / TR3 (famílias de relações e sequências) | 20/20 e 20/20 | 20/20 e 20/20 |
+| TR4 (10 seções de gaps e erros) | iguais ao registrado | iguais ao registrado |
+| TR5 (3 processos, `PYTHONHASHSEED` 101, 101, 202) | digests iguais | digests iguais |
+| TR6 (SHA da fonte e SHA comportamental) | `98ebbd9a…f866` e `9aa6a0c7…25c4` | idênticos, em Python 3.11 e 3.12 |
+
+- **Move-only:** o bloco foi movido byte a byte (SHA-256 da fonte congelado em `TR_SOURCE_SHA`); `core/constitutional_brain.py` passou de 23 327 para 23 021 linhas e reexporta os quatro nomes no ponto original; `core/cognitivo/__init__.py` reexporta os mesmos objetos (`brain.X is core.cognitivo.X is module.X`).
+- **GREEN:** todos os 18 testes do contrato passam (os 8 que falhavam no RED); o módulo não importa numpy, vita nem o monólito.
+- **Mutantes:** 135 novos (`tr_*`) em `tools/cognitivo_mutation.py`, catálogo total 878, todos mortos em Python 3.11 e 3.12. A primeira rodada deixou 1 sobrevivente (`tr_package_drops_all_entry`: tirar `TemporalSequence` de `core.cognitivo.__all__`); foi adicionado o teste `test_package_and_module_declare_the_four_public_names` (não altera TR1–TR6) e a segunda rodada matou os 878.
+- **Cobertura de `core/cognitivo`:** 98 % (≥ 90); `temporal_reasoning.py` 99 % (131 instruções, 0 perdidas; 1 ramo parcial). Python 3.11 e 3.12.
+- **Relatórios:** `tools/reality_audit.py` regenerou `AUDIT_REALITY_REPORT.md` e `audit_reality.json` (núcleo 23 327 → 23 021 linhas, 218 → 214 classes, 698 → 688 funções; extraídos 16 → 17 módulos); `git diff` limpo depois. `SECURITY_TRIAGE.md --check` e `embedded_assert_audit` verdes; `validar_registro` verde; `targeted_mutation` 80/80.
+- **Ressalva herdada (não é desta mudança):** `tools/cognitivo_eval.py --capability all` sai com 1 por causa de `M3` (mental_simulation); o mesmo ocorre em `af28cc1` sem este PR. `--capability temporal_reasoning` sai com 0.
+- **Claim:** removido neste último commit (`claims: []`).
+
 ## SCM contrafactual — abdução-ação-predição (pré-registro SCM-A, SCM-B, SCM-N, SCM-E; 2026-11-04)
 
 Autorização do Pedro: **t158u** («Prossiga» sobre a fila aprovada; item 1 = SCM/contrafactual da Pearl). Base: `main` `af28cc1`. **Este commit só registra decisões, critérios e previsão; nenhum teste nem código de produção muda.** Os critérios abaixo não são ajustados depois do RED; se um falhar no GREEN, **paro sem push** e reporto opções com uma recomendada.
