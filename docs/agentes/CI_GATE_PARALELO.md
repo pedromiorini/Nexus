@@ -50,3 +50,28 @@ Fatia ≈ 1/3 do passo cognitivo mais o custo de rodar a linha de base das suít
 
 ## Disciplina
 Se algum critério falhar: parar e relatar opções (uma recomendada); **sem errata e sem ajuste** de limiares (720 s, N = 3), definições ou dados depois de ver o resultado. Não define `versao_aceita` de ninguém.
+
+## Resultados (medidos em 04/11/2026; critérios acima não foram alterados)
+SHA medido: `fbf4555` (código final). Run hospedado `41877767194`, tentativas 1–3 (re-execuções do mesmo SHA). Durações dos jobs `completed_at − started_at` da API; «conjunto» = do início do primeiro job ao fim de `Final state attestation`, sem a fila.
+
+| tentativa | fatia 1 | fatia 2 | fatia 3 | `contract-gate` | replay | atestação | conjunto |
+|---|---|---|---|---|---|---|---|
+| 1 | 176 s | 225 s | 323 s | 477 s | 16 s | 12 s | 492 s |
+| 2 | 319 s | 309 s | 183 s | 448 s | 13 s | 16 s | 477 s |
+| 3 | 325 s | 231 s | 222 s | 420 s | 20 s | 10 s | 437 s |
+
+Antes (8 sucessos anteriores, job único): 666–1149 s (55–96 % de 1200 s).
+
+- **CG1 passa:** maior duração de qualquer job nas 3 execuções = 477 s (40 % do limite; alvo ≤ 720 s). Uma mesma fatia variou 176–325 s entre execuções (1,8×): a variação de runner continua, mas agora cabe com folga.
+- **CG2 passa:** conjunto 437–492 s (36–41 %; alvo ≤ 720 s; antes até 1149 s).
+- **CG3 passa:** (a) partição disjunta e completa para N = 1…16 (teste novo, verde); (b) soma de `declared` dos artefatos das fatias = 811 = `len(MUTATIONS)`, 271 + 270 + 270, nomes únicos e iguais ao catálogo, `killed` = `declared`, `survived` = `not_applied` = 0, conferido por script nos artefatos das tentativas 1 e 3. **Limite:** na tentativa 2 o artefato foi sobrescrito pela tentativa 3 (mesmo nome) e os logs de job não foram legíveis pela API; para ela só consta o `success` das 3 fatias (que exige `killed == declared`). Localmente também: sem `--shard` 811/811 e as 3 fatias 271 + 270 + 270 = 811.
+- **CG4 passa:** `tools/targeted_mutation.py` e testes existentes sem diff; catálogo `MUTATIONS` sem hunk; diff estrutural do YAML contra `main`: único passo removido de `contract-gate` é `Run core/cognitivo mutation gate`, restantes idênticos e na mesma ordem, atributos do job idênticos (`timeout-minutes: 20`), `state-manifest` idêntico, `agent-guard-replay` só ganhou `needs: [cognitivo-mutation]`; job novo sem `if`/`continue-on-error`.
+- **CG5 passa:** `test_ci_gate_shard_contract.py` verde, junto com `test_agent_replay_contract.py` e `test_cognitivo_mutation_parallel_contract.py` sem edição.
+- **CG6 passa:** commit de prova `d9d2fed` (`--shard 4/3`), run `41885319968`: as 3 fatias `failure` em 12–20 s, `Agent guard replay` `skipped`, `Final state attestation` `skipped`, run `failure`. O `contract-gate` também falhou (o teste novo de estrutura detecta o workflow adulterado). Revertido em `637abc8`; árvore idêntica a `fbf4555`.
+- **CG7 e CG8 passam:** 20 testes novos; RED na `main`: 16 de 20 falhavam (previsão «todos falham» errada: 4 já passavam — 1 guarda do formato antigo, 1 guarda de limiares, e 2 negativos que o parser antigo já recusava com saída 2).
+- **CG9 passa:** suíte 1169 testes verde em Python 3.11 e 3.12; ruff; compileall; `reality_audit` sem diff; Bandit 139 LOW e 0 MEDIUM/HIGH com `security_triage --check` ok; cobertura `core/cognitivo/*` 98 %; `targeted_mutation` 80/80; `validar_registro` ok; `claims: []`; actionlint 1.7.12 e zizmor 1.31.1 sem achados; CI hospedado verde nas 3 tentativas.
+- **CG10 (informativo):** a guarda `timeout_margin.sh 20` (85 % = 1020 s) não dispararia em nenhuma das 3 (máx. 477 s). Minutos de runner por execução: 1229 s, 1288 s, 1228 s contra ≈ 943 s antes (média dos 8 anteriores + replay e atestação): **+30 %** (previsto +10–20 %; repositório público, sem custo).
+
+Previsões: fatia 200–330 s (real 176–325), `contract-gate` 440–480 s (real 420–477), conjunto 520–560 s (real 437–492, melhor que o previsto). Erradas: a previsão de RED («todos falham») e o aumento de minutos de runner.
+
+Observação de infraestrutura: após a tentativa 1 o run ficou com `status: in_progress` na API por ~20 min com todos os jobs concluídos (impediu `gh run rerun`); desfez-se sozinho após fechar e reabrir o PR (isso criou o run `41881023327`, cancelado pela concorrência). Não afeta as medições (tempos vêm dos jobs).
