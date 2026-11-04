@@ -94,6 +94,24 @@ class C10S1NaoMudaChaveExistenteNemAlarga(unittest.TestCase):
                 self.assertIsNone(veto_key(text))
 
 
+class C12GuardaMarcasMnMe(unittest.TestCase):
+    """Guarda acrescentada na etapa de mutantes (errata E-VK6): as 14 variantes da Pearl só têm Mn; sem esta guarda o
+    mutante ``vk_keeps_me`` (Me fora do filtro) sobrevivia. Passa no GREEN; morre sob ``vk_keeps_me``/``vk_keeps_mn``."""
+
+    def test_marcas_envolventes_me(self):
+        for c in ("\u20dd", "\u0488"):
+            for v in (B + c, "SHUTDOWN_" + c + "SERVICE", "SHUT" + c + "DOWN_SERVICE"):
+                with self.subTest(v=ascii(v)):
+                    self.assertEqual(veto_key(v), B)
+                    self.assertIsNone(DC.select_operator([v]).selected)
+
+    def test_toda_marca_mn_e_me_do_unicode_e_removida(self):
+        marcas = [chr(i) for i in range(0x110000) if unicodedata.category(chr(i)) in ("Mn", "Me")]
+        self.assertGreater(len(marcas), 1000)
+        ruins = [hex(ord(c)) for c in marcas if veto_key("SHUTDOWN_" + c + "SERVICE") != B]
+        self.assertEqual(ruins[:5], [])
+
+
 class S3EntradaNaoStrNaoChamaMetodoDoChamador(unittest.TestCase):
     """Guarda (passa hoje; falha sob M3a = ``plan`` sem ``not isinstance(action, str)``, e sob M3b = ``veto_lookup``
     sem ``isinstance``)."""
