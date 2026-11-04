@@ -100,7 +100,7 @@ class DC1Oracle(unittest.TestCase):
             with self.subTest(k=k):
                 _, proposals, rejects, better = build_case(k)
                 sel, kind, cands, rejected = oracle(proposals, rejects, better)
-                decision = m.select_operator(proposals, rejects=rejects, better=better)
+                decision = m.select_operator(proposals, rejects=rejects, better=better, use_default_rejects=False)
                 kinds.add(kind)
                 self.assertEqual(decision.selected, sel)
                 self.assertEqual(decision.impasse.kind if decision.impasse else None, kind)
@@ -119,7 +119,7 @@ class DC1Oracle(unittest.TestCase):
                 rec = Rec(result=("r", k))
                 decision = m.run_decision_cycle(
                     state, [lambda s: proposals[:half], lambda s: tuple(proposals[half:])],
-                    apply=rec, rejects=rejects, better=better)
+                    apply=rec, rejects=rejects, better=better, use_default_rejects=False)
                 self.assertEqual(decision.selected, sel)
                 self.assertEqual(decision.impasse.kind if decision.impasse else None, kind)
                 self.assertEqual(decision.candidates, cands)
@@ -261,9 +261,13 @@ class DC5Constraint(unittest.TestCase):
         self.assertEqual(decision.selected, "MONITOR")
         self.assertIn("SHUTDOWN_SERVICE", decision.rejected)
 
-    def test_explicit_empty_rejects_disables_the_default(self):
+    def test_explicit_empty_rejects_no_longer_disables_the_default(self):
+        # Errata E-DC5: o veto padrão é aditivo; desligar exige use_default_rejects=False.
         m = dc()
-        self.assertEqual(m.select_operator(["SHUTDOWN_SERVICE"], rejects={}).selected, "SHUTDOWN_SERVICE")
+        self.assertIsNone(m.select_operator(["SHUTDOWN_SERVICE"], rejects={}).selected)
+        self.assertEqual(
+            m.select_operator(["SHUTDOWN_SERVICE"], rejects={}, use_default_rejects=False).selected,
+            "SHUTDOWN_SERVICE")
 
     def test_better_does_not_rehabilitate_a_vetoed_operator(self):
         m = dc()
