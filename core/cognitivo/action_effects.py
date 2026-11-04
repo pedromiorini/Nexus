@@ -47,23 +47,28 @@ def planner_deltas() -> Dict[str, Dict[str, float]]:
 # A chave canônica serve só ao VETO (sobre-aproxima de propósito). O vocabulário permitido e a tabela de efeitos
 # continuam com nome exato: uma variante não declarada segue sem modelo (falha fechado).
 _SEPARATORS = re.compile(r"[\s\-.:/\\,\u2010-\u2015\u2212\u00b7]+")
-_CALL_SYNTAX = re.compile(r"(?:\(_*\))?[;!?]*\Z")
+_CALL_SYNTAX = re.compile(r"(?:\(_*\))?[_;!?]*\Z")
+# Invisíveis que não são Cf/Cc: marcas Mn/Me (CGJ, seletores de variação, acentos combinantes) e preenchedores.
+_DROPPED_CATEGORIES = ("Cf", "Cc", "Mn", "Me")
+_FILLERS = frozenset("\u115f\u1160\u3164\uffa0\u2800")
 _ASCII_KEY = re.compile(r"[A-Za-z0-9_]+")
 
 
 def veto_key(name: Any) -> Optional[str]:
     """Chave canônica ``[A-Z0-9_]+`` de um nome de ação para comparar vetos, ou ``None`` (não canonicalizável).
 
-    Ordem: NFKC; remove Cf/Cc que não sejam espaço (``\\t`` e ``\\n`` são separadores); separadores
+    Ordem: NFKC; remove Cf/Cc que não sejam espaço (``\\t`` e ``\\n`` são separadores), as marcas Mn/Me e os
+    preenchedores U+115F, U+1160, U+3164, U+FFA0 e U+2800 (errata E-VK5); separadores
     (espaço, ``- . : / \\ ,``, U+2010–U+2015, U+2212, ``·``) viram ``_``; tira a sintaxe de chamada final
-    (``()``, ``;``, ``!``, ``?``); exige ASCII **antes** de ``upper()`` (cirílico, ``ı`` e ``ß`` nunca viram ASCII);
+    (``()``, ``;``, ``!``, ``?``, também com ``_`` solto entre eles, como em ``NOME ( ) ;``); exige ASCII **antes** de ``upper()`` (cirílico, ``ı`` e ``ß`` nunca viram ASCII);
     ``upper()``. Idempotente. Sufixos ``_V2``, ``.exec``, plural e prefixo ``do_`` continuam identidades distintas.
     Não-``str`` e vazio devolvem ``None`` (nunca chama método do chamador: usa ``str.__str__``).
     """
     if not isinstance(name, str):
         return None
     text = unicodedata.normalize("NFKC", str.__str__(name))
-    text = "".join(c for c in text if c.isspace() or unicodedata.category(c) not in ("Cf", "Cc"))
+    text = "".join(c for c in text if c.isspace() or (
+        c not in _FILLERS and unicodedata.category(c) not in _DROPPED_CATEGORIES))
     text = _CALL_SYNTAX.sub("", _SEPARATORS.sub("_", text.strip()))
     text = re.sub(r"_+", "_", text).strip("_")
     if not text or not _ASCII_KEY.fullmatch(text):
