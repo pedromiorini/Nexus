@@ -71,9 +71,12 @@ def _freeze_default_vetoes() -> Mapping[str, str]:
 
 _FROZEN_DEFAULT_VETOES: Mapping[str, str] = _freeze_default_vetoes()
 # Chaves canônicas (veto_key) do veto padrão, congeladas no import como o mapa exato.
-_FROZEN_DEFAULT_CANON: Mapping[str, str] = MappingProxyType(
-    {key: str.__str__(reason) for key, reason in veto_index(
-        {str.__str__(name): reason for name, reason in DEFAULT_VETOES.items()}).items()})
+def _freeze_default_canon() -> Mapping[str, str]:
+    index = veto_index({str.__str__(name): reason for name, reason in DEFAULT_VETOES.items()})
+    return MappingProxyType({key: str.__str__(reason) for key, reason in index.items()})
+
+
+_FROZEN_DEFAULT_CANON: Mapping[str, str] = _freeze_default_canon()
 
 
 class DecisionInputError(ValueError):

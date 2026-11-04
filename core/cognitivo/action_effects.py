@@ -56,7 +56,7 @@ def veto_key(name: Any) -> Optional[str]:
 
     Ordem: NFKC; remove Cf/Cc que não sejam espaço (``\\t`` e ``\\n`` são separadores); separadores
     (espaço, ``- . : / \\ ,``, U+2010–U+2015, U+2212, ``·``) viram ``_``; tira a sintaxe de chamada final
-    (``()``, ``;``, ``!``, ``?``); exige ASCII **antes** de ``upper()`` (cirílico, ``ı`` e ``ſ`` nunca viram ASCII);
+    (``()``, ``;``, ``!``, ``?``); exige ASCII **antes** de ``upper()`` (cirílico, ``ı`` e ``ß`` nunca viram ASCII);
     ``upper()``. Idempotente. Sufixos ``_V2``, ``.exec``, plural e prefixo ``do_`` continuam identidades distintas.
     Não-``str`` e vazio devolvem ``None`` (nunca chama método do chamador: usa ``str.__str__``).
     """
