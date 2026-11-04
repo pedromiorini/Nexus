@@ -90,7 +90,7 @@
       },
       {
         "path": "core/cognitivo/scm_counterfactual.py",
-        "lines": 188,
+        "lines": 218,
         "classes": 2,
         "functions": 7
       },
