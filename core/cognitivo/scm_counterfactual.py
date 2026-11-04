@@ -9,15 +9,24 @@ após a sequência factual. Os três passos:
    que ela atribui, U[k] não é identificável (o valor final não depende de U[k]);
 2. ação: troca a sequência factual pela contrafactual (do);
 3. predição: o valor de k é conhecido se a contrafactual o atribui ou se U[k] foi abduzido;
-   caso contrário a chave fica em ``unidentified`` — nunca é adivinhada.
+   caso contrário a chave fica em ``unidentified`` — nunca é adivinhada; ``possible`` devolve o
+   domínio (valores possíveis) de cada uma dessas chaves.
+
+Limites do modelo (declarados): o modelo é sem arestas entre variáveis — cada ação só atribui
+valores às chaves do ``WORLD_SCHEMA``, e nenhuma chave é função de outra; a única operação
+causal aceita é do(ação). Os nomes de ação exatos são exigidos (``apply_patch`` não vira
+``APPLY_PATCH``). O veto de ``rank_alternatives`` compara os mesmos nomes exatos: se um dia os
+nomes forem normalizados, o veto deve ser normalizado junto (hoje não é).
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from core.cognitivo.action_effects import ACTION_EFFECTS
 from core.cognitivo.causal_world_model import STATUS_UTILITY, WORLD_SCHEMA, _schema_pair
+from core.cognitivo.mcts_planner import DEFAULT_VETOES
 
 
 class ScmInputError(ValueError):
@@ -38,6 +47,7 @@ class ScmCounterfactual:
     backdrop: Dict[str, Any] = field(default_factory=dict)
     verified_status: Optional[str] = None
     utility: Optional[int] = None
+    possible: Dict[str, Tuple[Any, ...]] = field(default_factory=dict)
 
 
 def _canonical_observation(observed: object) -> Dict[str, Any]:
@@ -113,7 +123,6 @@ def counterfactual_outcome(
     factual = _actions(factual_actions, name="factual_actions")
     counter = _actions(counterfactual_actions, name="counterfactual_actions")
     assigned_f = _assignments(world_model, factual)
-    assigned_c = _assignments(world_model, counter)
 
     conflicts = {
         key: (evidence[key], value)
@@ -123,6 +132,7 @@ def counterfactual_outcome(
     if conflicts:
         return ScmCounterfactual(False, {}, tuple(sorted(WORLD_SCHEMA)), conflicts)
 
+    assigned_c = _assignments(world_model, counter)
     backdrop = {key: value for key, value in sorted(evidence.items()) if key not in assigned_f}
     state = dict(backdrop)
     state.update(assigned_c)
@@ -132,6 +142,7 @@ def counterfactual_outcome(
     return ScmCounterfactual(
         True, state, unidentified, {}, backdrop, status,
         STATUS_UTILITY.get(status) if status is not None else None,
+        {key: tuple(WORLD_SCHEMA[key]) for key in unidentified},
     )
 
 
@@ -140,10 +151,21 @@ def rank_alternatives(
     factual_actions: Sequence[str],
     alternatives: Sequence[Sequence[str]],
     world_model: object = None,
+    vetoes: Optional[Mapping] = None,
 ) -> Dict[str, Any]:
-    """Ordena sequências alternativas pelo status contrafactual identificado."""
+    """Ordena sequências alternativas pelo status contrafactual identificado.
+
+    O veto marca, não exclui: toda alternativa identificada continua em ``ranking`` (cada item
+    traz ``vetoed``, lista de ``{"action", "reason"}``, vazia se não vetada) e ``vetoed`` lista as
+    vetadas. ``best`` é a primeira não vetada; ``tied_best`` reúne os itens com a utilidade de
+    ``best`` (os vetados aparecem marcados). ``vetoes=None`` usa ``DEFAULT_VETOES``; ``{}`` desliga.
+    """
     evidence = _canonical_observation(observed)
     factual = _actions(factual_actions, name="factual_actions")
+    if vetoes is None:
+        vetoes = DEFAULT_VETOES
+    elif not isinstance(vetoes, Mapping):
+        raise TypeError("vetoes deve ser um mapa ação -> motivo")
     if alternatives is None or (isinstance(alternatives, (list, tuple)) and not alternatives):
         raise ScmInputError("SCM_NO_ALTERNATIVES", "alternatives ausente ou vazia")
     if isinstance(alternatives, (str, bytes)) or not isinstance(alternatives, (list, tuple)):
@@ -176,13 +198,21 @@ def rank_alternatives(
             "verified_status": result.verified_status,
             "utility": result.utility,
             "gain": None if factual_utility is None else result.utility - factual_utility,
+            "state": dict(result.state),
+            "unidentified": list(result.unidentified),
+            "vetoed": [{"action": a, "reason": str(vetoes[a])} for a in dict.fromkeys(seq) if a in vetoes],
         })
     if conflicts:
         return {"consistent": False, "conflicts": conflicts, "factual_utility": factual_utility,
-                "ranking": [], "best": None, "unidentified": [], "unmodeled": []}
+                "ranking": [], "best": None, "tied_best": [], "vetoed": [],
+                "unidentified": [], "unmodeled": []}
     ranking.sort(key=lambda r: (-r["utility"], len(r["actions"]), tuple(r["actions"])))
     unidentified.sort(key=lambda s: (len(s), tuple(s)))
     unmodeled.sort(key=lambda s: (len(s), tuple(s)))
+    allowed = [item for item in ranking if not item["vetoed"]]
+    best = allowed[0] if allowed else None
+    tied_best = [item for item in ranking if best is not None and item["utility"] == best["utility"]]
+    vetoed = [{"actions": item["actions"], "vetoes": item["vetoed"]} for item in ranking if item["vetoed"]]
     return {"consistent": True, "conflicts": {}, "factual_utility": factual_utility,
-            "ranking": ranking, "best": ranking[0] if ranking else None,
+            "ranking": ranking, "best": best, "tied_best": tied_best, "vetoed": vetoed,
             "unidentified": unidentified, "unmodeled": unmodeled}

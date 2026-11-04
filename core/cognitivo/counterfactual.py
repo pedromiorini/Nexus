@@ -574,9 +574,9 @@ class RealCounterfactualReasoningEngine:
             observed, factual_actions, counterfactual_actions, self.world_model
         )
 
-    def rank_counterfactuals(self, observed, factual_actions, alternatives):
-        """Ordena sequências alternativas pelo status contrafactual identificado (consulta pura)."""
-        return scm_rank_alternatives(observed, factual_actions, alternatives, self.world_model)
+    def rank_counterfactuals(self, observed, factual_actions, alternatives, vetoes=None):
+        """Ordena alternativas pelo status contrafactual identificado, marcando as vetadas (consulta pura)."""
+        return scm_rank_alternatives(observed, factual_actions, alternatives, self.world_model, vetoes)
 
     def _parse_what_if_question(self, question: str) -> tuple:
         """Parse questão 'what if?'"""
