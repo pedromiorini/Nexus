@@ -119,6 +119,13 @@ class DC11AdditiveRejects(unittest.TestCase):
         d = m.select_operator(["SHUTDOWN_SERVICE"], rejects={"shutdown service": "meu motivo"})
         self.assertEqual(d.rejected["SHUTDOWN_SERVICE"], mcts_planner.DEFAULT_VETOES["SHUTDOWN_SERVICE"])
 
+    def test_default_vetoes_are_normalized_when_frozen(self):
+        from unittest import mock
+        m = dc()
+        with mock.patch.object(m, "DEFAULT_VETOES", {"Foo  Bar": "motivo-padrao"}):
+            frozen = m._freeze_default_vetoes()
+        self.assertEqual(dict(frozen), {norm("Foo  Bar"): "motivo-padrao"})
+
     def test_run_cycle_honours_flag_and_additive_default(self):
         m = dc()
         rec = Rec()
@@ -339,6 +346,13 @@ class DC14RejectedImmutable(unittest.TestCase):
                     with self.assertRaises((TypeError, AttributeError)):
                         mutate()
                 self.assertEqual(dict(d.rejected), before)
+
+    def test_default_decision_has_a_read_only_rejected(self):
+        m = dc()
+        d = m.Decision()
+        self.assertEqual(dict(d.rejected), {})
+        with self.assertRaises((TypeError, AttributeError)):
+            d.rejected["X"] = "y"
 
     def test_rejected_does_not_alias_the_callers_rejects(self):
         m = dc()
