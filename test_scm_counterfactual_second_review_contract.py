@@ -154,23 +154,29 @@ class AliasLimitationTests(unittest.TestCase):
 
     ALIAS = {"shutdown_service": {"system_status": "offline"}}
 
-    def test_h2a_declared_alias_with_the_same_effect_is_not_vetoed_by_default(self):
+    def test_h2a_declared_alias_with_the_same_effect_is_vetoed_by_default(self):
+        # E-VK1 (decisão do Pedro, t166s1111): o veto compara a chave canônica (veto_key); antes este teste
+        # fixava o contrário (alias minúsculo declarado NÃO vetado e escolhido como best).
         out = scm().rank_alternatives(OBS, ["MONITOR"], [["shutdown_service"], ["MONITOR"]],
                                       _world(self.ALIAS))
         alias = next(item for item in out["ranking"] if item["actions"] == ["shutdown_service"])
         self.assertEqual(alias["verified_status"], "offline")
-        self.assertEqual(alias["vetoed"], [])
-        self.assertEqual(out["vetoed"], [])
-        self.assertEqual(out["best"]["actions"], ["shutdown_service"])
+        self.assertEqual([v["action"] for v in alias["vetoed"]], ["shutdown_service"])
+        self.assertEqual(alias["vetoed"][0]["reason"], DEFAULT_VETOES["SHUTDOWN_SERVICE"])
+        self.assertNotEqual(out["vetoed"], [])
+        self.assertEqual(out["best"]["actions"], ["MONITOR"])
 
     def test_h2b_the_alias_is_vetoed_when_its_name_is_in_the_mapping(self):
         out = scm().rank_alternatives(OBS, ["MONITOR"], [["shutdown_service"], ["MONITOR"]], _world(self.ALIAS),
                                       vetoes={"shutdown_service": "alias"})
         self.assertEqual(out["best"]["actions"], ["MONITOR"])
 
-    def test_h2c_the_module_docstring_states_the_limitation(self):
+    def test_h2c_the_module_docstring_states_the_canonical_veto_and_the_remaining_limitation(self):
+        # E-VK2: marcas antigas (ainda verdadeiras) + `veto_key` e `sufixo` (o docstring deixou de dizer que o alias
+        # declarado não é vetado).
         doc = scm().__doc__
-        for needle in ("alias", "declare_intervention", "veto por efeito", "Limitação conhecida"):
+        for needle in ("alias", "declare_intervention", "veto por efeito", "Limitação conhecida", "veto_key",
+                       "sufixo"):
             with self.subTest(needle=needle):
                 self.assertIn(needle, doc)
 
