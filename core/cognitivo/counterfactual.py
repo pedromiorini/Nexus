@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional
 
 from core.cognitivo.action_effects import ACTION_EFFECTS
 from core.cognitivo.causal_world_model import _schema_pair, classify_text_effects
+from core.cognitivo.scm_counterfactual import counterfactual_outcome as scm_counterfactual_outcome
+from core.cognitivo.scm_counterfactual import rank_alternatives as scm_rank_alternatives
 
 # Sonda ao planner injetado. Não é o default 200 de RealMCTSPlanner.plan
 # e não calibra plausibilidade.
@@ -563,6 +565,19 @@ class RealCounterfactualReasoningEngine:
             "insights": comparison.insights_learned,
         }
     
+    def counterfactual_query(self, observed, factual_actions, counterfactual_actions):
+        """Contrafactual por abdução-ação-predição; ver ``scm_counterfactual``.
+
+        Consulta pura: não grava cenário, insight nem estatística.
+        """
+        return scm_counterfactual_outcome(
+            observed, factual_actions, counterfactual_actions, self.world_model
+        )
+
+    def rank_counterfactuals(self, observed, factual_actions, alternatives):
+        """Ordena sequências alternativas pelo status contrafactual identificado (consulta pura)."""
+        return scm_rank_alternatives(observed, factual_actions, alternatives, self.world_model)
+
     def _parse_what_if_question(self, question: str) -> tuple:
         """Parse questão 'what if?'"""
         # Heurística: extrair de "what if X?"

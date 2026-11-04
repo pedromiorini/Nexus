@@ -1,0 +1,188 @@
+"""Contrafactual SCM por abdução-ação-predição (Pearl, 2009, cap. 7) sobre o mundo simbólico.
+
+Modelo: variáveis endógenas = chaves do WORLD_SCHEMA; mecanismo de cada ação = atribuição
+determinística (efeito da tabela ACTION_EFFECTS e intervenção declarada; texto livre NÃO é
+mecanismo); ruído exógeno U = estado inicial, desconhecido. Evidência = estado final observado
+após a sequência factual. Os três passos:
+
+1. abdução: U[k] = observado[k] para toda chave k que a sequência factual não atribui; para chave
+   que ela atribui, U[k] não é identificável (o valor final não depende de U[k]);
+2. ação: troca a sequência factual pela contrafactual (do);
+3. predição: o valor de k é conhecido se a contrafactual o atribui ou se U[k] foi abduzido;
+   caso contrário a chave fica em ``unidentified`` — nunca é adivinhada.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+from core.cognitivo.action_effects import ACTION_EFFECTS
+from core.cognitivo.causal_world_model import STATUS_UTILITY, WORLD_SCHEMA, _schema_pair
+
+
+class ScmInputError(ValueError):
+    """Entrada inválida do contrafactual SCM. ``code`` identifica o motivo."""
+
+    def __init__(self, code: str, message: str, actions: Tuple[str, ...] = ()) -> None:
+        super().__init__(f"{code}: {message}")
+        self.code = code
+        self.actions = actions
+
+
+@dataclass(frozen=True)
+class ScmCounterfactual:
+    consistent: bool
+    state: Dict[str, Any] = field(default_factory=dict)
+    unidentified: Tuple[str, ...] = ()
+    conflicts: Dict[str, Tuple[Any, Any]] = field(default_factory=dict)
+    backdrop: Dict[str, Any] = field(default_factory=dict)
+    verified_status: Optional[str] = None
+    utility: Optional[int] = None
+
+
+def _canonical_observation(observed: object) -> Dict[str, Any]:
+    if observed is None:
+        raise ScmInputError("SCM_NO_OBSERVATION", "observed ausente")
+    if not isinstance(observed, dict):
+        raise TypeError("observed deve ser dict")
+    if not observed:
+        raise ScmInputError("SCM_NO_OBSERVATION", "observed vazio")
+    canon: Dict[str, Any] = {}
+    for key, value in observed.items():
+        pair = _schema_pair(key, value)
+        if pair is None:
+            raise ScmInputError("SCM_BAD_OBSERVATION", f"{key!r}={value!r} fora do WORLD_SCHEMA")
+        if pair[0] in canon and canon[pair[0]] != pair[1]:
+            raise ScmInputError("SCM_BAD_OBSERVATION", f"{pair[0]!r} observado com dois valores")
+        canon[pair[0]] = pair[1]
+    return canon
+
+
+def _actions(actions: object, *, name: str) -> List[str]:
+    if actions is None:
+        raise ScmInputError("SCM_NO_ACTIONS", f"{name} ausente")
+    if isinstance(actions, (str, bytes)) or not isinstance(actions, (list, tuple)):
+        raise TypeError(f"{name} deve ser lista de str")
+    out: List[str] = []
+    for action in actions:
+        if not isinstance(action, str):
+            raise TypeError(f"{name} deve conter só str")
+        if not action.strip():
+            raise ScmInputError("SCM_BAD_ACTION", f"{name} contém ação em branco")
+        out.append(action)
+    return out
+
+
+def _mechanism(world_model: object, action: str) -> Optional[Dict[str, Any]]:
+    """Efeitos verificados da ação (tabela, depois declarada); None se a ação não é modelada."""
+    entry = ACTION_EFFECTS.get(action)
+    effects: Dict[str, Any] = dict(entry["world"]) if entry is not None else {}
+    reasoning = getattr(world_model, "causal_reasoning", None)
+    declared_all = getattr(reasoning, "declared_interventions", None)
+    declared: Dict[str, Any] = {}
+    if isinstance(declared_all, dict):
+        raw = declared_all.get(action)
+        for key, value in (raw.items() if isinstance(raw, dict) else ()):
+            pair = _schema_pair(key, value)
+            if pair is not None:
+                declared[pair[0]] = pair[1]
+    if entry is None and not declared:
+        return None
+    effects.update(declared)
+    return effects
+
+
+def _assignments(world_model: object, actions: Sequence[str]) -> Dict[str, Any]:
+    unmodeled = tuple(dict.fromkeys(a for a in actions if _mechanism(world_model, a) is None))
+    if unmodeled:
+        raise ScmInputError("SCM_UNMODELED", f"ação sem efeito verificado: {', '.join(unmodeled)}", unmodeled)
+    assigned: Dict[str, Any] = {}
+    for action in actions:
+        assigned.update(_mechanism(world_model, action) or {})
+    return assigned
+
+
+def counterfactual_outcome(
+    observed: Dict[str, Any],
+    factual_actions: Sequence[str],
+    counterfactual_actions: Sequence[str],
+    world_model: object = None,
+) -> ScmCounterfactual:
+    """Abdução-ação-predição. Não muta nenhum argumento nem o modelo de mundo."""
+    evidence = _canonical_observation(observed)
+    factual = _actions(factual_actions, name="factual_actions")
+    counter = _actions(counterfactual_actions, name="counterfactual_actions")
+    assigned_f = _assignments(world_model, factual)
+    assigned_c = _assignments(world_model, counter)
+
+    conflicts = {
+        key: (evidence[key], value)
+        for key, value in sorted(assigned_f.items())
+        if key in evidence and evidence[key] != value
+    }
+    if conflicts:
+        return ScmCounterfactual(False, {}, tuple(sorted(WORLD_SCHEMA)), conflicts)
+
+    backdrop = {key: value for key, value in sorted(evidence.items()) if key not in assigned_f}
+    state = dict(backdrop)
+    state.update(assigned_c)
+    state = dict(sorted(state.items()))
+    unidentified = tuple(sorted(set(WORLD_SCHEMA) - set(state)))
+    status = state.get("system_status")
+    return ScmCounterfactual(
+        True, state, unidentified, {}, backdrop, status,
+        STATUS_UTILITY.get(status) if status is not None else None,
+    )
+
+
+def rank_alternatives(
+    observed: Dict[str, Any],
+    factual_actions: Sequence[str],
+    alternatives: Sequence[Sequence[str]],
+    world_model: object = None,
+) -> Dict[str, Any]:
+    """Ordena sequências alternativas pelo status contrafactual identificado."""
+    evidence = _canonical_observation(observed)
+    factual = _actions(factual_actions, name="factual_actions")
+    if alternatives is None or (isinstance(alternatives, (list, tuple)) and not alternatives):
+        raise ScmInputError("SCM_NO_ALTERNATIVES", "alternatives ausente ou vazia")
+    if isinstance(alternatives, (str, bytes)) or not isinstance(alternatives, (list, tuple)):
+        raise TypeError("alternatives deve ser lista de listas de ação")
+    sequences = [_actions(seq, name="alternatives[i]") for seq in alternatives]
+    _assignments(world_model, factual)
+    factual_status = evidence.get("system_status")
+    factual_utility = STATUS_UTILITY.get(factual_status) if factual_status is not None else None
+
+    ranking: List[Dict[str, Any]] = []
+    unidentified: List[List[str]] = []
+    unmodeled: List[List[str]] = []
+    conflicts: Dict[str, Tuple[Any, Any]] = {}
+    for seq in sequences:
+        try:
+            result = counterfactual_outcome(evidence, factual, seq, world_model)
+        except ScmInputError as exc:
+            if exc.code != "SCM_UNMODELED":
+                raise
+            unmodeled.append(list(seq))
+            continue
+        if not result.consistent:
+            conflicts = result.conflicts
+            break
+        if result.utility is None:
+            unidentified.append(list(seq))
+            continue
+        ranking.append({
+            "actions": list(seq),
+            "verified_status": result.verified_status,
+            "utility": result.utility,
+            "gain": None if factual_utility is None else result.utility - factual_utility,
+        })
+    if conflicts:
+        return {"consistent": False, "conflicts": conflicts, "factual_utility": factual_utility,
+                "ranking": [], "best": None, "unidentified": [], "unmodeled": []}
+    ranking.sort(key=lambda r: (-r["utility"], len(r["actions"]), tuple(r["actions"])))
+    unidentified.sort(key=lambda s: (len(s), tuple(s)))
+    unmodeled.sort(key=lambda s: (len(s), tuple(s)))
+    return {"consistent": True, "conflicts": {}, "factual_utility": factual_utility,
+            "ranking": ranking, "best": ranking[0] if ranking else None,
+            "unidentified": unidentified, "unmodeled": unmodeled}
