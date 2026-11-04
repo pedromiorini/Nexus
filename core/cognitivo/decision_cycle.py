@@ -5,11 +5,13 @@ o ciclo falha fechado: devolve um *impasse* tipado (NO_CHANGE, TIE, CONFLICT,
 CONSTRAINT_FAILURE, PROPOSER_FAILURE, OPERATOR_NO_CHANGE) com um *subgoal* de registro.
 Pré-registro DC1–DC16: docs/cognitivo/AUDITORIA_2026-10-22.md.
 
-Veto aditivo (errata E-DC5): o conjunto efetivo é o veto padrão (``DEFAULT_VETOES``,
+Veto aditivo (errata E-DC5; chave canônica ``veto_key``, ver abaixo): o conjunto efetivo é o veto padrão (``DEFAULT_VETOES``,
 congelado no import) somado a ``rejects``; ``rejects=None`` e ``{}`` mantêm o padrão e só
 ``use_default_rejects=False`` o desliga. ``allowed`` fecha o vocabulário: operador cuja
 chave normalizada não esteja nele é rejeitado (cobre grafias com caracteres invisíveis,
-largura total, pontuação etc.). O motivo do padrão/``rejects`` vence o do vocabulário.
+largura total, pontuação etc.). O veto também compara a chave canônica ``veto_key`` (caixa, separadores,
+invisíveis, ``()`` final), então a grafia alternativa de um operador vetado é rejeitada com o motivo do veto,
+não com o do vocabulário. O motivo do padrão/``rejects`` vence o do vocabulário.
 
 ``OPERATOR_NO_CHANGE`` (errata E-DC8): se ``apply`` levanta, o operador selecionado é mantido
 em ``selected`` com ``applied=False``, mas o impasse e o subgoal registram que a aplicação não
@@ -34,6 +36,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from core.cognitivo.action_effects import veto_index, veto_key
 from core.cognitivo.counterfactual import _normalize_action_key
 from core.cognitivo.mcts_planner import DEFAULT_VETOES
 
@@ -67,6 +70,10 @@ def _freeze_default_vetoes() -> Mapping[str, str]:
 
 
 _FROZEN_DEFAULT_VETOES: Mapping[str, str] = _freeze_default_vetoes()
+# Chaves canônicas (veto_key) do veto padrão, congeladas no import como o mapa exato.
+_FROZEN_DEFAULT_CANON: Mapping[str, str] = MappingProxyType(
+    {key: str.__str__(reason) for key, reason in veto_index(
+        {str.__str__(name): reason for name, reason in DEFAULT_VETOES.items()}).items()})
 
 
 class DecisionInputError(ValueError):
@@ -140,11 +147,18 @@ def _rejects(rejects: Any, use_default: Any) -> Dict[str, str]:
     else:
         raise DecisionInputError("DC_BAD_REJECTS", "rejects deve ser um mapa operador -> motivo")
     out: Dict[str, str] = dict(_FROZEN_DEFAULT_VETOES) if use_default else {}
+    canon: Dict[str, str] = dict(_FROZEN_DEFAULT_CANON) if use_default else {}
     for name, reason in dict(source).items():
-        _, key = _text(name, "DC_BAD_REJECTS", "operador rejeitado")
+        plain, key = _text(name, "DC_BAD_REJECTS", "operador rejeitado")
         if not isinstance(reason, str):
             raise DecisionInputError("DC_BAD_REJECTS", "motivo da rejeição deve ser str")
         out.setdefault(key, str.__str__(reason))
+        canonical = veto_key(plain)
+        if canonical is not None:
+            canon.setdefault(canonical, str.__str__(reason))
+    # Chaves canônicas entram DEPOIS das exatas: o nome exato (e o padrão) vence na colisão.
+    for key, reason in canon.items():
+        out.setdefault(key, reason)
     return out
 
 
@@ -193,8 +207,11 @@ def _decide(proposals: List[Tuple[str, str]], rejects: Dict[str, str],
     spelling = dict(proposals)
     blocked: Dict[str, str] = {}
     for key in spelling:
+        canonical = veto_key(spelling[key])
         if key in rejects:
             blocked[key] = rejects[key]
+        elif canonical is not None and canonical in rejects:  # veto por chave canônica (vence o vocabulário)
+            blocked[key] = rejects[canonical]
         elif allowed is not None and key not in allowed:
             blocked[key] = _OUT_OF_VOCABULARY
     rejected = {spelling[key]: blocked[key] for key in spelling if key in blocked}
