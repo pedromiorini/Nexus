@@ -185,6 +185,14 @@ class TemporalReasoningExtractionContractTests(unittest.TestCase):
                 self.assertIs(getattr(package, name), getattr(temporal_reasoning, name))
                 self.assertEqual(getattr(temporal_reasoning, name).__module__, "core.cognitivo.temporal_reasoning")
 
+    def test_package_and_module_declare_the_four_public_names(self):
+        temporal_reasoning = _module()
+        import core.cognitivo as package
+        self.assertEqual(sorted(temporal_reasoning.__all__), sorted(_NAMES))
+        for name in _NAMES:
+            with self.subTest(name=name):
+                self.assertIn(name, package.__all__)
+
     def test_module_imports_without_numpy_vita_or_monolith(self):
         _module()
         env = dict(os.environ, PYTHONPATH=str(ROOT))
