@@ -3411,3 +3411,9 @@ Novo arquivo `test_decision_cycle_review_contract.py` (importa só auxiliares do
 
 ### Regra de parada
 Critério que falhar depois do GREEN, teste existente de `main` que falhar ou mutante sobrevivente ⇒ **parar sem push** e trazer opções com uma recomendada. Nenhum critério, seed ou limite é ajustado depois de ver resultado. O PR continua em DRAFT e não é mesclado.
+
+### Adendo E-DC16 (omissão do pré-registro, registrada depois de ver o GREEN; sem mudar nenhum critério DC11–DC15)
+O pré-registro acima listou 3 edições forçadas em `test_decision_cycle_contract.py` e exigiu no DC16 que os demais testes antigos passassem sem alteração. **Esse critério falhou no GREEN (`f022a9c`)**: `DC5Constraint.test_all_rejected` (14 subtestes: k = 0, 3–8, 10, 12, 13, 15–17, 19) passa em `rejects` operadores do veto padrão com motivos próprios (`r{k}-{op}`) e espera esses motivos em `Decision.rejected`; pela errata E-DC5 o motivo do **padrão** vence na colisão. Eu havia previsto que só 3 testes antigos eram afetados e errei por não ter inspecionado esse. O efeito é puramente do motivo exibido; o operador continua rejeitado, a segurança não muda.
+- Tratamento aplicado (a confirmar pelo Pedro; reversível, commit separado): a mesma edição mecânica das outras 2 do DC1 — `use_default_rejects=False` na chamada de `test_all_rejected`, que testa a rejeição por `rejects` (CONSTRAINT_FAILURE com todos os motivos), não o veto padrão (coberto por `test_default_vetoes`, DC11 e DC12). Nenhuma asserção foi relaxada.
+- Alternativa descartada por mudar produção para caber no teste e contrariar DC11(f): motivo de `rejects` vencer na colisão.
+- Total de testes antigos editados: **4** (não 3).

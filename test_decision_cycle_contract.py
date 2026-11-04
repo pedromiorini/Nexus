@@ -243,7 +243,7 @@ class DC5Constraint(unittest.TestCase):
                 ops = rng.sample(POOL, rng.randint(1, 4))
                 proposals = [spell(o, rng) for o in ops]
                 rejects = {o: f"r{k}-{o}" for o in ops}
-                decision = m.select_operator(proposals, rejects=rejects)
+                decision = m.select_operator(proposals, rejects=rejects, use_default_rejects=False)
                 self.assertIsNone(decision.selected)
                 self.assertEqual(decision.impasse.kind, "CONSTRAINT_FAILURE")
                 self.assertEqual(decision.impasse.code, "DC_IMPASSE_CONSTRAINT")
