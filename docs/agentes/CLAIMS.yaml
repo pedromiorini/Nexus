@@ -1,4 +1,16 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "PR #156: errata E-DC5/E-DC8 e melhorias do Laird no ciclo de decisão (DC11–DC16)"
+    arquivos:
+      - core/cognitivo/decision_cycle.py
+      - test_decision_cycle_contract.py
+      - test_decision_cycle_review_contract.py
+      - tools/cognitivo_mutation.py
+      - docs/cognitivo/AUDITORIA_2026-10-22.md
+      - docs/agentes/CLAIMS.yaml
+      - AUDIT_REALITY_REPORT.md
+      - audit_reality.json
+    expira_em: "2026-11-05T22:00:00Z"
