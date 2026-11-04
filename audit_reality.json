@@ -42,9 +42,9 @@
       },
       {
         "path": "core/cognitivo/counterfactual.py",
-        "lines": 602,
+        "lines": 617,
         "classes": 4,
-        "functions": 26
+        "functions": 28
       },
       {
         "path": "core/cognitivo/emotional_memory_weighting.py",
@@ -87,6 +87,12 @@
         "lines": 490,
         "classes": 3,
         "functions": 17
+      },
+      {
+        "path": "core/cognitivo/scm_counterfactual.py",
+        "lines": 188,
+        "classes": 2,
+        "functions": 7
       },
       {
         "path": "core/cognitivo/semantic_networks.py",
