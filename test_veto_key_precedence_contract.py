@@ -98,9 +98,9 @@ class VetoKeyEdgeTests(unittest.TestCase):
         self.assertEqual(veto_key("\u212a"), "K")  # NFKC leva o kelvin a ASCII antes da checagem
         self.assertEqual(veto_key("shutdown_\u017fervice"), "SHUTDOWN_SERVICE")  # idem ſ (NFKC: «s»)
 
-    def test_call_syntax_with_space_between_parens_and_mark_does_not_canonicalize(self):
-        # Limite documentado: «() ;» (espaço entre ``)`` e ``;``) não canonicaliza; o registro o recusa.
-        self.assertIsNone(veto_key("shutdown_service ( ) ;"))
+    def test_call_syntax_with_space_between_parens_and_mark_canonicalizes(self):
+        # Errata E-VK5 (substitui o limite documentado em E-VK4(b)): «( ) ;» com espaço canonicaliza.
+        self.assertEqual(veto_key("shutdown_service ( ) ;"), "SHUTDOWN_SERVICE")
 
 
 class DeclareInterventionMessageTests(unittest.TestCase):
