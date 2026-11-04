@@ -57,7 +57,11 @@ CF_TESTS = ("test_counterfactual_extraction_contract.py", "test_counterfactual_c
             "test_counterfactual_planner_contract.py",
             "test_counterfactual_dox_contract.py")
 SCM_CF = "core/cognitivo/scm_counterfactual.py"
-SCM_CF_TESTS = ("test_scm_counterfactual_contract.py", "test_scm_counterfactual_review_contract.py")
+SCM_CF_TESTS = (
+    "test_scm_counterfactual_contract.py",
+    "test_scm_counterfactual_review_contract.py",
+    "test_scm_counterfactual_second_review_contract.py",
+)
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
@@ -1715,11 +1719,11 @@ MUTATIONS = [
              'for key in unidentified},',
              'for key in WORLD_SCHEMA},', tests=SCM_CF_TESTS),
     Mutation('scm_cf_veto_default_off', SCM_CF,
-             '        vetoes = DEFAULT_VETOES',
-             '        vetoes = {}', tests=SCM_CF_TESTS),
+             '        return _FROZEN_DEFAULT_VETOES',
+             '        return {}', tests=SCM_CF_TESTS),
     Mutation('scm_cf_veto_mapping_unchecked', SCM_CF,
-             '    elif not isinstance(vetoes, Mapping):',
-             '    elif False:', tests=SCM_CF_TESTS),
+             '    if not isinstance(vetoes, Mapping):\n        raise TypeError("vetoes deve ser um mapa',
+             '    if False:\n        raise TypeError("vetoes deve ser um mapa', tests=SCM_CF_TESTS),
     Mutation('scm_cf_veto_excludes_instead_of_marking', SCM_CF,
              '    allowed = [item for item in ranking if not item["vetoed"]]',
              '    ranking = [item for item in ranking if not item["vetoed"]]\n    allowed = ranking', tests=SCM_CF_TESTS),
@@ -1768,6 +1772,42 @@ MUTATIONS = [
     Mutation('scm_cf_engine_drops_vetoes', COUNTERFACTUAL,
              'self.world_model, vetoes)',
              'self.world_model)', tests=SCM_CF_TESTS),
+    Mutation('scm_cf_default_vetoes_live', SCM_CF,
+             '        return _FROZEN_DEFAULT_VETOES',
+             '        return DEFAULT_VETOES', tests=SCM_CF_TESTS),
+    Mutation('scm_cf_default_vetoes_not_frozen', SCM_CF,
+             '_FROZEN_DEFAULT_VETOES: Mapping = MappingProxyType(dict(DEFAULT_VETOES))',
+             '_FROZEN_DEFAULT_VETOES: Mapping = DEFAULT_VETOES', tests=SCM_CF_TESTS),
+    Mutation('scm_cf_vetoes_not_frozen_copy', SCM_CF,
+             '    return MappingProxyType(frozen)',
+             '    return vetoes', tests=SCM_CF_TESTS),
+    Mutation('scm_cf_vetoes_validated_after_alternatives', SCM_CF,
+             '    vetoes = _freeze_vetoes(vetoes)\n    if alternatives is None or',
+             '    vetoes = _freeze_vetoes(vetoes) if alternatives else vetoes\n    if alternatives is None or', tests=SCM_CF_TESTS),
+    Mutation('scm_cf_doc_drops_alias_limitation', SCM_CF,
+             'Limitação conhecida (veto por nome',
+             'Observação (veto por nome', tests=SCM_CF_TESTS),
+    Mutation('scm_cf_doc_drops_no_effect_veto', SCM_CF,
+             'Não há veto por efeito.',
+             'Não há veto.', tests=SCM_CF_TESTS),
+    Mutation('scm_cf_doc_drops_best_decision', SCM_CF,
+             'A decisão é ``best``, não ``ranking[0]``',
+             'A decisão é o primeiro do ranking', tests=SCM_CF_TESTS),
+    Mutation('scm_cf_doc_drops_all_vetoed', SCM_CF,
+             'significa todas vetadas',
+             'significa vazio', tests=SCM_CF_TESTS),
+    Mutation('scm_cf_vetoes_key_type_unchecked', SCM_CF,
+             'frozen[str.__str__(action)] = str.__str__(reason)',
+             'frozen[action] = str.__str__(reason)', tests=SCM_CF_TESTS),
+    Mutation('scm_cf_vetoes_value_type_unchecked', SCM_CF,
+             'frozen[str.__str__(action)] = str.__str__(reason)',
+             'frozen[str.__str__(action)] = reason', tests=SCM_CF_TESTS),
+    Mutation('scm_cf_vetoes_not_exact_str', SCM_CF,
+             'frozen[str.__str__(action)] = str.__str__(reason)',
+             'frozen[action] = reason', tests=SCM_CF_TESTS),
+    Mutation('scm_cf_vetoes_type_error_swallowed', SCM_CF,
+             '            raise TypeError("vetoes: ação e motivo devem ser str") from None',
+             '            pass', tests=SCM_CF_TESTS),
 ]
 
 
