@@ -1813,38 +1813,58 @@ MUTATIONS = [
 
 MAX_JOBS = 32
 DEFAULT_MAX_JOBS = 8
-USAGE = "uso: python tools/cognitivo_mutation.py [--jobs N]  (N: inteiro de 1 a 32; padrão: núcleos, no máximo 8)"
+MAX_SHARDS = 16
+USAGE = (
+    "uso: python tools/cognitivo_mutation.py [--jobs N] [--shard K/N]  "
+    "(--jobs: inteiro de 1 a 32, padrão: núcleos, no máximo 8; --shard: fatia K de N, 1 <= K <= N <= 16)"
+)
 
 
-def parse_jobs(argv: list[str]) -> int:
-    """Lê `--jobs N`/`--jobs=N`; qualquer outra entrada sai com 2 sem executar nada."""
+def parse_args(argv: list[str]) -> tuple[int, tuple[int, int] | None]:
+    """Lê `--jobs N` e `--shard K/N` (também `--opção=valor`); qualquer outra entrada sai com 2 sem executar nada."""
 
     def invalid(reason: str) -> SystemExit:
         print(f"entrada inválida: {reason}\n{USAGE}", file=sys.stderr)
         return SystemExit(2)
 
     jobs = None
+    shard = None
     args = list(argv)
     while args:
         arg = args.pop(0)
-        if arg == "--jobs":
-            if jobs is not None:
-                raise invalid("--jobs repetido")
-            if not args:
-                raise invalid("--jobs sem valor")
-            value = args.pop(0)
-        elif arg.startswith("--jobs="):
-            if jobs is not None:
-                raise invalid("--jobs repetido")
-            value = arg[len("--jobs="):]
-        else:
+        name, equals, inline = arg.partition("=")
+        if name not in ("--jobs", "--shard"):
             raise invalid(f"argumento não reconhecido: {arg!r}")
-        if re.fullmatch(r"[1-9][0-9]{0,1}", value) is None or not 1 <= int(value) <= MAX_JOBS:
-            raise invalid(f"--jobs deve ser inteiro de 1 a {MAX_JOBS}, recebi {value!r}")
-        jobs = int(value)
+        if (jobs if name == "--jobs" else shard) is not None:
+            raise invalid(f"{name} repetido")
+        if equals:
+            value = inline
+        elif not args:
+            raise invalid(f"{name} sem valor")
+        else:
+            value = args.pop(0)
+        if name == "--jobs":
+            if re.fullmatch(r"[1-9][0-9]{0,1}", value) is None or not 1 <= int(value) <= MAX_JOBS:
+                raise invalid(f"--jobs deve ser inteiro de 1 a {MAX_JOBS}, recebi {value!r}")
+            jobs = int(value)
+        else:
+            found = re.fullmatch(r"([1-9][0-9]?)/([1-9][0-9]?)", value)
+            if found is None or not int(found[1]) <= int(found[2]) <= MAX_SHARDS:
+                raise invalid(f"--shard deve ser K/N com 1 <= K <= N <= {MAX_SHARDS}, recebi {value!r}")
+            shard = (int(found[1]), int(found[2]))
     if jobs is None:
         jobs = max(1, min(os.cpu_count() or 1, DEFAULT_MAX_JOBS))
-    return jobs
+    return jobs, shard
+
+
+def parse_jobs(argv: list[str]) -> int:
+    """Número de trabalhadores de `argv` (mesmas regras de `parse_args`)."""
+    return parse_args(argv)[0]
+
+
+def shard_catalog(mutations: list[Mutation], index: int, count: int) -> list[Mutation]:
+    """Fatia `index` (1..count) do catálogo: o mutante de posição i pertence à fatia (i mod count) + 1."""
+    return [m for i, m in enumerate(mutations) if i % count == index - 1]
 
 
 def evaluate_mutation(workdir: Path, m: Mutation) -> dict:
@@ -1907,10 +1927,11 @@ def run_catalog(mutations: list[Mutation], root: Path, jobs: int, skip_baseline:
 def main(argv: list[str] | None = None, *, mutations: list[Mutation] | None = None,
          root: Path = ROOT, report: Path = REPORT) -> int:
     try:
-        jobs = parse_jobs(sys.argv[1:] if argv is None else argv)
+        jobs, shard = parse_args(sys.argv[1:] if argv is None else argv)
     except SystemExit as exc:
         return int(exc.code)
-    catalog = MUTATIONS if mutations is None else mutations
+    full = MUTATIONS if mutations is None else mutations
+    catalog = full if shard is None else shard_catalog(full, *shard)
     results = run_catalog(catalog, root, jobs)
     killed = sum(r["status"] == "killed" for r in results)
     summary = {
@@ -1919,12 +1940,11 @@ def main(argv: list[str] | None = None, *, mutations: list[Mutation] | None = No
         "survived": sum(r["status"] == "survived" for r in results),
         "not_applied": sum(r["status"] == "not_applied" for r in results),
     }
-    report.write_text(
-        json.dumps({"tool": "nexus-cognitivo-mutation", "mutations": results, "summary": summary},
-                   indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    print(json.dumps(summary, ensure_ascii=False))
+    document = {"tool": "nexus-cognitivo-mutation", "mutations": results, "summary": summary}
+    if shard is not None:
+        document["shard"] = {"index": shard[0], "count": shard[1], "catalog_total": len(full)}
+    report.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(json.dumps(summary if shard is None else {**summary, "shard": document["shard"]}, ensure_ascii=False))
     for r in results:
         if r["status"] != "killed":
             print(f"  {r['status']}: {r['name']} ({r['target']})", file=sys.stderr)
