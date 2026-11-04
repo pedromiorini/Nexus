@@ -1,4 +1,18 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "veto_key rodada 2 (#157): S1 e S3 da Pearl, errata E-VK5 e critérios C9–C12"
+    arquivos:
+      - core/cognitivo/action_effects.py
+      - test_red_pr157_pearl.py
+      - test_veto_key_precedence_contract.py
+      - test_veto_key_retired_mutants_contract.py
+      - tools/cognitivo_mutation.py
+      - docs/cognitivo/AUDITORIA_2026-10-22.md
+      - docs/cognitivo/MUTANTES_VK_RETIRADOS.md
+      - docs/agentes/CLAIMS.yaml
+      - AUDIT_REALITY_REPORT.md
+      - audit_reality.json
+    expira_em: "2026-11-06T00:00:00Z"
