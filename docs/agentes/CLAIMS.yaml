@@ -1,4 +1,14 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "limites da auditoria Vita e dígito não ASCII na margem de timeout"
+    arquivos:
+      - vita/nexus_constitutional_bridge_v3.py
+      - test_vita_audit_bounds_contract.py
+      - tools/agente/timeout_margin.sh
+      - test_timeout_margin_locale_contract.py
+      - docs/agentes/LICOES_APRENDIDAS.md
+      - CONTINUATION.md
+    expira_em: "2026-11-07T06:30:00Z"

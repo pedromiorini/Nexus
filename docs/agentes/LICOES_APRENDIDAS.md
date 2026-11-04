@@ -127,3 +127,31 @@ O replay `tools/agente/replay/run_replay.sh` não executa este auditor. Tipo des
 - Nota sobre medição: sem bloco de reincidência de propósito (lição `registrada`, reincidência não medida; ver desvio de AD8 em `ARTEFATOS_DRIFT.md`). Inferir `não medido` aqui faria o auditor reportá-la como `verificada`, e `test_current_lessons_are_not_reported_as_measured` exige `nao_checavel`.
 - Alternativas descartadas: colocar os casos `drift` em `casos.tsv` (o job de replay do CI não instala bandit); estender a guarda ao marcador `bandit_low` (fora do escopo pré-registrado; fica como proposta separada).
 - Status: registrada (origem/anterior/incompatível medidos no replay local; o teste de lição atual exige `nao_checavel` para lições não ativas; a ativação e a medição de reincidência são decisão do Pedro)
+
+### L-011 — Limite bool e janela NaN na auditoria Vita passavam como sucesso
+- Data: 2026-11-04
+- Verificador que deveria ter falhado: `test_recovery_diagnostics_contract.py` e `test_deferred_task_queue.py` (cobrem `window_seconds=0`, não cobrem bool, NaN, +inf nem float no limite).
+- Fato observado: em `af28cc1`, com um evento já gravado, `get_policy_audit(limit=True)` devolveu 1 linha e executou SQL; `limit=1.5`, NaN e +inf executaram SQL e levantaram `sqlite3.IntegrityError`; `get_recovery_analysis(window_seconds=float("nan"))` devolveu `events_analyzed=0` e `severity=info`. Sonda sem pipe. O contrato novo, no commit `fe3af07` e com a produção ainda intacta, saiu 1 (6 testes, 24 falhas, 6 erros).
+- Causa (Fato): `limit < 1` trata `True` como 1 e deixa float chegar ao SQLite; `window_seconds <= 0` é falso para NaN e para +inf, então a janela filtra tudo ou não filtra nada.
+- O que mudou: `TypeError` antes do SQL para ausente, vazio, bool e não inteiro (saída 2 no subprocesso); `ValueError` para não positivo e não finito (saída 3). `None` continua sendo a janela ausente (saída 0). Commit `23803b3`.
+- Regra/checagem derivada: comparação numérica não distingue bool nem NaN; o contrato precisa do tipo e de `math.isfinite` antes da consulta.
+- Evidência: base `af28cc1abba5a4ff19930afb74daef7e4d3e4ed5`; RED `fe3af07`; mudança `23803b3`.
+- Derivada de: nenhuma.
+- Teste dos três casos (escrito no contrato antes da mudança; resultado depois): (a) NaN não devolve análise vazia e `limit=True` não devolve linha; (b) `None`, limite 1 e os 28 testes anteriores de recuperação/concorrência continuam verdes; (c) `""`, +inf e `1.5` não são sucesso.
+- Nota de status: os três casos passaram nesta sessão. O status não vai a `ativa` porque `test_current_lessons_are_not_reported_as_measured` exige `nao_checavel` para toda lição deste arquivo, e esse teste está no #77. Bloco de reincidência omitido de propósito, no mesmo desvio da L-010.
+- Alternativas descartadas: aceitar `IntegrityError` do SQLite como rejeição (o SQL já tinha rodado).
+- Status: registrada
+
+### L-012 — Dígito não ASCII na margem de timeout saía 0 em en_US.UTF-8
+- Data: 2026-11-04
+- Verificador que falhou: `python -m unittest discover -p 'test_*.py'` neste ambiente (`LC_ALL=en_US.UTF-8`), em `test_unparseable_lines` com a linha `٣`.
+- Fato observado: em `af28cc1`, arquivo com `500` e `٣`, `bash tools/agente/timeout_margin.sh 12 <arquivo>` imprimiu `syntax error: operand expected` e saiu 0 com `OK: max 500s <= 612s`. O mesmo comando com `LC_ALL=C` saiu 3. A suíte acusou `AssertionError: 0 != 3`. O contrato novo, commit `cf7ac38`, saiu 1 (1 falha).
+- Causa (Fato): a classe `[0-9]` segue `LC_COLLATE` e, em `en_US.UTF-8`, casa `٣`. A guarda usa `set -uo pipefail` sem `-e`, então a falha de `(( ))` não troca o status.
+- O que mudou: classes ASCII explícitas e falha da aritmética passam a sair 3. Commit `5fb94cb`. `test_timeout_margin_contract.py` (arquivo do #77) não foi editado; 25/25 depois, com o contrato novo.
+- Regra/checagem derivada: faixa `[0-9]` em bash não é critério de dígito ASCII. Entrada inválida tem de sair 3 também quando o locale alarga a faixa.
+- Evidência: base `af28cc1abba5a4ff19930afb74daef7e4d3e4ed5`; RED `cf7ac38`; mudança `5fb94cb`.
+- Derivada de: L-005 (replay e guarda que saíam 0 sem execução útil).
+- Teste dos três casos: (a) `٣` em `en_US.UTF-8` sai 3, sem `syntax error`; (b) duração `500` continua 0 nos dois locales e `run_replay.sh` continua 17/17; (c) arquivo ausente e vazio continuam 3.
+- Nota de status: igual à L-011. Não promover a `ativa` enquanto o teste do auditor exigir `nao_checavel` para este arquivo.
+- Alternativas descartadas: confiar no locale C do CI (este ambiente está em `en_US.UTF-8` e a suíte ficou vermelha).
+- Status: registrada
