@@ -92,6 +92,17 @@ class VetoValidationTests(unittest.TestCase):
                 self.assertIs(type(veto["reason"]), str)
                 self.assertIs(type(veto["action"]), str)
 
+    def test_h1k_str_subclasses_become_exact_str_without_calling_their_str(self):
+        class Loud(str):
+            def __str__(self):
+                raise RuntimeError("não deve ser chamado")
+
+        out = _rank(vetoes={Loud("SHUTDOWN_SERVICE"): Loud("motivo")})
+        veto = out["ranking"][0]["vetoed"][0]
+        self.assertEqual(veto, {"action": "SHUTDOWN_SERVICE", "reason": "motivo"})
+        self.assertIs(type(veto["action"]), str)
+        self.assertIs(type(veto["reason"]), str)
+
     def test_h1f_mutating_the_mapping_after_the_call_does_not_change_the_result(self):
         vetoes = {"SHUTDOWN_SERVICE": "motivo A"}
         out = _rank(vetoes=vetoes)

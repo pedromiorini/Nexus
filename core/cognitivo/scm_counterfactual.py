@@ -46,9 +46,10 @@ def _freeze_vetoes(vetoes: Optional[Mapping]) -> Mapping:
         raise TypeError("vetoes deve ser um mapa ação -> motivo")
     frozen: Dict[str, str] = {}
     for action, reason in dict(vetoes).items():
-        if not isinstance(action, str) or not isinstance(reason, str):
-            raise TypeError("vetoes: ação e motivo devem ser str")
-        frozen[str.__str__(action)] = str.__str__(reason)
+        try:  # str.__str__ só aceita str e devolve um str exato (sem chamar __str__ do chamador)
+            frozen[str.__str__(action)] = str.__str__(reason)
+        except TypeError:
+            raise TypeError("vetoes: ação e motivo devem ser str") from None
     return MappingProxyType(frozen)
 
 
