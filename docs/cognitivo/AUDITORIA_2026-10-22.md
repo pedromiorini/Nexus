@@ -3269,3 +3269,16 @@ Antes do move, o contrato novo falha por `ModuleNotFoundError: core.cognitivo.te
 Aberto em `docs/agentes/CLAIMS.yaml` neste commit (agente `grok-bot`, 72 h) e removido no último commit (`claims: []`).
 
 Pré-registro escrito **antes** do move, **antes** do contrato novo de extração e **antes** de rodar `tools/cognitivo_eval.py --capability temporal_reasoning`. O SHA deste commit entra no PR. Resultados só numa seção posterior.
+
+### Esclarecimentos do harness (declarados no commit RED; nenhum critério, limiar ou valor esperado muda)
+
+- **E1 (declarado antes de qualquer execução).** O pré-registro não fixou a fórmula do sorteio de `L2` no caso `overlaps` de TR2. O harness usa `a = n/16` (n 8..40), `L1 = a + n/16` (n 8..40) e `L2 = (L1 − a) + n/16` (n 8..40), com ordem de sorteio por seed `[before, after, simultaneous, overlaps, during]`; a precondição `scenario_invalid` (exit 3) confere cada caso pela referência independente. Limiares e rótulos esperados são os de TR2.
+- **E2 (declarado depois da primeira execução do harness sobre o monólito, antes de qualquer commit de teste; sem efeito sobre resultado).** A primeira versão de `_tr_run_view` comparava por cópia profunda listas de índices que nunca chegavam ao motor, então o sinal «entrada não alterada» de TR1 não observava as listas de ids passadas a `build_temporal_sequence` e `predict_next_event`. Corrigido para snapshot das listas de ids realmente passadas. Nas duas versões, no monólito: TR1 120/120, entradas alteradas 0, SHA comportamental idêntico (`9aa6a0c7…25c4`, py3.11 e py3.12); nenhum critério passou ou falhou por causa da correção.
+
+### Congelamento do SHA comportamental (TR6)
+
+Capturado no monólito (`af28cc1`, antes do move) com `tools.cognitivo_eval._ms_sha(tr_fingerprint(core.constitutional_brain))`: `9aa6a0c7d499ad46277f9319081b62ff06acfc7a4d0823fc0efa865b82fd25c4`, idêntico em Python 3.11 e 3.12 (duas execuções em 3.11), congelado em `TR_BEHAVIOR_SHA`. Valores no monólito: TR1 120/120 instâncias iguais à referência, 0 entradas alteradas (519 eventos, 1 223 relações: before 616, after 288, overlaps 159, simultaneous 82, during 78; 136 sequências com ≥ 2 eventos; 95 previsões não nulas); TR2 20/20; TR3 20/20; TR4 as 10 seções iguais ao registrado; metadados (campos, assinatura de `__init__`, banner) iguais.
+
+### Resultado do RED (`test_temporal_reasoning_contract.py`)
+
+18 testes: 10 passam (caracterização do monólito: entradas inválidas, gaps, colaboradores, saídas 2 e 3 do CLI) e 8 falham **apenas** com `ModuleNotFoundError: No module named 'core.cognitivo.temporal_reasoning'` (reexport, standalone, fingerprint congelado, negativos de golden/TR5/adulteração e CLI exit 0). `tools/cognitivo_eval.py --capability temporal_reasoning` sai com 1 no mesmo ponto. Como previsto: nenhum critério de propósito (TR1–TR5) falha no monólito.

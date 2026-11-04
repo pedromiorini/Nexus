@@ -3,7 +3,7 @@
 Critérios: /workspace/nexus/cognitivo/AUDITORIA_2026-10-22.md (sha256 3d24a63d…), escritos
 antes da execução. Mede propósito, não só ausência de crash.
 
-Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,attention,incremental,episodic_future,mental_simulation,analogical_reasoning,all} [--json PATH]
+Uso: python tools/cognitivo_eval.py --capability {episodic,predictive,mcts,causal,counterfactual,working_memory,attention,incremental,episodic_future,mental_simulation,analogical_reasoning,temporal_reasoning,all} [--json PATH]
 Saída: exit 0 se todo critério passa, 1 se algum falha, 2 para entrada ausente/vazia/desconhecida.
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_INVALID_SCENARIO = 0, 1, 2, 3
-CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future", "mental_simulation", "analogical_reasoning", "contextual_memory", "emotional_memory", "semantic_networks")
+CAPABILITIES = ("episodic", "predictive", "mcts", "causal", "counterfactual", "working_memory", "attention", "incremental", "episodic_future", "mental_simulation", "analogical_reasoning", "contextual_memory", "emotional_memory", "semantic_networks", "temporal_reasoning")
 
 TOPICS = [
     ("database", "migration", "rollback"), ("network", "latency", "spike"), ("disk", "quota", "exceeded"),
@@ -7109,6 +7109,610 @@ def eval_semantic_networks(criteria="v1"):
     ]
 
 
+# ── Temporal Reasoning (POST41): amostragem e referência independentes do bloco ──
+
+TR_SOURCE_SHA = "98ebbd9a8e46a591a6336d7a8e22d0dae4958290a5c4ac9286520610dfa4f866"
+TR_BEHAVIOR_SHA = "9aa6a0c7d499ad46277f9319081b62ff06acfc7a4d0823fc0efa865b82fd25c4"  # capturado uma única vez no monólito, antes do move (3.11 e 3.12 idênticos)
+_TR_MARKER = "# MÓDULO 41: TEMPORAL REASONING ENGINE (POST 41)"
+_TR_END = '            "temporal_relations": len(self.temporal_relations)\n        }'
+_TR_BANNER = "⏰🔗 POST 41 - RealTemporalReasoningEngine initialized (Temporal reasoning active)\n"
+_TR_NAMES = ("TemporalEvent", "TemporalRelation", "TemporalSequence", "RealTemporalReasoningEngine")
+_TR_GRID_SEED = 2041
+_TR_GRID_SIZE = 120
+_TR_LIMIT = 0.90
+_TR_TYPES = ("deploy", "alert", "fix", "review")
+_TR_DURATIONS = (None, None, 0, 0.5, 2.0, 5.0, 10.0)
+_TR_STEPS = (0.0, 0.0625, 0.125, 0.5, 2.0, 7.0, -0.25, -3.0)
+_TR_STARTS = (995.0, 1000.0, 1001.0, 1003.5, 1010.0, 1020.0)
+_TR_WIDTHS = (0.0, 0.5, 2.0, 10.0, 30.0)
+_TR_HASH_SEEDS = (101, 101, 202)
+_TR_FIELDS = {
+    "TemporalEvent": ["event_id", "event_type", "timestamp", "duration", "description"],
+    "TemporalRelation": ["relation_id", "event1_id", "event2_id", "relation_type", "confidence"],
+    "TemporalSequence": ["sequence_id", "events", "total_duration", "causal_chain"],
+}
+_TR_INIT_PARAMS = ["self", "causal_reasoning", "planner", "world_model"]
+_TR_FRESH = {"total_events_tracked": 0, "total_relations_detected": 0, "total_sequences_built": 0,
+             "avg_sequence_length": 0.0, "active_events": 0, "temporal_relations": 0}
+
+
+class _TrWorld:
+    """Relógio e gerador de ids determinísticos (só durante a instância)."""
+
+    def __init__(self):
+        self.pending = []
+        self.counter = 0
+
+    def __enter__(self):
+        import uuid
+        from unittest import mock
+        self._patches = [mock.patch.object(time, "time", self._time), mock.patch.object(uuid, "uuid4", self._uuid)]
+        for patch in self._patches:
+            patch.start()
+        return self
+
+    def __exit__(self, *exc):
+        for patch in reversed(self._patches):
+            patch.stop()
+        return False
+
+    def _time(self):
+        return self.pending.pop(0)
+
+    def _uuid(self):
+        import uuid
+        self.counter += 1
+        return uuid.UUID(int=self.counter)
+
+    def track(self, engine, event_type, description, duration, stamp):
+        self.pending.append(stamp)
+        return engine.track_event(event_type, description, duration)
+
+
+class _TrBoom:
+    def __getattribute__(self, name):
+        raise AssertionError("acessou " + name)
+
+
+def _tr_engine(ns, *args, **kwargs):
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        engine = ns.RealTemporalReasoningEngine(*args, **kwargs)
+    return engine, buffer.getvalue()
+
+
+def _tr_ref_relation(first, second):
+    """Referência independente das regras pré-registradas; first/second = (duração, instante)."""
+    gap = second[1] - first[1]
+    kind, conf = ("before", 0.9) if gap > 0.1 else (("after", 0.9) if gap < -0.1 else ("simultaneous", 0.7))
+    if first[0] and second[0]:
+        first_end, second_end = first[1] + first[0], second[1] + second[0]
+        if first[1] <= second[1] and first_end >= second_end:
+            kind, conf = "during", 0.85
+        elif first[1] < second_end and first_end > second[1]:
+            kind, conf = "overlaps", 0.8
+    return kind, conf
+
+
+def _tr_grid():
+    rng = random.Random(_TR_GRID_SEED)  # nosec B311 - grade sintética de avaliação
+    rows = []
+    for _ in range(_TR_GRID_SIZE):
+        count = rng.randint(0, 8)
+        stamp, events = 1000.0, []
+        for index in range(count):
+            if index:
+                stamp += rng.choice(_TR_STEPS)
+            events.append((rng.choice(_TR_TYPES), f"d{index}", rng.choice(_TR_DURATIONS), stamp))
+        builds = []
+        for _ in range(rng.randint(1, 3)):
+            refs = rng.sample(range(count), rng.randint(0, count))
+            if rng.random() < 0.2:
+                refs.append("missing")
+            if refs and rng.random() < 0.2:
+                refs.append(refs[0])
+            builds.append(refs)
+        windows = [(start := rng.choice(_TR_STARTS), start + rng.choice(_TR_WIDTHS)) for _ in range(3)]
+        predictions = []
+        for _ in range(3):
+            refs = rng.sample(range(count), rng.randint(0, min(count, 4)))
+            if rng.random() < 0.2:
+                refs.append("missing")
+            predictions.append(refs)
+        rows.append({"events": events, "builds": builds, "windows": windows, "predictions": predictions})
+    return rows
+
+
+def _tr_ref_view(row):
+    events = row["events"]
+    counter = 0
+    event_ids, relations = [], []
+    for index, (_etype, _desc, duration, stamp) in enumerate(events):
+        counter += 1
+        event_ids.append(counter)
+        for before in range(index):
+            counter += 1
+            kind, conf = _tr_ref_relation((events[before][2], events[before][3]), (duration, stamp))
+            relations.append([before, index, kind, conf, counter])
+    sequences, avg = [], 0.0
+    for refs in row["builds"]:
+        chosen = sorted((i for i in range(len(events)) if i in refs), key=lambda i: events[i][3])
+        if len(chosen) >= 2:
+            end = events[chosen[-1]][3] + (events[chosen[-1]][2] if events[chosen[-1]][2] else 0)
+            total = end - events[chosen[0]][3]
+        else:
+            total = 0.0
+        counter += 1
+        sequences.append({"events": chosen, "total_duration": total, "chain": list(chosen), "id": counter})
+        avg = float(len(chosen)) if avg == 0 else (avg + len(chosen)) / 2
+    durations = []
+    for index in list(range(len(events))) + ["missing"]:
+        if index == "missing":
+            durations.append(None)
+        elif events[index][2]:
+            durations.append(events[index][2])
+        else:
+            same = [e[2] for e in events if e[0] == events[index][0] and e[2]]
+            durations.append(sum(same) / len(same) if same else None)
+    windows = []
+    for low, high in row["windows"]:
+        hit = []
+        for index, (_t, _d, duration, stamp) in enumerate(events):
+            if low <= stamp <= high or (duration and low <= stamp + duration <= high):
+                hit.append(index)
+        windows.append(hit)
+    predictions = []
+    for refs in row["predictions"]:
+        votes = []
+        for seq in sequences:
+            if len(set(seq["events"][:len(refs)]) & set(refs)) >= len(refs) * 0.7 and len(seq["events"]) > len(refs):
+                votes.append(events[seq["events"][len(refs)]][0])
+        best = None
+        for vote in votes:
+            if best is None or votes.count(vote) > votes.count(best):
+                best = vote
+        predictions.append(best)
+    stats = {"total_events_tracked": len(events), "total_relations_detected": len(relations),
+             "total_sequences_built": len(sequences), "avg_sequence_length": avg,
+             "active_events": len(events), "temporal_relations": len(relations)}
+    return {"events": [list(e) for e in events], "event_ids": event_ids, "relations": relations,
+            "sequences": sequences, "durations": durations, "windows": windows,
+            "predictions": predictions, "stats": stats}
+
+
+def _tr_run_view(ns, row):
+    with _TrWorld() as world, contextlib.redirect_stdout(io.StringIO()):
+        engine = ns.RealTemporalReasoningEngine()
+        for etype, desc, duration, stamp in row["events"]:
+            world.track(engine, etype, desc, duration, stamp)
+        ids = [e.event_id for e in engine.events]
+        index_of = {value: i for i, value in enumerate(ids)}
+
+        def real(refs):
+            return [ids[r] if r != "missing" else "missing-id" for r in refs]
+
+        build_inputs = [real(refs) for refs in row["builds"]]
+        predict_inputs = [real(refs) for refs in row["predictions"]]
+        snapshot = json.dumps([build_inputs, predict_inputs])
+        relation_rows = [[index_of[r.event1_id], index_of[r.event2_id], r.relation_type, r.confidence,
+                          int(r.relation_id.replace("-", ""), 16)] for r in engine.temporal_relations]
+        sequences = []
+        for refs in build_inputs:
+            seq = engine.build_temporal_sequence(refs)
+            sequences.append({"events": [index_of[e.event_id] for e in seq.events], "total_duration": seq.total_duration,
+                              "chain": [index_of[i] for i in seq.causal_chain],
+                              "id": int(seq.sequence_id.replace("-", ""), 16)})
+        durations = [engine.reason_about_duration(i) for i in ids] + [engine.reason_about_duration("missing-id")]
+        windows = [[index_of[e.event_id] for e in engine.get_events_between(a, b)] for a, b in row["windows"]]
+        predictions = [engine.predict_next_event(refs) for refs in predict_inputs]
+        view = {"events": [[e.event_type, e.description, e.duration, e.timestamp] for e in engine.events],
+                "event_ids": [int(i.replace("-", ""), 16) for i in ids], "relations": relation_rows,
+                "sequences": sequences, "durations": durations, "windows": windows,
+                "predictions": predictions, "stats": engine.get_statistics()}
+        view["mutated"] = json.dumps([build_inputs, predict_inputs]) != snapshot
+    return view
+
+
+def _tr_norm(value):
+    return json.loads(json.dumps(value))
+
+
+def _tr_grid_results(ns):
+    rows = _tr_grid()
+    views = [_tr_run_view(ns, row) for row in rows]
+    refs = [_tr_ref_view(row) for row in rows]
+    matches = sum(_tr_norm({k: v for k, v in view.items() if k != "mutated"}) == _tr_norm(ref)
+                  for view, ref in zip(views, refs))
+    return {"count": len(rows), "reference_matches": matches, "mutated_inputs": sum(v["mutated"] for v in views),
+            "sha": _ms_sha(_tr_norm(views))}
+
+
+def _tr_grid_digest(ns):
+    return _tr_grid_results(ns)["sha"]
+
+
+def _tr_sequence_ids(engine):
+    return [e.event_id for e in engine.events]
+
+
+def _tr_case(rng, kind):
+    """Cinco casos limpos: ((duração, instante), (duração, instante)), intenção."""
+    top = 1000.0
+    if kind == "before":
+        return ((None, top), (None, top + rng.randint(16, 160) / 16)), ("before", 0.9)
+    if kind == "after":
+        return ((None, top), (None, top - rng.randint(16, 160) / 16)), ("after", 0.9)
+    if kind == "simultaneous":
+        return ((None, top), (None, top + rng.choice((-0.0625, 0.0, 0.0625)))), ("simultaneous", 0.7)
+    if kind == "overlaps":
+        start = rng.randint(8, 40) / 16
+        first = start + rng.randint(8, 40) / 16
+        second = (first - start) + rng.randint(8, 40) / 16
+        return ((first, top), (second, top + start)), ("overlaps", 0.8)
+    first = rng.randint(64, 160) / 16
+    start = rng.randint(8, 16) / 16
+    return ((first, top), (rng.randint(8, 32) / 16, top + start)), ("during", 0.85)
+
+
+def _tr_family_tr2(ns):
+    kinds = ("before", "after", "simultaneous", "overlaps", "during")
+    passed = invalid = 0
+    detail = []
+    for seed in range(20):
+        rng = random.Random(4100 + seed)  # nosec B311 - dados sintéticos de avaliação
+        seed_ok = True
+        for kind in kinds:
+            specs, intent = _tr_case(rng, kind)
+            if _tr_ref_relation(*specs) != intent:
+                invalid += 1
+            with _TrWorld() as world, contextlib.redirect_stdout(io.StringIO()):
+                engine = ns.RealTemporalReasoningEngine()
+                for index, (duration, stamp) in enumerate(specs):
+                    world.track(engine, "t", f"d{index}", duration, stamp)
+                got = [(r.relation_type, r.confidence) for r in engine.temporal_relations]
+            seed_ok = seed_ok and got == [intent]
+        passed += seed_ok
+        detail.append(seed_ok)
+    return {"hits": passed, "total": 20, "rate": passed / 20, "invalid": invalid, "detail": detail}
+
+
+def _tr_family_tr3(ns):
+    passed = invalid = 0
+    detail = []
+    for seed in range(20):
+        rng = random.Random(4200 + seed)  # nosec B311 - dados sintéticos de avaliação
+        count = rng.randint(3, 6)
+        stamp, events = 1000.0, []
+        for index in range(count):
+            if index:
+                stamp += rng.randint(1, 8) / 2
+            events.append(["abcd"[rng.randrange(4)], stamp])
+        last = rng.choice((None, 1.0, 2.5))
+        order = list(range(count))
+        rng.shuffle(order)
+        if count < 3 or any(events[i][1] >= events[i + 1][1] for i in range(count - 1)):
+            invalid += 1
+        with _TrWorld() as world, contextlib.redirect_stdout(io.StringIO()):
+            engine = ns.RealTemporalReasoningEngine()
+            for index, (etype, at) in enumerate(events):
+                world.track(engine, etype, f"d{index}", last if index == count - 1 else None, at)
+            ids = _tr_sequence_ids(engine)
+            seq = engine.build_temporal_sequence([ids[i] for i in order])
+            ordered = [e.event_id for e in seq.events] == ids and seq.causal_chain == ids
+            expected_total = (events[-1][1] + (last or 0)) - events[0][1]
+            ok = ordered and seq.total_duration == expected_total
+            for k in range(1, count):
+                ok = ok and engine.predict_next_event(ids[:k]) == events[k][0]
+            ok = ok and engine.predict_next_event(ids[:count]) is None
+        passed += bool(ok)
+        detail.append(bool(ok))
+    return {"hits": passed, "total": 20, "rate": passed / 20, "invalid": invalid, "detail": detail}
+
+
+def _tr_exc(fn):
+    try:
+        fn()
+    except Exception as exc:  # noqa: BLE001 - o harness registra qualquer tipo de erro
+        return type(exc).__name__
+    return None
+
+
+def _tr_track_all(ns, world, specs, **kwargs):
+    engine, _ = _tr_engine(ns, **kwargs)
+    for index, (etype, duration, stamp) in enumerate(specs):
+        world.track(engine, etype, f"d{index}", duration, stamp)
+    return engine
+
+
+def _tr_pair(ns, first, second):
+    with _TrWorld() as world:
+        engine = _tr_track_all(ns, world, [("t", first[0], first[1]), ("t", second[0], second[1])])
+        return [(r.relation_type, r.confidence) for r in engine.temporal_relations]
+
+
+def _tr_tr4(ns):
+    out = {}
+    with _TrWorld() as world:
+        engine, banner = _tr_engine(ns)
+        out["fresh"] = {"stats": engine.get_statistics(), "banner": banner,
+                        "lists": [engine.events, engine.temporal_relations, engine.sequences]}
+        engine = _tr_track_all(ns, world, [("a", None, 100.0), ("a", None, 100.5), ("a", None, 101.0), ("a", None, 101.5)])
+        index_of = {e.event_id: i for i, e in enumerate(engine.events)}
+        out["counters"] = {"stats": engine.get_statistics(),
+                           "relations": [(index_of[r.event1_id], index_of[r.event2_id], r.relation_type, r.confidence)
+                                         for r in engine.temporal_relations]}
+        c, p, w = _TrBoom(), _TrBoom(), _TrBoom()
+        by_kw, _ = _tr_engine(ns, causal_reasoning=c, planner=p, world_model=w)
+        by_pos, _ = _tr_engine(ns, c, p, w)
+        engine = _tr_track_all(ns, world, [("a", 1.0, 5.0), ("b", None, 6.0)], causal_reasoning=c, planner=p, world_model=w)
+        ids = _tr_sequence_ids(engine)
+        engine.build_temporal_sequence(ids)
+        engine.reason_about_duration(ids[0])
+        engine.get_events_between(0.0, 100.0)
+        engine.predict_next_event(ids[:1])
+        engine.get_statistics()
+        out["collaborators"] = {"kw": [by_kw.causal is c, by_kw.planner is p, by_kw.world_model is w],
+                                "pos": [by_pos.causal is c, by_pos.planner is p, by_pos.world_model is w],
+                                "never_read": True}
+        out["relations"] = {
+            "meets": _tr_pair(ns, (5, 10.0), (5, 15.0)),
+            "contained_first": _tr_pair(ns, (3, 10.0), (20, 5.0)),
+            "equal": _tr_pair(ns, (5, 10.0), (5, 10.0)),
+            "zero_duration": _tr_pair(ns, (0, 10.0), (5, 10.0)),
+            "plus_small": _tr_pair(ns, (None, 10.0), (None, 10.0625)),
+            "minus_small": _tr_pair(ns, (None, 10.0), (None, 9.9375)),
+            "plus_large": _tr_pair(ns, (None, 10.0), (None, 10.125)),
+            "minus_large": _tr_pair(ns, (None, 10.0), (None, 9.875)),
+        }
+        engine = _tr_track_all(ns, world, [("t", 5, 10.0)])
+        single = engine.build_temporal_sequence([engine.events[0].event_id])
+        engine = _tr_track_all(ns, world, [("t", 100, 0.0), ("t", None, 1.0)])
+        long_first = engine.build_temporal_sequence(_tr_sequence_ids(engine))
+        engine, _ = _tr_engine(ns)
+        empty = engine.build_temporal_sequence([])
+        empty_stats = engine.get_statistics()
+        engine = _tr_track_all(ns, world, [("t", None, float(i)) for i in range(4)])
+        ids = _tr_sequence_ids(engine)
+        averages = []
+        for chosen in (ids, ids[:2], ids[:2]):
+            engine.build_temporal_sequence(chosen)
+            averages.append(engine.avg_sequence_length)
+        engine = _tr_track_all(ns, world, [("t", None, float(i)) for i in range(4)])
+        ids = _tr_sequence_ids(engine)
+        after_zero = []
+        for chosen in ([], ids):
+            engine.build_temporal_sequence(chosen)
+            after_zero.append(engine.avg_sequence_length)
+        out["sequence"] = {"single": [single.total_duration, len(single.causal_chain)],
+                           "long_first": long_first.total_duration,
+                           "empty": [empty.events, empty.total_duration, empty_stats["total_sequences_built"],
+                                     empty_stats["avg_sequence_length"]],
+                           "avg_4_2_2": averages, "avg_0_4": after_zero}
+        engine = _tr_track_all(ns, world, [("x", 2.0, 1.0), ("x", 4.0, 2.0), ("x", None, 3.0), ("x", 0.0, 4.0),
+                                           ("y", None, 5.0), ("z", 0.0, 6.0)])
+        out["duration"] = [engine.reason_about_duration(e.event_id) for e in engine.events] + \
+                          [engine.reason_about_duration("missing")]
+        engine = _tr_track_all(ns, world, [("t", 100, 0.0)])
+        spanning = [e.description for e in engine.get_events_between(10, 20)]
+        engine = _tr_track_all(ns, world, [("t", 5, 0.0), ("t", None, 5.0)])
+        out["window"] = {"spanning": spanning,
+                         "five": [e.description for e in engine.get_events_between(5, 5)],
+                         "zero": [e.description for e in engine.get_events_between(0, 0)]}
+        engine = _tr_track_all(ns, world, [(t, None, 10.0 + i) for i, t in enumerate("ABCABD")])
+        e = _tr_sequence_ids(engine)
+        engine.build_temporal_sequence([e[0], e[1], e[2]])
+        predict = engine.predict_next_event
+        out["predict"] = {"p0": predict([e[0]]), "p01": predict([e[0], e[1]]), "p012": predict([e[0], e[1], e[2]]),
+                          "p34": predict([e[3], e[4]]), "p05": predict([e[0], e[5]]), "p00": predict([e[0], e[0]])}
+        engine = _tr_track_all(ns, world, [(t, None, 10.0 + i) for i, t in enumerate("AB")])
+        e = _tr_sequence_ids(engine)
+        engine.build_temporal_sequence([e[1]])
+        engine.build_temporal_sequence([e[0]])
+        tie = engine.predict_next_event([])
+        engine, _ = _tr_engine(ns)
+        none_seq = engine.predict_next_event([])
+        engine = _tr_track_all(ns, world, [(f"T{i}", None, 10.0 + i) for i in range(7)])
+        e = _tr_sequence_ids(engine)
+        engine.build_temporal_sequence(e[:5])
+        out["predict"].update({"tie": tie, "no_sequences": none_seq,
+                               "tolerance_hit": engine.predict_next_event([e[0], e[1], e[2], e[5]]),
+                               "tolerance_miss": engine.predict_next_event([e[0], e[1], e[5], e[6]])})
+        out["errors"], out["state"] = _tr_error_items(ns, world)
+    return out
+
+
+def _tr_error_items(ns, world):
+    def with_events(count=1, **kwargs):
+        return _tr_track_all(ns, world, [("t", None, 10.0 + i) for i in range(count)], **kwargs)
+
+    def with_sequence():
+        engine = with_events(2)
+        engine.build_temporal_sequence(_tr_sequence_ids(engine))
+        return engine
+
+    fresh, _ = _tr_engine(ns)
+    full_id = with_events(1)
+    cases = {
+        "track_noargs": lambda: _tr_engine(ns)[0].track_event(),
+        "init_four": lambda: _tr_engine(ns, 1, 2, 3, 4),
+        "event_noargs": lambda: ns.TemporalEvent(),
+        "relation_noargs": lambda: ns.TemporalRelation(),
+        "sequence_noargs": lambda: ns.TemporalSequence(),
+        "build_noargs": lambda: fresh.build_temporal_sequence(),
+        "build_none_events": lambda: with_events().build_temporal_sequence(None),
+        "build_int_events": lambda: with_events().build_temporal_sequence(5),
+        "window_noargs": lambda: fresh.get_events_between(),
+        "window_str_events": lambda: with_events().get_events_between("a", "b"),
+        "window_none_events": lambda: with_events().get_events_between(None, None),
+        "predict_noargs": lambda: fresh.predict_next_event(),
+        "predict_none_seq": lambda: with_sequence().predict_next_event(None),
+        "predict_int_seq": lambda: with_sequence().predict_next_event(5),
+        "build_none_empty": lambda: _tr_engine(ns)[0].build_temporal_sequence(None),
+        "build_str_events": lambda: with_events().build_temporal_sequence("abc"),
+        "duration_none": lambda: with_events().reason_about_duration(None),
+        "duration_list": lambda: with_events().reason_about_duration([1]),
+        "window_str_empty": lambda: _tr_engine(ns)[0].get_events_between("a", "b"),
+        "predict_none_empty": lambda: _tr_engine(ns)[0].predict_next_event(None),
+        "predict_str_seq": lambda: with_sequence().predict_next_event("ab"),
+        "track_odd_types": lambda: (_tr_odd(world, 5, None, None), _tr_odd(world, "t", "d", -1.0)),
+    }
+    def _tr_odd(world, etype, desc, duration):
+        engine, _ = _tr_engine(ns)
+        return world.track(engine, etype, desc, duration, 10.0)
+
+    errors = {name: _tr_exc(fn) for name, fn in cases.items()}
+    full = full_id.build_temporal_sequence(full_id.events[0].event_id)
+    negative = _tr_odd(world, "t", "d", -1.0)
+    typed_first = _tr_odd(world, 5, None, None)
+    broke, _ = _tr_engine(ns)
+    world.pending.append(1.0)
+    broke.track_event("x", "y", duration="5")
+    world.pending.append(2.0)
+    second = _tr_exc(lambda: broke.track_event("x", "z", duration=3.0))
+    state = {"str_as_list": len(full.events), "negative_duration": negative.duration,
+             "odd_type": [typed_first.event_type, typed_first.description],
+             "second_track": second, "events": len(broke.events), "tracked": broke.total_events_tracked,
+             "relations": broke.total_relations_detected, "stored_relations": len(broke.temporal_relations)}
+    return errors, state
+
+
+_TR_EXPECTED = {
+    "fresh": {"stats": _TR_FRESH, "banner": _TR_BANNER, "lists": [[], [], []]},
+    "counters": {"stats": {"total_events_tracked": 4, "total_relations_detected": 6, "total_sequences_built": 0,
+                           "avg_sequence_length": 0.0, "active_events": 4, "temporal_relations": 6},
+                 "relations": [(0, 1, "before", 0.9), (0, 2, "before", 0.9), (1, 2, "before", 0.9),
+                               (0, 3, "before", 0.9), (1, 3, "before", 0.9), (2, 3, "before", 0.9)]},
+    "collaborators": {"kw": [True] * 3, "pos": [True] * 3, "never_read": True},
+    "relations": {"meets": [("before", 0.9)], "contained_first": [("overlaps", 0.8)], "equal": [("during", 0.85)],
+                  "zero_duration": [("simultaneous", 0.7)], "plus_small": [("simultaneous", 0.7)],
+                  "minus_small": [("simultaneous", 0.7)], "plus_large": [("before", 0.9)],
+                  "minus_large": [("after", 0.9)]},
+    "sequence": {"single": [0.0, 1], "long_first": 1.0, "empty": [[], 0.0, 1, 0.0],
+                 "avg_4_2_2": [4.0, 3.0, 2.5], "avg_0_4": [0.0, 4.0]},
+    "duration": [2.0, 4.0, 3.0, 3.0, None, None, None],
+    "window": {"spanning": [], "five": ["d0", "d1"], "zero": ["d0"]},
+    "predict": {"p0": "B", "p01": "C", "p012": None, "p34": None, "p05": None, "p00": None, "tie": "B",
+                "no_sequences": None, "tolerance_hit": "T4", "tolerance_miss": None},
+    "errors": {**{k: "TypeError" for k in ("track_noargs", "init_four", "event_noargs", "relation_noargs",
+                                           "sequence_noargs", "build_noargs", "build_none_events", "build_int_events",
+                                           "window_noargs", "window_str_events", "window_none_events",
+                                           "predict_noargs", "predict_none_seq", "predict_int_seq")},
+               **{k: None for k in ("build_none_empty", "build_str_events", "duration_none", "duration_list",
+                                    "window_str_empty", "predict_none_empty", "predict_str_seq", "track_odd_types")}},
+    "state": {"str_as_list": 1, "negative_duration": -1.0, "odd_type": [5, None], "second_track": "TypeError",
+              "events": 2, "tracked": 2, "relations": 0, "stored_relations": 0},
+}
+
+
+def tr_fingerprint(ns):
+    """Resumo comportamental (TR1–TR4 e metadados) sobre o objeto que expõe as quatro classes."""
+    import dataclasses
+    import inspect
+    grid = _tr_grid_results(ns)
+    engine, banner = _tr_engine(ns)
+    return {
+        "grid": grid, "tr2": _tr_family_tr2(ns), "tr3": _tr_family_tr3(ns), "tr4": _tr_tr4(ns),
+        "fields": {name: [f.name for f in dataclasses.fields(getattr(ns, name))] for name in _TR_FIELDS},
+        "init": list(inspect.signature(ns.RealTemporalReasoningEngine.__init__).parameters), "banner": banner,
+        "clock": ["time.time", "uuid.uuid4"],
+    }
+
+
+def temporal_reasoning_source_text(src: str) -> str:
+    idx = src.index(_TR_MARKER)
+    line_start = src.rfind("\n", 0, idx - 1) + 1
+    end = src.index(_TR_END, idx) + len(_TR_END)
+    return src[line_start:end]
+
+
+def _temporal_reasoning_source_sha(path="core/cognitivo/temporal_reasoning.py") -> str:
+    import hashlib
+    text = (ROOT / path).read_text(encoding="utf-8")
+    return hashlib.sha256(temporal_reasoning_source_text(text).encode()).hexdigest()
+
+
+def _temporal_reasoning_standalone() -> bool:
+    """Árvore de imports: constitutional_brain, numpy ou vita no módulo extraído falha TR6."""
+    import ast
+
+    tree = ast.parse((ROOT / "core/cognitivo/temporal_reasoning.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names = [node.module]
+        for name in names:
+            root = name.split(".")[0]
+            if root in {"numpy", "vita"} or name == "core.constitutional_brain" \
+                    or name.startswith("core.constitutional_brain."):
+                return False
+    return True
+
+
+_TR_PROC_SCRIPT = ("import importlib, sys\nimport tools.cognitivo_eval as e\n"
+                   "m = importlib.import_module({source!r})\nprint('TRDIG:' + e._tr_grid_digest(m))\n")
+
+
+def _tr_process_digest(source, hash_seed):
+    import subprocess  # nosec B404 - roda só o interpretador atual com script fixo
+    env = {**os.environ, "PYTHONHASHSEED": str(hash_seed), "PYTHONPATH": str(ROOT)}
+    proc = subprocess.run(  # nosec B603 - interpretador atual e script fixo do harness
+        [sys.executable, "-c", _TR_PROC_SCRIPT.format(source=source)],
+        capture_output=True, text=True, env=env, cwd=str(ROOT), timeout=300, check=False)
+    lines = [line for line in proc.stdout.splitlines() if line.startswith("TRDIG:")]
+    if proc.returncode != 0 or not lines:
+        raise RuntimeError(f"subprocesso falhou ({source}, seed {hash_seed}): {proc.stderr[-400:]}")
+    return lines[-1][len("TRDIG:"):]
+
+
+def eval_temporal_reasoning(criteria="v1"):
+    """TR1–TR6. criteria é aceito e ignorado: há um único protocolo pré-registrado."""
+    import core.cognitivo as package
+    import core.cognitivo.temporal_reasoning as temporal_reasoning
+    import core.constitutional_brain as brain
+
+    payload = tr_fingerprint(temporal_reasoning)
+    sha_module = _ms_sha(payload)
+    sha_brain = _ms_sha(tr_fingerprint(brain))
+    source_sha = _temporal_reasoning_source_sha()
+    standalone = _temporal_reasoning_standalone()
+    identity = all(
+        getattr(brain, name) is getattr(temporal_reasoning, name) is getattr(package, name)
+        and getattr(temporal_reasoning, name).__module__ == "core.cognitivo.temporal_reasoning"
+        for name in _TR_NAMES
+    )
+    grid, tr2, tr3 = payload["grid"], payload["tr2"], payload["tr3"]
+    digests = [_tr_process_digest("core.cognitivo.temporal_reasoning", seed) for seed in _TR_HASH_SEEDS]
+    tr1 = (grid["count"] == _TR_GRID_SIZE and grid["reference_matches"] == _TR_GRID_SIZE and grid["mutated_inputs"] == 0)
+    tr2_invalid, tr3_invalid = tr2["invalid"] > 0, tr3["invalid"] > 0
+    tr4_sections = {key: payload["tr4"].get(key) == expected for key, expected in _TR_EXPECTED.items()}
+    tr4 = all(tr4_sections.values())
+    tr5 = len(set(digests)) == 1
+    tr6 = (source_sha == TR_SOURCE_SHA and sha_module == sha_brain == TR_BEHAVIOR_SHA and identity and standalone
+           and payload["fields"] == _TR_FIELDS and payload["init"] == _TR_INIT_PARAMS
+           and payload["banner"] == _TR_BANNER and payload["clock"] == ["time.time", "uuid.uuid4"])
+    return [
+        _check("TR1", {"instances": grid["count"], "reference_matches": grid["reference_matches"],
+                       "mutated_inputs": grid["mutated_inputs"]},
+               tr1, "120/120 instâncias iguais à referência independente; 0 entradas alteradas"),
+        _check("TR2", {"hits": tr2["hits"], "total": tr2["total"], "rate": tr2["rate"], "invalid": tr2["invalid"]},
+               not tr2_invalid and tr2["rate"] >= _TR_LIMIT, "≥ 0.90 das 20 seeds com os cinco rótulos corretos",
+               **({"scenario_invalid": True} if tr2_invalid else {})),
+        _check("TR3", {"hits": tr3["hits"], "total": tr3["total"], "rate": tr3["rate"], "invalid": tr3["invalid"]},
+               not tr3_invalid and tr3["rate"] >= _TR_LIMIT,
+               "≥ 0.90 das 20 seeds com ordem, duração, cadeia e previsão corretas",
+               **({"scenario_invalid": True} if tr3_invalid else {})),
+        _check("TR4", {"sections": tr4_sections}, tr4, "contadores, colaboradores, erros e gaps conforme o registrado"),
+        _check("TR5", {"digests": digests}, tr5,
+               "resumo das 120 instâncias igual com PYTHONHASHSEED 101 (duas vezes) e 202"),
+        _check("TR6", {"source_sha": source_sha, "sha_module": sha_module, "sha_brain": sha_brain,
+                       "identity": identity, "standalone": standalone, "clock": payload["clock"],
+                       "source_golden": TR_SOURCE_SHA, "behavior_golden": TR_BEHAVIOR_SHA},
+               tr6, "SHA de fonte e de comportamento pré-registrados; reexport idêntico"),
+    ]
+
+
 EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": eval_mcts,
               "causal": eval_causal, "counterfactual": eval_counterfactual,
               "working_memory": eval_working_memory,
@@ -7119,7 +7723,8 @@ EVALUATORS = {"episodic": eval_episodic, "predictive": eval_predictive, "mcts": 
               "analogical_reasoning": eval_analogical_reasoning,
               "contextual_memory": eval_contextual_memory,
               "emotional_memory": eval_emotional_memory,
-              "semantic_networks": eval_semantic_networks}
+              "semantic_networks": eval_semantic_networks,
+              "temporal_reasoning": eval_temporal_reasoning}
 
 
 def main(argv=None) -> int:
