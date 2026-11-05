@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from numbers import Real
 from typing import Any, ClassVar, Dict, List, Mapping, Optional, Tuple
 
-from core.cognitivo.action_effects import planner_deltas
+from core.cognitivo.action_effects import planner_deltas, veto_index, veto_lookup
 from core.cognitivo.causal_world_model import STATUS_UTILITY
 
 __all__ = ["DEFAULT_VETOES", "MCTSNode", "PlanResult", "RealMCTSPlanner"]
@@ -440,9 +440,13 @@ class RealMCTSPlanner:
         # P1b: veto padrão. Ações vetadas saem do espaço de busca e voltam em PlanResult.vetoed_actions.
         candidates = allowed if allowed is not None else list(self._action_effects)
         vetoed: List[Dict[str, str]] = []
+        veto_canon = veto_index(self.vetoes)  # chave canônica -> motivo (nome exato tem precedência)
         for action in candidates:
-            if isinstance(action, str) and action in self.vetoes and all(v["action"] != action for v in vetoed):
-                vetoed.append({"action": action, "reason": self.vetoes[action]})
+            if not isinstance(action, str) or any(v["action"] == action for v in vetoed):
+                continue
+            hit, reason = veto_lookup(action, self.vetoes, veto_canon)
+            if hit:
+                vetoed.append({"action": action, "reason": reason})
         if vetoed:
             names = {v["action"] for v in vetoed}
             allowed = [a for a in candidates if a not in names]

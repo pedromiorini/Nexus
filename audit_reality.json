@@ -12,9 +12,9 @@
       },
       {
         "path": "core/cognitivo/action_effects.py",
-        "lines": 39,
+        "lines": 106,
         "classes": 0,
-        "functions": 1
+        "functions": 4
       },
       {
         "path": "core/cognitivo/analogical_reasoning.py",
@@ -30,7 +30,7 @@
       },
       {
         "path": "core/cognitivo/causal_world_model.py",
-        "lines": 317,
+        "lines": 319,
         "classes": 5,
         "functions": 14
       },
@@ -42,9 +42,15 @@
       },
       {
         "path": "core/cognitivo/counterfactual.py",
-        "lines": 602,
+        "lines": 617,
         "classes": 4,
-        "functions": 26
+        "functions": 28
+      },
+      {
+        "path": "core/cognitivo/decision_cycle.py",
+        "lines": 320,
+        "classes": 4,
+        "functions": 12
       },
       {
         "path": "core/cognitivo/emotional_memory_weighting.py",
@@ -72,7 +78,7 @@
       },
       {
         "path": "core/cognitivo/mcts_planner.py",
-        "lines": 536,
+        "lines": 540,
         "classes": 3,
         "functions": 23
       },
@@ -87,6 +93,12 @@
         "lines": 490,
         "classes": 3,
         "functions": 17
+      },
+      {
+        "path": "core/cognitivo/scm_counterfactual.py",
+        "lines": 252,
+        "classes": 2,
+        "functions": 8
       },
       {
         "path": "core/cognitivo/semantic_networks.py",
