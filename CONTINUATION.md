@@ -7,6 +7,25 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — rebase da #147 (MCTS P1c) sobre 7c0464c — 2026-11-05
+
+- **Base:** `7c0464c9620d6c2678abd820219a368b7c64c699` (`origin/main`, merge da #161). Branch `grok/mcts-p1c-brain-veto-20261030`. Rebase linear, sem commit de merge. O HEAD antigo da PR era `7f1a86eb3928c995f8fdad977eac1981a877ffb1`.
+- **Agent-Id:** `grok-bot`. O primeiro commit (`175d80c`) tira o lease da #161 (TemporalFactStore, já na `main`, `expira_em: 2026-11-08T15:00:00+00:00`, cobria `core/constitutional_brain.py`) e abre o claim deste rebase, `expira_em: 2026-11-08T16:00:00+00:00`. `python tools/agente/validar_registro.py --expirados aviso` saiu 0 nesse commit, antes de qualquer replay que edite o monólito.
+- **Decisão do Pedro (2026-11-05):** S2a (`expected_reward == 0.0` para ação inventada) e a errata do resíduo `:180` (dublê sem `is_modeled`) ficam como estão. `_evaluate` / critério P1b não mudam. O replay preserva o GREEN já na #147: S1, S2b (`DECLARED_SUCCESS_CAP = 0.9`) e S3, inclusive a errata E-P1c-VK (casamento por `veto_lookup`, construtor só valida nomes) e o import tardio de `_normalize_action_key` dentro de `_veto_key` (o replay linear tinha deixado o import no topo; `edcbba5` restaura o texto de `7f1a86e`). `core/cognitivo/mcts_planner.py` e os três contratos P1c ficam iguais ao tip antigo.
+- **Gates locais neste ambiente** (Python 3.11.18 via uv, venv `/tmp/nexus-ci311`, `uv pip install --require-hashes -r requirements-ci.lock`; Ruff 0.17.1, Bandit 1.9.4; `LC_ALL=C`; `PYTHONPATH=.`; `NEXUS_AUDIT_DB=/tmp/nexus_audit.sqlite3`). Não é a imagem do Actions.
+  - Ruff e `compileall` exit 0.
+  - Contratos P1c + `test_mcts_action_contract` + `test_mcts_planner_quality_contract` + `test_mcts_p1b_contract` + `test_agent_registry_contract`: 83 testes, OK, exit 0. O teste P1b `test_double_without_is_modeled_keeps_the_warning_criterion` passou.
+  - `coverage run --branch -m unittest discover -p 'test_*.py'`: 1390 testes, OK, 5 falhas esperadas, 196,9 s, exit 0. Demo `coverage run --append --branch core/constitutional_brain.py` exit 0. O banner do demo não é evidência de capacidade. Cobertura de ramo: núcleo 69% (piso 62); `core/cognitivo/*` 98% (piso 90; `mcts_planner.py` 94%); fila 95%; VRAM 94%; fatos temporais 94%; ponte Vita 76%.
+  - `python tools/targeted_mutation.py`: `declared 80, killed 80, survived 0, not_applied 0`, exit 0. O arquivo não foi editado.
+  - `python tools/cognitivo_mutation.py --jobs 4`: `declared 998, killed 998, survived 0, not_applied 0`, exit 0.
+  - Bandit: 139 LOW, 0 MEDIUM/HIGH. `security_triage.py --check`, `embedded_assert_audit` e `implementation_gap_audit` exit 0.
+  - `reality_audit.py` exit 0, relatórios commitados em `696d6c3`. Núcleo 23439 → 23449 linhas, 218 classes, 703 funções. `core/cognitivo` 18 módulos, 6402 → 6494 linhas. `mcts_planner.py` 540 → 632 linhas, 23 → 27 funções.
+  - `bash tools/agente/predeleg.sh HEAD origin/main`: `OK: sem conflito`, exit 0.
+- **Bloco `NEXUS-CURRENT-STATE`:** não reescrito. Continua `tests: CURRENT_TESTS` e `bandit_low: 139`. `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md` não foram editados: este rebase não muda alegação de evidência.
+- **Fila:** `predeleg` contra `origin/fix/pr147-veto-hardening-20261031` (#149) sai 2 (`audit_reality.json`, `mcts_planner.py`, `test_mcts_p1c_contract.py`, `tools/cognitivo_mutation.py`). Contra `origin/fix/audit-sanitizer-exact-members-20261031` (#148) sai 2 (`audit_reality.json`). Esses conflitos não foram resolvidos.
+- **Fora:** S2a, errata `:180`, `tools/targeted_mutation.py`, branches dos PRs #115, #79, #116 e #131. Sem merge.
+- **Não verificado:** CI hospedado, actionlint, zizmor, Python 3.12, a suíte com `LC_ALL=en_US.UTF-8`, `cognitivo_eval`, benchmarks de capacidade e POMDP. `state_consistency_audit.py` com manifesto local (`tests.status: not_generated`, sem `test-summary.json`) levantou `KeyError: 'executed'` e não produziu relatório; não se fabricou `gates_status: success`. O claim permanece até o merge e deve sair no último commit antes dele.
+
 ## Rodada — injeção opt-in de TemporalFactStore em RealKnowledgeGraph — 2026-11-05
 
 - **Base:** `351af8f724f9d4906ba21603653d78550c88feb5` (`origin/main`). Branch `cursor/temporal-graph-injection-d00c`. Claim do `grok-bot` aberto no commit anterior, com os leases do SCM (`#159`) e do GlobalWorkspace (`#160`) removidos porque essas PRs já estão na `main`. `expira_em: 2026-11-08T15:00:00+00:00`. `python tools/agente/validar_registro.py --expirados aviso --agora 2026-11-05T16:00:00+00:00` saiu 0 antes de qualquer edição do monólito.
