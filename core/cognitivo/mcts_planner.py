@@ -37,16 +37,17 @@ def _veto_key(action: Any) -> Optional[str]:
 
 
 def _veto_table(vetoes: Mapping[Any, Any]) -> Dict[str, str]:
-    """Mapa chave normalizada → motivo; com duas chaves iguais depois de normalizar, vence a primeira."""
+    """Cópia validada do mapa de vetos de ``compare_allowed_futures`` (nomes originais como chave).
+
+    O casamento é o da ``main`` (E-P1c-VK1): ``veto_lookup`` com nome exato primeiro e depois a ``veto_key``.
+    """
     table: Dict[str, str] = {}
     for name, reason in vetoes.items():
         if not isinstance(name, str) or not isinstance(reason, str):
             raise TypeError("vetoes must map action names (str) to reasons (str)")
         if not _veto_key(name):
             raise ValueError("veto action name must not be empty")
-        key = _veto_key(name)
-        if key and key not in table:
-            table[key] = reason
+        table[name] = reason
     return table
 
 
@@ -62,19 +63,20 @@ def compare_allowed_futures(world_model: Any, sequences: List[List[str]],
     if vetoes is not None and not isinstance(vetoes, Mapping):
         raise TypeError("vetoes must be a mapping of action -> reason")
     table = _veto_table(DEFAULT_VETOES if vetoes is None else vetoes)
+    canon = veto_index(table)
     allowed: List[int] = []
     vetoed_futures: List[int] = []
     vetoed_actions: List[Dict[str, str]] = []
     for index, sequence in enumerate(sequences):
         steps = sequence if isinstance(sequence, (list, tuple)) else ()
-        hits = [a for a in steps if _veto_key(a) in table]
+        hits = [a for a in steps if veto_lookup(a, table, canon)[0]]
         if not hits:
             allowed.append(index)
             continue
         vetoed_futures.append(index)
         for action in hits:
             if all(v["action"] != action for v in vetoed_actions):
-                vetoed_actions.append({"action": action, "reason": table[_veto_key(action)]})
+                vetoed_actions.append({"action": action, "reason": veto_lookup(action, table, canon)[1]})
     if allowed:
         out = dict(world_model.compare_futures([sequences[i] for i in allowed]))
         best = out.get("best_future_index")  # um modelo sem esse campo (dublê) segue como veio
@@ -197,9 +199,9 @@ class RealMCTSPlanner:
         if vetoes is not None:
             if not isinstance(vetoes, Mapping):
                 raise TypeError("vetoes must be a mapping of action -> reason")
-            for name, reason in vetoes.items():
-                if not isinstance(name, str) or not isinstance(reason, str):
-                    raise TypeError("vetoes must map action names (str) to reasons (str)")
+            for name in vetoes:  # E-P1c-VK2: só os nomes; o motivo pode ser qualquer valor
+                if not isinstance(name, str):
+                    raise TypeError("vetoes must map action names (str) to reasons")
                 if not _veto_key(name):
                     raise ValueError("veto action name must not be empty")
         self.vetoes: Dict[str, str] = dict(DEFAULT_VETOES if vetoes is None else vetoes)
