@@ -14,3 +14,9 @@ claims:
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
     expira_em: "2026-11-08T06:41:00+00:00"
+  - agente: grok-bot
+    tarefa: "GlobalWorkspace: teto de pending, substituição com histerese, broadcast com assinantes, fiação attention.consciousness e update_consciousness em think() (P-A, P-C, P-E, P-F, P-G)"
+    arquivos:
+      - core/constitutional_brain.py
+      - test_global_workspace_contract.py
+    expira_em: "2026-11-08T12:00:00+00:00"
