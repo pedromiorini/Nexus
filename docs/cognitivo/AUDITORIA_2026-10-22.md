@@ -3536,3 +3536,77 @@ Fato que motiva a errata: depois do GREEN (`9d506eb`), a primeira rodada dos `vk
 - **Suíte final** (com a guarda Me e o teste dos retirados): **1303 testes OK** (`expected failures=5`) em py3.11 e py3.12; cobertura `core/cognitivo/*` 97 % (≥ 90; 98 % em `dca56c4`, a diferença é um ramo parcial a mais).
 - **Gates locais:** ruff, compileall, Bandit + `security_triage --check` + `embedded_assert_audit` + `implementation_gap_audit`, `validar_registro --expirados aviso` verdes; `reality_audit` regenerado por `tools/reality_audit.py`. `claims: []` neste último commit.
 - **Fora de escopo, como pedido:** S2 não foi implementada nem portada; #79, #115, #116, #131, Axis e `tools/targeted_mutation.py` intactos.
+
+## Incremental Learner — reconsolidação idempotente (C1–C9, pré-registro)
+
+**Objetivo desta rodada:** tornar `RealIncrementalLearner.consolidate_learning` / `learn_from_episode` idempotente por instância. Reprocessar o mesmo par (episódio, id de memória) não pode gerar nova linha, novo reforço, novo padrão nem evento de aprendizado. O registro de padrão passa a contar episódios distintos e continua `Dict[str, int]`. Cada chave de padrão é gravada no máximo uma vez nesta instância. Nada disso persiste.
+
+**Base da observação:** `26e38e538a8e8f3d774922fb15f230caf90d5f0f` (`origin/main`). Sonda local em Python 3.12.3, só de leitura, com fakes duck-typed (`search_episodes`, `get_episode_memories`, `store`, `retrieve`, `log_event`) e, num caso, `RealEpisodicMemory` em SQLite `:memory:`. O fingerprint foi o de `tools.cognitivo_eval.incremental_fingerprint` sobre `core.cognitivo.incremental_learner`, gravado em `test_incremental_fingerprint_26e38e5.json`. Esta seção foi escrita antes do contrato `test_incremental_consolidate_contract.py` falhar e antes de editar a produção.
+
+### O que a sonda mediu (Fato)
+
+- Não existe conjunto de pares já vistos. `learn_from_episode("ep")` três vezes no mesmo item (id 7, relevância 0.9, importância 0.8) devolve 1+1+1 eventos, faz 3 `store` e deixa `total_reinforcements == 2`. A segunda e a terceira gravam de novo a importância original 0.8 somada a 0.08 (0.88), não a importância da linha anterior.
+- `promoted_ids` impede a segunda promoção (`promotion` fica falso) e o `elif` reforça.
+- Duas memórias no mesmo episódio, `"Repeat Me"` e `"  REPEAT ME  "`, deixam `pattern_registry["repeat me"] == 2` e `detect_and_store_patterns` grava uma vez. São ocorrências, não episódios.
+- A tag buscada é `"[PATTERN] {chave}"`. O que se grava é `"[PATTERN freq={freq}] {chave}"`. `tag[:30]` não ocorre nesse texto. Com `retrieve` em eco, vazio ou devolvendo `"unrelated"`, a segunda `detect_and_store_patterns` grava outra linha e, se há log, outro `PATTERN_DETECTED`. Com `retrieve` devolvendo a própria tag, não grava.
+- Relevância 0.1 ainda entra no registro. O limiar 0.75 só está na promoção.
+- `apply_decay({1})` duas vezes, com log, emite `DECAY_APPLIED` duas vezes e não chama `store`.
+- Três `consolidate_learning` nos mesmos dois episódios (um promove, outro reforça): os relatórios 2 e 3 continuam com `episodes_processed == 2`, `memories_reinforced == 2`, `patterns_detected == 1`, `total_learning_events == 2`. O log repete `PATTERN_DETECTED`, `DECAY_APPLIED` e `LEARNING_CONSOLIDATION`. `total_consolidations` vai a 3. No fim, 9 `store`.
+- Uma instância nova começa com contadores e registro vazios. Não há coluna nem arquivo desses pares.
+- `search_episodes(status="closed", limit=2)` e depois `limit=4`, quatro episódios com o mesmo texto e relevância baixa: o registro vai de 2 para 6. A janela maior reprocessa os dois primeiros.
+- Em `core/constitutional_brain.py` há `self.learner.learn_from_episode(episode_id)` (por volta da fase de aprendizado) e, mais adiante no mesmo fluxo, `close_episode`. `consolidate_learning` do orquestrador só delega a `self.learner.consolidate_learning`. `link_memory_to_episode` não aparece no monólito (contagem 0). Sem link, `get_episode_memories` devolve `[]` e as duas chamadas não geram evento. Com um link explícito feito na sonda, a chamada durante o episódio promove e a consolidação seguinte reforça o mesmo par (1 promoção, 1 reforço, 2 `store` de conteúdo mais o padrão se a frequência chegar a 2).
+
+### Hipóteses e o que as separa
+
+| id | hipótese | o que a sonda fez | conclusão nesta base |
+|---|---|---|---|
+| F1 | a busca pega N recentes e o par (episódio, memória) não é marcado | três consolidações repetem a busca e reaprendem | sobrevive como descrição do código |
+| F2 | o reforço lê a importância do episódio e grava linha nova | o segundo `store` usa 0.88 de novo, a partir de 0.8 | sobrevive |
+| F3 | `promoted_ids` só bloqueia a promoção; o `elif` reforça | a segunda chamada promove falso e reforça | sobrevive |
+| F4 | o padrão conta ocorrências, não episódios distintos | duas memórias num episódio contam 2 | sobrevive |
+| F5 | a guarda busca `"[PATTERN] chave"` e grava `"[PATTERN freq=N] chave"` | a segunda detecção grava de novo, salvo se o `retrieve` devolve a tag | sobrevive |
+| F6 | 0.75 só vale para a promoção | relevância 0.1 entra no registro | sobrevive; fora desta correção |
+| F7 | `apply_decay` não persiste e emite `DECAY_APPLIED` a cada chamada | duas chamadas, dois eventos, zero `store` | sobrevive; fora desta correção |
+| F8 | `total_consolidations` sobe e `episodes_processed` é o tamanho da busca mesmo sem trabalho novo | relatório 2 ainda processa 2 e o contador vai a 3 | sobrevive; fora desta correção |
+| F9 | o estado é só da instância | instância nova vem vazia | sobrevive; vira o limite C10 |
+| F10 | o orquestrador aprende e a consolidação refaz o trabalho | a ordem das chamadas existe; sem link não há memória para refazer; com link, refaz | a ordem é fato; "refaz o trabalho" só quando o episódio já tem memória ligada. O monólito não liga. O learner, sim, refaz |
+| F11 | janelas sobrepostas inflam a frequência | 2 e depois 4 viram frequência 6 | sobrevive |
+
+Não se conclui aprendizado, consolidação de memória fora deste contrato, nem prontidão. O nome da classe não é evidência.
+
+### Critérios (pré-registrados; não são ajustados depois do resultado)
+
+Arquivo novo `test_incremental_consolidate_contract.py`. Chaves de `get_statistics`, nesta ordem, terminando em `pattern_registry_size`: `total_promotions`, `total_reinforcements`, `total_patterns`, `total_consolidations`, `total_learning_events`, `pattern_registry_size`. Nenhuma chave nova depois dessa.
+
+- **C1** `test_consolidate_same_episodes_three_times_is_idempotent`. Três episódios (`solo` promovido, `solo` só no padrão, `only-once` só no padrão). A 2ª e a 3ª consolidação repetem `episodes_processed` e zeram promoção, reforço, padrão e eventos de aprendizado. No fim: 1 promoção, 0 reforços, 1 padrão, `total_consolidations == 3`, registro `{"solo": 2, "only-once": 1}`, stores `solo` e `"[PATTERN freq=2] solo"`.
+- **C2** `test_pattern_counts_distinct_episodes_not_occurrences`. Duas grafias no mesmo episódio contam 1 e `detect` devolve 0; um segundo episódio conta 2 e grava 1. A mesma chamada de episódio não sobe o contador. `nan` e relevância −1 não geram evento e contam 1. Janela 2 e depois 4, quatro episódios, conta 4.
+- **C3** `test_pattern_emitted_at_most_once_regardless_of_retrieve`. Eco do sintético, `retrieve` vazio e texto que não é a tag: a segunda detecção devolve 0 e fica uma linha `"[PATTERN freq=2] repeat me"` a 0.92. Com `retrieve` vazio e log ligado: um único `PATTERN_DETECTED`. Tag achada: zero gravações (guarda que já passa).
+- **C4** `test_reinforcement_stores_once_per_episode_memory`. Relevância 0.6 e importância 0.8: uma linha 0.88; a 2ª e a 3ª chamadas devolvem `[]`. O mesmo id duas vezes na mesma lista gera um evento. `True` na importância não é rejeitado (continua bool, teto 0.99) e a 2ª chamada não grava. `importance` str levanta `TypeError`, não grava, e o float seguinte grava uma vez.
+- **C5** `test_promoted_memory_not_reinforced_on_same_episode`. Relevância 0.9 e importância 0.8: a 2ª chamada no mesmo episódio não reforça; o registro da chave fica 1. `True` e `inf` na relevância promovem uma vez. Outro episódio com o mesmo id ainda reforça (guarda).
+- **C6** `test_report_zero_events_on_reconsolidation`. Dois episódios que na 1ª vez promovem e reforçam. A 2ª e a 3ª têm os quatro contadores de evento em 0 e `episodes_processed == 2`. No log: um `PATTERN_DETECTED`, um `DECAY_APPLIED`, três `LEARNING_CONSOLIDATION`, e os dois últimos com `events_generated == 0` e `patterns_found == 0`.
+- **C7** `test_late_linked_memory_processed_once`. Depois da 1ª consolidação entra outra memória no mesmo episódio. A 2ª promove essa memória e não reforça a primeira. A 3ª não gera evento. Cada conteúdo aparece uma vez nos stores de conteúdo.
+- **C8** `test_new_independent_episode_still_accumulates`. Guarda que já passa neste commit: dois episódios novos promovem, a chave conta 2 e o padrão grava 1; dois reforços em episódios distintos acumulam; uma consolidação de dois episódios promove 2.
+- **C9** `test_fingerprint_changes_only_declared_keys`. Contra o fixture de `26e38e5`, o fingerprint novo só difere em caminhos sob `promotion.again`, `promotion.again_stores`, `promotion.again_stats`, `patterns.own_synthetic_second` e `patterns.own_stores`. `again` é `[]`, `again_stores` iguala o store da promoção, `again_stats` fica com 0 reforços e 1 evento, `own_synthetic_second` é 0 e `own_stores` tem uma linha. `again_promoted` continua `[7]`. `NaN` comparado com `NaN` não conta como diferença. As chaves de `get_statistics` são as de cima.
+- **C10** sem teste. Idempotência por instância. Processo novo, ou outra instância, não herda par, registro nem chave já emitida. `apply_decay` direto continua podendo emitir de novo. `total_consolidations` continua subindo. `episodes_processed` continua sendo o tamanho da busca.
+
+### Fora desta correção
+
+Reforço no lugar da linha antiga, persistir o par, contador `episodes_skipped`, lock, decay que altere importância, mudança em `learn_from_plan`, passar o limiar 0.75 para o padrão, e qualquer edição de `core/constitutional_brain.py` ou de `tools/targeted_mutation.py`. Não se mexe nas branches #79, #115, #116, #131.
+
+### Sobreposição com PRs abertos (2026-11-05, `gh pr list` e `git diff` contra o merge-base)
+
+Nenhum PR aberto altera `core/cognitivo/incremental_learner.py` no diff próprio contra o merge-base com `origin/main`. `#147`, `#148`, `#150` e `#153` acrescentam mutantes em `tools/cognitivo_mutation.py` (região perto da linha 1609, não o bloco `il_*`). `#116` acrescenta mutantes `wm_*` por volta da linha 639. `#153` acrescenta protocolo em `tools/cognitivo_eval.py` sem tocar `incremental_fingerprint`, `IL_SOURCE_SHA`, `IL_BEHAVIOR_SHA` nem `_IL_END`. `#147`, `#148`, `#150` e `#153` também acrescentam texto no fim desta auditoria: o acréscimo desta seção conflita com eles na ponta do arquivo. `#79` muda o topo de `REGISTRO_AGENTES.yaml` (versão 3.4.2 do `grok-bot`); esta rodada só acrescenta o agente `cursor-grok-4-7-il` e não altera `versao_aceita` alheia. `#152` e `#79` editam `CLAIMS.yaml` nas branches deles. O claim desta tarefa sai no último commit. `core/constitutional_brain.py` não é editado (fila única; vários PRs abertos já o tocam).
+
+### Previsão do RED
+
+Em `26e38e5`, sem produção alterada: C1–C7 e C9 falham; C8 passa. A guarda da tag em C3, o outro episódio em C5 e o `TypeError` da importância str (antes da gravação) passam dentro dos métodos que ainda falham nos outros subtestes. O contrato antigo `test_incremental_learner_contract.py` continua passando, porque o harness ainda descreve a segunda chamada que reforça e a segunda gravação do sintético.
+
+### Correção mínima pretendida (ainda não aplicada)
+
+- **B1.** Marcar o par `(episode_id, mem_id)` só depois de processar sem exceção. Par já visto: `continue` antes de promover, reforçar ou contar padrão.
+- **B2.** `pattern_registry[chave] =` número de `episode_id` distintos. O tipo continua `Dict[str, int]`.
+- **B3.** Conjunto de chaves já emitidas nesta instância. A guarda do `retrieve` permanece para o caso da tag.
+- **B4.** Atualizar no harness os caminhos `again*` e `own_synthetic_second` (e `own_stores`, que deixa de ter a segunda linha). Recalcular `IL_SOURCE_SHA` e `IL_BEHAVIOR_SHA`. `promo["again"][0]` não pode indexar lista vazia.
+- **B5.** Rever mutantes `il_*` em `tools/cognitivo_mutation.py` apenas. Exigir `not_applied: 0` em `cognitivo_mutation` e em `targeted_mutation`. Não editar `tools/targeted_mutation.py`.
+- **B6.** Resultados medidos entram numa seção posterior desta auditoria, sem reescrever IL1–IL6 nem este pré-registro.
+- **B7.** Não acrescentar chave em `get_statistics` depois de `pattern_registry_size`. `_IL_END` permanece esse trecho.

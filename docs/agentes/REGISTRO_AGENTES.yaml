@@ -56,6 +56,35 @@ agentes:
     assinaturas_commit: ["cursoragent@cursor.com"]
     contato: pedromiorini (GitHub)
     last_seen: "2026-10-28"
+  - id: cursor-grok-4-7-il
+    operador: pedromiorini
+    ferramenta: Cursor Cloud Agent
+    modelo: Grok 4.7
+    instrucoes:
+      arquivo: docs/agentes/versoes/3.4.1/6778552adef5433c85bf9209b494456f4f497ffdf6f8e190b19eab45d54c20a6.md
+      sha256: 6778552adef5433c85bf9209b494456f4f497ffdf6f8e190b19eab45d54c20a6
+      versao_aceita: "3.4.1"
+    conhecimentos: [contrato do incremental learner, fingerprint IL6, mutação cognitiva]
+    skills: [contract-first-bugfix, multi-agent-pr-triage, repo-evidence-audit]
+    escopo_arquivos:
+      - core/cognitivo/incremental_learner.py
+      - test_incremental_consolidate_contract.py
+      - test_incremental_fingerprint_26e38e5.json
+      - tools/cognitivo_eval.py
+      - tools/cognitivo_mutation.py
+      - docs/cognitivo/AUDITORIA_2026-10-22.md
+      - CONTINUATION.md
+      - docs/agentes/REGISTRO_AGENTES.yaml
+      - docs/agentes/CLAIMS.yaml
+    limites:
+      - sem merge, rascunho por padrão
+      - não editar tools/targeted_mutation.py
+      - não editar branches dos PRs #79, #115, #116 e #131
+      - não alterar versao_aceita de outro agente
+      - não implementar reforço in-place, persistência do par, episodes_skipped, lock, decay real nem learn_from_plan
+    assinaturas_commit: ["cursoragent@cursor.com"]
+    contato: pedromiorini (GitHub)
+    last_seen: "2026-11-05"
 # Modelo para novos agentes (copie, preencha e abra PR; não invente dados):
 #  - id: <slug-unico>
 #    uid: <identificador-canônico-opcional; string não vazia, preservada sem normalização>
