@@ -113,9 +113,9 @@
         "functions": 25
       }
     ],
-    "core_lines": 23327,
+    "core_lines": 23402,
     "classes": 218,
-    "functions": 698,
+    "functions": 701,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -196,7 +196,7 @@
   "code_claim_inventory": {
     "by_level": {
       "strong_capability_claim": 51,
-      "scientific_terminology": 233,
+      "scientific_terminology": 241,
       "neutral_identifier": 63
     },
     "items": [
@@ -239,7 +239,7 @@
       {
         "level": "scientific_terminology",
         "label": "consciência/consciousness",
-        "occurrences": 203,
+        "occurrences": 211,
         "examples": [
           "• × POST17 (Consciousness): Consciência perceptual",
           "def __init__(self, memory=None, consciousness=None):",
