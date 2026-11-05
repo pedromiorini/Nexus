@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.cognitivo.action_effects import ACTION_EFFECTS
+from core.cognitivo.action_effects import ACTION_EFFECTS, veto_key
 
 # R2: utilidade ordinal do estado final (status desconhecido fica abaixo de todos)
 STATUS_UTILITY: Dict[str, int] = {"secure": 3, "stable": 2, "isolated": 1, "offline": 1, "vulnerable": 1,
@@ -87,6 +87,8 @@ class RealCausalReasoning:
         """Declara os efeitos verificados de uma ação. Guarda só pares do WORLD_SCHEMA e devolve os rejeitados."""
         if not isinstance(action, str) or not action.strip():
             raise ValueError("action deve ser str não vazia")
+        if veto_key(action) is None:  # o veto compara a chave canônica: nome que não canonicaliza não é declarável
+            raise ValueError("action deve canonicalizar para [A-Z0-9_]+ (veto_key)")
         if not isinstance(effects, dict):
             raise TypeError("effects deve ser dict")
         accepted: Dict[str, Any] = {}

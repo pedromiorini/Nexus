@@ -15,13 +15,20 @@ após a sequência factual. Os três passos:
 Limites do modelo (declarados): o modelo é sem arestas entre variáveis — cada ação só atribui
 valores às chaves do ``WORLD_SCHEMA``, e nenhuma chave é função de outra; a única operação
 causal aceita é do(ação). Os nomes de ação exatos são exigidos (``apply_patch`` não vira
-``APPLY_PATCH``). O veto de ``rank_alternatives`` compara os mesmos nomes exatos: se um dia os
-nomes forem normalizados, o veto deve ser normalizado junto (hoje não é).
+``APPLY_PATCH``): a tabela de efeitos e a intervenção declarada continuam por nome exato.
+
+Veto por nome canônico: o veto de ``rank_alternatives`` compara a chave canônica
+``core.cognitivo.action_effects.veto_key`` (NFKC, sem caracteres invisíveis, separadores e sintaxe de
+chamada final viram ``_``, ASCII, maiúsculas), então ``shutdown_service``, ``SHUTDOWN SERVICE`` e
+``SHUTDOWN_SERVICE()`` são vetadas como ``SHUTDOWN_SERVICE``. ``declare_intervention`` recusa o nome
+que não canonicaliza. O nome exato do ``vetoes`` continua valendo e vence na colisão.
 
 Limitação conhecida (veto por nome, não por efeito): um alias declarado com ``declare_intervention``
-(por exemplo ``shutdown_service`` com o mesmo efeito de ``SHUTDOWN_SERVICE``) tem outro nome e,
-portanto, não é vetado pelo ``DEFAULT_VETOES``; para vetá-lo, passe o nome do alias em ``vetoes``.
-Não há veto por efeito. O ``DEFAULT_VETOES`` é copiado no import: alterá-lo depois não muda este módulo.
+cujo nome canônico seja outro (por exemplo ``SHUTDOWN_SERVICE_V2``, ``SHUTDOWN_SERVICES``,
+``do_shutdown_service`` ou ``SHUTDOWN_SERVICE.exec``: o sufixo ou prefixo faz outra identidade) com o
+mesmo efeito de ``SHUTDOWN_SERVICE`` não é vetado pelo ``DEFAULT_VETOES``; para vetá-lo, passe o nome do
+alias em ``vetoes``. Não há veto por efeito. O ``DEFAULT_VETOES`` é copiado no import: alterá-lo
+depois não muda este módulo.
 """
 from __future__ import annotations
 
@@ -30,7 +37,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from core.cognitivo.action_effects import ACTION_EFFECTS
+from core.cognitivo.action_effects import ACTION_EFFECTS, veto_index, veto_lookup
 from core.cognitivo.causal_world_model import STATUS_UTILITY, WORLD_SCHEMA, _schema_pair
 from core.cognitivo.mcts_planner import DEFAULT_VETOES
 
@@ -191,6 +198,7 @@ def rank_alternatives(
     evidence = _canonical_observation(observed)
     factual = _actions(factual_actions, name="factual_actions")
     vetoes = _freeze_vetoes(vetoes)
+    veto_canon = veto_index(vetoes)
     if alternatives is None or (isinstance(alternatives, (list, tuple)) and not alternatives):
         raise ScmInputError("SCM_NO_ALTERNATIVES", "alternatives ausente ou vazia")
     if isinstance(alternatives, (str, bytes)) or not isinstance(alternatives, (list, tuple)):
@@ -225,7 +233,8 @@ def rank_alternatives(
             "gain": None if factual_utility is None else result.utility - factual_utility,
             "state": dict(result.state),
             "unidentified": list(result.unidentified),
-            "vetoed": [{"action": a, "reason": str(vetoes[a])} for a in dict.fromkeys(seq) if a in vetoes],
+            "vetoed": [{"action": a, "reason": str(reason)} for a, (hit, reason) in
+                       ((a, veto_lookup(a, vetoes, veto_canon)) for a in dict.fromkeys(seq)) if hit],
         })
     if conflicts:
         return {"consistent": False, "conflicts": conflicts, "factual_utility": factual_utility,

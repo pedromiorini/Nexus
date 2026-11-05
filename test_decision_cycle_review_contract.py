@@ -6,6 +6,8 @@ Os testes `test_laird_red*` portam os REDs da revisão (/workspace/probes_pr156/
 """
 import importlib
 import random
+import re
+import unicodedata
 import unittest
 
 from core.cognitivo import mcts_planner
@@ -27,6 +29,19 @@ def default_pairs():
     return [(norm(k), v) for k, v in mcts_planner.DEFAULT_VETOES.items()]
 
 
+def canon_ref(text):
+    """E-VK3: canonicalizador de REFERÊNCIA do veto (independente de ``veto_key``; só o necessário ao ruído do DC12).
+
+    NFKC, tira Cf/Cc não-espaço, separadores/``()`` finais viram nada, ASCII ou ``None``.
+    """
+    t = unicodedata.normalize("NFKC", text)
+    t = "".join(c for c in t if c.isspace() or unicodedata.category(c) not in ("Cf", "Cc"))
+    t = re.sub(r"[\s\-.:/\\,\u2010-\u2015\u2212\u00b7]+", "_", t.strip())
+    t = re.sub(r"(\(_*\))?[;!?]*$", "", t)
+    t = re.sub(r"_+", "_", t).strip("_")
+    return t.upper() if t and re.fullmatch(r"[A-Za-z0-9_]+", t) else None
+
+
 def oracle(proposals, reject_pairs, better, allowed=None):
     """(selected, kind, candidates, rejected); rejected usa 'VOCAB' como motivo de vocabulário."""
     first = {}
@@ -35,12 +50,17 @@ def oracle(proposals, reject_pairs, better, allowed=None):
     if not first:
         return None, "NO_CHANGE", (), {}
     rej = {}
+    veto = {}
     for key, reason in reject_pairs:
         rej.setdefault(norm(key), reason)
+        if canon_ref(key) is not None:
+            veto.setdefault(canon_ref(key), reason)
     blocked = {}
     for key in first:
         if key in rej:
             blocked[key] = rej[key]
+        elif canon_ref(first[key]) in veto:  # E-VK3: o veto canônico vence o vocabulário
+            blocked[key] = veto[canon_ref(first[key])]
         elif allowed is not None and key not in {norm(a) for a in allowed}:
             blocked[key] = "VOCAB"
     rejected = {first[k]: blocked[k] for k in first if k in blocked}
