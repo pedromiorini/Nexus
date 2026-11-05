@@ -175,10 +175,10 @@ class ExactStrActionTests(unittest.TestCase):
         )
         for item in bad:
             with self.subTest(item=item):
-                with self.assertRaises(TypeError):
-                    counterfactual_outcome(OBS, ["MONITOR"], [item])
-                with self.assertRaises(TypeError):
-                    counterfactual_outcome(OBS, [item], ["MONITOR"])
+                for seq in ((["MONITOR"], [item]), ([item], ["MONITOR"])):
+                    with self.assertRaises(TypeError) as caught:
+                        counterfactual_outcome(OBS, *seq)
+                    self.assertIn("deve conter só str", str(caught.exception))
 
 
 class ExactStrObservationTests(unittest.TestCase):

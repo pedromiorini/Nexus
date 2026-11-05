@@ -1,4 +1,16 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "SCM: str exato na observação e nas ações, sem métodos da subclasse"
+    arquivos:
+      - core/cognitivo/scm_counterfactual.py
+      - test_scm_exact_str_contract.py
+      - test_scm_counterfactual_contract.py
+      - CONTINUATION.md
+      - docs/agentes/CLAIMS.yaml
+      - docs/agentes/LICOES_APRENDIDAS.md
+      - AUDIT_REALITY_REPORT.md
+      - audit_reality.json
+    expira_em: "2026-11-08T06:41:00+00:00"
