@@ -15,7 +15,6 @@ from typing import Any, ClassVar, Dict, List, Mapping, Optional, Tuple
 
 from core.cognitivo.action_effects import planner_deltas, veto_index, veto_lookup
 from core.cognitivo.causal_world_model import STATUS_UTILITY
-from core.cognitivo.counterfactual import _normalize_action_key
 
 __all__ = ["DECLARED_SUCCESS_CAP", "DEFAULT_VETOES", "MCTSNode", "PlanResult", "RealMCTSPlanner",
            "compare_allowed_futures"]
@@ -33,7 +32,12 @@ DECLARED_SUCCESS_CAP = 0.9
 
 def _veto_key(action: Any) -> Optional[str]:
     """Nome normalizado como ``counterfactual._normalize_action_key``; ``None`` se não for texto."""
-    return _normalize_action_key(action) if isinstance(action, str) else None
+    if not isinstance(action, str):
+        return None
+    # Import tardio: counterfactual -> scm_counterfactual -> mcts_planner formaria ciclo no import do módulo.
+    from core.cognitivo.counterfactual import _normalize_action_key
+
+    return _normalize_action_key(action)
 
 
 def _veto_table(vetoes: Mapping[Any, Any]) -> Dict[str, str]:
