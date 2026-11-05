@@ -15,7 +15,7 @@ class _WorldModel:
 
 class V3CanonicalVariantsTests(unittest.TestCase):
     def test_main_canonical_variants_are_vetoed(self):
-        for name in ("shutdown.service", "Shutdown-Service()", "shutdown\u200bservice"):
+        for name in ("shutdown.service", "Shutdown-Service()", "shutdown\u200b_service"):  # E-P1c-VK3
             with self.subTest(name=repr(name)):
                 out = compare_allowed_futures(_WorldModel(), [[name], ["MONITOR"]])
                 self.assertEqual(out["allowed_indices"], [1])

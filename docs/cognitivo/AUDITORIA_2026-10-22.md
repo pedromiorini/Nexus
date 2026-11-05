@@ -3688,3 +3688,8 @@ Pré-registro (arquivo novo `test_mcts_p1c_veto_key_errata_contract.py` + ediç�
 - **V4:** `compare_allowed_futures` com `{"my action": "x", "MY_ACTION": "y"}`: `"MY_ACTION"` → `"y"` (nome exato), `"my-action"` → `"x"`.
 - **Previsão do RED** (antes do GREEN, sobre o merge `f21ddb4`): V1 **passa** (o `plan()` já é o da `main`); V2 falha (`{"A": 2}`/`{"A": None}` dão `TypeError`); V3 e V4 falham (o helper ainda usa `_normalize_action_key`); `test_veto_key_precedence_contract.test_veto_with_none_reason_still_vetoes_variants` (da `main`) dá erro.
 - **Gates:** suíte inteira verde sem outra edição de teste; `cognitivo_mutation` completo (todo ramo novo ou alterado com mutante morto; mutantes da PR re-agulhados, nenhum removido) e `targeted_mutation` 80/80; `reality_audit` por `tools/reality_audit.py`. Se um critério falhar: parar e reportar opções.
+
+### Errata E-P1c-VK3 (V3, sub-caso ZWSP; decisão do Pedro: opção A; 2026-11-05)
+
+- **Falha registrada:** no GREEN (não comitado), V3 falhou só no sub-caso `"shutdown\u200bservice"`. O erro é do pré-registro, não do código: a `veto_key` da `main` **remove** caracteres de largura zero (não os trata como separador), logo `veto_key("shutdown\u200bservice") == "SHUTDOWNSERVICE"` ≠ `"SHUTDOWN_SERVICE"`. Os testes da `main` (`test_red_pr156_veto_names.py`: `ZWSP-fim`, `ZWSP-meio`, `ZWSP-em-letra`) só cobrem ZWSP somado ao separador ou dentro da palavra. Os outros sub-casos de V3 e V1, V2, V4 passaram.
+- **Troca:** o sub-caso passa a ser `"shutdown\u200b_service"` (ZWSP + separador; coberto pela `main`, equivalente ao `ZWSP-meio`). Nenhum outro critério muda; o contrato da `main` não é alterado.
