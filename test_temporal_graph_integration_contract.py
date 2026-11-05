@@ -262,9 +262,15 @@ class TemporalGraphIntegrationContract(unittest.TestCase):
         restored = TemporalFactStore.from_snapshot(
             store.export_snapshot(), clock=clock, expected_head=head,
         )
+        live = store.facts_as_of(clock.t, subject="ana", predicate="conhece")
         self.assertEqual(
-            _objects(restored.facts_as_of(clock.t, subject="ana", predicate="conhece")),
-            [f"p{i}" for i in range(1, len(valid_froms) + 1)],
+            [(f.object, f.valid_from) for f in restored.facts_as_of(
+                clock.t, subject="ana", predicate="conhece")],
+            [(f.object, f.valid_from) for f in live],
+        )
+        self.assertEqual(
+            [f.valid_from for f in live],
+            sorted(float(v) for v in valid_froms),
         )
 
 
