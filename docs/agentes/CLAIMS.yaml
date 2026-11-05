@@ -14,16 +14,3 @@ claims:
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
     expira_em: "2026-11-08T06:41:00+00:00"
-  - agente: cursor-grok-4-7-il
-    tarefa: "IncrementalLearner.consolidate_learning idempotente (C1–C9, B1–B7)"
-    arquivos:
-      - core/cognitivo/incremental_learner.py
-      - test_incremental_consolidate_contract.py
-      - test_incremental_fingerprint_26e38e5.json
-      - tools/cognitivo_eval.py
-      - tools/cognitivo_mutation.py
-      - docs/cognitivo/AUDITORIA_2026-10-22.md
-      - CONTINUATION.md
-      - docs/agentes/REGISTRO_AGENTES.yaml
-      - docs/agentes/CLAIMS.yaml
-    expira_em: "2026-11-08T04:00:00Z"
