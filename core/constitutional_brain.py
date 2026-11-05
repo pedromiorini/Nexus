@@ -6209,12 +6209,30 @@ class GlobalWorkspace:
     - Competition for consciousness
     - Winner-take-all dynamics
     - Broadcasting to all modules
+
+    Limites de engenharia (não são evidência de consciência):
+    - pending guarda no máximo max_pending itens (padrão 1000). No estouro
+      sai o de menor saliência; empate descarta o mais antigo.
+    - um pendente só substitui um incumbente se a saliência do pendente é
+      maior que a do incumbente mais SALIENCE_HYSTERESIS (0.05). A margem
+      fica acima do vão de 0.01 da guarda de oscilação e abaixo do vão de
+      0.40 do caso de substituição. Quem sai vai para consciousness_stream
+      e não volta a pending.
+    - broadcast chama cada assinante com uma cópia do workspace e devolve
+      outra cópia. O limiar 0.3 do histórico não muda neste contrato.
     """
 
-    def __init__(self, capacity: int = 1):
+    SALIENCE_HYSTERESIS = 0.05
+    DEFAULT_MAX_PENDING = 1000
+
+    def __init__(self, capacity: int = 1, max_pending: int = DEFAULT_MAX_PENDING):
+        if isinstance(max_pending, bool) or not isinstance(max_pending, int) or max_pending < 1:
+            raise ValueError("max_pending deve ser inteiro >= 1")
         self.capacity = capacity  # Quantos itens conscientes simultâneos (default: 1)
+        self.max_pending = max_pending
         self.workspace: List[ConsciousContent] = []
         self.pending: List[ConsciousContent] = []
+        self._subscribers: List[Any] = []
 
         # Histórico
         self.consciousness_stream: List[ConsciousContent] = []
@@ -6223,19 +6241,44 @@ class GlobalWorkspace:
         self.total_contents = 0
         self.total_broadcasts = 0
 
+    @staticmethod
+    def _require_salience(value: Any) -> None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("salience deve ser número real, sem bool")
+        if not math.isfinite(value) or value < 0:
+            raise ValueError("salience deve ser finita e não negativa")
+
+    def _enforce_pending_cap(self) -> None:
+        extra = len(self.pending) - self.max_pending
+        if extra <= 0:
+            return
+        # Menor saliência primeiro; empate fica com o índice menor (mais antigo).
+        losers = sorted(range(len(self.pending)), key=lambda i: (self.pending[i].salience, i))[:extra]
+        drop = set(losers)
+        self.pending = [item for index, item in enumerate(self.pending) if index not in drop]
+
     def submit_content(self, content: ConsciousContent):
         """Submeter conteúdo para possível consciência"""
+        if not isinstance(content, ConsciousContent):
+            raise TypeError("content deve ser ConsciousContent")
+        self._require_salience(content.salience)
         self.pending.append(content)
         self.total_contents += 1
+        self._enforce_pending_cap()
 
     def update_workspace(self):
         """
         Atualizar workspace (competição por consciência).
-        
-        Winner-take-all: conteúdo com maior salience ganha.
+
+        Vaga livre: entra o pendente de maior saliência.
+        Vaga ocupada: o pendente só desaloja o incumbente mais fraco se
+        salience_pendente > salience_incumbente + SALIENCE_HYSTERESIS.
+        O incumbente desalojado fica só no histórico.
         """
         if not self.pending:
             return
+
+        self._enforce_pending_cap()
 
         # Ordenar por salience
         self.pending.sort(key=lambda x: x.salience, reverse=True)
@@ -6245,6 +6288,19 @@ class GlobalWorkspace:
             winner = self.pending.pop(0)
             self.workspace.append(winner)
             self.consciousness_stream.append(winner)
+
+        margin = self.SALIENCE_HYSTERESIS
+        while self.pending and self.workspace:
+            challenger = self.pending[0]
+            weakest_i = min(range(len(self.workspace)), key=lambda i: (self.workspace[i].salience, i))
+            incumbent = self.workspace[weakest_i]
+            if not (challenger.salience > incumbent.salience + margin):
+                break
+            self.pending.pop(0)
+            displaced = self.workspace.pop(weakest_i)
+            self.consciousness_stream.append(displaced)
+            self.workspace.append(challenger)
+            self.consciousness_stream.append(challenger)
 
         # Remover itens com baixa salience do workspace
         self.workspace = [
@@ -6260,14 +6316,24 @@ class GlobalWorkspace:
         """Obter conteúdo atualmente consciente"""
         return self.workspace.copy()
 
+    def subscribe(self, callback: Any) -> None:
+        """Registrar callback. broadcast entrega uma cópia do workspace."""
+        if not callable(callback):
+            raise TypeError("callback deve ser chamável")
+        self._subscribers.append(callback)
+
     def broadcast(self) -> List[ConsciousContent]:
         """
         Broadcast: conteúdo consciente é transmitido para todos os módulos.
         
         Este é o mecanismo de integração de informação.
+        O retorno continua sendo uma cópia do workspace.
         """
         self.total_broadcasts += 1
-        return self.workspace.copy()
+        snapshot = self.workspace.copy()
+        for callback in tuple(self._subscribers):
+            callback(snapshot.copy())
+        return snapshot
 
 
 class ConsciousnessInternalMonitor:
@@ -20156,6 +20222,11 @@ class CompleteNexusBrain:
                 self.attention_routing.executive = self.executive
             if hasattr(self, 'router') and self.router:
                 self.attention_routing.router = self.router
+
+        # Wire attention → consciousness. attend() só submete ao workspace com esta ponte.
+        if hasattr(self, 'attention') and self.attention:
+            if hasattr(self, 'consciousness') and self.consciousness:
+                self.attention.consciousness = self.consciousness
         
         # Wire error_correction dependencies
         if hasattr(self, 'error_correction') and self.error_correction:
@@ -21138,7 +21209,11 @@ class CompleteNexusBrain:
             print(f"🎯 FINAL: result keys = {list(result.keys())}")
             print("="*80)
             # ========================================================
-            
+
+            # Uma passagem de competição e broadcast por ciclo think() concluído.
+            if self.enable_consciousness and self.consciousness:
+                self.consciousness.update_consciousness()
+
             return result
             
         except Exception as e:
