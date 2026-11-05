@@ -16,6 +16,9 @@ Limites do modelo (declarados): o modelo é sem arestas entre variáveis — cad
 valores às chaves do ``WORLD_SCHEMA``, e nenhuma chave é função de outra; a única operação
 causal aceita é do(ação). Os nomes de ação exatos são exigidos (``apply_patch`` não vira
 ``APPLY_PATCH``): a tabela de efeitos e a intervenção declarada continuam por nome exato.
+Uma subclasse de ``str`` na observação ou no nome da ação vira ``str`` exato
+(``str.__str__``) antes de validar: ``strip``, ``lower``, ``__eq__``, ``__hash__``
+e ``__str__`` do chamador não são chamados. Espaço nas pontas do nome não é removido.
 
 Veto por nome canônico: o veto de ``rank_alternatives`` compara a chave canônica
 ``core.cognitivo.action_effects.veto_key`` (NFKC, sem caracteres invisíveis, separadores e sintaxe de
@@ -90,6 +93,10 @@ def _canonical_observation(observed: object) -> Dict[str, Any]:
         raise ScmInputError("SCM_NO_OBSERVATION", "observed vazio")
     canon: Dict[str, Any] = {}
     for key, value in observed.items():
+        if isinstance(key, str):
+            key = str.__str__(key)
+        if isinstance(value, str):
+            value = str.__str__(value)
         pair = _schema_pair(key, value)
         if pair is None:
             raise ScmInputError("SCM_BAD_OBSERVATION", f"{key!r}={value!r} fora do WORLD_SCHEMA")
@@ -108,6 +115,7 @@ def _actions(actions: object, *, name: str) -> List[str]:
     for action in actions:
         if not isinstance(action, str):
             raise TypeError(f"{name} deve conter só str")
+        action = str.__str__(action)
         if not action.strip():
             raise ScmInputError("SCM_BAD_ACTION", f"{name} contém ação em branco")
         out.append(action)
