@@ -3,15 +3,17 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "Integração opt-in de TemporalFactStore em RealKnowledgeGraph (injeção keyword-only, default desligado); supersede do PR 38"
+    tarefa: "Rebase da #147 (MCTS P1c S1/S2b/S3) sobre main 7c0464c; sem implementar S2a nem a errata :180"
     arquivos:
+      - core/cognitivo/mcts_planner.py
       - core/constitutional_brain.py
-      - test_temporal_graph_integration_contract.py
-      - CONTINUATION.md
-      - docs/agentes/CLAIMS.yaml
-      - docs/agentes/LICOES_APRENDIDAS.md
+      - test_mcts_p1c_contract.py
+      - test_mcts_compare_veto_contract.py
+      - test_mcts_p1c_veto_key_errata_contract.py
+      - tools/cognitivo_mutation.py
+      - docs/cognitivo/AUDITORIA_2026-10-22.md
       - AUDIT_REALITY_REPORT.md
       - audit_reality.json
-      - NEXUS_DECISIONS.md
-      - NEXUS_ROADMAP.md
-    expira_em: "2026-11-08T15:00:00+00:00"
+      - docs/agentes/CLAIMS.yaml
+      - CONTINUATION.md
+    expira_em: "2026-11-08T16:00:00+00:00"

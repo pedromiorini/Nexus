@@ -16,7 +16,8 @@ from typing import Any, ClassVar, Dict, List, Mapping, Optional, Tuple
 from core.cognitivo.action_effects import planner_deltas, veto_index, veto_lookup
 from core.cognitivo.causal_world_model import STATUS_UTILITY
 
-__all__ = ["DEFAULT_VETOES", "MCTSNode", "PlanResult", "RealMCTSPlanner"]
+__all__ = ["DECLARED_SUCCESS_CAP", "DEFAULT_VETOES", "MCTSNode", "PlanResult", "RealMCTSPlanner",
+           "compare_allowed_futures"]
 
 # P1b: ações que o planejador não recomenda por padrão (motivo devolvido em PlanResult.vetoed_actions).
 # Quem quiser planejar com elas passa ``vetoes={}`` (ou outro mapa) ao construir o planejador.
@@ -24,6 +25,73 @@ DEFAULT_VETOES: Dict[str, str] = {
     "IGNORE_ALERT": "ignorar um alerta de segurança não é uma resposta aceitável por padrão",
     "SHUTDOWN_SERVICE": "desligar o serviço é uma ação destrutiva e exige decisão humana explícita",
 }
+
+# P1c: ação declarada fora da tabela é hipótese do usuário, não verificação: a chance de sucesso nunca passa disto.
+DECLARED_SUCCESS_CAP = 0.9
+
+
+def _veto_key(action: Any) -> Optional[str]:
+    """Nome normalizado como ``counterfactual._normalize_action_key``; ``None`` se não for texto."""
+    if not isinstance(action, str):
+        return None
+    # Import tardio: counterfactual -> scm_counterfactual -> mcts_planner formaria ciclo no import do módulo.
+    from core.cognitivo.counterfactual import _normalize_action_key
+
+    return _normalize_action_key(action)
+
+
+def _veto_table(vetoes: Mapping[Any, Any]) -> Dict[str, str]:
+    """Cópia validada do mapa de vetos de ``compare_allowed_futures`` (nomes originais como chave).
+
+    O casamento é o da ``main`` (E-P1c-VK1): ``veto_lookup`` com nome exato primeiro e depois a ``veto_key``.
+    """
+    table: Dict[str, str] = {}
+    for name, reason in vetoes.items():
+        if not isinstance(name, str) or not isinstance(reason, str):
+            raise TypeError("vetoes must map action names (str) to reasons (str)")
+        if not _veto_key(name):
+            raise ValueError("veto action name must not be empty")
+        table[name] = reason
+    return table
+
+
+def compare_allowed_futures(world_model: Any, sequences: List[List[str]],
+                            vetoes: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+    """``world_model.compare_futures`` só sobre as sequências sem ação vetada (P1c).
+
+    ``best_future_index`` é o índice **original** em ``sequences`` (``None`` se todas forem vetadas ou a
+    lista for vazia). ``results`` traz só as permitidas, na ordem de ``allowed_indices``; ``vetoed_futures``
+    lista os índices das vetadas e ``vetoed_actions`` as ações vetadas (``[{"action", "reason"}]``, ordem de
+    aparição, sem repetir o mesmo texto). ``vetoes=None`` usa ``DEFAULT_VETOES``; ``{}`` desliga.
+    """
+    if vetoes is not None and not isinstance(vetoes, Mapping):
+        raise TypeError("vetoes must be a mapping of action -> reason")
+    table = _veto_table(DEFAULT_VETOES if vetoes is None else vetoes)
+    canon = veto_index(table)
+    allowed: List[int] = []
+    vetoed_futures: List[int] = []
+    vetoed_actions: List[Dict[str, str]] = []
+    for index, sequence in enumerate(sequences):
+        steps = sequence if isinstance(sequence, (list, tuple)) else ()
+        hits = [a for a in steps if veto_lookup(a, table, canon)[0]]
+        if not hits:
+            allowed.append(index)
+            continue
+        vetoed_futures.append(index)
+        for action in hits:
+            if all(v["action"] != action for v in vetoed_actions):
+                vetoed_actions.append({"action": action, "reason": veto_lookup(action, table, canon)[1]})
+    if allowed:
+        out = dict(world_model.compare_futures([sequences[i] for i in allowed]))
+        best = out.get("best_future_index")  # um modelo sem esse campo (dublê) segue como veio
+        if isinstance(best, int) and not isinstance(best, bool) and 0 <= best < len(allowed):
+            out["best_future_index"] = allowed[best]
+    else:
+        out = {"results": [], "best_future_index": None, "best_future": None}
+    out["allowed_indices"] = allowed
+    out["vetoed_futures"] = vetoed_futures
+    out["vetoed_actions"] = vetoed_actions
+    return out
 
 
 @dataclass
@@ -79,7 +147,12 @@ class MCTSNode:
 
 @dataclass
 class PlanResult:
-    """Resultado de um planejamento MCTS"""
+    """Resultado de um planejamento MCTS.
+
+    ``vetoed_actions`` (P1b) é atributo da instância, não campo: ``copy.copy``, ``copy.deepcopy`` e ``pickle``
+    o preservam, mas ``dataclasses.replace`` **o perde** (volta ao padrão ``()``). Promovê-lo a campo exige
+    errata do contrato ER5 (conjunto de campos de ``PlanResult``).
+    """
     goal: str
     best_action_sequence: List[str]      # Sequência de ações recomendada
     expected_reward: float               # Recompensa esperada (0.0 - 1.0)
@@ -127,8 +200,14 @@ class RealMCTSPlanner:
             raise TypeError("max_depth must be an integer")
         if max_depth <= 0:
             raise ValueError("max_depth must be positive")
-        if vetoes is not None and not isinstance(vetoes, Mapping):
-            raise TypeError("vetoes must be a mapping of action -> reason")
+        if vetoes is not None:
+            if not isinstance(vetoes, Mapping):
+                raise TypeError("vetoes must be a mapping of action -> reason")
+            for name in vetoes:  # E-P1c-VK2: só os nomes; o motivo pode ser qualquer valor
+                if not isinstance(name, str):
+                    raise TypeError("vetoes must map action names (str) to reasons")
+                if not _veto_key(name):
+                    raise ValueError("veto action name must not be empty")
         self.vetoes: Dict[str, str] = dict(DEFAULT_VETOES if vetoes is None else vetoes)
         self.world_model = world_model
         self.causal_reasoning = causal_reasoning
@@ -179,6 +258,13 @@ class RealMCTSPlanner:
                 return not is_modeled(action)
             return bool(getattr(self.world_model.simulate([action]), "warnings", []))
         return action not in self._action_effects
+
+    def _is_declared_only(self, action: str) -> bool:
+        """Modelada só por intervenção declarada (fora da tabela): vale para o simulador, mas não é verificada."""
+        if not self._uses_world_effects() or action in self._action_effects:
+            return False
+        is_modeled = getattr(self.world_model, "is_modeled", None)
+        return bool(callable(is_modeled) and is_modeled(action))
 
     # ─── Fase 1: SELEÇÃO ────────────────────────────────────────────────────
 
@@ -380,7 +466,11 @@ class RealMCTSPlanner:
         return sequence
 
     def _extract_alternatives(self, root: MCTSNode, top_n: int = 3) -> List[Dict]:
-        """Extrair planos alternativos (filhos diretos da raiz ordenados por reward)"""
+        """Extrair planos alternativos (filhos diretos da raiz ordenados por reward).
+
+        A ordem é determinística só no empate de recompensa (decidido pelo nome da primeira ação). Fora do
+        empate ela segue a recompensa média dos rollouts sorteados, que varia com a semente (P1c).
+        """
         if not root.children:
             return []
 
@@ -510,6 +600,8 @@ class RealMCTSPlanner:
         planning_time = time.time() - start_time
         if any(self._is_unmodeled(a) for a in best_sequence):
             success_probability = 0.0  # ação sem efeito conhecido não ganha confiança
+        elif any(self._is_declared_only(a) for a in best_sequence):
+            success_probability = round(min(DECLARED_SUCCESS_CAP, expected_reward * 1.1), 4)
         else:
             success_probability = round(min(1.0, expected_reward * 1.1), 4)
 
