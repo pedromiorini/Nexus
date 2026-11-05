@@ -72,7 +72,7 @@
       },
       {
         "path": "core/cognitivo/incremental_learner.py",
-        "lines": 334,
+        "lines": 350,
         "classes": 3,
         "functions": 7
       },
