@@ -7,6 +7,20 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — str exato no contrafactual SCM — 2026-11-05
+
+- **Base:** `26e38e5` (`origin/main`). Branch `cursor/scm-exact-str-e81c`. Código de produção só em `core/cognitivo/scm_counterfactual.py`. Testes em `test_scm_exact_str_contract.py` (novo) e uma exigência de mensagem em `test_scm_counterfactual_contract.py`. O bloco `NEXUS-CURRENT-STATE` não foi reescrito (`tests: CURRENT_TESTS`, `bandit_low: 139`).
+- **Fora desta rodada, com colisão:** S2 da #157 (`_map_intervention` em `core/cognitivo/counterfactual.py`) fica de fora porque o #77 já edita esse arquivo. Leitura em `26e38e5`: `patch apply` mapeia para `APPLY_PATCH` e `veto_key` devolve `PATCH_APPLY`. A falha de `test_unparseable_lines` com o dígito `٣` aparece só com `LC_ALL=en_US.UTF-8` (a guarda sai 0). Com `LC_ALL=C` esse teste passa. O draft #152 já edita `tools/agente/timeout_margin.sh`. Nenhum dos dois arquivos foi alterado.
+- **Fenômeno:** subclasse de `str` na ação passa por `strip` do chamador e por `ACTION_EFFECTS.get` (`__eq__`/`__hash__`). Na observação, `_schema_pair` chama `strip`/`lower` da subclasse. `bool`, `NaN` e o nome com espaço não entram nessa conversão.
+- **Hipóteses:** H1, a ação subclasse já era `str` exato — excluída (`RuntimeError: strip` / `eq`). H2, a observação subclasse já era `str` exato — excluída (`RuntimeError: strip`). H3, `str.__str__` também apararia o nome — excluída: ` MONITOR `, `monitor` e `apply patch` continuam `SCM_UNMODELED`; uma subclasse cujo `strip` devolveria `APPLY_PATCH` também.
+- **RED:** commit `b6ccc65`, produção intacta. `python -m unittest -v test_scm_exact_str_contract.py` → 14 testes, 10 falhas, 6 erros, exit 1. Passaram os controles de não-`str` e o recipiente de observação que não é dict.
+- **GREEN:** `str.__str__` antes de `strip` e antes de `_schema_pair`. Os 4 arquivos SCM (`test_scm_exact_str_contract.py` e os três contratos anteriores) → 81 testes, exit 0. `unittest discover -p 'test_*.py'` com `LC_ALL=C` → 1317 testes, OK, 5 falhas esperadas, exit 0. `targeted_mutation.py` → 80/80 mortos, exit 0. Cobertura `core/cognitivo/*` 98% (piso 90); `scm_counterfactual.py` 99%.
+- **Mutação:** `tools/cognitivo_mutation.py` não foi editado (PRs abertos). No `5771bf4`, catálogo `955` mortos `954`, 1 sobrevivente (`scm_cf_action_type_unchecked`), 0 `not_applied`. O teste já catalogado passou a exigir a mensagem. Os dois mutantes, de novo: `killed 2`. Catálogo completo outra vez: `955/955` mortos, 0 sobreviventes, 0 `not_applied`, exit 0. `targeted_mutation.py` não foi editado.
+- **Ambiente:** Python 3.11.18 (uv; não é a imagem do Actions), venv `/tmp/nexus-ci311`, `pip install --require-hashes -r requirements-ci.lock` (Ruff 0.17.1, Bandit 1.9.4). `LC_ALL=C` na suíte deste branch.
+- **Gates neste commit de código, antes desta prosa:** ruff e compileall exit 0 na `main`. Bandit na `main` `26e38e5`: 139 LOW, 0 MEDIUM/HIGH, exit 1. No branch, `bandit -r core vita tools -b /tmp/base.json` → 0 achados novos, exit 0. Relatório completo no branch: 139 LOW. `security_triage.py --check`, `embedded_assert_audit` e `implementation_gap_audit` exit 0. Replay `run_replay.sh` 17/17, exit 0. `validar_registro.py --expirados aviso` exit 0. `reality_audit.py` mudou só a contagem: `scm_counterfactual.py` 252 → 260 linhas; `core/cognitivo` 6378 → 6386. Núcleo 23327 linhas, 218 classes, 698 funções.
+- **Sonda local, fora do catálogo:** cópia com as duas atribuições `str.__str__` removidas, `python -m unittest test_scm_exact_str_contract.py` → 14 testes, 10 falhas, 6 erros, exit 1 (o mesmo RED).
+- **Limitações:** CI hospedado, actionlint e zizmor não rodaram. A suíte com `LC_ALL=en_US.UTF-8` continua com a falha já coberta pelo #152. Mutantes novos destas duas linhas não entraram no catálogo. Não é evidência de capacidade causal. O claim deste PR expira em `2026-11-08T06:41:00+00:00`.
+
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
 ## Rodada — `limit==0` e barra invertida na busca episódica — 2026-10-29

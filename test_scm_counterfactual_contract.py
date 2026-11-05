@@ -314,9 +314,16 @@ class NegativeInputTests(unittest.TestCase):
 
     def test_n5_wrong_types(self):
         obs = {"system_status": "secure"}
-        for args in (([1], []), ([], [None]), ("APPLY_PATCH", []), ([], "MONITOR"), ([], b"MONITOR")):
-            with self.subTest(args=args), self.assertRaises(TypeError):
-                scm().counterfactual_outcome(obs, *args)
+        for args in (([1], []), ([], [None]), ([], [b"MONITOR"])):
+            with self.subTest(args=args):
+                with self.assertRaises(TypeError) as caught:
+                    scm().counterfactual_outcome(obs, *args)
+                self.assertIn("deve conter só str", str(caught.exception))
+        for args in (("APPLY_PATCH", []), ([], "MONITOR"), ([], b"MONITOR")):
+            with self.subTest(args=args):
+                with self.assertRaises(TypeError) as caught:
+                    scm().counterfactual_outcome(obs, *args)
+                self.assertIn("deve ser lista de str", str(caught.exception))
         with self.assertRaises(TypeError):
             scm().counterfactual_outcome(["system_status"], [], [])
         with self.assertRaises(TypeError):

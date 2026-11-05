@@ -127,3 +127,16 @@ O replay `tools/agente/replay/run_replay.sh` não executa este auditor. Tipo des
 - Nota sobre medição: sem bloco de reincidência de propósito (lição `registrada`, reincidência não medida; ver desvio de AD8 em `ARTEFATOS_DRIFT.md`). Inferir `não medido` aqui faria o auditor reportá-la como `verificada`, e `test_current_lessons_are_not_reported_as_measured` exige `nao_checavel`.
 - Alternativas descartadas: colocar os casos `drift` em `casos.tsv` (o job de replay do CI não instala bandit); estender a guarda ao marcador `bandit_low` (fora do escopo pré-registrado; fica como proposta separada).
 - Status: registrada (origem/anterior/incompatível medidos no replay local; o teste de lição atual exige `nao_checavel` para lições não ativas; a ativação e a medição de reincidência são decisão do Pedro)
+
+### L-011 — `TypeError` sem mensagem deixou mutante de tipo sobreviver
+- Data: 2026-11-05
+- Verificador que falhou: `tools/cognitivo_mutation.py`, mutante `scm_cf_action_type_unchecked`.
+- Fato observado: no commit `5771bf4`, o catálogo inteiro saiu `declared 955, killed 954, survived 1, not_applied 0`. O sobrevivente troca `isinstance(action, str)` por `False`. `str.__str__` na linha seguinte também levanta `TypeError`, e o teste do catálogo só exigia o tipo da exceção.
+- Causa (Fato): a guarda e a conversão seguinte falham com o mesmo tipo; um assert só de tipo não distingue as duas.
+- Correção: `test_scm_counterfactual_contract.py` passa a exigir a mensagem `deve conter só str` no item e `deve ser lista de str` no recipiente. Reexecução só desses dois mutantes (`scm_cf_action_type_unchecked` e `scm_cf_blank_action_accepted`): `killed 2`. O catálogo não foi editado (arquivo em PRs abertos).
+- Regra/checagem derivada: se uma conversão posterior levanta o mesmo tipo que a guarda, o teste do catálogo precisa da mensagem (ou de outro discriminante). Não aceitar «a exceção ainda é TypeError» como morte do mutante.
+- Evidência: commit `5771bf4` (sobrevivente); a morte dos dois mutantes é local, neste branch, depois do assert da mensagem.
+- Derivada de: L-010 (catálogo e artefato de gate).
+- Nota sobre medição: sem bloco de reincidência, de propósito. `test_current_lessons_are_not_reported_as_measured` exige `nao_checavel` para toda lição deste arquivo, e `test_correction_claim_audit_contract.py` está no PR #77. Três casos, medidos à parte, sem mudar o status para `ativa`: (a) o mutante de tipo morre com a mensagem; (b) `scm_cf_blank_action_accepted` continua morto; (c) o assert só de tipo, na rodada de `5771bf4`, não o mata.
+- Alternativas descartadas: editar `tools/cognitivo_mutation.py` para apontar o mutante ao teste novo (arquivo em PRs abertos); apagar a guarda `isinstance` e ficar só com `str.__str__` (o mutante deixaria de aplicar e o gate contaria `not_applied`).
+- Status: registrada (mesmo desvio de L-010; ativação é decisão do Pedro)
