@@ -300,13 +300,18 @@ class N1NormalizedVetoTests(unittest.TestCase):
             for name in ("MY_ACTION", "my-action"):
                 with self.subTest(seed=seed, name=name):
                     r = _plan(seed, actions=[name, "MONITOR"], planner=RealMCTSPlanner(vetoes={"my action": "x", "MY_ACTION": "y"}))
-                    self.assertEqual(r.vetoed_actions, [{"action": name, "reason": "x"}])
+                    # E-P1c-VK1: nome exato primeiro (veto_lookup da main), depois a chave canônica.
+                    want = "y" if name == "MY_ACTION" else "x"
+                    self.assertEqual(r.vetoed_actions, [{"action": name, "reason": want}])
                     self.assertEqual(set(r.best_action_sequence), {"MONITOR"})
 
     def test_invalid_maps(self):
-        for bad in ({1: 2}, {"A": 2}, {1: "x"}, {None: None}):
+        for bad in ({1: 2}, {1: "x"}, {None: None}):
             with self.subTest(bad=bad), self.assertRaises(TypeError):
                 RealMCTSPlanner(vetoes=bad)
+        for ok in ({"A": 2}, {"A": None}):  # E-P1c-VK2: só os nomes são validados
+            with self.subTest(ok=ok):
+                self.assertEqual(RealMCTSPlanner(vetoes=ok).vetoes, ok)
         for bad in ({"  ": "x"}, {"--": "x"}):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 RealMCTSPlanner(vetoes=bad)
