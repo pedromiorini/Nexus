@@ -84,6 +84,7 @@ ATT = "core/cognitivo/attention.py"
 AT_TESTS = ("test_attention_contract.py",)
 IL = "core/cognitivo/incremental_learner.py"
 IL_TESTS = ("test_incremental_learner_contract.py",)
+IL_IDEM_TESTS = ("test_incremental_learner_contract.py", "test_incremental_consolidate_contract.py")
 EF = "core/cognitivo/episodic_future_thinking.py"
 EF_TESTS = ("test_episodic_future_thinking_contract.py",)
 MS = "core/cognitivo/mental_simulation.py"
@@ -824,6 +825,26 @@ MUTATIONS = [
              "key = content[:60].lower().strip()", "key = content[:60]", tests=IL_TESTS),
     Mutation("il_pattern_guard_removed", IL,
              "if not already_stored:", "if True:", tests=IL_TESTS),
+    Mutation("il_consumed_pair_ignored", IL,
+             "if (episode_id, mem_id) in self._consumed_pairs:\n                continue",
+             "if False and (episode_id, mem_id) in self._consumed_pairs:\n                continue",
+             tests=IL_IDEM_TESTS),
+    Mutation("il_consumed_pair_not_recorded", IL,
+             "self._consumed_pairs.add((episode_id, mem_id))",
+             "self._consumed_pairs.discard((episode_id, mem_id))",
+             tests=IL_IDEM_TESTS),
+    Mutation("il_pattern_counts_occurrences", IL,
+             "self.pattern_registry[key] = len(episodes_for_key)",
+             "self.pattern_registry[key] = self.pattern_registry.get(key, 0) + 1",
+             tests=IL_IDEM_TESTS),
+    Mutation("il_emitted_pattern_ignored", IL,
+             "if content_key in self._emitted_pattern_keys:\n                    continue",
+             "if False and content_key in self._emitted_pattern_keys:\n                    continue",
+             tests=IL_IDEM_TESTS),
+    Mutation("il_emitted_pattern_not_recorded", IL,
+             "self._emitted_pattern_keys.add(content_key)",
+             "self._emitted_pattern_keys.discard(content_key)",
+             tests=IL_IDEM_TESTS),
     Mutation("il_pattern_synthetic_is_raw_key", IL,
              'synthetic = f"[PATTERN freq={freq}] {content_key}"',
              "synthetic = content_key", tests=IL_TESTS),

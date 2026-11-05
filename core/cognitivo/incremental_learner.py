@@ -4,6 +4,9 @@ Extração strangler: o código abaixo foi movido sem alteração de comportamen
 core.constitutional_brain reexporta as classes no ponto original.
 Não há relógio injetável: timestamps e a duração da consolidação usam time.time().
 apply_decay é heurística: registra um evento no log e não atualiza a memória.
+Nesta instância, um par (episode_id, id de memória) já processado é ignorado
+por completo. O registro de padrão conta episódios distintos. Cada chave de
+padrão é gravada no máximo uma vez. Esse estado não persiste.
 """
 
 import time
@@ -83,10 +86,13 @@ class RealIncrementalLearner:
         self.memory = hierarchical_memory
         self.log = constitutional_log
 
-        # Estado interno
+        # Estado interno (só desta instância; não persiste)
         self.learning_history: List[LearningEvent] = []
-        self.pattern_registry: Dict[str, int] = {}   # conteúdo → freq. de ocorrência
+        self.pattern_registry: Dict[str, int] = {}   # conteúdo → episódios distintos
         self.promoted_ids: Set[int] = set()           # IDs já promovidos (sem duplicatas)
+        self._consumed_pairs: Set[tuple] = set()      # (episode_id, memory_id) já processados
+        self._pattern_episodes: Dict[str, Set] = {}   # chave → episode_id já contados
+        self._emitted_pattern_keys: Set[str] = set()  # chave de padrão já gravada
 
         # Estatísticas
         self.total_promotions: int = 0
@@ -113,6 +119,9 @@ class RealIncrementalLearner:
             old_imp   = mem.get("importance", 0.5)
 
             if mem_id is None:
+                continue
+
+            if (episode_id, mem_id) in self._consumed_pairs:
                 continue
 
             # ── Regra 1: PROMOÇÃO (relevância alta → long-term) ──────────
@@ -153,9 +162,13 @@ class RealIncrementalLearner:
                 )
                 events.append(ev)
 
-            # ── Rastrear padrão ─────────────────────────────────────────
+            # ── Rastrear padrão (um episódio distinto por chave) ────────
             key = content[:60].lower().strip()
-            self.pattern_registry[key] = self.pattern_registry.get(key, 0) + 1
+            episodes_for_key = self._pattern_episodes.setdefault(key, set())
+            if episode_id not in episodes_for_key:
+                episodes_for_key.add(episode_id)
+            self.pattern_registry[key] = len(episodes_for_key)
+            self._consumed_pairs.add((episode_id, mem_id))
 
         self.learning_history.extend(events)
         return events
@@ -174,6 +187,8 @@ class RealIncrementalLearner:
 
         for content_key, freq in self.pattern_registry.items():
             if freq >= self.PATTERN_MIN_FREQ:
+                if content_key in self._emitted_pattern_keys:
+                    continue
                 # Verifica se padrão já foi consolidado antes
                 tag = f"[PATTERN] {content_key}"
                 existing = self.memory.retrieve(tag, limit=1)
@@ -191,6 +206,7 @@ class RealIncrementalLearner:
                             "content": content_key,
                             "frequency": freq
                         })
+                self._emitted_pattern_keys.add(content_key)
 
         return new_patterns
 

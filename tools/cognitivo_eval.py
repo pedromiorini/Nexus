@@ -1931,8 +1931,8 @@ def incremental_fingerprint(mod):
     }
 
 
-IL_SOURCE_SHA = "e09c2d75df964dd52915eaf0c0660dd45a6ac34cbf476804c786423910057542"
-IL_BEHAVIOR_SHA = "636c95bfaebbd60ca55a5e14f12e9f5ff7b6f7868f5a476b31fa479528db7767"
+IL_SOURCE_SHA = "9f20d6d02cee07417b3c2c44ed9e80a8cd3f37b600aa6861670ce81777cd0c48"
+IL_BEHAVIOR_SHA = "5b7d701e678dd28a499ed8e52647f6836dfba10f4e0ee4d9a33fa46f0ef3d21a"
 _IL_MARKER = "# MÓDULO 11: INCREMENTAL LEARNER (POST12)\n"
 _IL_END = '            "pattern_registry_size": len(self.pattern_registry),\n        }\n'
 _IL_NAMES = ("LearningEvent", "ConsolidationReport", "RealIncrementalLearner")
@@ -1996,7 +1996,7 @@ def eval_incremental(criteria="v1"):
     )
     promo = payload["promotion"]
     event = promo["events"][0]
-    again = promo["again"][0]
+    again = promo["again"]
     il1 = (
         payload["hyper"]["promotion"] == 0.75
         and payload["hyper"]["cap"] == 0.99
@@ -2012,11 +2012,13 @@ def eval_incremental(criteria="v1"):
         and promo["stats"]["total_promotions"] == 1
         and promo["stats"]["total_reinforcements"] == 0
         and promo["stats"]["pattern_registry_size"] == 1
-        and again["promotion"] is False
-        and again["new_importance"] == min(0.99, 0.8 + 0.08)
+        and again == []
+        and promo["again_stores"] == promo["stores"]
         and promo["again_promoted"] == [7]
         and promo["again_stats"]["total_promotions"] == 1
-        and promo["again_stats"]["total_reinforcements"] == 1
+        and promo["again_stats"]["total_reinforcements"] == 0
+        and promo["again_stats"]["total_learning_events"] == 1
+        and promo["again_stats"]["pattern_registry_size"] == 1
         and payload["below"]["events"] == []
         and payload["below"]["stores"] == []
         and payload["below"]["patterns"] == {"alpha fact": 1}
@@ -2068,9 +2070,8 @@ def eval_incremental(criteria="v1"):
         and patterns["freq1_retrieves"] == []
         and patterns["registry"] == {"repeat me": 2}
         and patterns["own_synthetic_first"] == 1
-        and patterns["own_synthetic_second"] == 1
+        and patterns["own_synthetic_second"] == 0
         and patterns["own_stores"] == [
-            ["[PATTERN freq=2] repeat me", "long_term", 0.92],
             ["[PATTERN freq=2] repeat me", "long_term", 0.92],
         ]
         and patterns["logged_new"] == 1
@@ -2166,17 +2167,17 @@ def eval_incremental(criteria="v1"):
         and payload["clock"] == "wall"
     )
     return [
-        _check("IL1", {"new": event["new_importance"], "again_promotion": again["promotion"],
+        _check("IL1", {"new": event["new_importance"], "again_len": len(again),
                        "cap": payload["cap"]["events"][0]["new_importance"],
                        "skipped": payload["skip_none"]["events"], "zero_id": payload["zero_id"]["events"][0]["memory_id"]},
-               il1, "promove em 0.75 com teto 0.99; o mesmo id não promove de novo"),
+               il1, "promove em 0.75 com teto 0.99; o mesmo par não é reprocessado"),
         _check("IL2", {"boosted": bounds["rel_0_5_imp_0_7"]["events"][0]["new_importance"],
                        "both": bounds["both_would_match"]["events"][0]["promotion"],
                        "under": bounds["rel_under"]["events"]},
                il2, "reforço +0.08 só no elif; 0.8/0.8 promove uma vez"),
         _check("IL3", {"registry": patterns["registry"], "own_second": patterns["own_synthetic_second"],
                        "tag": patterns["tag_suppresses"], "logged": patterns["logged_new"]},
-               il3, "freq 2 grava 0.92; a tag achada não duplica; o sintético próprio duplica"),
+               il3, "freq 2 grava 0.92 uma vez; a tag achada não duplica; o sintético próprio também não"),
         _check("IL4", {"none": plans["none"], "low": plans["low"], "importance": ok["new_importance"],
                        "errors": payload["errors"]},
                il4, "None e reward<0.7 devolvem None; 0.7 grava com importância 0.845"),
