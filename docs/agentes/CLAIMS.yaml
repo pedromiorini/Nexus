@@ -3,7 +3,7 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "SCM: str exato na observação e nas ações, sem métodos da subclasse"
+    tarefa: "SCM: str exato na observação e nas ações, sem métodos da subclasse (PR 159)"
     arquivos:
       - core/cognitivo/scm_counterfactual.py
       - test_scm_exact_str_contract.py
