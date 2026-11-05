@@ -1,4 +1,6 @@
 import unittest
+from copy import deepcopy
+from unittest.mock import patch
 
 from core.vram_defense_guard import VramDefenseGuard, VramSnapshot
 from core.constitutional_brain import CentralRouter
@@ -74,6 +76,24 @@ class VramDefenseGuardBoundaryTests(unittest.TestCase):
                     VramDefenseGuard(soft_limit=soft, hard_limit=hard)
         self.assertEqual(VramDefenseGuard(soft_limit=0.5, hard_limit=1.0).hard_limit, 1.0)
 
+    def test_constructor_rejects_boolean_limits(self):
+        for soft, hard in ((False, 0.92), (True, 0.92), (0.5, False), (0.5, True),
+                           (False, False), (False, True), (True, False), (True, True)):
+            with self.subTest(soft=soft, hard=hard):
+                with self.assertRaises(TypeError):
+                    VramDefenseGuard(soft_limit=soft, hard_limit=hard)
+
+    def test_constructor_preserves_numeric_limits_and_inclusive_actions(self):
+        for hard in (1, 1.0):
+            with self.subTest(hard_type=type(hard).__name__):
+                guard = VramDefenseGuard(soft_limit=0.5, hard_limit=hard)
+                self.assertIs(guard.hard_limit, hard)
+                self.assertEqual(guard.soft_limit, 0.5)
+                self.assertEqual(guard.evaluate(VramSnapshot(True, reserved_bytes=50, total_bytes=100)).action,
+                                 "defer_and_release")
+                self.assertEqual(guard.evaluate(VramSnapshot(True, reserved_bytes=100, total_bytes=100)).action,
+                                 "emergency_release")
+
     def test_utilization_is_capped_at_one_and_safe_without_total(self):
         self.assertEqual(VramSnapshot(True, reserved_bytes=150, total_bytes=100).utilization, 1.0)
         self.assertEqual(VramSnapshot(True, reserved_bytes=10, total_bytes=0).utilization, 0.0)
@@ -85,6 +105,183 @@ class VramDefenseGuardBoundaryTests(unittest.TestCase):
         self.assertTrue(result.successful)
         self.assertEqual(result.skipped, ["defer_next_task"])
         self.assertEqual(result.completed, ["release_cached_tensors", "gc_collect"])
+
+
+class VramSnapshotCounterTests(unittest.TestCase):
+    FIELDS = ("allocated_bytes", "reserved_bytes", "total_bytes")
+    INVALID_MUTATIONS = ((True, TypeError), (1.5, TypeError), (-1, ValueError))
+
+    class IntSubclass(int):
+        pass
+
+    INVALID_TYPES = (
+        True, False, 0.0, 1.5, -1.0, float("nan"), float("inf"),
+        float("-inf"), None, "1", b"1", [], {}, object(), IntSubclass(1),
+    )
+
+    def test_each_counter_rejects_invalid_types(self):
+        for field in self.FIELDS:
+            for value in self.INVALID_TYPES:
+                with self.subTest(field=field, value=value):
+                    with self.assertRaisesRegex(TypeError, field):
+                        VramSnapshot(True, **{field: value})
+
+    def test_each_counter_rejects_negative_integers(self):
+        for field in self.FIELDS:
+            for value in (-1, -(2**64)):
+                with self.subTest(field=field, value=value):
+                    with self.assertRaisesRegex(ValueError, field):
+                        VramSnapshot(True, **{field: value})
+
+    def test_invalid_construction_has_no_guard_side_effects_or_decision(self):
+        for field in self.FIELDS:
+            for value in (*self.INVALID_TYPES, -1):
+                for available in (True, False):
+                    with self.subTest(field=field, value=value, available=available):
+                        guard = VramDefenseGuard()
+                        guard.execute_mitigation(guard.evaluate(VramSnapshot(False)))
+                        before = deepcopy((guard.history, guard.mitigation_history,
+                                           guard.audit_log, guard.statistics()))
+                        error = ValueError if type(value) is int else TypeError
+                        with patch("core.vram_defense_guard.DefenseDecision") as decision:
+                            # Argument construction must fail before evaluate is entered.
+                            with self.assertRaises(error):
+                                guard.evaluate(VramSnapshot(available, **{field: value}))
+                            # The same guarantee holds for a failing measurement provider.
+                            with patch.object(guard, "snapshot", side_effect=lambda: VramSnapshot(
+                                available, **{field: value}
+                            )):
+                                with self.assertRaises(error):
+                                    guard.evaluate()
+                            decision.assert_not_called()
+                        self.assertEqual((guard.history, guard.mitigation_history,
+                                          guard.audit_log, guard.statistics()), before)
+
+    def test_mutated_counters_are_rejected_before_evaluation_side_effects(self):
+        for field in self.FIELDS:
+            for value, error in self.INVALID_MUTATIONS:
+                for available in (True, False):
+                    with self.subTest(field=field, value=value, available=available):
+                        snapshot = VramSnapshot(available, allocated_bytes=1,
+                                                reserved_bytes=50, total_bytes=100)
+                        setattr(snapshot, field, value)
+                        guard = VramDefenseGuard()
+                        before = deepcopy((guard.history, guard.mitigation_history,
+                                           guard.audit_log, guard.statistics()))
+                        with patch("core.vram_defense_guard.DefenseDecision") as decision:
+                            with self.assertRaises(error):
+                                guard.evaluate(snapshot)
+                            decision.assert_not_called()
+                        self.assertEqual((guard.history, guard.mitigation_history,
+                                          guard.audit_log, guard.statistics()), before)
+
+    def test_valid_counter_mutation_remains_supported(self):
+        snapshot = VramSnapshot(True, allocated_bytes=1, reserved_bytes=10, total_bytes=100)
+        snapshot.allocated_bytes = 20
+        snapshot.reserved_bytes = 85
+        self.assertEqual(snapshot.utilization, 0.85)
+        self.assertEqual(VramDefenseGuard().evaluate(snapshot).action, "defer_and_release")
+
+    def test_mitigation_plan_reclassifies_valid_snapshot_mutation(self):
+        guard = VramDefenseGuard()
+        snapshot = VramSnapshot(True, reserved_bytes=10, total_bytes=100)
+        decision = guard.evaluate(snapshot)
+        self.assertEqual(decision.action, "continue")
+        original_decision = (decision.action, decision.severity, decision.reason)
+        before_statistics = deepcopy(guard.statistics())
+
+        snapshot.reserved_bytes = 95
+        plan = guard.mitigation_plan(decision)
+
+        self.assertEqual(plan["action"], "emergency_release")
+        self.assertEqual(plan["severity"], "critical")
+        self.assertEqual(plan["utilization"], 0.95)
+        self.assertIn("stop_noncritical_tasks", plan["steps"])
+        self.assertEqual((decision.action, decision.severity, decision.reason), original_decision)
+        self.assertIs(guard.history[0], decision)
+        self.assertEqual(len(guard.history), 1)
+        self.assertEqual(guard.history[0].action, "continue")
+        self.assertEqual(guard.statistics(), before_statistics)
+        self.assertEqual(guard.mitigation_history, [])
+        self.assertEqual(guard.audit_log, [])
+
+    def test_execute_mitigation_reclassifies_before_callbacks(self):
+        guard = VramDefenseGuard()
+        snapshot = VramSnapshot(True, reserved_bytes=10, total_bytes=100)
+        decision = guard.evaluate(snapshot)
+        original_decision = (decision.action, decision.severity, decision.reason)
+        before_statistics = deepcopy(guard.statistics())
+        snapshot.reserved_bytes = 95
+        callbacks = []
+
+        result = guard.execute_mitigation(
+            decision,
+            defer_callback=lambda: callbacks.append("defer"),
+            stop_callback=lambda: callbacks.append("stop"),
+        )
+
+        self.assertEqual(result.action, "emergency_release")
+        self.assertEqual(callbacks, ["stop"])
+        self.assertIn("stop_noncritical_tasks", result.completed)
+        self.assertIn("gc_collect", result.completed)
+        self.assertIn("require_recheck", result.skipped)
+        self.assertEqual((decision.action, decision.severity, decision.reason), original_decision)
+        self.assertEqual(guard.history, [decision])
+        self.assertEqual(len(guard.history), 1)
+        self.assertEqual(guard.history[0].action, "continue")
+        after_statistics = guard.statistics()
+        self.assertEqual(after_statistics["samples"], before_statistics["samples"])
+        self.assertEqual(after_statistics["actions"], before_statistics["actions"])
+        self.assertEqual(after_statistics["mitigations"], before_statistics["mitigations"] + 1)
+        self.assertEqual(after_statistics["audit_events"], before_statistics["audit_events"] + 1)
+        self.assertEqual(guard.mitigation_history, [result])
+        self.assertEqual(guard.audit_log[0]["action"], "emergency_release")
+
+    def test_mutated_counters_block_plan_and_mitigation_atomically(self):
+        for field in self.FIELDS:
+            for value, error in self.INVALID_MUTATIONS:
+                with self.subTest(field=field, value=value):
+                    snapshot = VramSnapshot(True, allocated_bytes=1,
+                                            reserved_bytes=85, total_bytes=100)
+                    guard = VramDefenseGuard()
+                    decision = guard.evaluate(snapshot)
+                    setattr(snapshot, field, value)
+                    before = deepcopy((guard.history, guard.mitigation_history,
+                                       guard.audit_log, guard.statistics()))
+                    callbacks = []
+                    with self.assertRaises(error):
+                        guard.mitigation_plan(decision)
+                    with self.assertRaises(error):
+                        guard.execute_mitigation(
+                            decision,
+                            defer_callback=lambda: callbacks.append("defer"),
+                            stop_callback=lambda: callbacks.append("stop"),
+                        )
+                    self.assertEqual(callbacks, [])
+                    self.assertEqual((guard.history, guard.mitigation_history,
+                                      guard.audit_log, guard.statistics()), before)
+
+    def test_valid_counter_boundaries_and_timestamp_are_preserved(self):
+        for field in self.FIELDS:
+            for value in (0, 1, 2**64):
+                with self.subTest(field=field, value=value):
+                    snapshot = VramSnapshot(True, timestamp=123.5, **{field: value})
+                    self.assertIs(getattr(snapshot, field), value)
+                    self.assertEqual(snapshot.timestamp, 123.5)
+        snapshot = VramSnapshot(True, 2**64, 2**64, 2**64)
+        self.assertEqual(snapshot.utilization, 1.0)
+        self.assertEqual(VramDefenseGuard().evaluate(snapshot).action, "emergency_release")
+
+    def test_zero_totals_and_unavailable_defaults_remain_valid(self):
+        guard = VramDefenseGuard()
+        unavailable = VramSnapshot(False)
+        self.assertEqual((unavailable.allocated_bytes, unavailable.reserved_bytes,
+                          unavailable.total_bytes), (0, 0, 0))
+        self.assertIsInstance(unavailable.timestamp, float)
+        self.assertEqual(unavailable.utilization, 0.0)
+        self.assertEqual(guard.evaluate(unavailable).action, "observe")
+        self.assertEqual(guard.evaluate(VramSnapshot(True)).action, "continue")
+        self.assertEqual(VramSnapshot(True, 10, 20, 0).utilization, 0.0)
 
 
 if __name__ == "__main__":
