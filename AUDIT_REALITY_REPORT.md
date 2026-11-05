@@ -4,7 +4,7 @@
 
 ## Evidência estrutural
 
-O núcleo analisado possui **23402 linhas**, **218 classes** e **701 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **1** funções com retorno constante simples e **31** marcadores de testes embutidos.
+O núcleo analisado possui **23439 linhas**, **218 classes** e **703 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **1** funções com retorno constante simples e **31** marcadores de testes embutidos.
 
 | Área | Resultado | Interpretação |
 |---|---:|---|

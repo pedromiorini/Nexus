@@ -157,6 +157,7 @@ import weakref
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
 from core.vram_defense_guard import VramDefenseGuard
 from core.deferred_task_queue import DeferredTaskQueue
+from core.temporal_facts import TemporalFactStore
 
 
 _NEXUS_DEBUG = os.environ.get("NEXUS_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
@@ -549,8 +550,11 @@ class RealKnowledgeGraph:
     - Latência: < 45ms
     """
 
-    def __init__(self, hierarchical_memory: Optional[Any] = None):
+    def __init__(self, hierarchical_memory: Optional[Any] = None, *,
+                 temporal_store: Optional[TemporalFactStore] = None):
         """NetworkX não precisa de instalação — já está na stdlib Python 3"""
+        if temporal_store is not None and not isinstance(temporal_store, TemporalFactStore):
+            raise TypeError("temporal_store deve ser TemporalFactStore ou None")
         try:
             import networkx as nx
             self.nx = nx
@@ -559,6 +563,7 @@ class RealKnowledgeGraph:
             self.nx = None
 
         self.memory = hierarchical_memory
+        self.temporal_store = temporal_store
 
         # Grafo principal
         if self.nx:
@@ -615,8 +620,23 @@ class RealKnowledgeGraph:
         return entity
 
     def add_relation(self, source_id: str, relation_type: str, target_id: str,
-                     properties: Optional[Dict] = None, confidence: float = 0.9) -> Relation:
-        """Adicionar relação direcionada entre entidades."""
+                     properties: Optional[Dict] = None, confidence: float = 0.9,
+                     *, source: str = "observation",
+                     valid_from: Optional[float] = None) -> Relation:
+        """Adicionar relação direcionada entre entidades.
+
+        Com ``temporal_store`` injetado, o fato entra no livro-razão antes de
+        qualquer mutação do grafo. Sem store, o caminho é o legado.
+        """
+        if self.temporal_store is not None:
+            self.temporal_store.assert_fact(
+                source_id,
+                relation_type,
+                target_id,
+                valid_from=valid_from,
+                confidence=confidence,
+                source=source,
+            )
         # Verificar que entidades existem
         if source_id not in self.entity_index or target_id not in self.entity_index:
             # Criar entidades automaticamente se não existirem
@@ -656,6 +676,23 @@ class RealKnowledgeGraph:
 
         self.total_relations += 1
         return relation
+
+    def relations_as_of(self, valid_at: float, *,
+                        subject: Optional[str] = None,
+                        predicate: Optional[str] = None) -> List[Any]:
+        """Projeção do store em ``valid_at``. Sem store, falha fechado."""
+        if self.temporal_store is None:
+            raise RuntimeError("temporal_store ausente")
+        return self.temporal_store.facts_as_of(
+            valid_at, subject=subject, predicate=predicate)
+
+    def current_relations(self, subject: Optional[str] = None,
+                          predicate: Optional[str] = None) -> List[Any]:
+        """Fatos correntes no relógio do store. Sem store, falha fechado."""
+        if self.temporal_store is None:
+            raise RuntimeError("temporal_store ausente")
+        return self.temporal_store.get_current_facts(
+            subject=subject, predicate=predicate)
 
     # ── Query: Busca e Multihop Reasoning ─────────────────────────────────
 
