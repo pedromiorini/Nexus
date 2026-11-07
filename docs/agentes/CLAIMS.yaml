@@ -1,19 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "Rebase da #147 (MCTS P1c S1/S2b/S3) sobre main 7c0464c; sem implementar S2a nem a errata :180"
-    arquivos:
-      - core/cognitivo/mcts_planner.py
-      - core/constitutional_brain.py
-      - test_mcts_p1c_contract.py
-      - test_mcts_compare_veto_contract.py
-      - test_mcts_p1c_veto_key_errata_contract.py
-      - tools/cognitivo_mutation.py
-      - docs/cognitivo/AUDITORIA_2026-10-22.md
-      - AUDIT_REALITY_REPORT.md
-      - audit_reality.json
-      - docs/agentes/CLAIMS.yaml
-      - CONTINUATION.md
-    expira_em: "2026-11-08T16:00:00+00:00"
+claims: []
