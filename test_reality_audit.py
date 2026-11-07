@@ -1,5 +1,7 @@
 import ast
+import tempfile
 import unittest
+from pathlib import Path
 
 from tools.reality_audit import (
     audit_claims,
@@ -7,7 +9,10 @@ from tools.reality_audit import (
     audit_code_overclaims,
     build_report,
     collect_static_evidence,
+    code_sources,
+    extracted_module_files,
     iter_functions,
+    markdown,
     parse_python,
     CORE,
 )
@@ -25,6 +30,9 @@ class RealityAuditTests(unittest.TestCase):
     def test_report_has_version_and_scope(self):
         self.assertEqual(self.report["audit_version"], "1.1")
         self.assertEqual(self.report["scope"], "conservative reality audit")
+        report_markdown = markdown(self.report)
+        self.assertIn("Módulos extraídos nas varreduras de alegações e evidência estrutural", report_markdown)
+        self.assertIn("métricas do núcleo contam somente o monólito", report_markdown)
 
     def test_static_evidence_is_quantified(self):
         evidence = self.report["static_evidence"]
@@ -130,6 +138,72 @@ class ClaimInventoryTests(unittest.TestCase):
         )
         labels = {item["label"] for item in inventory["items"]}
         self.assertIn("classes com prefixo Real", labels)
+
+    def test_marker_discovers_future_standalone_module_but_excludes_unmarked(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            core = root / "core"
+            core.mkdir()
+            (core / "constitutional_brain.py").write_text(
+                "class MonolithClass:\n    def method(self):\n        return 1\n",
+                encoding="utf-8",
+            )
+            (core / "future_standalone.py").write_text(
+                '# NEXUS_EXTRACTED_CORE_MODULE\n"""REAL Future Capability"""\n'
+                "class FutureExtracted:\n    def extracted_method(self):\n        return 1\n",
+                encoding="utf-8",
+            )
+            (core / "unmarked_module.py").write_text(
+                '"""REAL Unmarked Capability"""\nclass NotExtracted:\n    pass\n',
+                encoding="utf-8",
+            )
+            (core / "late_marker.py").write_text(
+                "# header\n" * 16
+                + '# NEXUS_EXTRACTED_CORE_MODULE\n"""REAL Late Marker"""\n',
+                encoding="utf-8",
+            )
+
+            discovered = extracted_module_files(root)
+            self.assertEqual(
+                [path.relative_to(root).as_posix() for path in discovered],
+                ["core/future_standalone.py"],
+            )
+
+            source = code_sources(root)
+            self.assertIn("REAL Future Capability", source)
+            self.assertNotIn("REAL Unmarked Capability", source)
+            self.assertNotIn("REAL Late Marker", source)
+            self.assertEqual(
+                audit_code_claim_inventory(source)["by_level"]["strong_capability_claim"],
+                1,
+            )
+
+            evidence = collect_static_evidence(root)
+            self.assertEqual(
+                [item["path"] for item in evidence["extracted_modules"]],
+                ["core/future_standalone.py"],
+            )
+            self.assertEqual(evidence["core_lines"], 3)
+            self.assertEqual(evidence["classes"], 1)
+            self.assertEqual(evidence["functions"], 1)
+            self.assertEqual(evidence["extracted_modules"][0]["classes"], 1)
+            self.assertEqual(evidence["extracted_modules"][0]["functions"], 1)
+
+    def test_standalone_extracted_core_module_is_in_static_evidence(self):
+        evidence = collect_static_evidence()
+        modules = {item["path"]: item for item in evidence["extracted_modules"]}
+        self.assertTrue(
+            "core/system_health_diagnostics.py" in modules,
+            "o módulo extraído não está representado na evidência estática",
+        )
+
+    def test_standalone_extracted_core_module_claims_are_scanned(self):
+        from tools.reality_audit import code_sources
+
+        self.assertTrue(
+            "REAL Comprehensive System Monitoring" in code_sources(),
+            "o texto do módulo extraído não está entre as fontes de claims",
+        )
 
     def test_strong_capability_claims_do_not_grow(self):
         total = audit_code_claim_inventory()["by_level"]["strong_capability_claim"]

@@ -11,26 +11,47 @@ import ast
 import json
 import re
 import sys
+from itertools import islice
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 README = ROOT / "README.md"
 CORE = ROOT / "core" / "constitutional_brain.py"
-# Capacidades extraídas do monólito (strangler). Entram no inventário de alegações do código
-# e têm evidência estrutural própria; os números de `core_*` continuam só do monólito.
-COGNITIVO = ROOT / "core" / "cognitivo"
+# `core/cognitivo` é uma convenção de extração; módulos standalone usam o marcador no topo do arquivo.
+# Ambos entram nas varreduras de claims e evidência estrutural, nunca nas métricas do monólito.
+EXTRACTED_CORE_MARKER = "# NEXUS_EXTRACTED_CORE_MODULE"
 EXIT_MISSING_INPUT = 2
 EXIT_EMPTY_INPUT = 3
 
 
-def cognitivo_files() -> list[Path]:
-    return sorted(COGNITIVO.glob("*.py")) if COGNITIVO.is_dir() else []
+def cognitivo_files(root: Path = ROOT) -> list[Path]:
+    cognitivo = root / "core" / "cognitivo"
+    return sorted(cognitivo.glob("*.py")) if cognitivo.is_dir() else []
 
 
-def code_sources() -> str:
-    """Monólito + módulos extraídos, para que extrair código não esconda alegações do auditor."""
-    parts = [CORE.read_text(encoding="utf-8", errors="replace")]
-    parts.extend(path.read_text(encoding="utf-8", errors="replace") for path in cognitivo_files())
+def extracted_module_files(root: Path = ROOT) -> list[Path]:
+    """Return conventional cognitive modules and explicitly marked standalone extractions."""
+    core = root / "core"
+    paths = set(cognitivo_files(root))
+    if core.is_dir():
+        for path in core.rglob("*.py"):
+            if path == core / "constitutional_brain.py":
+                continue
+            with path.open(encoding="utf-8", errors="replace") as source:
+                marked = any(
+                    line.strip() == EXTRACTED_CORE_MARKER
+                    for line in islice(source, 16)
+                )
+            if marked:
+                paths.add(path)
+    return sorted(paths, key=lambda path: path.relative_to(root).as_posix())
+
+
+def code_sources(root: Path = ROOT) -> str:
+    """Monolith plus extracted modules, for claim scans without changing core-only metrics."""
+    core = root / "core" / "constitutional_brain.py"
+    parts = [core.read_text(encoding="utf-8", errors="replace")]
+    parts.extend(path.read_text(encoding="utf-8", errors="replace") for path in extracted_module_files(root))
     return "\n".join(parts)
 
 CLAIMS = {
@@ -98,8 +119,9 @@ def is_pure_literal(node: ast.AST) -> bool:
     return True
 
 
-def collect_static_evidence() -> dict:
-    tree = parse_python(CORE)
+def collect_static_evidence(root: Path = ROOT) -> dict:
+    core = root / "core" / "constitutional_brain.py"
+    tree = parse_python(core)
     classes = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
     functions = [node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))]
     passes = [node for node in functions if len([item for item in node.body if not (isinstance(item, ast.Expr) and isinstance(getattr(item, "value", None), ast.Constant) and isinstance(item.value.value, str))]) == 1 and isinstance([item for item in node.body if not (isinstance(item, ast.Expr) and isinstance(getattr(item, "value", None), ast.Constant) and isinstance(item.value.value, str))][0], ast.Pass)]
@@ -113,13 +135,13 @@ def collect_static_evidence() -> dict:
                 strict_constants.append({"qualname": qualnames[id(node)], "value": ast.unparse(body[0].value)})
             else:
                 dynamic_literals.append(qualnames[id(node)])
-    source = CORE.read_text(encoding="utf-8", errors="replace")
+    source = core.read_text(encoding="utf-8", errors="replace")
     embedded_tests = len(re.findall(r"TEST \d+(?:\.\d+)? PASSED", source))
     extracted = []
-    for path in cognitivo_files():
+    for path in extracted_module_files(root):
         module_tree = parse_python(path)
         extracted.append({
-            "path": path.relative_to(ROOT).as_posix(),
+            "path": path.relative_to(root).as_posix(),
             "lines": len(path.read_text(encoding="utf-8", errors="replace").splitlines()),
             "classes": sum(isinstance(node, ast.ClassDef) for node in ast.walk(module_tree)),
             "functions": sum(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) for node in ast.walk(module_tree)),
@@ -274,7 +296,7 @@ def markdown(report: dict) -> str:
     lines.append(f"| Terminologia científica no código (informativo) | {levels['scientific_terminology']} | Nomes de constructos modelados; não são alegações por si só |")
     lines.append(f"| Classes com prefixo Real (identificadores) | {levels['neutral_identifier']} | Nome histórico; renomear exige alias de compatibilidade |")
     extracted = evidence.get("extracted_modules", [])
-    lines.append(f"| Módulos extraídos em core/cognitivo (inventário de alegações inclui estes) | {len(extracted)} ({sum(item['lines'] for item in extracted)} linhas) | Fora das contagens do núcleo; cobertos pelos mesmos padrões de alegação |")
+    lines.append(f"| Módulos extraídos nas varreduras de alegações e evidência estrutural | {len(extracted)} ({sum(item['lines'] for item in extracted)} linhas) | Listados separadamente; métricas do núcleo contam somente o monólito |")
     lines.append(f"| Dependências opcionais sinalizadas | {len(evidence['optional_dependency_warnings'])} | Fallbacks podem alterar o comportamento |")
     lines.extend(["", "## Alegações (README e código-fonte)", ""])
     for claim in report["claims"] + report["code_claims"]:
