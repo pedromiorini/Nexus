@@ -3518,7 +3518,7 @@ class RealToolUse:
 
             self.log.log_event("TOOL_EXECUTION_FAILED", {
                 "tool": tool_name,
-                "error": str(e)
+                "error": "EXECUTOR_EXCEPTION"
             })
 
             return execution_result

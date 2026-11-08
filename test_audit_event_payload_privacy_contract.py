@@ -11,6 +11,7 @@ from core.constitutional_brain import (
     ModuleResult,
     ModuleType,
     RealImmutableLog,
+    RealToolUse,
     RequestType,
 )
 from test_router_fail_closed_contract import _router
@@ -505,6 +506,24 @@ class AuditEventPayloadPrivacyContract(unittest.TestCase):
                 self.assertNotIn(marker, json.dumps(payloads[0], sort_keys=True))
         finally:
             RequestType.QUERY._value_ = original_value
+
+    def test_tool_execution_failure_logs_fixed_code_but_preserves_functional_error(self):
+        marker = "canary_unknown_operation_148"
+        expected_error = f"Unknown operation: {marker}"
+        with self._new_log() as log:
+            tool_use = RealToolUse(log)
+            result = tool_use.execute_tool(
+                "list_operations", {"items": [1], "operation": marker}
+            )
+
+            self.assertFalse(result.success)
+            self.assertEqual(result.error, expected_error)
+            payloads = self._payloads(log, "TOOL_EXECUTION_FAILED")
+            self.assertEqual(
+                payloads,
+                [{"tool": "list_operations", "error": "EXECUTOR_EXCEPTION"}],
+            )
+            self.assertNotIn(marker, json.dumps(payloads, sort_keys=True))
 
 
 if __name__ == "__main__":

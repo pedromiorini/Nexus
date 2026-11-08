@@ -7,6 +7,14 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Candidata local — follow-up de privacidade da #148 — 2026-11-08
+
+- **Base e isolamento:** head da PR #148 confirmado por `git ls-remote origin refs/pull/148/head`: `d8b4afb2f5a23f2e882d504afb7f94df309a850a`. A branch candidata `local/pr148-privacy-candidate-20261108` parte exatamente desse commit e reaplica o delta de `e8df3c42143d833cbcb6110c17f8189e4c72cc81` (pai `7d4a03e980d52c06a722a0a176643a3649feeb7c`). Não houve rebase nem incorporação da `main`; a edição persistente limita-se a `core/constitutional_brain.py`, `test_audit_event_payload_privacy_contract.py`, este arquivo e `NEXUS_DECISIONS.md`.
+- **Reconciliação documental:** na candidata, a decisão de privacidade permanece D-030, como já estava no head da PR. O delta de origem usa D-031 porque sua base local já continha a D-030 temporal da `main`; essa mudança de numeração não foi transportada, pois a `main` ficou fora do escopo.
+- **Contrato e correção:** a exceção capturada por `RealToolUse.execute_tool()` grava `EXECUTOR_EXCEPTION` em `TOOL_EXECUTION_FAILED`, sem mudar `ToolExecutionResult.error`. A regressão confirma que o canário da mensagem não persiste no payload e que a mensagem original continua retornando ao chamador.
+- **Validação local:** Python 3.12.3. `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-pr148-candidate-privacy-20261108.sqlite3 python -m unittest -v test_audit_event_payload_privacy_contract test_router_review_addendum_contract test_immutable_log_contract test_router_fail_closed_contract` passou 67/67. `ruff check core/constitutional_brain.py test_audit_event_payload_privacy_contract.py` e `python -m compileall -q core/constitutional_brain.py test_audit_event_payload_privacy_contract.py` passaram. `psutil` e FAISS/SentenceTransformers opcionais não estão instalados; os caminhos aplicáveis usaram fallback.
+- **Claim e limites:** foi aberta antes da edição uma claim local `axis`, limitada aos quatro paths autorizados, com expiração `2026-11-08T22:30:00+00:00`, e removida ao terminar; o registro de agentes e a claim expirada do Grok no clone original permaneceram intactos. Esta preparação não executou suíte completa, mutation gate nem CI hospedada. Sem push, force-push, comentário, merge, atualização da `main` ou alteração de outra PR.
+
 > Handoff operacional versionado para continuidade entre agentes Manus.
 
 ## Rodada local — alcance documental das allowlists de logs — 2026-10-31
