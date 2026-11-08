@@ -116,6 +116,12 @@ RUNTIME_EVENT_AREA_MAP = {
     "telemetry": ("recovery-diagnostics",),
 }
 
+EVENT_TRACE_LABELS = {
+    "policy_transition": "Transição de política",
+    "telemetry": "Telemetria de reprocessamento",
+}
+MAX_VISIBLE_TRACE_EVENTS = 20
+
 
 def _parse_finite_float(token: str) -> float:
     value = float(token)
@@ -281,6 +287,67 @@ def _render_function_evidence_section(snapshot: dict[str, Any]) -> str:
     </section>"""
 
 
+def _unknown_events_omission_label(count: int) -> str:
+    if count == 1:
+        return "1 registro com tipo não permitido foi omitido"
+    return f"{count} registros com tipo não permitido foram omitidos"
+
+
+def _render_event_trace_section(snapshot: dict[str, Any]) -> str:
+    """Renderiza somente eventos allowlisted do snapshot, sem ler payloads."""
+    events = snapshot["events"]
+    permitted_events = [
+        event for event in events if event["event_type"] in EVENT_TRACE_LABELS
+    ]
+    unknown_count = len(events) - len(permitted_events)
+    visible_events = permitted_events[-MAX_VISIBLE_TRACE_EVENTS:]
+    truncated_count = len(permitted_events) - len(visible_events)
+
+    if not events:
+        status = "Nenhum evento incluído neste snapshot."
+    elif not permitted_events:
+        status = "Nenhum evento permitido neste snapshot"
+        status += f"; {_unknown_events_omission_label(unknown_count)}."
+    else:
+        status = (
+            f"Exibindo {len(visible_events)} de {len(permitted_events)} "
+            "eventos permitidos neste recorte."
+        )
+        if unknown_count:
+            status += f" {_unknown_events_omission_label(unknown_count)}."
+
+    if truncated_count:
+        if truncated_count == 1:
+            status += (
+                f" 1 evento permitido anterior foi omitido pelo limite de "
+                f"{MAX_VISIBLE_TRACE_EVENTS} linhas visíveis."
+            )
+        else:
+            status += (
+                f" {truncated_count} eventos permitidos anteriores foram omitidos "
+                f"pelo limite de {MAX_VISIBLE_TRACE_EVENTS} linhas visíveis."
+            )
+
+    rows = "".join(
+        "<li>"
+        f'<span class="event-timestamp">Timestamp da ocorrência (Unix): '
+        f'{html.escape(str(event["timestamp"]), quote=True)} s</span> '
+        f'<span class="event-label">{html.escape(EVENT_TRACE_LABELS[event["event_type"]], quote=True)}</span>'
+        "</li>"
+        for event in visible_events
+    )
+    event_list = f'<ol class="event-trace">{rows}</ol>' if rows else ""
+    return f"""<section id="event-trace" aria-labelledby="event-trace-title">
+      <div class="section-heading">
+        <p class="eyebrow">Recorte do snapshot</p>
+        <h2 id="event-trace-title">Rastro de eventos observáveis</h2>
+        <p class="intro">Eventos permitidos incluídos neste recorte, em ordem de registro. O timestamp é o da ocorrência, em Unix (segundos). Não é um feed ao vivo.</p>
+      </div>
+      <p class="trace-status">{html.escape(status, quote=True)}</p>
+      {event_list}
+    </section>"""
+
+
 def render_html_dashboard(snapshot: Any) -> str:
     """Renderiza um HTML estático e autocontido para um snapshot validado."""
     bridge = NexusConstitutionalBridge(":memory:")
@@ -338,6 +405,7 @@ def render_html_dashboard(snapshot: Any) -> str:
     else:
         window_label = f"{diagnostics['window_seconds']:.3f} s"
     window_label = html.escape(window_label, quote=True)
+    event_trace_section = _render_event_trace_section(snapshot)
     function_evidence_section = _render_function_evidence_section(snapshot)
 
     return f"""<!doctype html>
@@ -386,6 +454,11 @@ def render_html_dashboard(snapshot: Any) -> str:
     .refs {{ margin: 0; padding-left: 1.2rem; }}
     .refs li {{ margin-bottom: .25rem; }}
     .refs code, .catalog-table code {{ overflow-wrap: anywhere; }}
+    .trace-status {{ margin: 1rem 0 .5rem; padding: .75rem; background: #e8f2f6; line-height: 1.5; }}
+    .event-trace {{ margin: .5rem 0 0; padding-left: 1.5rem; }}
+    .event-trace li {{ margin: .65rem 0; padding-left: .3rem; line-height: 1.5; }}
+    .event-timestamp {{ display: block; color: #526474; font-size: .9rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }}
+    .event-label {{ font-weight: 650; }}
     @media (max-width: 640px) {{ main {{ width: min(100% - 1.25rem, 1080px); padding-top: 1.25rem; }} .metrics, .charts {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
@@ -396,7 +469,7 @@ def render_html_dashboard(snapshot: Any) -> str:
       <h1>Nexus — Painel de recuperação</h1>
       <p class="intro">Resumo dos indicadores observados neste snapshot; os gráficos mostram contagens, não uma avaliação geral do sistema.</p>
     </header>
-    <nav aria-label="Navegação do painel"><a href="#functions-and-evidence">Funções e evidências</a></nav>
+    <nav aria-label="Navegação do painel"><a href="#event-trace">Rastro de eventos</a> · <a href="#functions-and-evidence">Funções e evidências</a></nav>
     <section class="metrics" aria-label="Resumo dos indicadores">
       <dl class="card metric"><dt>Severidade geral</dt><dd>{severity}</dd></dl>
       <dl class="card metric"><dt>Eventos analisados</dt><dd>{events_analyzed}</dd></dl>
@@ -423,6 +496,7 @@ def render_html_dashboard(snapshot: Any) -> str:
         </table>
       </figure>
     </section>
+    {event_trace_section}
     {function_evidence_section}
     <p class="note">Este MVP visualiza somente o snapshot de recuperação disponível; não é um fluxo ao vivo de todo o Nexus. Contagens zero não significam que a função esteja inativa.</p>
     <p class="meta">Schema: {schema} · Fonte: {source} · Snapshot gerado (Unix): {html.escape(generated_label, quote=True)} · Janela: {window_label} · Limite de exportação: não informado no schema v1 · Eventos incluídos: {snapshot_events}; eventos analisados podem diferir quando há janela temporal.</p>

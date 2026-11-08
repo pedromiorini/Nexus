@@ -12,6 +12,7 @@ from hypothesis import given, settings, strategies as st
 
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
 from tools.diagnostics_dashboard import (
+    EVENT_TRACE_LABELS,
     FUNCTION_EVIDENCE_CATALOG,
     FUNCTION_EVIDENCE_CATALOG_VERSION,
     RUNTIME_EVENT_AREA_MAP,
@@ -40,6 +41,7 @@ class RecoveryDiagnosticsContractTests(unittest.TestCase):
             "policy_transition": ("recovery-diagnostics",),
             "telemetry": ("recovery-diagnostics",),
         })
+        self.assertEqual(set(EVENT_TRACE_LABELS), set(RUNTIME_EVENT_AREA_MAP))
         root = Path(__file__).resolve().parent
         for entry in FUNCTION_EVIDENCE_CATALOG:
             self.assertTrue(entry.label)
@@ -118,6 +120,97 @@ class RecoveryDiagnosticsContractTests(unittest.TestCase):
         self.assertIn("<th scope=\"row\">Crítica</th>", rendered)
         self.assertIn("<th scope=\"row\">Pausas</th>", rendered)
         self.assertNotIn("RAW_EVENT_PAYLOAD_MARKER", rendered)
+
+    def test_html_dashboard_event_trace_uses_allowlist_and_registration_order(self):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        snapshot["events"] = [
+            {
+                "event_type": "policy_transition", "timestamp": 50.5,
+                "payload": {"reason": "RAW_TRACE_PAYLOAD_MARKER"},
+                "private_field": "RAW_TRACE_ARBITRARY_FIELD_MARKER",
+            },
+            {
+                "event_type": "PRIVATE_UNKNOWN_TRACE_TYPE_MARKER", "timestamp": 51.0,
+                "payload": {"reason": "RAW_UNKNOWN_TRACE_PAYLOAD_MARKER"},
+            },
+            {"event_type": "telemetry", "timestamp": 10.0, "payload": {"secret": "RAW_TELEMETRY_PAYLOAD_MARKER"}},
+        ]
+
+        rendered = render_html_dashboard(snapshot)
+        trace = rendered.split('<section id="event-trace"', 1)[1].split("</section>", 1)[0]
+
+        self.assertIn('<a href="#event-trace">', rendered)
+        self.assertIn("Rastro de eventos observáveis", trace)
+        self.assertIn("em ordem de registro", trace.lower())
+        self.assertIn("não é um feed ao vivo", trace.lower())
+        self.assertIn("Transição de política", trace)
+        self.assertIn("Telemetria de reprocessamento", trace)
+        self.assertLess(trace.index("50.5"), trace.index("10.0"))
+        for marker in (
+            "PRIVATE_UNKNOWN_TRACE_TYPE_MARKER", "RAW_TRACE_PAYLOAD_MARKER",
+            "RAW_TRACE_ARBITRARY_FIELD_MARKER", "RAW_UNKNOWN_TRACE_PAYLOAD_MARKER",
+            "RAW_TELEMETRY_PAYLOAD_MARKER",
+        ):
+            with self.subTest(marker=marker):
+                self.assertNotIn(marker, rendered)
+
+    def test_html_dashboard_event_trace_distinguishes_empty_and_unknown_only_snapshots(self):
+        empty_snapshot = self.bridge.export_recovery_diagnostics()
+        empty_trace = render_html_dashboard(empty_snapshot).split(
+            '<section id="event-trace"', 1
+        )[1].split("</section>", 1)[0]
+        self.assertIn("Nenhum evento incluído neste snapshot.", empty_trace)
+
+        unknown_snapshot = self.bridge.export_recovery_diagnostics()
+        unknown_snapshot["events"] = [{
+            "event_type": "PRIVATE_UNKNOWN_TRACE_TYPE_MARKER", "timestamp": 1.0,
+            "payload": {"private": "RAW_UNKNOWN_TRACE_PAYLOAD_MARKER"},
+        }]
+        unknown_trace = render_html_dashboard(unknown_snapshot).split(
+            '<section id="event-trace"', 1
+        )[1].split("</section>", 1)[0]
+        self.assertIn("Nenhum evento permitido neste snapshot", unknown_trace)
+        self.assertIn("1 registro com tipo não permitido foi omitido", unknown_trace)
+        self.assertNotIn("PRIVATE_UNKNOWN_TRACE_TYPE_MARKER", unknown_trace)
+        self.assertNotIn("RAW_UNKNOWN_TRACE_PAYLOAD_MARKER", unknown_trace)
+
+    def test_html_dashboard_event_trace_limits_rows_and_reports_each_omission(self):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        snapshot["events"] = [
+            {"event_type": "telemetry", "timestamp": float(index), "payload": {}}
+            for index in range(22)
+        ]
+        snapshot["events"].insert(3, {
+            "event_type": "PRIVATE_UNKNOWN_TRACE_TYPE_MARKER", "timestamp": 22.0,
+            "payload": {"private": "RAW_LIMIT_TRACE_PAYLOAD_MARKER"},
+        })
+
+        trace = render_html_dashboard(snapshot).split(
+            '<section id="event-trace"', 1
+        )[1].split("</section>", 1)[0]
+
+        self.assertEqual(trace.count("<li>"), 20)
+        self.assertIn("Exibindo 20 de 22 eventos permitidos neste recorte", trace)
+        self.assertIn("2 eventos permitidos anteriores foram omitidos pelo limite de 20 linhas visíveis", trace)
+        self.assertIn("1 registro com tipo não permitido foi omitido", trace)
+        self.assertNotIn("Unix): 0.0 s", trace)
+        self.assertIn("Unix): 2.0 s", trace)
+        self.assertNotIn("PRIVATE_UNKNOWN_TRACE_TYPE_MARKER", trace)
+        self.assertNotIn("RAW_LIMIT_TRACE_PAYLOAD_MARKER", trace)
+
+    def test_html_dashboard_event_trace_wraps_extreme_finite_integer_timestamps(self):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        timestamp = 10**300
+        snapshot["events"] = [{
+            "event_type": "telemetry", "timestamp": timestamp, "payload": {},
+        }]
+
+        rendered = render_html_dashboard(snapshot)
+        trace = rendered.split('<section id="event-trace"', 1)[1].split("</section>", 1)[0]
+        timestamp_style = rendered.split(".event-timestamp {", 1)[1].split("}", 1)[0]
+
+        self.assertIn(f"Unix): {timestamp} s", trace)
+        self.assertIn("overflow-wrap: anywhere;", timestamp_style)
 
     def test_html_dashboard_escapes_variable_text(self):
         snapshot = self.bridge.export_recovery_diagnostics()

@@ -63,7 +63,7 @@ O painel deve exibir números absolutos e denominador (por exemplo, “3/13 áre
 |---|---|---|
 | Cartões de eventos analisados, severidade, pausas, recuperações, duração média e estado observado | Sim, do snapshot v1 | Mostrar janela/limite, horário e denominador; manter razão de recuperação como numerador/denominador, inclusive `0/0` ou “sem pausas”. |
 | Barras por severidade e barras de pausas/recuperações | Sim | São contagens do recorte. Não converter a razão em pizza/progresso de “pronto”. |
-| Linha do tempo curta de eventos Vita | Parcialmente | O snapshot contém timestamps e tipo em ordem do log, mas não ID/seq explícito nem payload seguro. Pode mostrar apenas marcador genérico derivado por allowlist; não inventar motivo nem expor payload. |
+| Linha do tempo curta de eventos Vita | Sim, de forma restrita no HTML estático local | O rastro usa apenas `policy_transition` e `telemetry`, mostra rótulos traduzidos e timestamp Unix da ocorrência, preserva a ordem de registro e omite payloads/campos arbitrários e tipos não permitidos. É limitado aos eventos do recorte exportado; não é feed ao vivo. |
 | Mapa de funções por evidência de código/testes | Sim, como catálogo estático revisado para uma revisão do repositório | Não representa atividade em execução. Referenciar paths/testes e fixar a revisão; não inferir “ativo” de classe existente. |
 | Gráfico de atenção, memória, predição, planejamento ou uso multimodal em runtime | Não | Requer produtores e contratos de telemetria específicos para cada função. Não usar números de teste como substituto de uso em produção. |
 | Evolução histórica, latência por etapa e estado ao vivo | Não | Requer coleta com timestamps/ordenação, retenção, definição de unidade, denominadores, origem e mecanismo de atualização; snapshot v1 não é esse fluxo. |
@@ -100,6 +100,8 @@ Use uma **linha do tempo de caixa-preta operacional / diário de bordo do softwa
 
 **Aceitação:** cada contagem é reconciliável ao recorte que a gerou; a tela mostra período, origem e denominadores; nenhum payload bruto, pensamento interno fabricado ou estado de outras áreas é renderizado; valores ausentes, zero observações e `0/0` têm rótulos distintos; leitura por teclado e versão móvel preservadas.
 
+**Incremento local nesta branch:** o HTML inclui um rastro estático derivado do snapshot já validado. A allowlist contém somente `policy_transition` e `telemetry`; o rastro mostra seus rótulos em português e o timestamp Unix da ocorrência, em ordem de registro. Exibe até 20 eventos permitidos mais recentes do recorte, preservando a ordem entre eles, e informa quantos registros foram omitidos por tipo não permitido ou pelo limite. Snapshot sem eventos e snapshot contendo apenas tipos não permitidos têm estados textuais diferentes. Payload, nomes de tipos não permitidos e campos adicionais não são exibidos. O schema v1, o produtor, o CLI textual padrão e suas saídas permanecem inalterados; não há JavaScript, dependência ou feed ao vivo. A revisão visual manual de teclado/dispositivos móveis não faz parte desta verificação local.
+
 ### Fase 4 — Instrumentar áreas adicionais, uma por vez
 
 **Entrega proposta:** escolher cada função por necessidade concreta e criar um evento mínimo com produtor, contrato e limites de privacidade antes de desenhar seu gráfico. Não instrumentar todo o monólito de uma vez.
@@ -114,7 +116,7 @@ Use uma **linha do tempo de caixa-preta operacional / diário de bordo do softwa
 
 ## Limites e decisão em aberto
 
-A principal escolha de produto é se o primeiro incremento após o MVP será somente o catálogo estático (menor risco e sem nova coleta) ou se também se aprovará um evento seguro para um fluxo operacional Vita. Este documento recomenda começar pelo catálogo e manter a linha do tempo somente com o que o snapshot v1 consegue sustentar. Qualquer expansão para telemetria cognitiva, armazenamento adicional ou atualização ao vivo exige contrato e autorização próprios.
+A decisão de produto para etapas além deste incremento continua em aberto. Esta branch local acrescenta somente o catálogo estático e um rastro HTML limitado ao que o snapshot v1 já contém; não cria evento seguro novo nem instrumentação. Qualquer expansão para telemetria cognitiva, armazenamento adicional ou atualização ao vivo exige contrato e autorização próprios.
 
 Nada nesta especificação declara o Nexus, seus módulos cognitivos, seus testes ou seu fluxo de recuperação completos, eficazes em geral, conscientes, em tempo real ou prontos para produção.
 
@@ -139,6 +141,12 @@ O mapa local explícito `event_type → área` é conservador:
 As outras 12 áreas permanecem `Não instrumentado` por esse snapshot. Em particular, esses eventos não atestam execução de roteamento/fila, defesa VRAM ou função cognitiva genérica; um registro não torna todos os cartões `Parcial`. Tipos alheios e alegações contidas no payload não alteram a classificação.
 
 Os estados `0`, `Desconhecido`, `Sem denominador` e `Não instrumentado` são distintos. Contagem zero permanece `0`; campo ausente/indeterminado é `Desconhecido`; razões de recuperação com zero pausas são `Sem denominador (0/0)`, e não `0.000`; estado sem telemetria compatível é `Não instrumentado`. Quando houver pausas, a razão é acompanhada por numerador/denominador. Rótulos textuais e tabelas HTML semânticas tornam estados e contagens compreensíveis sem depender de cor.
+
+### Rastro HTML estático de eventos (incremento local)
+
+O rastro é uma lista ordenada, gerada somente a partir de `events[]` depois da validação do snapshot v1. Ele não classifica eventos com base no payload. A allowlist de apresentação é fechada: `policy_transition` aparece como “Transição de política” e `telemetry` como “Telemetria de reprocessamento”; esses tipos continuam associados somente a `recovery-diagnostics`. Nenhum campo além do tipo permitido e do timestamp da ocorrência é usado para compor cada linha. O timestamp é apresentado como valor Unix em segundos, sem conversão para fuso horário.
+
+Quando há mais de 20 eventos permitidos, o rastro exibe os 20 permitidos mais recentes dentro do array recebido, preservando a ordem de registro original, e informa quantos anteriores foram omitidos pelo limite. Tipos não permitidos nunca têm seus nomes ou conteúdo mostrados; sua quantidade é informada separadamente. Um array vazio mostra “Nenhum evento incluído neste snapshot”; um array não vazio sem tipos permitidos mostra “Nenhum evento permitido neste snapshot” e a contagem omitida. Nenhum desses estados indica atividade atual ou ausência de atividade no sistema. A lista diz respeito apenas ao recorte presente no snapshot, não a um “agora” nem a um feed ao vivo.
 
 Por compatibilidade, a saída textual padrão foi mantida literalmente: o renderer legado ainda usa zero para contadores opcionais ausentes. A distinção visual de campos ausentes e `0/0` deste incremento vale para o HTML; o comportamento textual legado é uma limitação conhecida, não evidência de zero observações.
 
