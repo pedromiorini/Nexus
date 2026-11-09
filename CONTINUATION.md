@@ -45,6 +45,18 @@ Hipóteses, cada uma com o que a derruba:
 - **H4.** Cherry-pick de `54d1fc9` preserva E-P1c-VK. Derrubada: o pick conflita em `mcts_planner.py` e o lado do commit troca `veto_lookup` por `_veto_key in table` e o construtor por `_validate_vetoes` (motivo obrigatoriamente `str`). Esses hunks não entram.
 - **H5.** O timeout de 30 min de `4b1624f` ainda é o endurecimento necessário. Fora de escopo: a CI em `main` fixa `timeout-minutes: 20` no job com shards. O commit aplica limpo e não será carregado.
 
+### Resultados (reexecução nesta branch; critérios C1–C9 não foram reescritos)
+
+- **RED** no pai `579a2e8d97ecaab570c4eb52c34ba4ebb8cd0bdc`, só com os testes novos: `python -m unittest` dos sete métodos C1–C7 → 7 testes, 13 falhas, exit 1, 0,156 s. C5 e C7 passaram. C1–C4 e C6 falharam como pré-registrado.
+- **GREEN** em `7f389940436510e3e7c408e1a53a0af4e5c7ea46`: os mesmos sete métodos, OK, exit 0, 0,226 s. Produção: guarda de forma no início de `compare_allowed_futures`; `think` compara quando `possible_actions` é verdadeiro, só no sítio P1c (o `multi_task` segue `len > 1`).
+- **Suíte:** `python -m unittest discover -p 'test_*.py'` → 1397 testes, OK, 5 falhas esperadas, 68,416 s, exit 0. Base, antes do patch: 1390, OK, 5 falhas esperadas, 68,106 s, exit 0.
+- **Ruff 0.17.1** e `compileall` dos arquivos tocados: exit 0. Python 3.11.18, venv `/tmp/nexus-ci311`, `requirements-ci.lock`. `LC_ALL=C`.
+- **Realidade:** `python tools/reality_audit.py` exit 0. `mcts_planner.py` 632 → 641 linhas, 27 funções. `core/cognitivo` 6494 → 6503 linhas. Núcleo continua 23449 linhas, 218 classes, 703 funções. Commit `a0674b082e23d1fa4b45c5213b1071398421f335`. Segunda execução depois desse commit: exit 0 e `git diff --exit-code` limpo.
+- **Mutação:** `tools/targeted_mutation.py` não foi editado. `tools/cognitivo_mutation.py` não foi editado. As 64 agulhas `p1b_*`/`p1c_*` continuam com uma ocorrência cada. Campanha completa do catálogo não foi rodada.
+- **Registro:** `python tools/agente/validar_registro.py --expirados erro` exit 0. `bash tools/agente/predeleg.sh HEAD 632ce8456ff76810654aa19b950ed1960e9754d0` → `OK: sem conflito`, exit 0.
+- **Limite observado, fora dos critérios:** `think` com `[["MONITOR", None]]` entra no `except` que já existia (`WARNING: MCTS failed: sequences[0] must contain only action names (str)`); `mcts_plan` fica `None` e não há `world_comparison`. Na base, uma sequência só não chamava a comparação. Não houve mudança de critério para cobrir esse caminho.
+- **Publicação:** não houve push. `origin/main` segue `632ce84`; a #162 segue `9c152b6`; a #150 segue `5ccc8df`. CI hospedado não verificado.
+
 ## Rodada — rebase da #147 (MCTS P1c) sobre 7c0464c — 2026-11-05
 
 - **Base:** `7c0464c9620d6c2678abd820219a368b7c64c699` (`origin/main`, merge da #161). Branch `grok/mcts-p1c-brain-veto-20261030`. Rebase linear, sem commit de merge. O HEAD antigo da PR era `7f1a86eb3928c995f8fdad977eac1981a877ffb1`.
