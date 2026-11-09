@@ -43,6 +43,15 @@ def _compare(sequences, **kwargs):
     return mp.compare_allowed_futures(_wm(), sequences, **kwargs)
 
 
+class _RecordingModel:
+    def __init__(self):
+        self.called = False
+
+    def compare_futures(self, sequences):
+        self.called = True
+        return {"results": [], "best_future_index": None, "best_future": None}
+
+
 def _declared():
     causal = RealCausalReasoning()
     causal.declare_intervention("AAA_DECL", {"system_status": "secure"})
@@ -125,6 +134,51 @@ class B1AllowedFuturesTests(unittest.TestCase):
         self.assertEqual(DEFAULT_VETOES, before_defaults)
         self.assertEqual(sequences, before_input)
 
+    def test_c1_string_element_is_rejected_before_the_model(self):
+        model = _RecordingModel()
+        with self.assertRaisesRegex(TypeError, r"^sequences\[0\] must be a list or tuple of action names$"):
+            mp.compare_allowed_futures(model, ["IGNORE_ALERT"])
+        self.assertFalse(model.called)
+
+    def test_c2_non_string_action_is_rejected_before_the_model(self):
+        cases = (
+            [["MONITOR", None]],
+            [[True]],
+            [[float("nan")]],
+            [[float("inf")]],
+            [[-1]],
+        )
+        for sequences in cases:
+            model = _RecordingModel()
+            with self.subTest(sequences=sequences):
+                with self.assertRaisesRegex(TypeError, r"^sequences\[0\] must contain only action names \(str\)$"):
+                    mp.compare_allowed_futures(model, sequences)
+                self.assertFalse(model.called)
+
+    def test_c3_mixed_future_is_rejected_before_the_model(self):
+        model = _RecordingModel()
+        with self.assertRaisesRegex(TypeError, r"^sequences\[1\] must be a list or tuple of action names$"):
+            mp.compare_allowed_futures(model, [["MONITOR"], "IGNORE_ALERT"])
+        self.assertFalse(model.called)
+
+    def test_c4_top_level_value_is_rejected_before_the_model(self):
+        for sequences in ("IGNORE_ALERT", None, True, 1, 1.5):
+            model = _RecordingModel()
+            with self.subTest(sequences=sequences):
+                with self.assertRaisesRegex(TypeError, r"^sequences must be a list or tuple of action sequences$"):
+                    mp.compare_allowed_futures(model, sequences)
+                self.assertFalse(model.called)
+
+    def test_c5_empty_string_action_stays_accepted(self):
+        model = _RecordingModel()
+        out = mp.compare_allowed_futures(model, [["", "MONITOR"]])
+        self.assertTrue(model.called)
+        self.assertIn("allowed_indices", out)
+        model = _RecordingModel()
+        out = mp.compare_allowed_futures(model, (["MONITOR"], ["APPLY_PATCH"]))
+        self.assertTrue(model.called)
+        self.assertEqual(out["vetoed_futures"], [])
+
     def test_exported(self):
         self.assertIn("compare_allowed_futures", mp.__all__)
         self.assertEqual([f.name for f in dataclasses.fields(PlanResult)],
@@ -169,6 +223,22 @@ class BrainTests(unittest.TestCase):
         r = self._think([["MONITOR", "IGNORE_ALERT"], ["MONITOR"]])  # só a comparação vê o passo vetado
         self.assertEqual(r["best_future"], 1)
         self.assertEqual([v["action"] for v in r["vetoed_actions"]], ["IGNORE_ALERT"])
+
+    def test_c6_think_compares_a_single_candidate_sequence(self):
+        r = self._think([["MONITOR", "IGNORE_ALERT"]])
+        self.assertIn("world_comparison", r)
+        self.assertIn("world_model", r["modules_activated"])
+        self.assertIsNone(r["best_future"])
+        self.assertEqual(r["world_comparison"]["vetoed_futures"], [0])
+        self.assertEqual([v["action"] for v in r["vetoed_actions"]], ["IGNORE_ALERT"])
+        self.assertEqual(r["vetoed_actions"][0]["reason"], DEFAULT_VETOES["IGNORE_ALERT"])
+
+    def test_c7_default_vetoes_propagate_without_possible_actions(self):
+        r = self._think(None)
+        self.assertEqual(
+            {(v["action"], v["reason"]) for v in r["vetoed_actions"]},
+            set(DEFAULT_VETOES.items()),
+        )
 
     def test_b5_disabled_vetoes_in_the_brain_planner(self):
         saved = self.brain.mcts_planner.vetoes
