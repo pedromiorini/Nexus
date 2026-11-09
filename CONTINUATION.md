@@ -52,10 +52,30 @@ Hipóteses, cada uma com o que a derruba:
 - **Suíte:** `python -m unittest discover -p 'test_*.py'` → 1397 testes, OK, 5 falhas esperadas, 68,416 s, exit 0. Base, antes do patch: 1390, OK, 5 falhas esperadas, 68,106 s, exit 0.
 - **Ruff 0.17.1** e `compileall` dos arquivos tocados: exit 0. Python 3.11.18, venv `/tmp/nexus-ci311`, `requirements-ci.lock`. `LC_ALL=C`.
 - **Realidade:** `python tools/reality_audit.py` exit 0. `mcts_planner.py` 632 → 641 linhas, 27 funções. `core/cognitivo` 6494 → 6503 linhas. Núcleo continua 23449 linhas, 218 classes, 703 funções. Commit `a0674b082e23d1fa4b45c5213b1071398421f335`. Segunda execução depois desse commit: exit 0 e `git diff --exit-code` limpo.
-- **Mutação:** `tools/targeted_mutation.py` não foi editado. `tools/cognitivo_mutation.py` não foi editado. As 64 agulhas `p1b_*`/`p1c_*` continuam com uma ocorrência cada. Campanha completa do catálogo não foi rodada.
+- **Mutação (agulhas):** `tools/targeted_mutation.py` e `tools/cognitivo_mutation.py` não foram editados. As 64 agulhas `p1b_*`/`p1c_*` continuam com uma ocorrência cada. A campanha completa está na subseção de gates.
 - **Registro:** `python tools/agente/validar_registro.py --expirados erro` exit 0. `bash tools/agente/predeleg.sh HEAD 632ce8456ff76810654aa19b950ed1960e9754d0` → `OK: sem conflito`, exit 0.
 - **Limite observado, fora dos critérios:** `think` com `[["MONITOR", None]]` entra no `except` que já existia (`WARNING: MCTS failed: sequences[0] must contain only action names (str)`); `mcts_plan` fica `None` e não há `world_comparison`. Na base, uma sequência só não chamava a comparação. Não houve mudança de critério para cobrir esse caminho.
 - **Publicação:** não houve push. `origin/main` segue `632ce84`; a #162 segue `9c152b6`; a #150 segue `5ccc8df`. CI hospedado não verificado.
+
+### Gates locais no HEAD `df7c43e` — 2026-11-09, sem `gates_status: success`
+
+Python 3.11.18 (`/tmp/nexus-ci311`), Ruff 0.17.1, Bandit 1.9.4, Coverage 7.16.2, `requirements-ci.lock`, `LC_ALL=C`, `NEXUS_AUDIT_DB` fora do repo. Critérios C1–C9 não mudaram. C1–C7 no HEAD: 7 testes, OK, exit 0.
+
+- `ruff check` e `compileall` dos caminhos do workflow: exit 0.
+- `reality_audit.py` e `git diff --exit-code` dos relatórios: exit 0.
+- `coverage run --branch -m unittest discover`: 1397 testes, OK, 5 falhas esperadas, 195,439 s, exit 0. Demo `coverage run --append --branch core/constitutional_brain.py`: exit 0. `integrated-summary.json` com `result: passed` (30 aprovados, 1 skip). Pisos: total 81% (piso 0); fila 95%; VRAM 94%; temporal 94%; Vita 76%; núcleo 69%; `core/cognitivo/*` 98%; `mcts_planner.py` 94%. Todos os `--fail-under` do workflow saíram 0.
+- `bandit -r core vita tools`: 139 LOW, 0 MEDIUM, 0 HIGH. O processo do Bandit sai 1 quando há achados; o arquivo existe. Política de severidade: exit 0. `security_triage.py --check`: exit 0. `embedded_assert_audit.py` e `implementation_gap_audit.py`: exit 0.
+- `tools/targeted_mutation.py`: `declared 80, applicable 80, killed 80, survived 0, not_applied 0`, exit 0. Arquivo intocado.
+- `tools/cognitivo_mutation.py --jobs 4`: `declared 998, killed 998, survived 0, not_applied 0`, exit 0. 20:56:10Z–21:02:13Z. Não é o formato de três shards do CI; o catálogo é o mesmo `MUTATIONS`.
+- `bash tools/agente/replay/run_replay.sh`: 17 casos, exit 0. O replay com expectativas `0` trocadas por `9` falha, como o workflow exige.
+- actionlint 1.7.12 e zizmor 1.31.1, checksums do workflow conferidos, ambos exit 0. O workflow não foi editado.
+- Python 3.12.3, mesmo lock, venv `/tmp/nexus-ci312`: ruff, compileall e a suíte (1397, OK, 5 falhas esperadas, 78,489 s) exit 0. Não é a imagem do Actions.
+- `test_summary.py`: `executed 1397, passed 1397, failed 0, result passed`, exit 0. As 5 falhas esperadas não entram em `failed`.
+- `state_manifest.py` sem `--gates-status` grava `ci.gates_status: not_ci` e `run_id: not_ci`. `state_consistency_audit.py`: exit 1, único erro `manifesto: ci.gates_status deve ser 'success'`. Testes 1397 e `bandit_low` 139 batem com os quatro documentos. Não se gravou `success`.
+
+### #150 — bloqueio, sem implementação
+
+O patch de `test_cognitivo_mutation_parallel_contract.py` (`40ad115`) aplica neste HEAD (`git apply --check`, exit 0) e exige `len(MUTATIONS) == 779`. O catálogo atual tem 998. O patch de `tools/cognitivo_mutation.py` não aplica: a âncora `parse_jobs` na linha 1746 não existe; o `main` atual usa `parse_args` com `--shard`. Trocar 779 ou escolher se o preflight vê o catálogo inteiro ou a fatia seria alterar contrato ou semântica que o commit original não tem. Não houve branch da #150.
 
 ## Rodada — rebase da #147 (MCTS P1c) sobre 7c0464c — 2026-11-05
 
