@@ -7,6 +7,44 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — endurecimento P1c da #162 sobre 632ce84 — 2026-11-09
+
+- **Base:** `632ce8456ff76810654aa19b950ed1960e9754d0` (`origin/main`, squash da #147). Branch local `cursor/p1c-harden-162-local-9a99`. Sem push, sem merge, sem retarget. Agent-Id: `grok-bot`.
+- **Claim:** o lease da #147 em `docs/agentes/CLAIMS.yaml` (`expira_em: 2026-11-08T16:00:00+00:00`) está expirado. `python tools/agente/validar_registro.py --expirados erro` na base sai 1 com `claim[0] grok-bot: claim expirado`. Ruff e `compileall` na base saíram 0. `python -m unittest discover -p 'test_*.py'` na base: 1390 testes, OK, 5 falhas esperadas, 68,106 s, exit 0. A correção administrativa é só nesta branch: o lease morto sai e entra o claim deste endurecimento, `expira_em: 2026-11-12T18:00:00+00:00`. O validador e os critérios dele não foram alterados.
+- **Fora deste diff:** S2a (`expected_reward == 0.0`), errata `:180`, timeout 30 min, workflow, `tools/targeted_mutation.py`, `tools/cognitivo_mutation.py`, E-P1c-VK1 (`veto_lookup`) e E-P1c-VK2 (construtor aceita motivo não-`str`). Seeds `SEEDS_B`/`SEEDS_D`/`SEEDS_N` não mudam.
+
+### Critérios pré-registrados (antes do GREEN; não alterar se a implementação falhar)
+
+Observação na base, Python 3.11.18, `LC_ALL=C`, `PYTHONPATH=.`, modelo gravador com `compare_futures`:
+
+- **C1.** `["IGNORE_ALERT"]` não levanta e chama o modelo.
+- **C2.** `[["MONITOR", None]]`, `[[True]]`, `[[float("nan")]]`, `[[float("inf")]]` e `[[-1]]` não levantam e chamam o modelo.
+- **C3.** `[["MONITOR"], "IGNORE_ALERT"]` não levanta e chama o modelo.
+- **C4.** `"IGNORE_ALERT"` não levanta e chama o modelo. `None`, `True`, `1` e `1.5` levantam `TypeError` com a mensagem do iterador (`not iterable`), não a mensagem do contrato.
+- **C5.** `[["", "MONITOR"]]` não levanta e chama o modelo. Nome `str` vazio continua aceito.
+- **C6.** `think` com `possible_actions=[["MONITOR", "IGNORE_ALERT"]]`, `planning_goal` e seed `20261301` (`SEEDS_B[0]`) não tem `world_comparison` nem `world_model` em `modules_activated`. `vetoed_actions` veio `[]`.
+- **C7.** `think` com `possible_actions=None` já devolve o conjunto `set(DEFAULT_VETOES.items())`. A alegação de defeito aqui fica falsificada na base; não há correção de produção para C7.
+
+Contrato que o GREEN tem de cumprir, sem mudar estas frases:
+
+- **C1.** `TypeError` com mensagem exata `sequences[0] must be a list or tuple of action names`; `called is False`.
+- **C2.** `TypeError` com mensagem exata `sequences[0] must contain only action names (str)`; `called is False`.
+- **C3.** `TypeError` com mensagem exata `sequences[1] must be a list or tuple of action names`; `called is False`.
+- **C4.** `TypeError` com mensagem exata `sequences must be a list or tuple of action sequences`; `called is False`.
+- **C5.** continua sem `TypeError` e com o modelo chamado.
+- **C6.** `world_comparison` presente; `world_model` em `modules_activated`; `best_future is None`; `world_comparison["vetoed_futures"] == [0]`; nomes vetados `["IGNORE_ALERT"]`; motivo igual a `DEFAULT_VETOES["IGNORE_ALERT"]`.
+- **C7.** o mesmo conjunto de pares da base. Teste de trava, não de correção.
+- **C8.** `test_invalid_maps` segue aceitando `{"A": 2}` e `{"A": None}` (E-P1c-VK2).
+- **C9.** o casamento de veto em `compare_allowed_futures` segue `veto_lookup` (E-P1c-VK1). Tupla de sequências bem formadas continua aceita.
+
+Hipóteses, cada uma com o que a derruba:
+
+- **H1.** Sequência malformada é tratada como vazia e o modelo roda. Derruba: C1–C4 com a mensagem exata e `called is False`.
+- **H2.** `think` só compara quando há duas ou mais sequências. Derruba: C6.
+- **H3.** Vetos padrão não saem em `think(None)`. Derrubada na base por C7, antes de qualquer patch.
+- **H4.** Cherry-pick de `54d1fc9` preserva E-P1c-VK. Derrubada: o pick conflita em `mcts_planner.py` e o lado do commit troca `veto_lookup` por `_veto_key in table` e o construtor por `_validate_vetoes` (motivo obrigatoriamente `str`). Esses hunks não entram.
+- **H5.** O timeout de 30 min de `4b1624f` ainda é o endurecimento necessário. Fora de escopo: a CI em `main` fixa `timeout-minutes: 20` no job com shards. O commit aplica limpo e não será carregado.
+
 ## Rodada — rebase da #147 (MCTS P1c) sobre 7c0464c — 2026-11-05
 
 - **Base:** `7c0464c9620d6c2678abd820219a368b7c64c699` (`origin/main`, merge da #161). Branch `grok/mcts-p1c-brain-veto-20261030`. Rebase linear, sem commit de merge. O HEAD antigo da PR era `7f1a86eb3928c995f8fdad977eac1981a877ffb1`.
