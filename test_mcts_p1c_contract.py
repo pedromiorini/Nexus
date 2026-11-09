@@ -218,7 +218,7 @@ class BrainTests(unittest.TestCase):
                 self.assertIn(r["best_future"], (0, 1))
 
     def test_b5_vetoed_actions_from_planner_and_from_later_steps(self):
-        r = self._think([["SHUTDOWN_SERVICE"]])  # uma só ação: não há comparação; vale o veto do planejador
+        r = self._think([["SHUTDOWN_SERVICE"]])  # planner e comparação veem o veto; o resultado o deduplica
         self.assertEqual([v["action"] for v in r["vetoed_actions"]], ["SHUTDOWN_SERVICE"])
         r = self._think([["MONITOR", "IGNORE_ALERT"], ["MONITOR"]])  # só a comparação vê o passo vetado
         self.assertEqual(r["best_future"], 1)

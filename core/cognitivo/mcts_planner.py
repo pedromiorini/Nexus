@@ -63,7 +63,16 @@ def compare_allowed_futures(world_model: Any, sequences: List[List[str]],
     lista for vazia). ``results`` traz só as permitidas, na ordem de ``allowed_indices``; ``vetoed_futures``
     lista os índices das vetadas e ``vetoed_actions`` as ações vetadas (``[{"action", "reason"}]``, ordem de
     aparição, sem repetir o mesmo texto). ``vetoes=None`` usa ``DEFAULT_VETOES``; ``{}`` desliga.
+    Sequência que não é lista/tupla, ou ação que não é ``str``, é ``TypeError`` antes do modelo.
+    Nome de ação ``str`` vazio continua aceito.
     """
+    if not isinstance(sequences, (list, tuple)):
+        raise TypeError("sequences must be a list or tuple of action sequences")
+    for index, sequence in enumerate(sequences):
+        if not isinstance(sequence, (list, tuple)):
+            raise TypeError(f"sequences[{index}] must be a list or tuple of action names")
+        if any(not isinstance(action, str) for action in sequence):
+            raise TypeError(f"sequences[{index}] must contain only action names (str)")
     if vetoes is not None and not isinstance(vetoes, Mapping):
         raise TypeError("vetoes must be a mapping of action -> reason")
     table = _veto_table(DEFAULT_VETOES if vetoes is None else vetoes)
