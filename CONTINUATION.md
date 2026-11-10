@@ -7,6 +7,15 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Critérios — reconciliação local da #153 (Temporal Reasoning) — 2026-11-10
+
+Escritos antes de resolver qualquer conflito. Base: `621ddb760c0c56962935a381db9152beb3bc6f13`. Branch local `cursor/tr-reconcile-153-9a99`. Sem push. Se um critério falhar, parar e reportar opções, sem ajustar o critério. Não editar `tools/targeted_mutation.py` nem arquivos de Axis.
+
+- **C1.** O move continua só extração, sem mudança de comportamento. O bloco `class TemporalEvent` até o fim de `RealTemporalReasoningEngine` na `main` é o mesmo texto do módulo extraído em `717c803` (a diferença vista antes deste commit é só o banner do módulo 42, que não entra no move).
+- **C2.** O reexport preserva os nomes públicos `RealTemporalReasoningEngine`, `TemporalEvent`, `TemporalRelation` e `TemporalSequence` em `core.constitutional_brain` e em `core.cognitivo`.
+- **C3.** Conflitos em `audit_reality.json` e `tools/cognitivo_mutation.py` não removem nem enfraquecem mutante. O catálogo não diminui (hoje 998; os 135 `tr_*` entram por cima). `preflight_catalog(MUTATIONS)` devolve `()`: nenhuma âncora ausente ou ambígua.
+- **C4.** Gates completos verdes: suíte, mutação cognitiva 100%, direcionada 80/80, Bandit 0 MEDIUM/HIGH, pisos de cobertura, replay e `predeleg` contra a `main`.
+
 ## Rodada — encerrar leases do grok-bot já mesclados — 2026-11-10
 
 - **Base:** `2353eef11dd51f8f1d02ecae20a232f0b6348273` (`origin/main`). Branch local `cursor/grok-claims-close-9a99`. Sem push. Agent-Id: `grok-bot`.
