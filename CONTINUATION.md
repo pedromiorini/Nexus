@@ -7,6 +7,13 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — encerrar leases do grok-bot já mesclados — 2026-11-10
+
+- **Base:** `2353eef11dd51f8f1d02ecae20a232f0b6348273` (`origin/main`). Branch local `cursor/grok-claims-close-9a99`. Sem push. Agent-Id: `grok-bot`.
+- **§9C.3:** ao terminar, o claim sai. O único lease ainda no arquivo era o da #150 (`expira_em: 2026-11-13T04:00:00+00:00`), trabalho já squashado neste SHA. `claims` volta a `[]`. Nenhum claim de Axis ou de outro agente foi editado: não havia outro no arquivo.
+- **#162** está na `main` como `929189bf736622dde232b8e81d6df8face105f7f`. O lease dessa rodada (`expira_em: 2026-11-12T18:00:00+00:00`) estava nesse squash e foi substituído pelo da #150. **#147** não tem lease neste arquivo; o prazo `2026-11-08T16:00:00+00:00` (13:00 BRT) ficou na rodada de 2026-11-05 e saiu antes do squash da #162.
+- **Estado:** as seções abaixo que ainda dizem «sem push» ou «#150 sem implementação» são o registro daquelas rodadas, não o estado depois dos merges. O bloco `NEXUS-CURRENT-STATE` não foi reescrito (`tests: CURRENT_TESTS`, `bandit_low: 139`).
+
 ## Rodada — semântica de Axis no preflight da #150 — 2026-11-10
 
 - **Base:** `500066f3ccda37fc7e026338cb210a846497cf3f`. Branch `cursor/pr150-axis-semantics-9a99`. As branches `cursor/p1c-harden-162-local-9a99` e `cursor/pr150-preflight-experimental-9a99` não são movidas. Sem push. Agent-Id: `grok-bot`.
