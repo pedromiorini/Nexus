@@ -8,6 +8,7 @@ claims:
       - tools/cognitivo_mutation.py
       - test_cognitivo_mutation_parallel_contract.py
       - test_ci_gate_shard_contract.py
+      - test_cognitivo_mutation_preflight_edges_contract.py
       - docs/agentes/CLAIMS.yaml
       - CONTINUATION.md
     expira_em: "2026-11-13T04:00:00+00:00"
