@@ -5,7 +5,7 @@
 - Workflows, timeouts, pisos de cobertura e qualquer arquivo de `.github/`.
 - Validadores, schema, aceites e `versao_aceita` do Axis (#79 e `tools/agente/validar_registro.py` além de rodá-lo).
 - Arquivos das PRs #79, #115, #116, #148, #166, #167 e #77, no sentido de não editar o trabalho delas nem rebaseá-las.
-- Orçamento fail-open e Swarm só em `ETHICAL_DECISION` (deixados em aberto pelo adendo RT).
+- Orçamento já falha fechado nesta base: módulo que não tem sucesso, veredito que não é booleano `True`, ou orçamento que não rodou devolvem `BUDGET_CHECK_FAILED` (`core/constitutional_brain.py:10072-10084`, conferido em `b9de4cf`). Swarm já é exigido no roteador (`:10021-10035` e `:10085-10096`). A frase anterior («fail-open» e «Swarm só em `ETHICAL_DECISION`», adendo RT) estava desatualizada.
 - Resolver subgoal, preferência `indifferent`, veto por efeito, `compare_futures`.
 - Mudar o comportamento de `temporal_reasoning.py` ou fazer o roteador passar a chamar `track_event` / `predict_next_event`.
 - Implementar `rejectors(state)` / `required` na seção A.
