@@ -7,6 +7,76 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — endurecimento P1c da #162 sobre 632ce84 — 2026-11-09
+
+- **Base:** `632ce8456ff76810654aa19b950ed1960e9754d0` (`origin/main`, squash da #147). Branch local `cursor/p1c-harden-162-local-9a99`. Sem push, sem merge, sem retarget. Agent-Id: `grok-bot`.
+- **Claim:** o lease da #147 em `docs/agentes/CLAIMS.yaml` (`expira_em: 2026-11-08T16:00:00+00:00`) está expirado. `python tools/agente/validar_registro.py --expirados erro` na base sai 1 com `claim[0] grok-bot: claim expirado`. Ruff e `compileall` na base saíram 0. `python -m unittest discover -p 'test_*.py'` na base: 1390 testes, OK, 5 falhas esperadas, 68,106 s, exit 0. A correção administrativa é só nesta branch: o lease morto sai e entra o claim deste endurecimento, `expira_em: 2026-11-12T18:00:00+00:00`. O validador e os critérios dele não foram alterados.
+- **Fora deste diff:** S2a (`expected_reward == 0.0`), errata `:180`, timeout 30 min, workflow, `tools/targeted_mutation.py`, `tools/cognitivo_mutation.py`, E-P1c-VK1 (`veto_lookup`) e E-P1c-VK2 (construtor aceita motivo não-`str`). Seeds `SEEDS_B`/`SEEDS_D`/`SEEDS_N` não mudam.
+
+### Critérios pré-registrados (antes do GREEN; não alterar se a implementação falhar)
+
+Observação na base, Python 3.11.18, `LC_ALL=C`, `PYTHONPATH=.`, modelo gravador com `compare_futures`:
+
+- **C1.** `["IGNORE_ALERT"]` não levanta e chama o modelo.
+- **C2.** `[["MONITOR", None]]`, `[[True]]`, `[[float("nan")]]`, `[[float("inf")]]` e `[[-1]]` não levantam e chamam o modelo.
+- **C3.** `[["MONITOR"], "IGNORE_ALERT"]` não levanta e chama o modelo.
+- **C4.** `"IGNORE_ALERT"` não levanta e chama o modelo. `None`, `True`, `1` e `1.5` levantam `TypeError` com a mensagem do iterador (`not iterable`), não a mensagem do contrato.
+- **C5.** `[["", "MONITOR"]]` não levanta e chama o modelo. Nome `str` vazio continua aceito.
+- **C6.** `think` com `possible_actions=[["MONITOR", "IGNORE_ALERT"]]`, `planning_goal` e seed `20261301` (`SEEDS_B[0]`) não tem `world_comparison` nem `world_model` em `modules_activated`. `vetoed_actions` veio `[]`.
+- **C7.** `think` com `possible_actions=None` já devolve o conjunto `set(DEFAULT_VETOES.items())`. A alegação de defeito aqui fica falsificada na base; não há correção de produção para C7.
+
+Contrato que o GREEN tem de cumprir, sem mudar estas frases:
+
+- **C1.** `TypeError` com mensagem exata `sequences[0] must be a list or tuple of action names`; `called is False`.
+- **C2.** `TypeError` com mensagem exata `sequences[0] must contain only action names (str)`; `called is False`.
+- **C3.** `TypeError` com mensagem exata `sequences[1] must be a list or tuple of action names`; `called is False`.
+- **C4.** `TypeError` com mensagem exata `sequences must be a list or tuple of action sequences`; `called is False`.
+- **C5.** continua sem `TypeError` e com o modelo chamado.
+- **C6.** `world_comparison` presente; `world_model` em `modules_activated`; `best_future is None`; `world_comparison["vetoed_futures"] == [0]`; nomes vetados `["IGNORE_ALERT"]`; motivo igual a `DEFAULT_VETOES["IGNORE_ALERT"]`.
+- **C7.** o mesmo conjunto de pares da base. Teste de trava, não de correção.
+- **C8.** `test_invalid_maps` segue aceitando `{"A": 2}` e `{"A": None}` (E-P1c-VK2).
+- **C9.** o casamento de veto em `compare_allowed_futures` segue `veto_lookup` (E-P1c-VK1). Tupla de sequências bem formadas continua aceita.
+
+Hipóteses, cada uma com o que a derruba:
+
+- **H1.** Sequência malformada é tratada como vazia e o modelo roda. Derruba: C1–C4 com a mensagem exata e `called is False`.
+- **H2.** `think` só compara quando há duas ou mais sequências. Derruba: C6.
+- **H3.** Vetos padrão não saem em `think(None)`. Derrubada na base por C7, antes de qualquer patch.
+- **H4.** Cherry-pick de `54d1fc9` preserva E-P1c-VK. Derrubada: o pick conflita em `mcts_planner.py` e o lado do commit troca `veto_lookup` por `_veto_key in table` e o construtor por `_validate_vetoes` (motivo obrigatoriamente `str`). Esses hunks não entram.
+- **H5.** O timeout de 30 min de `4b1624f` ainda é o endurecimento necessário. Fora de escopo: a CI em `main` fixa `timeout-minutes: 20` no job com shards. O commit aplica limpo e não será carregado.
+
+### Resultados (reexecução nesta branch; critérios C1–C9 não foram reescritos)
+
+- **RED** no pai `579a2e8d97ecaab570c4eb52c34ba4ebb8cd0bdc`, só com os testes novos: `python -m unittest` dos sete métodos C1–C7 → 7 testes, 13 falhas, exit 1, 0,156 s. C5 e C7 passaram. C1–C4 e C6 falharam como pré-registrado.
+- **GREEN** em `7f389940436510e3e7c408e1a53a0af4e5c7ea46`: os mesmos sete métodos, OK, exit 0, 0,226 s. Produção: guarda de forma no início de `compare_allowed_futures`; `think` compara quando `possible_actions` é verdadeiro, só no sítio P1c (o `multi_task` segue `len > 1`).
+- **Suíte:** `python -m unittest discover -p 'test_*.py'` → 1397 testes, OK, 5 falhas esperadas, 68,416 s, exit 0. Base, antes do patch: 1390, OK, 5 falhas esperadas, 68,106 s, exit 0.
+- **Ruff 0.17.1** e `compileall` dos arquivos tocados: exit 0. Python 3.11.18, venv `/tmp/nexus-ci311`, `requirements-ci.lock`. `LC_ALL=C`.
+- **Realidade:** `python tools/reality_audit.py` exit 0. `mcts_planner.py` 632 → 641 linhas, 27 funções. `core/cognitivo` 6494 → 6503 linhas. Núcleo continua 23449 linhas, 218 classes, 703 funções. Commit `a0674b082e23d1fa4b45c5213b1071398421f335`. Segunda execução depois desse commit: exit 0 e `git diff --exit-code` limpo.
+- **Mutação (agulhas):** `tools/targeted_mutation.py` e `tools/cognitivo_mutation.py` não foram editados. As 64 agulhas `p1b_*`/`p1c_*` continuam com uma ocorrência cada. A campanha completa está na subseção de gates.
+- **Registro:** `python tools/agente/validar_registro.py --expirados erro` exit 0. `bash tools/agente/predeleg.sh HEAD 632ce8456ff76810654aa19b950ed1960e9754d0` → `OK: sem conflito`, exit 0.
+- **Limite observado, fora dos critérios:** `think` com `[["MONITOR", None]]` entra no `except` que já existia (`WARNING: MCTS failed: sequences[0] must contain only action names (str)`); `mcts_plan` fica `None` e não há `world_comparison`. Na base, uma sequência só não chamava a comparação. Não houve mudança de critério para cobrir esse caminho.
+- **Publicação:** não houve push. `origin/main` segue `632ce84`; a #162 segue `9c152b6`; a #150 segue `5ccc8df`. CI hospedado não verificado.
+
+### Gates locais no HEAD `df7c43e` — 2026-11-09, sem `gates_status: success`
+
+Python 3.11.18 (`/tmp/nexus-ci311`), Ruff 0.17.1, Bandit 1.9.4, Coverage 7.16.2, `requirements-ci.lock`, `LC_ALL=C`, `NEXUS_AUDIT_DB` fora do repo. Critérios C1–C9 não mudaram. C1–C7 no HEAD: 7 testes, OK, exit 0.
+
+- `ruff check` e `compileall` dos caminhos do workflow: exit 0.
+- `reality_audit.py` e `git diff --exit-code` dos relatórios: exit 0.
+- `coverage run --branch -m unittest discover`: 1397 testes, OK, 5 falhas esperadas, 195,439 s, exit 0. Demo `coverage run --append --branch core/constitutional_brain.py`: exit 0. `integrated-summary.json` com `result: passed` (30 aprovados, 1 skip). Pisos: total 81% (piso 0); fila 95%; VRAM 94%; temporal 94%; Vita 76%; núcleo 69%; `core/cognitivo/*` 98%; `mcts_planner.py` 94%. Todos os `--fail-under` do workflow saíram 0.
+- `bandit -r core vita tools`: 139 LOW, 0 MEDIUM, 0 HIGH. O processo do Bandit sai 1 quando há achados; o arquivo existe. Política de severidade: exit 0. `security_triage.py --check`: exit 0. `embedded_assert_audit.py` e `implementation_gap_audit.py`: exit 0.
+- `tools/targeted_mutation.py`: `declared 80, applicable 80, killed 80, survived 0, not_applied 0`, exit 0. Arquivo intocado.
+- `tools/cognitivo_mutation.py --jobs 4`: `declared 998, killed 998, survived 0, not_applied 0`, exit 0. 20:56:10Z–21:02:13Z. Não é o formato de três shards do CI; o catálogo é o mesmo `MUTATIONS`.
+- `bash tools/agente/replay/run_replay.sh`: 17 casos, exit 0. O replay com expectativas `0` trocadas por `9` falha, como o workflow exige.
+- actionlint 1.7.12 e zizmor 1.31.1, checksums do workflow conferidos, ambos exit 0. O workflow não foi editado.
+- Python 3.12.3, mesmo lock, venv `/tmp/nexus-ci312`: ruff, compileall e a suíte (1397, OK, 5 falhas esperadas, 78,489 s) exit 0. Não é a imagem do Actions.
+- `test_summary.py`: `executed 1397, passed 1397, failed 0, result passed`, exit 0. As 5 falhas esperadas não entram em `failed`.
+- `state_manifest.py` sem `--gates-status` grava `ci.gates_status: not_ci` e `run_id: not_ci`. `state_consistency_audit.py`: exit 1, único erro `manifesto: ci.gates_status deve ser 'success'`. Testes 1397 e `bandit_low` 139 batem com os quatro documentos. Não se gravou `success`.
+
+### #150 — bloqueio, sem implementação
+
+O patch de `test_cognitivo_mutation_parallel_contract.py` (`40ad115`) aplica neste HEAD (`git apply --check`, exit 0) e exige `len(MUTATIONS) == 779`. O catálogo atual tem 998. O patch de `tools/cognitivo_mutation.py` não aplica: a âncora `parse_jobs` na linha 1746 não existe; o `main` atual usa `parse_args` com `--shard`. Trocar 779 ou escolher se o preflight vê o catálogo inteiro ou a fatia seria alterar contrato ou semântica que o commit original não tem. Não houve branch da #150.
+
 ## Rodada — rebase da #147 (MCTS P1c) sobre 7c0464c — 2026-11-05
 
 - **Base:** `7c0464c9620d6c2678abd820219a368b7c64c699` (`origin/main`, merge da #161). Branch `grok/mcts-p1c-brain-veto-20261030`. Rebase linear, sem commit de merge. O HEAD antigo da PR era `7f1a86eb3928c995f8fdad977eac1981a877ffb1`.
