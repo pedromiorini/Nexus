@@ -1,9 +1,8 @@
 """RED B1–B5 da ponte CentralRouter, congelado em
 docs/cognitivo/PONTE_CENTRALROUTER_SECAO_B_2026-11-10.md.
 
-Na main o ciclo ainda não é chamado. Este arquivo falha por isso
-(asserção ou KeyError nas chaves que a ponte ainda não devolve).
-A guarda B4a passa. Sem xfail: o doc não escolhe como isolar o RED.
+O commit GREEN (B2) tira os expectedFailure. Um sucesso inesperado
+reprova a suíte. A guarda B4a fica sem o marcador.
 """
 import contextlib
 import hashlib
@@ -64,6 +63,7 @@ def _blocks(test, result, error, calls):
 class B1Wiring(unittest.TestCase):
     """O ciclo é chamado 1x por requisição não cacheada, pelo atributo do módulo."""
 
+    @unittest.expectedFailure
     def test_cycle_called_once_and_type_matches_golden(self):
         for prompt, expected in GOLDEN.items():
             with self.subTest(prompt=prompt):
@@ -90,6 +90,7 @@ class B2ImpasseBlocks(unittest.TestCase):
         "TIE": (lambda state: ("planning",), lambda state: ("ethical",)),
     }
 
+    @unittest.expectedFailure
     def test_each_impasse_kind_blocks(self):
         for kind, proposers in self.cases.items():
             with self.subTest(kind=kind):
@@ -109,6 +110,7 @@ class B2ImpasseBlocks(unittest.TestCase):
 class B3InputErrorBlocks(unittest.TestCase):
     """DecisionInputError vira bloqueio, nunca exceção solta."""
 
+    @unittest.expectedFailure
     def test_bad_input_blocks_with_code(self):
         for bad in ("abc", [1], None):
             with self.subTest(bad=bad):
@@ -119,6 +121,7 @@ class B3InputErrorBlocks(unittest.TestCase):
                 _blocks(self, result, "ROUTER_DECISION_INPUT_INVALID", calls)
                 self.assertIn(result["impasse"]["code"], INPUT_CODES)
 
+    @unittest.expectedFailure
     def test_everything_failing_blocks_on_the_cycle_first(self):
         calls = []
         absent = {module.name: None for module in ModuleType}
@@ -143,6 +146,7 @@ class B4NoSteering(unittest.TestCase):
         self.assertEqual(result["request_type"], "ethical")
         self.assertIn("swarm", calls)
 
+    @unittest.expectedFailure
     def test_unicode_variant_from_a_proposer_is_rejected(self):
         for variant in ("ethical\u200b", "\uff45thical", "ethic al", "query;"):
             with self.subTest(v=variant):
@@ -161,6 +165,7 @@ class B4NoSteering(unittest.TestCase):
 class B5Observability(unittest.TestCase):
     """Ambiguidade no sucesso; impasse com origem; contador por tipo."""
 
+    @unittest.expectedFailure
     def test_success_records_all_proposals(self):
         for prompt, proposed in AMBIGUOUS.items():
             with self.subTest(prompt=prompt):
@@ -168,6 +173,7 @@ class B5Observability(unittest.TestCase):
                 self.assertEqual(result["decision"]["selected"], GOLDEN[prompt])
                 self.assertEqual(result["decision"]["proposed"], proposed + ["query"])
 
+    @unittest.expectedFailure
     def test_impasse_has_origin_and_is_counted(self):
         router = _router([])
         router.request_type_proposers = (_boom(),)
