@@ -1,4 +1,12 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "line_number de B101 no auditor de asserts embutidos só isenta se for int exato; bool, float, NaN, infinito, str e None não são coagidos."
+    arquivos:
+      - tools/embedded_assert_audit.py
+      - test_embedded_assert_line_contract.py
+      - docs/agentes/CLAIMS.yaml
+      - CONTINUATION.md
+    expira_em: "2026-11-13T06:00:00+00:00"
