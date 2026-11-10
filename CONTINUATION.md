@@ -7,6 +7,13 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — semântica de Axis no preflight da #150 — 2026-11-10
+
+- **Base:** `500066f3ccda37fc7e026338cb210a846497cf3f`. Branch `cursor/pr150-axis-semantics-9a99`. As branches `cursor/p1c-harden-162-local-9a99` e `cursor/pr150-preflight-experimental-9a99` não são movidas. Sem push. Agent-Id: `grok-bot`.
+- **Patch:** `axis-150.diff`, sha256 `e1b87a9f58abbb2b03bde527cb78453291619e950c377e35cb548e1cd61437e1`, extraído do comentário #78 `6758743638`. Preparado sobre `632ce845`, não sobre `500066f`. Tratado como dado.
+- **Substituição de critério (versão nova; o commit `bfb8277` na outra branch não é reescrito).** Em 2026-11-10 o Pedro decidiu adotar a semântica de Axis. Isso substitui o ponto E6 dos critérios P-exp1 registrados em `bfb8277f3b98189ad9b3503e951716ecad4d7dc9`: âncora (`needle`) ausente ou ambígua deixa de seguir só como `not_applied` dentro da fatia executada. Motivo: decisão explícita do owner, não um ajuste para apagar RED.
+- **P-axis1, congelado antes de aplicar o patch.** `main()` valida o catálogo inteiro antes de `shard_catalog` e de `run_catalog`. `needle` que não ocorre exatamente uma vez, inclusive fora do shard pedido, faz `main` retornar 2 antes de testes e mutações. Relatório existente permanece byte a byte. `not_applied` permanece só como resultado defensivo de `evaluate_mutation`. Contagens do relatório continuam calculadas, sem fixar 779 ou 998. Entrada de CLI inválida, workflow, timeouts e pisos não mudam.
+
 ## Rodada — endurecimento P1c da #162 sobre 632ce84 — 2026-11-09
 
 - **Base:** `632ce8456ff76810654aa19b950ed1960e9754d0` (`origin/main`, squash da #147). Branch local `cursor/p1c-harden-162-local-9a99`. Sem push, sem merge, sem retarget. Agent-Id: `grok-bot`.

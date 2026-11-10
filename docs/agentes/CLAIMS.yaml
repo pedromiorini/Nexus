@@ -3,13 +3,11 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "Endurecimento P1c da #162 sobre main 632ce84: rejeitar futuro malformado e comparar sequência única; sem S2a, sem errata :180, sem reverter E-P1c-VK"
+    tarefa: "Semântica de Axis para o preflight da #150 sobre 500066f: agulha ausente ou ambígua falha o catálogo inteiro. Decisão do Pedro em 2026-11-10. Não é publicação."
     arquivos:
-      - core/cognitivo/mcts_planner.py
-      - core/constitutional_brain.py
-      - test_mcts_p1c_contract.py
-      - AUDIT_REALITY_REPORT.md
-      - audit_reality.json
+      - tools/cognitivo_mutation.py
+      - test_cognitivo_mutation_parallel_contract.py
+      - test_ci_gate_shard_contract.py
       - docs/agentes/CLAIMS.yaml
       - CONTINUATION.md
-    expira_em: "2026-11-12T18:00:00+00:00"
+    expira_em: "2026-11-13T04:00:00+00:00"
