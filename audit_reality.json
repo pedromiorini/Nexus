@@ -117,11 +117,17 @@
         "lines": 438,
         "classes": 6,
         "functions": 25
+      },
+      {
+        "path": "core/system_health_diagnostics.py",
+        "lines": 310,
+        "classes": 4,
+        "functions": 13
       }
     ],
-    "core_lines": 23143,
-    "classes": 214,
-    "functions": 693,
+    "core_lines": 22858,
+    "classes": 210,
+    "functions": 680,
     "pass_only_functions": [],
     "constant_return_functions": [
       {
@@ -172,7 +178,6 @@
       "RealSensorimotorIntegrationLayer.get_statistics",
       "RealSkillCompositionEngine.get_statistics",
       "RealSocialLearningSystem.get_statistics",
-      "RealSystemHealthDiagnosticsEngine.get_statistics",
       "RealTheoryOfMind.get_statistics",
       "RealTransferLearningEngine.get_statistics",
       "RealUncertaintyQuantificationEngine.get_statistics"
