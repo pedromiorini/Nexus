@@ -16,7 +16,9 @@ import yaml
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from test_cognitivo_mutation_parallel_contract import Project, norm, synthetic_catalog  # noqa: E402
+from test_cognitivo_mutation_parallel_contract import (  # noqa: E402
+    Project, norm, synthetic_catalog, valid_synthetic_catalog,
+)
 from tools import cognitivo_mutation as cm  # noqa: E402
 
 WORKFLOW = ROOT / ".github/workflows/nexus-contract-gate.yml"
@@ -119,13 +121,13 @@ class ShardedRunsAreEquivalent(unittest.TestCase):
     def run_main(self, argv):
         with Project() as p:
             report = p.root / "report.json"
-            code = run_cli_main(argv, synthetic_catalog(), p.root, report)
+            code = run_cli_main(argv, valid_synthetic_catalog(), p.root, report)
             data = json.loads(report.read_text(encoding="utf-8"))
         return code, data
 
     def test_union_of_four_shards_equals_unsharded_run(self):
         code, whole = self.run_main(["--jobs", "2"])
-        order = {m.name: i for i, m in enumerate(synthetic_catalog())}
+        order = {m.name: i for i, m in enumerate(valid_synthetic_catalog())}
         merged, codes = [], []
         for k in (1, 2, 3, 4):
             c, data = self.run_main(["--jobs", "2", "--shard", f"{k}/4"])
@@ -134,7 +136,7 @@ class ShardedRunsAreEquivalent(unittest.TestCase):
         merged.sort(key=lambda r: order[r["name"]])
         self.assertEqual(norm(merged), norm(whole["mutations"]))
         self.assertEqual(code, 1)
-        self.assertEqual(codes, [0, 1, 1, 1])  # só a fatia 1 (kills-f, syntax-error) é limpa
+        self.assertEqual(codes, [0, 1, 0, 0])  # só a fatia 2 contém um mutante sobrevivente
 
     def test_one_of_one_matches_unsharded(self):
         code, whole = self.run_main(["--jobs", "2"])
@@ -144,10 +146,12 @@ class ShardedRunsAreEquivalent(unittest.TestCase):
         self.assertEqual(one["summary"], whole["summary"])
 
     def test_sharded_report_carries_completeness_fields(self):
+        catalog = valid_synthetic_catalog()
+        expected = cm.shard_catalog(catalog, 2, 3)
         _, data = self.run_main(["--jobs", "2", "--shard", "2/3"])
         self.assertEqual(list(data), ["tool", "mutations", "summary", "shard"])
-        self.assertEqual(data["shard"], {"index": 2, "count": 3, "catalog_total": 6})
-        self.assertEqual(data["summary"]["declared"], 2)
+        self.assertEqual(data["shard"], {"index": 2, "count": 3, "catalog_total": len(catalog)})
+        self.assertEqual(data["summary"]["declared"], len(expected))
 
     def test_unsharded_report_shape_is_unchanged(self):
         _, data = self.run_main(["--jobs", "2"])

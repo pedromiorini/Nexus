@@ -53,6 +53,10 @@ def synthetic_catalog():
     ]
 
 
+def valid_synthetic_catalog():
+    return [m for m in synthetic_catalog() if m.name not in {"absent", "ambiguous"}]
+
+
 class Project:
     def __enter__(self):
         self._tmp = tempfile.TemporaryDirectory(prefix="cm-par-")
@@ -120,18 +124,18 @@ class EquivalenceAcrossJobs(unittest.TestCase):
         for jobs in (1, 3, 8):
             with Project() as p:
                 report = p.root / "report.json"
-                code = cm.main(["--jobs", str(jobs)], mutations=synthetic_catalog(), root=p.root, report=report)
+                code = cm.main(["--jobs", str(jobs)], mutations=valid_synthetic_catalog(), root=p.root, report=report)
                 data = json.loads(report.read_text(encoding="utf-8"))
                 runs[jobs] = (code, norm(data["mutations"]), data["summary"], list(data))
         base = runs[1]
-        names = [m.name for m in synthetic_catalog()]
+        names = [m.name for m in valid_synthetic_catalog()]
         self.assertEqual([r["name"] for r in base[1]], names)
         self.assertEqual(
             {r["name"]: r["status"] for r in base[1]},
-            {"kills-f": "killed", "survives-g": "survived", "absent": "not_applied",
-             "ambiguous": "not_applied", "syntax-error": "killed", "kills-f-again": "killed"},
+            {"kills-f": "killed", "survives-g": "survived", "syntax-error": "killed",
+             "kills-f-again": "killed"},
         )
-        self.assertEqual(base[2], {"declared": 6, "killed": 3, "survived": 1, "not_applied": 2})
+        self.assertEqual(base[2], {"declared": 4, "killed": 3, "survived": 1, "not_applied": 0})
         self.assertEqual(base[0], 1)
         for jobs in (3, 8):
             self.assertEqual(runs[jobs], base, jobs)
@@ -139,24 +143,72 @@ class EquivalenceAcrossJobs(unittest.TestCase):
     def test_report_shape_is_unchanged(self):
         with Project() as p:
             report = p.root / "report.json"
-            cm.main(["--jobs", "2"], mutations=synthetic_catalog(), root=p.root, report=report)
+            cm.main(["--jobs", "2"], mutations=valid_synthetic_catalog(), root=p.root, report=report)
             data = json.loads(report.read_text(encoding="utf-8"))
         self.assertEqual(list(data), ["tool", "mutations", "summary"])
         self.assertEqual(data["tool"], "nexus-cognitivo-mutation")
-        killed = data["mutations"][0]
-        self.assertEqual(
-            set(killed), {"name", "target", "tests", "status", "exit_code", "duration_seconds", "output_tail"}
-        )
-        self.assertEqual(set(data["mutations"][2]), {"name", "target", "status", "matches"})
+        for result in data["mutations"]:
+            self.assertEqual(
+                set(result), {"name", "target", "tests", "status", "exit_code", "duration_seconds", "output_tail"}
+            )
+
+    def test_not_applied_results_remain_available_from_mutation_executor(self):
+        for name, matches in (("absent", 0), ("ambiguous", 2)):
+            with self.subTest(name=name), Project() as p:
+                mutation = next(m for m in synthetic_catalog() if m.name == name)
+                result = cm.evaluate_mutation(p.root, mutation)
+                self.assertEqual((result["status"], result["matches"]), ("not_applied", matches))
 
     def test_repeated_parallel_runs_are_deterministic(self):
         seen = []
         for _ in range(2):
             with Project() as p:
                 report = p.root / "report.json"
-                cm.main(["--jobs", "4"], mutations=synthetic_catalog(), root=p.root, report=report)
+                cm.main(["--jobs", "4"], mutations=valid_synthetic_catalog(), root=p.root, report=report)
                 seen.append(norm(json.loads(report.read_text(encoding="utf-8"))["mutations"]))
         self.assertEqual(seen[0], seen[1])
+
+
+class CatalogPreflightContract(unittest.TestCase):
+    def test_invalid_entry_in_any_shard_aborts_before_execution_and_preserves_report(self):
+        good = next(m for m in valid_synthetic_catalog() if m.name == "kills-f")
+        invalid = [m for m in synthetic_catalog() if m.name in {"absent", "ambiguous"}]
+        for bad in invalid:
+            for shard in (None, "1/2", "2/2"):
+                with self.subTest(name=bad.name, shard=shard), Project() as p:
+                    report = p.root / "report.json"
+                    report.write_bytes(b"existing report must remain byte-for-byte")
+                    argv = [] if shard is None else ["--shard", shard]
+                    with mock.patch.object(cm, "run_catalog", return_value=[]) as run, mock.patch("sys.stderr"):
+                        code = cm.main(argv, mutations=[good, bad], root=p.root, report=report)
+                    self.assertEqual(code, 2)
+                    run.assert_not_called()
+                    self.assertEqual(report.read_bytes(), b"existing report must remain byte-for-byte")
+
+    def test_valid_shard_runs_only_its_slice_and_reports_dynamic_catalog_sizes(self):
+        catalog = valid_synthetic_catalog()
+        requested = (2, 2)
+        expected = cm.shard_catalog(catalog, *requested)
+        with Project() as p:
+            report = p.root / "report.json"
+
+            def fake_run(selected, root, jobs):
+                self.assertEqual(root, p.root)
+                return [
+                    {"name": m.name, "target": m.target, "status": "killed"}
+                    for m in selected
+                ]
+
+            with mock.patch.object(cm, "run_catalog", side_effect=fake_run) as run:
+                code = cm.main(["--shard=2/2"], mutations=catalog, root=p.root, report=report)
+            data = json.loads(report.read_text(encoding="utf-8"))
+
+        self.assertEqual(code, 0)
+        self.assertEqual([m.name for m in run.call_args.args[0]], [m.name for m in expected])
+        self.assertEqual([m.name for m in expected], [r["name"] for r in data["mutations"]])
+        self.assertEqual(data["summary"]["declared"], len(expected))
+        self.assertEqual(data["shard"], {"index": requested[0], "count": requested[1], "catalog_total": len(catalog)})
+        self.assertEqual(data["summary"]["killed"], len(expected))
 
 
 class GateIsNotWeakened(unittest.TestCase):
@@ -185,16 +237,8 @@ class GateIsNotWeakened(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(data["summary"]["survived"], 1)
 
-    def test_not_applied_exits_1_for_zero_and_multiple_matches(self):
-        for name, matches in (("absent", 0), ("ambiguous", 2)):
-            with self.subTest(name=name):
-                cat = [m for m in synthetic_catalog() if m.name in ("kills-f", name)]
-                code, _, data = self.run_main(cat)
-                self.assertEqual(code, 1)
-                self.assertEqual(data["mutations"][1]["matches"], matches)
-
     def test_broken_baseline_aborts_before_report(self):
-        code, err, data = self.run_main(synthetic_catalog(), broken_baseline=True)
+        code, err, data = self.run_main(valid_synthetic_catalog(), broken_baseline=True)
         self.assertIsNone(code)
         self.assertIn("Baseline failed before mutation", str(err))
         self.assertIsNone(data)
@@ -211,6 +255,7 @@ class GateIsNotWeakened(unittest.TestCase):
     def test_catalog_and_timeout_are_untouched(self):
         from tools import targeted_mutation as tm
 
+        self.assertEqual(cm.preflight_catalog(cm.MUTATIONS, ROOT), ())
         self.assertGreaterEqual(len(cm.MUTATIONS), 483)  # o catálogo nunca encolhe (M7 compara o diff)
         self.assertEqual(tm.TIMEOUT_SECONDS, 180)
         workflow = (ROOT / ".github/workflows/nexus-contract-gate.yml").read_text(encoding="utf-8")

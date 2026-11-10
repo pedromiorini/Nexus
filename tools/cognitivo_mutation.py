@@ -2404,6 +2404,78 @@ def shard_catalog(mutations: list[Mutation], index: int, count: int) -> list[Mut
     return [m for i, m in enumerate(mutations) if i % count == index - 1]
 
 
+def preflight_catalog(mutations: list[Mutation], root: Path) -> tuple[str, ...]:
+    """Valida o catálogo inteiro sem executar testes ou alterar arquivos."""
+    errors = []
+    if not isinstance(mutations, list):
+        return ("o catálogo deve ser uma lista",)
+    if not mutations:
+        return ("o catálogo não pode ser vazio",)
+    try:
+        root_path = Path(root).resolve(strict=True)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        return (f"raiz inválida: {exc}",)
+    if not root_path.is_dir():
+        return ("a raiz do catálogo não é um diretório",)
+
+    def catalog_file(value, field: str, label: str) -> Path | None:
+        if not isinstance(value, str) or not value:
+            errors.append(f"{label}: {field} deve ser um caminho relativo não vazio")
+            return None
+        relative = Path(value)
+        if relative.is_absolute() or ".." in relative.parts:
+            errors.append(f"{label}: {field} deve permanecer dentro da raiz")
+            return None
+        try:
+            resolved = (root_path / relative).resolve(strict=True)
+            resolved.relative_to(root_path)
+        except (OSError, RuntimeError, ValueError):
+            errors.append(f"{label}: arquivo {field} ausente ou fora da raiz: {value!r}")
+            return None
+        if not resolved.is_file():
+            errors.append(f"{label}: {field} não é um arquivo: {value!r}")
+            return None
+        return resolved
+
+    seen_names = set()
+    target_text = {}
+    for index, mutation in enumerate(mutations):
+        if not isinstance(mutation, Mutation):
+            errors.append(f"entrada {index}: esperada uma instância de Mutation")
+            continue
+        name = mutation.name
+        label = f"entrada {index} ({name!r})"
+        if not isinstance(name, str) or not name.strip():
+            errors.append(f"entrada {index}: name deve ser uma string não vazia")
+        elif name in seen_names:
+            errors.append(f"{label}: name duplicado")
+        else:
+            seen_names.add(name)
+
+        target = catalog_file(mutation.target, "target", label)
+        if not isinstance(mutation.needle, str) or not mutation.needle:
+            errors.append(f"{label}: needle deve ser uma string não vazia")
+        if not isinstance(mutation.replacement, str):
+            errors.append(f"{label}: replacement deve ser uma string")
+        elif target is not None and isinstance(mutation.needle, str) and mutation.needle:
+            try:
+                if target not in target_text:
+                    target_text[target] = target.read_text(encoding="utf-8")
+                matches = target_text[target].count(mutation.needle)
+            except (OSError, UnicodeError) as exc:
+                errors.append(f"{label}: não foi possível ler target: {exc}")
+            else:
+                if matches != 1:
+                    errors.append(f"{label}: needle deve ocorrer exatamente uma vez (encontrado: {matches})")
+
+        if not isinstance(mutation.tests, tuple) or not mutation.tests:
+            errors.append(f"{label}: tests deve ser uma tupla não vazia")
+            continue
+        for test in mutation.tests:
+            catalog_file(test, "tests", label)
+    return tuple(errors)
+
+
 def evaluate_mutation(workdir: Path, m: Mutation) -> dict:
     """Aplica o mutante na cópia `workdir`, roda seus testes e restaura o arquivo."""
     target = workdir / m.target
@@ -2468,6 +2540,12 @@ def main(argv: list[str] | None = None, *, mutations: list[Mutation] | None = No
     except SystemExit as exc:
         return int(exc.code)
     full = MUTATIONS if mutations is None else mutations
+    errors = preflight_catalog(full, root)
+    if errors:
+        print("catálogo de mutações inválido; execução abortada:", file=sys.stderr)
+        for error in errors:
+            print(f"  {error}", file=sys.stderr)
+        return 2
     catalog = full if shard is None else shard_catalog(full, *shard)
     results = run_catalog(catalog, root, jobs)
     killed = sum(r["status"] == "killed" for r in results)
