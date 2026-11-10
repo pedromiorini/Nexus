@@ -3,7 +3,9 @@
 O auditor não declara os asserts seguros nem os suprime. Ele apenas evita que
 novos asserts de demonstração apareçam fora do bloco ``if __name__ == '__main__'``
 no corpo direto do módulo e fornece um inventário reproduzível para a migração
-incremental. Guardas aninhadas não criam faixas de exceção.
+incremental. Guardas aninhadas não criam faixas de exceção. O número
+de linha citado só entra numa faixa se for ``int`` exato: ``bool``, float,
+``str`` e ``None`` não são convertidos.
 """
 from __future__ import annotations
 
@@ -45,6 +47,13 @@ def _assert_lines_outside_main(source: str, ranges: list[tuple[int, int]]) -> li
     ]
 
 
+def _cited_line_is_inside(line_number: object, ranges: list[tuple[int, int]]) -> bool:
+    """Faixa isenta só para int exato. bool não conta; nada é convertido."""
+    if type(line_number) is not int:
+        return False
+    return any(start <= line_number <= end for start, end in ranges)
+
+
 def audit(payload: dict[str, Any], source: str, filename: str) -> dict[str, Any]:
     ranges = _main_block_ranges(source)
     assert_lines_outside_main = _assert_lines_outside_main(source, ranges)
@@ -53,7 +62,7 @@ def audit(payload: dict[str, Any], source: str, filename: str) -> dict[str, Any]
         item
         for item in findings
         if item.get("filename") == filename
-        and not any(start <= int(item.get("line_number", 0)) <= end for start, end in ranges)
+        and not _cited_line_is_inside(item.get("line_number", 0), ranges)
     ]
     return {
         "filename": filename,
