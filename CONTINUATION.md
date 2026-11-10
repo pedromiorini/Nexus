@@ -7,6 +7,37 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — line_number B101 sem coerção — 2026-11-10
+
+- **Base:** `621ddb760c0c56962935a381db9152beb3bc6f13` (`origin/main`). Branch `cursor/embedded-assert-line-type-3ebd`. Agent-Id: `grok-bot`. Claim em `docs/agentes/CLAIMS.yaml`, `expira_em: 2026-11-13T06:00:00+00:00`.
+- **Bloco `NEXUS-CURRENT-STATE`:** reexecutado e deixado como está. Continua `tests: CURRENT_TESTS` e `bandit_low: 139`. `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md` não foram editados.
+- **Fora:** `core/constitutional_brain.py`, `core/cognitivo/`, `tools/cognitivo_mutation.py`, `tools/targeted_mutation.py`, `audit_reality.json`, arquivos da #79 e da fila #38–#50/#60. O mutante novo desta função não entrou no catálogo porque `tools/targeted_mutation.py` está em PRs abertos.
+
+### Fenômeno e hipóteses
+
+Em `tools/embedded_assert_audit.py`, a faixa do bloco `__main__` era comparada com `int(line_number)`. Observado na base, antes do patch, com o contrato novo e produção intacta (`39c6dcd`):
+
+- **H1.** `True` já ficava fora da faixa. Falsificada: o bloco nas linhas 1–2 aceita o achado e `ok` fica verdadeiro (`int(True) == 1`).
+- **H2.** Float e str numérica já eram recusados. Falsificada: `1.0`, `1.5`, `2.9`, `"1"`, `"2"` e `" 2"` entram na faixa. `False`, `-1.0` e `"1_0"` já saíam fora, porque a conversão não caía em 1–2; continuam fora.
+- **H3.** Valor não conversível já falhava fechado. Falsificada: `NaN` levanta `ValueError`, `±inf` levanta `OverflowError`, `None`, `""`, lista, dict e tupla levantam `TypeError`.
+- **H4.** `int` exato dentro da faixa já era isento. Sobreviveu na base e depois do patch: a linha 2 continua aceita; `0`, `-1`, `3` e `10**6` continuam fora.
+
+RED: `python -m unittest -v test_embedded_assert_line_contract.py` → 7 testes, 9 falhas, 10 erros, exit 1, 0,018 s. Quatro controles (int dentro, int fora, linha ausente, outro arquivo / não-B101) passaram. GREEN no commit `48cbf740f83dc6b81a7ab1409eb4e5e7850e55cf`: os mesmos 7 testes mais `test_embedded_assert_audit.py`, 18 testes, OK, exit 0, 0,050 s. A correção é `type(line_number) is int` antes da comparação. O valor citado permanece no relatório; não há campo novo.
+
+### Gates neste ambiente
+
+Python 3.11.18 (uv, não é a imagem do Actions), venv `/tmp/nexus-ci311`, `uv pip install --require-hashes -r requirements-ci.lock`. Ruff 0.17.1, Bandit 1.9.4, Coverage 7.16.2, Hypothesis 6.170.5. `LC_ALL=C`. `PYTHONPATH=.`. `NEXUS_AUDIT_DB` fora do repo.
+
+- Ruff e `compileall` dos caminhos do workflow: exit 0.
+- Linha de base em `621ddb76`, antes do patch: `unittest discover` 1403 testes, OK, 5 falhas esperadas, 68,443 s, exit 0.
+- Depois, `coverage run --branch -m unittest discover -p 'test_*.py'`: 1410 testes, OK, 5 falhas esperadas, 204,264 s, exit 0. Demo `coverage run --append --branch core/constitutional_brain.py`: exit 0. `integrated-summary.json` em `/tmp`: `result=passed`, 31 esperados, 30 aprovados, skip `0`, missing/unexpected/conflicting/duplicates vazios. O banner do demo não é evidência de capacidade. Pisos: total 81% (piso 0), fila 95%, VRAM 94%, temporal 94%, Vita 76%, núcleo 69%, `core/cognitivo/*` 98%. Todos os `--fail-under` saíram 0. `tools/embedded_assert_audit.py` ficou em 79% de ramo; não há piso para esse arquivo.
+- Bandit na base: `bandit -r core vita tools -f json -o /tmp/base.json` → 139 LOW, 0 MEDIUM, 0 HIGH; as 139 linhas citadas são `int`. No branch: `bandit -r core vita tools -b /tmp/base.json -f json -o /tmp/branch.json` → 0 achados novos, exit 0; totais continuam 139 LOW, 0 MEDIUM, 0 HIGH. `security_triage.py /tmp/base.json SECURITY_TRIAGE.md --check`: exit 0.
+- `tools/embedded_assert_audit.py /tmp/base.json core/constitutional_brain.py`: exit 0, `ok` verdadeiro, 111 B101, nenhum fora do bloco main.
+- `tools/targeted_mutation.py`: `declared 80, applicable 80, killed 80, survived 0, not_applied 0`, exit 0. O arquivo não foi editado. O mutante `embedded_assert_only_module_level_guards` continua aplicável.
+- `reality_audit.py` exit 0 e `git diff --exit-code` dos relatórios exit 0.
+- `validar_registro.py --expirados erro` exit 0. `predeleg.sh HEAD 621ddb76`: `OK: sem conflito`, exit 0. Replay `run_replay.sh`: 17 casos, exit 0.
+- **Lição não copiada para `docs/agentes/LICOES_APRENDIDAS.md`.** O arquivo já é editado pelas PRs #46 e #77, e a fila #38–#50 fica intocada até o Pedro revisar a #46. Uma entrada `pendente` ou `ativa` também faria `test_current_lessons_are_not_reported_as_measured` deixar de ver `nao_checavel`. Texto proposto, status que caberia no arquivo hoje: `registrada`, sem bloco de reincidência, no mesmo desvio de L-010/L-011. Fato: o auditor aceitava `True` como linha 1 e derrubava a chamada em `NaN`. Evidência: base `621ddb76`, RED `39c6dcd`, GREEN `48cbf74`.
+- **Não verificado:** CI hospedado, actionlint, zizmor, Python 3.12, a suíte com `LC_ALL` diferente de `C`, item de `results` que não seja dict. `state_consistency_audit.py` não foi rodado com manifesto `gates_status: success`; não se fabricou esse status.
 ## Critérios — reconciliação local da #153 (Temporal Reasoning) — 2026-11-10
 
 Escritos antes de resolver qualquer conflito. Base: `621ddb760c0c56962935a381db9152beb3bc6f13`. Branch local `cursor/tr-reconcile-153-9a99`. Sem push. Se um critério falhar, parar e reportar opções, sem ajustar o critério. Não editar `tools/targeted_mutation.py` nem arquivos de Axis.
