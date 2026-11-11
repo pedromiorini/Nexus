@@ -1,13 +1,13 @@
-"""C1–C3: o CentralRouter ainda não chama o ciclo de decisão.
+"""C1–C3 da ponte. O C1 passou a exigir uma chamada pelo atributo do módulo:
+a seção B liga o ciclo. O resultado de route("ping", {}) continua um dict com success.
 
-Critérios congelados em
-docs/cognitivo/PONTE_CENTRALROUTER_CARACTERIZACAO_2026-11-10.md.
-C4 e C5 são os testes já existentes e os gates, não este arquivo.
+Critérios em docs/cognitivo/PONTE_CENTRALROUTER_CARACTERIZACAO_2026-11-10.md.
 """
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from core.cognitivo import decision_cycle
 from core.constitutional_brain import (
     CentralRouter,
     CompleteNexusBrain,
@@ -40,13 +40,6 @@ ZERO_STATISTICS = {
 }
 
 
-def _record(calls):
-    def record(*args, **kwargs):
-        calls.append((args, kwargs))
-
-    return record
-
-
 class RouterDoesNotCallTheDecisionCycle(unittest.TestCase):
     def test_route_ping_with_empty_modules_does_not_call_the_cycle(self):
         calls = []
@@ -54,13 +47,17 @@ class RouterDoesNotCallTheDecisionCycle(unittest.TestCase):
         jailbreak = SimpleNamespace(detect=lambda prompt: SimpleNamespace(detected=False))
         guard = EthicsGuard(log, jailbreak)
         router = CentralRouter({}, guard)
-        with patch("core.cognitivo.decision_cycle.run_decision_cycle", _record(calls)), patch(
-            "core.cognitivo.decision_cycle.select_operator", _record(calls)
-        ):
+        real = decision_cycle.run_decision_cycle
+
+        def spy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return real(*args, **kwargs)
+
+        with patch("core.cognitivo.decision_cycle.run_decision_cycle", spy):
             result = router.route("ping", {})
         self.assertIsInstance(result, dict)
         self.assertIn("success", result)
-        self.assertEqual(calls, [])
+        self.assertEqual(len(calls), 1)
 
 
 class TemporalReasoningStaysUntrackedAfterConstruction(unittest.TestCase):

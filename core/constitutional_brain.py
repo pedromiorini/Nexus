@@ -9584,6 +9584,7 @@ class CentralRouter:
                 "last_reason": "",
             }
         }
+        self._impasses_by_kind: Dict[str, int] = defaultdict(int)
 
         # ─── Regras de Roteamento (otimizáveis via RSI) ───────────────────
         self.routing_rules = self._init_routing_rules()
@@ -9766,6 +9767,105 @@ class CentralRouter:
             cache_key=cache_key
         )
 
+    _TYPE_ORDER = ("planning", "ethical", "recall", "analysis", "creative", "query")
+    _TYPE_KEYWORDS = (
+        ("planning", ("plan", "strategy", "should i", "what if", "predict", "outcome")),
+        ("ethical", ("ethical", "moral", "should", "right", "wrong", "harm", "fair")),
+        ("recall", ("remember", "recall", "what did", "history", "previous", "last time")),
+        ("analysis", ("analyze", "why", "cause", "reason", "explain", "how come")),
+        ("creative", ("create", "imagine", "generate", "write", "compose", "design")),
+    )
+
+    def _default_type_proposers(self):
+        """Um proposer por lista de analyze_request, mais query. Só lê o prompt."""
+        proposers = []
+        for name, words in self._TYPE_KEYWORDS:
+            def propose(state, name=name, words=words):
+                text = state.lower() if isinstance(state, str) else ""
+                if any(word in text for word in words):
+                    return (name,)
+                return ()
+            proposers.append(propose)
+
+        def propose_query(state):
+            return ("query",)
+
+        proposers.append(propose_query)
+        return tuple(proposers)
+
+    def _prompt_origin(self, prompt: str) -> str:
+        return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
+
+    def _decision_block(self, prompt: str, start_time: float, error: str, reason: str, impasse: Dict[str, str]):
+        """Bloqueio do ciclo antes de qualquer estágio. Não entra no cache."""
+        plan = ExecutionPlan(RequestType.QUERY, [], [], 0)
+        response = self._finish_blocked(
+            prompt,
+            RequestType.QUERY,
+            {"error": error, "module": "decision_cycle", "reason": reason},
+            plan,
+            [],
+            start_time,
+        )
+        response["impasse"] = impasse
+        return response
+
+    def _decide_request_type(self, prompt: str, start_time: float):
+        """1a/2a/3a: o ciclo escolhe o RequestType. Entrada é só o prompt."""
+        import core.cognitivo.decision_cycle as decision_cycle
+        from core.cognitivo.counterfactual import _normalize_action_key
+
+        if "request_type_proposers" in self.__dict__:
+            proposers = self.request_type_proposers
+        else:
+            proposers = self._default_type_proposers()
+        recorded: List[str] = []
+
+        def watch(proposer):
+            def inner(state, proposer=proposer):
+                produced = proposer(state)
+                if isinstance(produced, (list, tuple)):
+                    recorded.extend(item for item in produced if isinstance(item, str))
+                return produced
+            return inner
+
+        if isinstance(proposers, (list, tuple)) and all(callable(item) for item in proposers):
+            called = tuple(watch(item) for item in proposers)
+        else:
+            called = proposers
+        order = getattr(self, "request_type_precedence", None)
+        if order is None:
+            order = self._TYPE_ORDER
+        better = tuple((left, right) for index, left in enumerate(order) for right in order[index + 1:])
+        allowed = tuple(item.value for item in RequestType)
+        try:
+            decision = decision_cycle.run_decision_cycle(
+                prompt, called, apply=None, better=better, allowed=allowed,
+            )
+        except decision_cycle.DecisionInputError as exc:
+            return self._decision_block(
+                prompt, start_time, "ROUTER_DECISION_INPUT_INVALID",
+                "entrada do ciclo de decisão inválida",
+                {"code": exc.code, "origin": self._prompt_origin(prompt)},
+            )
+        if decision.impasse is not None:
+            kind = decision.impasse.kind
+            self._impasses_by_kind[kind] += 1
+            return self._decision_block(
+                prompt, start_time, "ROUTER_IMPASSE", kind,
+                {
+                    "kind": kind,
+                    "code": decision.impasse.code,
+                    "origin": self._prompt_origin(prompt),
+                },
+            )
+        table = {
+            _normalize_action_key(item.value): item
+            for item in RequestType
+        }
+        request_type = table[_normalize_action_key(decision.selected)]
+        return request_type, {"selected": decision.selected, "proposed": recorded}
+
     def route(self, prompt: str, context: Optional[Dict] = None) -> Dict:
         """Route an external request without exposing internal reprocessing controls."""
         return self._route(prompt, context)
@@ -9834,7 +9934,10 @@ class CentralRouter:
             }
 
         # ─── 1. ANÁLISE ────────────────────────────────────────────────────
-        request_type = self.analyze_request(prompt, context)
+        decided = self._decide_request_type(prompt, start_time)
+        if isinstance(decided, dict):
+            return decided
+        request_type, decision_record = decided
         self.stats["requests_by_type"][request_type] += 1
         
         _dbg(f"🔍 DEBUG v3.70: request_type = {request_type}")
@@ -9945,6 +10048,7 @@ class CentralRouter:
         final_result["vram_mitigation"] = mitigation_result.__dict__
         final_result["deferred_queue"] = self.deferred_queue.statistics()
         final_result["request_type"] = request_type.value
+        final_result["decision"] = decision_record
         final_result["cached"] = False
         
         _dbg("🔍 DEBUG v3.70: Final result prepared")
@@ -10000,6 +10104,10 @@ class CentralRouter:
         start_time: float,
     ) -> Dict[str, Any]:
         """Resposta de bloqueio + um evento ROUTER_BLOCKED no log + estatística de requisição bloqueada."""
+        module = blocked.get("module")
+        if isinstance(module, str):
+            blocked = dict(blocked)
+            blocked["module"] = type("_RouterDecisionLabel", (), {"value": module})()
         response = self._blocked_response(prompt, request_type, blocked)
         log_module = self.modules.get(ModuleType.LOG)
         if log_module is not None:
@@ -10447,7 +10555,8 @@ class CentralRouter:
             },
             "deferred_queue": self.deferred_queue.statistics(),
             "recovery_diagnostics": self.get_recovery_diagnostics(),
-            "avg_modules_per_request": self.stats["avg_modules_per_request"]
+            "avg_modules_per_request": self.stats["avg_modules_per_request"],
+            "impasses_by_kind": dict(getattr(self, "_impasses_by_kind", {})),
         }
 
 
