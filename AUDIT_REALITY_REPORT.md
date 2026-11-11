@@ -4,13 +4,13 @@
 
 ## Evidência estrutural
 
-O núcleo analisado possui **22858 linhas**, **210 classes** e **680 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **1** funções com retorno constante simples e **31** marcadores de testes embutidos.
+O núcleo analisado possui **22967 linhas**, **210 classes** e **688 funções**. Foram encontrados **0** métodos compostos apenas por `pass`, **2** funções com retorno constante simples e **31** marcadores de testes embutidos.
 
 | Área | Resultado | Interpretação |
 |---|---:|---|
 | Testes embutidos marcados | 31 | Evidência de demos internas, não de capacidade geral |
 | Funções somente com `pass` | 0 | Lacunas explícitas que exigem revisão |
-| Funções com retorno constante (estrito: só literais) | 1 | Possíveis heurísticas, stubs ou simplificações |
+| Funções com retorno constante (estrito: só literais) | 2 | Possíveis heurísticas, stubs ou simplificações |
 | Funções que retornam dict/list/tuple literal com valores dinâmicos | 45 | Em geral getters e estatísticas; não são stubs por si só |
 | Padrões proibidos de alegação no código (gate: zero) | 0 | Cobre só as frases listadas em CODE_OVERCLAIMS; não significa ausência de linguagem de capacidade |
 | Frases fortes de capacidade no código (inventário; só pode diminuir) | 51 | Ênfase "REAL <Capacidade>", "REAL e FUNCIONAL", "100% funcional"; limite em test_reality_audit.py |

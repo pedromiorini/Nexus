@@ -125,11 +125,15 @@
         "functions": 13
       }
     ],
-    "core_lines": 22858,
+    "core_lines": 22967,
     "classes": 210,
-    "functions": 680,
+    "functions": 688,
     "pass_only_functions": [],
     "constant_return_functions": [
+      {
+        "qualname": "CentralRouter._default_type_proposers.<locals>.propose_query",
+        "value": "('query',)"
+      },
       {
         "qualname": "test_task",
         "value": "True"
