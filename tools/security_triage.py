@@ -6,7 +6,9 @@ mudança de severidade ou supressão.
 
 Os achados são agrupados por escopo (``Classe.método`` ou bloco ``__main__``) em vez de
 número de linha: números de linha mudam a cada edição do núcleo e deixavam o documento
-desatualizado. Ao regenerar um arquivo existente, o bloco ``NEXUS-CURRENT-STATE`` dele é
+desatualizado. O número citado só nomeia um escopo se for ``int`` exato; ``bool``,
+float, ``str`` e ``None`` não são convertidos e o achado fica ``<unresolved>``.
+Ao regenerar um arquivo existente, o bloco ``NEXUS-CURRENT-STATE`` dele é
 preservado (ele é validado por ``tools/state_consistency_audit.py``).
 """
 from __future__ import annotations
@@ -78,15 +80,18 @@ def _scope_spans(path: str) -> tuple[tuple[int, int, str], ...]:
 
 
 def resolve_scope(filename: str, line: Any, root: Path | None = None) -> str:
-    """Nome estável do escopo que contém a linha (o mais interno), ou ``<module>``."""
+    """Nome estável do escopo que contém a linha (o mais interno), ou ``<module>``.
+
+    Só ``int`` exato entra numa faixa. ``bool``, float, ``str``, ``None`` e
+    subclasse de ``int`` não são convertidos: devolvem ``<unresolved>`` e não
+    levantam. Arquivo ausente ou ilegível também devolve ``<unresolved>``.
+    """
     spans = _scope_spans(str((root or ROOT) / filename))
     if not spans:
         return "<unresolved>"
-    try:
-        number = int(line)
-    except (TypeError, ValueError):
+    if type(line) is not int:
         return "<unresolved>"
-    containing = [span for span in spans if span[0] <= number <= span[1]]
+    containing = [span for span in spans if span[0] <= line <= span[1]]
     return min(containing, key=lambda span: span[1] - span[0])[2] if containing else "<module>"
 
 
