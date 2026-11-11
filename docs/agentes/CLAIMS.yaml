@@ -1,4 +1,12 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "Linha da triagem Bandit só nomeia escopo se for int exato. Base 5776787. Sem merge."
+    arquivos:
+      - tools/security_triage.py
+      - test_security_triage_line_contract.py
+      - docs/agentes/CLAIMS.yaml
+      - CONTINUATION.md
+    expira_em: "2026-11-14T06:00:00+00:00"
