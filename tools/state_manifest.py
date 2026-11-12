@@ -79,7 +79,15 @@ def _test_summary() -> dict[str, Any]:
 
 
 def _integrated_summary() -> dict[str, Any]:
-    """Read and validate the embedded-suite summary as separate evidence."""
+    """Read and validate the embedded-suite summary as separate evidence.
+
+    The tally publishes ``passed`` and ``skipped`` already intersected with
+    ``expected``. ``unexpected`` is disjoint from ``expected``; it is not
+    recomputed from those two lists. ``duplicates``, when present, must be
+    terminal ids (a subset of passed, skipped or unexpected). A non-empty
+    duplicate list fails the suite, as missing, unexpected or conflicting ids
+    do. A missing key means an empty list, so older summaries stay valid.
+    """
     path = ROOT / "integrated-summary.json"
     try:
         summary = json.loads(path.read_text(encoding="utf-8"))
@@ -120,14 +128,32 @@ def _integrated_summary() -> dict[str, Any]:
     unexpected = set(values["unexpected"])
     conflicting = set(values["conflicting"])
     if (
-        missing != expected - passed - skipped
-        or unexpected != (passed | skipped) - expected
+        not passed <= expected
+        or not skipped <= expected
+        or missing != expected - passed - skipped
         or conflicting != passed & skipped
+        or unexpected & expected
     ):
+        return {"status": "invalid_summary"}
+    if "duplicates" in summary:
+        duplicate_items = summary["duplicates"]
+        if (
+            not isinstance(duplicate_items, list)
+            or any(
+                not isinstance(item, str) or not _INTEGRATED_CHECK_ID.fullmatch(item)
+                for item in duplicate_items
+            )
+            or len(set(duplicate_items)) != len(duplicate_items)
+        ):
+            return {"status": "invalid_summary"}
+        duplicates = set(duplicate_items)
+    else:
+        duplicates = set()
+    if not duplicates <= (passed | skipped | unexpected):
         return {"status": "invalid_summary"}
     if not isinstance(summary["result"], str) or summary["result"] not in {"passed", "failed"}:
         return {"status": "invalid_summary"}
-    expected_result = "failed" if missing or unexpected or conflicting else "passed"
+    expected_result = "failed" if missing or unexpected or conflicting or duplicates else "passed"
     if summary["result"] != expected_result:
         return {"status": "invalid_summary"}
 
