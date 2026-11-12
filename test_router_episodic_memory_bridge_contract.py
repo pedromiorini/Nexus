@@ -361,8 +361,10 @@ class C5RecallCallAndPublicResult(unittest.TestCase):
             first["modules_executed"],
             ["jailbreak", "budget", "memory", "episodic", "log"],
         )
-        for key in ("episodic", "episodes", "episode_id"):
-            self.assertNotIn(key, first)
+        self.assertNotIn("episodic", first)
+        self.assertNotIn("episode_id", first)
+        self.assertEqual(first["episodes"], [])
+        self.assertEqual(second["episodes"], [])
         self.assertIs(second["cached"], True)
         self.assertEqual(method_names(recorder.calls).count("search_episodes"), 1)
 
