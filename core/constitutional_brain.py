@@ -10050,6 +10050,22 @@ class CentralRouter:
         final_result["request_type"] = request_type.value
         final_result["decision"] = decision_record
         final_result["cached"] = False
+        for episodic_result in all_results:
+            if episodic_result.module != ModuleType.EPISODIC or not episodic_result.success:
+                continue
+            if not isinstance(episodic_result.data, list):
+                break
+            final_result["episodes"] = [
+                {
+                    "episode_id": episode.episode_id,
+                    "title": episode.title,
+                    "trigger_query": episode.trigger_query,
+                    "importance": episode.importance,
+                    "status": episode.status,
+                }
+                for episode in episodic_result.data
+            ]
+            break
         
         _dbg("🔍 DEBUG v3.70: Final result prepared")
         _dbg(f"🔍 DEBUG v3.70: modules_executed = {final_result['modules_executed']}")
