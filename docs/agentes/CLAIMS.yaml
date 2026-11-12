@@ -1,4 +1,12 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "Manifesto da suíte integrada aceita falha honesta de unexpected e duplicates"
+    arquivos:
+      - tools/state_manifest.py
+      - test_integrated_summary_duplicates_contract.py
+      - CONTINUATION.md
+      - docs/agentes/CLAIMS.yaml
+    expira_em: "2026-11-15T06:00:00+00:00"

@@ -7,6 +7,41 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — manifesto da suíte integrada e ids repetidos — 2026-11-12
+
+- **Base:** `f2b439c0f19a1aba14247b34194a4f54b7618c64` (`origin/main`). Branch `cursor/integrated-summary-duplicates-0a05`. Agent-Id: `grok-bot`. Claim em `docs/agentes/CLAIMS.yaml`, `expira_em: 2026-11-15T06:00:00+00:00`.
+- **Bloco `NEXUS-CURRENT-STATE`:** reexecutado e deixado como está. Continua `tests: CURRENT_TESTS` e `bandit_low: 139`. `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md` não foram editados. O manifesto local desta rodada tem `verification.tests.executed` 1457 e Bandit LOW 139; a sentinela e o `bandit_low` dos quatro documentos batem com esse manifesto. Não se gravou `ci.gates_status: success`.
+- **Fora:** `core/constitutional_brain.py`, `core/cognitivo/`, `tools/targeted_mutation.py`, `tools/security_triage.py`, workflows, `docs/agentes/LICOES_APRENDIDAS.md` e os arquivos dos PRs abertos listados na varredura. PRs abertos conferidos com `gh pr list`: #173, #167, #165, #164, #163, #152, #151, #140, #137, #116, #115, #79, #77, #60, #50, #49, #48, #47, #46, #45–#39. Nenhum edita `tools/state_manifest.py`.
+
+### Fenômeno e hipóteses
+
+`IntegratedSuiteTally.build_summary` publica `passed` e `skipped` já intersectados com `expected`. Um id fora do esperado vai para `unexpected`. `duplicates` lista ids terminais repetidos e, sozinho, faz `result` ser `failed`.
+
+Em `f2b439c`, antes do patch, `python -m unittest -v test_integrated_summary_duplicates_contract.py` (o contrato novo, produção intacta) saiu 1: 7 testes, 22 falhas, 0,026 s. O controle `test_summaries_the_tally_already_agrees_on_stay_generated` passou.
+
+- **H1.** Resumo só com `duplicates` e `result: failed` já era suíte gerada que falhou. Falsificada: o manifesto devolvia `invalid_summary`.
+- **H2.** Id em `unexpected` já era falha gerada. Falsificada: o mesmo `invalid_summary`, porque a conta era `(passed | skipped) - expected` e esses dois conjuntos já não contêm o id de fora.
+- **H3.** `result: passed` com `duplicates` não vazio já era recusado. Falsificada: saía `generated` e `result: passed`.
+- **H4.** `true`, `false`, `null`, `str`, número, item `bool` ou número, id repetido, id `-1` e `NaN` em `duplicates` já eram recusados num resumo que sem isso passaria. Falsificada: saíam `generated`.
+- **H5.** Exigir a chave `duplicates` quebraria o resumo que já passa sem ela. Sobreviveu na base e depois do patch: ausência da chave, lista vazia, skip e conflito com `duplicates` continuam `generated` com o `result` do tally.
+
+GREEN no commit `6cd86f6`: os mesmos 7 testes, OK, e `test_state_manifest.py` no mesmo processo, 22 testes, OK, 0,563 s. A correção está só em `tools/state_manifest.py`. O campo numérico `failed` do manifesto continua `len(missing) + len(conflicting)`. Falha só por repetição fica em `result: failed`, com `failed` 0 e `unexpected` 0.
+
+### Gates neste ambiente
+
+Python 3.12.3 (o pacote `python3.11` não está neste ambiente). Venv `/tmp/nexus-ci312`, `python -m pip install --require-hashes -r requirements-ci.lock`. Ruff 0.17.1 (é a versão do lock, não o 0.16.10 citado no snapshot antigo de `AGENTS.md`), Bandit 1.9.4, Coverage 7.16.2, Hypothesis 6.170.5. `LC_ALL=C`. `PYTHONPATH=.`. `NEXUS_AUDIT_DB` fora do repo. Não é a imagem do Actions.
+
+- Ruff e `compileall` dos caminhos do workflow: exit 0.
+- `reality_audit.py` exit 0 e `git diff --exit-code` de `AUDIT_REALITY_REPORT.md` e `audit_reality.json` exit 0. Núcleo 22967 linhas, 210 classes, 688 funções. Não é evidência de capacidade.
+- `coverage run --branch -m unittest discover -p 'test_*.py'`: 1457 testes, OK, 5 falhas esperadas, 197,254 s, exit 0. Demo `coverage run --append --branch core/constitutional_brain.py`: exit 0. `integrated-summary.json` em `/tmp`: `result` passed, 31 esperados, 30 aprovados, 1 skip, `duplicates` `[]`. O banner do demo não é evidência de capacidade. Pisos: total 82% (piso 0), fila 95%, VRAM 94%, temporal 94%, Vita 76%, núcleo 70%, `core/cognitivo/*` 98%. `tools/state_manifest.py` 83%. Todos os `--fail-under` saíram 0.
+- `tools/test_summary.py --output /tmp/test-summary.json`: `executed` 1457, `passed` 1457, `failed` 0, `result` passed, exit 0, 66,473 s. As 5 falhas esperadas do unittest não entram em `failed`.
+- Bandit na base `f2b439c` (`git worktree` em `/tmp/nexus-main`): `bandit -r core vita tools -f json -o /tmp/base.json` → 139 LOW, 0 MEDIUM, 0 HIGH. No branch: `bandit -r core vita tools -b /tmp/base.json -f json -o /tmp/branch.json` → 0 achados novos, exit 0. `security_triage.py /tmp/base.json SECURITY_TRIAGE.md --check`: exit 0. `embedded_assert_audit.py`: exit 0, `ok` verdadeiro, 111 B101, nenhum fora do bloco main. `implementation_gap_audit.py`: exit 0, `pass_only_count` 0, `not_implemented_count` 0.
+- `tools/targeted_mutation.py`: `declared 80, applicable 80, killed 80, survived 0, not_applied 0`, exit 0. O arquivo não foi editado. Não há mutante novo desta função no catálogo.
+- `validar_registro.py --expirados erro` na base do código, antes deste claim: exit 0. `predeleg.sh HEAD origin/main`: `OK: sem conflito`, exit 0. Replay `run_replay.sh`: 17 casos, exit 0. `pip install --dry-run --no-deps -r requirements_constitutional.txt`: exit 0.
+- Manifesto local sem `--gates-status`: `ci.gates_status` é `not_ci`. `state_consistency_audit.py`: exit 1, único erro `manifesto: ci.gates_status deve ser 'success'`, `conflicts` vazio. Não se fabricou sucesso de CI.
+- **Lição não copiada para `docs/agentes/LICOES_APRENDIDAS.md`.** O arquivo já é editado pelas PRs #46, #77 e #152. Uma entrada `pendente` ou `ativa` também faria o contrato do auditor de lições, hoje no #77, deixar de ver `nao_checavel`. Texto proposto, status que caberia no arquivo hoje: `registrada`, sem bloco de reincidência, no mesmo desvio de L-010/L-011. Fato: o manifesto rejeitava o resumo honesto do tally (id inesperado ou só repetido) como `invalid_summary` e aceitava `result: passed` com `duplicates`. Evidência: base `f2b439c`, RED `70186cc`, GREEN `6cd86f6`.
+- **Não verificado:** CI hospedado, Python 3.11, actionlint, zizmor, a campanha `tools/cognitivo_mutation.py`, `NaN`/`Infinity` num campo extra do resumo integrado (o leitor de `test-summary.json` já os recusa; este leitor só recusa `NaN` quando ele está em `duplicates` ou quebra outro campo já checado). O texto de `SystemExit` do demo, em `core/constitutional_brain.py`, não lista `duplicates`; o arquivo não foi editado.
+
 ## Rodada local — rebase da #166 sobre main pós-#171 — 2026-11-10
 
 - **Base e heads:** `origin/main` `97e4c1611c2af726785f23c9a59974e8ca2b0402`; head original da #166 `6e5e06e675f5a25c35b92a3f567a03d942c7bb7d`. Worktree nova `/workspace/Nexus-pr166-rebased-20261110`, branch `local/pr166-post62-rebased-20261110`. Os gates completos abaixo rodaram no head local `c614456fa5367c3774c5f1015dd85f16ce0ae940`, antes desta anotação documental; o código e os artefatos gerados não mudaram depois.
