@@ -7,6 +7,13 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — encerrar o lease do grok-bot já mesclado (#176) — 2026-11-12
+
+- **Base:** `a09b780655dabaf9b22018951cf91075868c920e` (`origin/main`, squash da #176). Branch `cursor/close-grok-claim-176-0a05`. Agent-Id: `grok-bot`.
+- **§9C.3:** o trabalho terminou. O Pedro marcou a #176 como pronta e mesclou. O lease que estava neste SHA (`expira_em: 2026-11-15T06:00:00+00:00`) sai. `claims` volta a `[]`. Não havia outro claim no arquivo.
+- **CI da #176:** run `43171344261`, 6 checks com sucesso no head `c11e90f2411b939a3a089e8f00ea98027a83b92b` (gate de contrato, mutação cognitiva nos três shards, replay e atestação final).
+- **Bloco `NEXUS-CURRENT-STATE`:** não reescrito. Continua `tests: CURRENT_TESTS` e `bandit_low: 139`. A seção abaixo que ainda cita o claim aberto é o registro daquela rodada, não o estado depois deste commit.
+
 ## Rodada — manifesto da suíte integrada e ids repetidos — 2026-11-12
 
 - **Base:** `f2b439c0f19a1aba14247b34194a4f54b7618c64` (`origin/main`). Branch `cursor/integrated-summary-duplicates-0a05`. Agent-Id: `grok-bot`. Claim em `docs/agentes/CLAIMS.yaml`, `expira_em: 2026-11-15T06:00:00+00:00`.
