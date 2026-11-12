@@ -7,6 +7,38 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — linha exata na triagem Bandit — 2026-11-11
+
+- **Base:** `57767876b1c11b4bcfa79ea79f6bd6d852bbffef` (`origin/main`). Branch `cursor/security-triage-exact-line-8db5`. Agent-Id: `grok-bot`. Claim em `docs/agentes/CLAIMS.yaml`, `expira_em: 2026-11-14T06:00:00+00:00`.
+- **Bloco `NEXUS-CURRENT-STATE`:** reexecutado e deixado como está. Continua `tests: CURRENT_TESTS` e `bandit_low: 139`. `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md` não foram editados. O `--check` da triagem saiu 0 com o JSON do branch (139 LOW).
+- **Fora:** `core/constitutional_brain.py`, `core/cognitivo/`, `tools/cognitivo_mutation.py`, `tools/targeted_mutation.py`, router/`decision_cycle`, o arquivo da #172, e os demais caminhos de código dos PRs abertos. `tools/security_triage.py` e o contrato novo não aparecem em `gh pr diff --name-only` desses PRs. `CONTINUATION.md` e `docs/agentes/CLAIMS.yaml` entram porque a §11.3 e a §9C pedem; os dois já são editados por PRs abertos (#79 e #152 no claims; vários no handoff). `predeleg.sh HEAD 5776787` saiu 0 contra a `main`. Conflito futuro com esses PRs não foi resolvido.
+- **Registro:** `python tools/agente/validar_registro.py --expirados erro` na base, antes da escolha, saiu 0 (`registro de agentes: OK`, `claims: []`). O `escopo_arquivos` declarado de `grok-bot` não lista `tools/security_triage.py`. O item é o da tarefa diária; o registro não foi ampliado neste PR (#79 já edita `REGISTRO_AGENTES.yaml`).
+
+### Fenômeno e hipóteses
+
+Em `tools/security_triage.py`, `resolve_scope` fazia `int(line)`. Observado na base, antes do patch, com o contrato novo e produção intacta (`e1ffd1c`):
+
+- **H1.** `True` já ficava `<unresolved>`. Falsificada: o arquivo de duas linhas cuja função `anchor` cobre as linhas 1–2 atribui `True` a `anchor`. `build_report` agrupa o achado nesse escopo.
+- **H2.** Float e str numérica já eram recusados. Falsificada: `1.0`, `1.5`, `2.9`, `"1"`, `"2"` e `" 1"` entram em `anchor`.
+- **H3.** Valor não conversível já falhava fechado, sem exceção, e sem rótulo de módulo. Falsificada em parte: `±inf` levanta `OverflowError` e `build_report` não devolve relatório. `False` vira 0 e `"1_0"` vira 10; os dois saem `<module>`. `NaN`, `None`, `""`, `"linha"`, lista, dict e tupla já saíam `<unresolved>` (`ValueError`/`TypeError` no `except`).
+- **H4.** `int` exato já resolve. Sobreviveu na base e depois do patch: as linhas 1 e 2 continuam `anchor`; `0`, `-1`, `3` e `10**6` continuam `<module>`; arquivo ausente continua `<unresolved>`, inclusive com `True` e `±inf`.
+
+RED: `python -m unittest -v test_security_triage_line_contract.py` → 7 testes, 12 falhas, 5 erros, exit 1, 0,986 s. Os três controles (int dentro, int fora, arquivo ausente) passaram. GREEN no commit `971b3706443e007ef337e0607ffe4ae86484537c`: os mesmos 7 testes mais `test_security_triage.py`, 15 testes, OK, exit 0, 0,050 s. A alteração é `type(line) is int` antes da comparação. Achado com linha inválida permanece no relatório, com escopo `<unresolved>`, e não muda o dict de entrada. Int exato fora da faixa não passa a ser tratado como tipo inválido.
+
+### Gates neste ambiente
+
+Python 3.11.18 (uv, não é a imagem do Actions), venv `/tmp/nexus-ci311`, `uv pip install --require-hashes -r requirements-ci.lock`. Ruff 0.17.1, Bandit 1.9.4, Coverage 7.16.2, Hypothesis 6.170.5. `LC_ALL=C`. `PYTHONPATH=.`. `NEXUS_AUDIT_DB` fora do repo.
+
+- Ruff e `compileall` dos caminhos do workflow: exit 0.
+- `python -m unittest discover -p 'test_*.py'`: 1449 testes, OK, 5 falhas esperadas, 69,268 s, exit 0. `tools/test_summary.py`: `executed 1449, passed 1449, failed 0, result passed`, exit 0. As 5 falhas esperadas não entram em `failed`.
+- `coverage run --branch -m unittest discover -p 'test_*.py'`: 1449 testes, OK, 5 falhas esperadas, 199,072 s, exit 0. Demo `coverage run --append --branch core/constitutional_brain.py`: exit 0. `integrated-summary.json` em `/tmp`: `result=passed`, 30 aprovados, skip `0`, missing/unexpected/conflicting/duplicates vazios. O banner do demo não é evidência de capacidade. Pisos: total 82% (piso 0), fila 95%, VRAM 94%, temporal 94%, Vita 76%, núcleo 70%, `core/cognitivo/*` 98%. Todos os `--fail-under` saíram 0. `tools/security_triage.py` ficou em 98%; a linha 174 é o `raise SystemExit` do `__main__`. Não há piso para esse arquivo.
+- Bandit na base, worktree detached em `5776787`, `bandit -r core vita tools -f json -o /tmp/base.json`: 139 LOW, 0 MEDIUM, 0 HIGH (`generated_at` `2026-11-11T06:42:01Z`). No branch: `bandit -r core vita tools -b /tmp/base.json -f json -o /tmp/branch.json` → 0 achados novos, exit 0. Varredura completa no branch: 139 LOW, 0 MEDIUM, 0 HIGH; o processo do Bandit sai 1 porque há achados. Nenhum achado em `tools/security_triage.py`. `security_triage.py --check`: exit 0. `embedded_assert_audit.py`: exit 0, `ok` verdadeiro, 111 B101, nenhum fora do bloco main. `implementation_gap_audit.py`: exit 0, `pass_only` 0, `not_implemented` 0.
+- `tools/targeted_mutation.py`: `declared 80, applicable 80, killed 80, survived 0, not_applied 0`, exit 0. O arquivo não foi editado. O mutante desta função não entrou no catálogo porque `tools/targeted_mutation.py` está em PRs abertos.
+- `reality_audit.py` exit 0 e `git diff --exit-code` dos relatórios exit 0.
+- `bash tools/agente/predeleg.sh HEAD 57767876b1c11b4bcfa79ea79f6bd6d852bbffef`: `OK: sem conflito`, exit 0, antes desta anotação. Replay `./tools/agente/replay/run_replay.sh`: 17 casos, exit 0.
+- **Lição não copiada para `docs/agentes/LICOES_APRENDIDAS.md`.** O arquivo é editado pelas PRs #46 e #152. Uma entrada `pendente` ou `ativa` faria `test_current_lessons_are_not_reported_as_measured` deixar de ver `nao_checavel`. Texto proposto, status que caberia no arquivo hoje: `registrada`, sem bloco de reincidência, no mesmo desvio de L-010/L-011. Fato: `resolve_scope` aceitava `True` como linha 1 e derrubava `build_report` em `±inf`. Evidência: base `5776787`, RED `e1ffd1c`, GREEN `971b370`.
+- **Não verificado:** CI hospedado, actionlint, zizmor, Python 3.12, a suíte com `LC_ALL` diferente de `C`, item de `results` que não seja dict, mutação cognitiva em shards, `state_consistency_audit.py` com manifesto `gates_status: success`. Não se fabricou esse status.
+
 ## Rodada local — rebase da #166 sobre main pós-#171 — 2026-11-10
 
 - **Base e heads:** `origin/main` `97e4c1611c2af726785f23c9a59974e8ca2b0402`; head original da #166 `6e5e06e675f5a25c35b92a3f567a03d942c7bb7d`. Worktree nova `/workspace/Nexus-pr166-rebased-20261110`, branch `local/pr166-post62-rebased-20261110`. Os gates completos abaixo rodaram no head local `c614456fa5367c3774c5f1015dd85f16ce0ae940`, antes desta anotação documental; o código e os artefatos gerados não mudaram depois.
