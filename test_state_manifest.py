@@ -160,7 +160,7 @@ class StateManifestTests(unittest.TestCase):
             {
                 "status": "generated", "scope": "embedded checks",
                 "discovered_static": 3, "passed": 2, "skipped": 1,
-                "failed": 0, "unexpected": 0, "result": "passed",
+                "failed": 0, "unexpected": 0, "duplicates": 0, "result": "passed",
             },
         )
 
