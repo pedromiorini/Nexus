@@ -1,13 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "Contagem explicita de duplicates no dict gerado por _integrated_summary"
-    arquivos:
-      - tools/state_manifest.py
-      - test_state_manifest.py
-      - test_integrated_manifest_duplicate_count_contract.py
-      - docs/agentes/CLAIMS.yaml
-      - CONTINUATION.md
-    expira_em: "2026-11-16T06:30:00+00:00"
+claims: []
