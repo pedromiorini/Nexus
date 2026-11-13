@@ -60,6 +60,29 @@ class KnowledgeGraphPathContractMixin:
         self.assertEqual(result.hops, 0)
         self.assertGreater(result.confidence, 0.0)
 
+    def test_existing_two_hop_path_is_preserved(self):
+        graph = self.make_graph()
+        graph.add_relation("a", "next", "b")
+        graph.add_relation("b", "next", "c")
+
+        result = graph.multihop_query("a", "c", max_hops=2)
+
+        self.assertEqual([entity.id for entity in result.entities], ["a", "b", "c"])
+        self.assertEqual(result.paths, [["a", "b", "c"]])
+        self.assertEqual(result.context, "a --[next]--> b | b --[next]--> c")
+        self.assertEqual(result.hops, 2)
+        self.assertGreater(result.confidence, 0.0)
+
+    def test_existing_disconnected_endpoints_return_standard_empty_result(self):
+        graph = self.make_graph()
+        graph.add_entity("a", "person")
+        graph.add_entity("b", "person")
+
+        result = graph.multihop_query("a", "b")
+
+        self.assertEqual(set(graph.entity_index), {"a", "b"})
+        self.assertEqual(result, QueryResult([], [], "", 0.0, 0))
+
 
 class KnowledgeGraphFallbackPathContractTests(
     KnowledgeGraphPathContractMixin, unittest.TestCase
