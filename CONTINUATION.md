@@ -7,6 +7,14 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada local — contrato de endpoints e limite de hops do grafo — 2026-11-13
+
+- **Base/candidata:** `main` revalidada em `99437e52d03e6b0f973d764052e93b89ac77941d`; clone isolado `/workspace/Nexus-kg-contracts-20261113`, branch `fix/kg-endpoint-hops-contract-20261113`, sem commit. O checkout protegido e as três WIPs antigas permaneceram intocados.
+- **Código:** `multihop_query` valida os dois IDs em `entity_index` antes de escolher backend e retorna `QueryResult([], [], "", 0.0, 0)` se faltar algum. O caminho NetworkX recusado por `max_hops` também retorna `hops=0`; o fallback já retornava o resultado vazio padrão. Caminho válido no limite e self-path existente seguem cobertos. A guarda ocupa a linha em branco existente para preservar os localizadores de linha do monólito.
+- **PRs na revalidação:** #39 e #40 seguem abertas contra `812ebd02b0c82ecc3169d620e36d25592b1d6727`; #39 espera a distância real para caminho recusado, em desacordo com este contrato; #40 propõe a validação de endpoint, ainda fora da `main`. #167 segue draft.
+- **Evidência:** RED do novo `test_knowledge_graph_endpoint_hops_contract.py` detectou endpoints ausentes/self ausente e `hops` indevido no NetworkX; fallback e NetworkX 3.6.1 (hashes de `requirements-ci.lock`) foram exercitados. GREEN: os testes de grafo/integração temporal passaram 24/24; `test_router_episodic_memory_bridge_contract.py` passou 26/26; a suíte `unittest discover` passou 1.506 testes, com 5 expected failures, exit 0. Ruff, `compileall` e `git diff --check` passaram.
+- **Limites:** CI hospedado não foi executado. Sem stage, commit, push ou PR; nenhum claim ou marcador de estado foi alterado.
+
 ## Rodada — contagem de duplicates no manifesto integrado — 2026-11-13
 
 - **Base:** `6c608f921f93a002c58604f80e1fc305245b67e5` (`origin/main`). Branch `cursor/integrated-duplicate-count-df4d`. Agent-Id: `grok-bot`. Claim em `docs/agentes/CLAIMS.yaml`, `expira_em: 2026-11-16T06:30:00+00:00`.
