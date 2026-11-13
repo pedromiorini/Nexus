@@ -33,3 +33,77 @@ M4, M5 e M6 rodam no mesmo cérebro, nessa ordem, e depois uma única `think("re
 ## O que esta medição não decide
 
 B2 continuaria a ser mudança de semântica. O resultado não autoriza passar `status`, incluir o aberto, nem editar produção.
+
+## Medição
+
+Os critérios acima não foram reescritos. Esta seção só registra a corrida.
+
+Comando, na raiz, Python 3.11.18:
+
+```sh
+PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus_audit_think_recall_list.sqlite3 LC_ALL=C python3.11
+```
+
+O script imprimiu os banners do cérebro e, no fim, o JSON. Arquivo integral: `/tmp/think_recall_list_measure.json`, copiado para `/opt/cursor/artifacts/think_recall_list_measure.json`. SHA-256 `e1ef9c5814bfa79b61d6bf394cebf4b4c6427ac6b1af3b84780f633849ec9cda`. Saída do processo: 0.
+
+### M1–M3, cérebro sem episódio prévio
+
+`think("remember the last time", use_router=True)`.
+
+`start_episode` devolveu `a414c783-fb46-4476-b196-e6fd2a5946bc`, com `title="Q: remember the last time"`, `trigger_query="remember the last time"`, `importance=0.7`.
+
+Uma chamada. `args` vazio. `kwargs` exatamente `{"query": "remember the last time", "limit": 3}`. A chave `status` não está nos kwargs.
+
+No instante da devolução, `current_episode_id` era `a414c783-fb46-4476-b196-e6fd2a5946bc`.
+
+Lista devolvida, integral:
+
+```json
+[]
+```
+
+O id aberto nesta chamada não está na lista.
+
+O dict de `think` não tem a chave `episodes`. O log do roteador, impresso antes da cópia para `think`, mostra a chave `episodes` no resultado de `route`.
+
+### M4–M6, o mesmo cérebro, nessa ordem, depois uma `think`
+
+- Fechado que casa: `b4c0036c-28b2-4ffb-9ded-9b73c613bc60`, título `"remember the last time"`.
+- Fechado que não casa: `88995f24-1074-4b6b-93bc-6151537179ae`, título `"unrelated note"`.
+- Aberto anterior, sem `close_episode`: `4da1649f-96df-450b-bed5-a198ef7b838e`, título `"remember the last time prior"`. `current_episode_id` antes da `think` era esse id.
+
+`start_episode` da `think` devolveu `e75d2d68-355c-44bc-aa78-eb3213041d63`. No instante da devolução da busca, `current_episode_id` era esse id novo. Depois da `think`, `current_episode_id` era `null`.
+
+Uma chamada. `args` vazio. `kwargs` exatamente `{"query": "remember the last time", "limit": 3}`. Sem chave `status`.
+
+Lista devolvida, integral:
+
+```json
+[
+  {
+    "episode_id": "b4c0036c-28b2-4ffb-9ded-9b73c613bc60",
+    "title": "remember the last time",
+    "trigger_query": null,
+    "importance": 0.6,
+    "status": "closed"
+  }
+]
+```
+
+O fechado que casa está na lista, com `status` `"closed"`. O fechado que não casa não está. O aberto anterior não está. O id aberto nesta `think` não está.
+
+### M7
+
+`think("ping", use_router=True)` num cérebro novo. Chamadas a `search_episodes`: 0. Lista: não houve devolução. `start_episode` devolveu `7e567b36-b942-497c-8b80-424b3a3224d0`.
+
+### Leitura pela regra dos critérios, sem reescrevê-los
+
+- M1: «status foi passado» fica falsificado. «status não foi passado» e «a chamada é query + limit=3» não ficam falsificados.
+- M2, no cérebro vazio: «o episódio recém-aberto entra na lista» fica falsificado. «fica de fora» não fica.
+- M3: «a busca ocorre depois de fechar» fica falsificado. «antes de fechar» não fica.
+- M4: «um fechado que casa no título fica de fora» fica falsificado. «entra» não fica. O `status` observado é `"closed"`.
+- M5: o id `"unrelated note"` não está, e a lista de M4–M6 não está vazia. «a query não restringe» fica falsificado.
+- M6: o aberto anterior não está. «todo aberto entra» fica falsificado. «todo aberto fica de fora» não fica, neste par de abertos.
+- M7: «ping busca» fica falsificado. «ping não busca» não fica.
+
+B2 não foi implementado.
