@@ -87,6 +87,8 @@ def _integrated_summary() -> dict[str, Any]:
     terminal ids (a subset of passed, skipped or unexpected). A non-empty
     duplicate list fails the suite, as missing, unexpected or conflicting ids
     do. A missing key means an empty list, so older summaries stay valid.
+    The generated dict records ``duplicates`` as that count, including zero.
+    ``failed`` stays the count of missing and conflicting ids.
     """
     path = ROOT / "integrated-summary.json"
     try:
@@ -165,6 +167,7 @@ def _integrated_summary() -> dict[str, Any]:
         "skipped": len(skipped & expected),
         "failed": len(missing) + len(conflicting),
         "unexpected": len(unexpected),
+        "duplicates": len(duplicates),
         "result": summary["result"],
     }
 

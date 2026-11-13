@@ -7,6 +7,41 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — contagem de duplicates no manifesto integrado — 2026-11-13
+
+- **Base:** `6c608f921f93a002c58604f80e1fc305245b67e5` (`origin/main`). Branch `cursor/integrated-duplicate-count-df4d`. Agent-Id: `grok-bot`. Claim em `docs/agentes/CLAIMS.yaml`, `expira_em: 2026-11-16T06:30:00+00:00`.
+- **Bloco `NEXUS-CURRENT-STATE`:** reexecutado e deixado como está. Continua `tests: CURRENT_TESTS` e `bandit_low: 139`. `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md` não foram editados. Bandit na base e no branch: 139 LOW, 0 MEDIUM, 0 HIGH.
+- **Fora:** `core/constitutional_brain.py`, `tools/targeted_mutation.py`, `tools/state_consistency_audit.py`, `tools/agente/timeout_margin.sh`, `docs/agentes/LICOES_APRENDIDAS.md`. PRs abertos (`gh pr list`): #180, #173, #167, #165, #164, #163, #152, #151, #140, #137, #116, #115, #79, #77, #60, #50–#39. Nenhum edita `tools/state_manifest.py`. `LICOES_APRENDIDAS.md` está em #46, #77 e #152; o script da margem está em #152.
+
+### Fenômeno e hipóteses
+
+Em `6c608f9`, `_integrated_summary` (linhas 81–169; lê `integrated-summary.json`) aceita um resumo cuja única falha são ids em `duplicates`, devolve `status: generated` e `result: failed`, com `failed` 0 e `unexpected` 0, e o dict não tem a chave `duplicates`. `_test_summary` (linhas 53–78) não lê essa lista.
+
+RED no commit `df2707f`, produção intacta: `python3 -m unittest -v test_integrated_manifest_duplicate_count_contract.py` saiu 1. 5 testes, 5 falhas, 0,010 s. As falhas foram `None != 1`, `None != 1`, `None != 2`, `None != 0` e `None != 0`. `test_duplicate_outside_terminal_ids_stays_invalid` e `test_inconsistent_result_stays_invalid` passaram.
+
+- **H1.** A contagem já estava no dict. Falsificada no RED: a chave falta.
+- **H2.** Id fora de `passed`/`skipped`/`unexpected` já era `invalid_summary`. Sobreviveu no RED e no GREEN.
+- **H3.** `result` incoerente com as listas já era `invalid_summary`. Sobreviveu no RED e no GREEN.
+- **H4.** Ausência da chave, ou lista vazia, já publicava 0. Falsificada no RED: a chave falta.
+- **H5.** O auditor ou um schema exigia o conjunto exato de chaves e rejeitaria o campo novo. Fato: não há schema de `STATE_MANIFEST` no repo. `tools/state_consistency_audit.py` só exige `discovered_static`, `passed`, `skipped`, `failed` e `unexpected`. Chave ausente, `duplicates: 0` e `duplicates: 2` com `result: passed` não geram erro de contagem; `result: failed` continua erro. O único assert de igualdade do dict gerado estava em `test_state_manifest.py` e passou a esperar `duplicates: 0`. Fixtures do auditor sem a chave continuam aceitas. O auditor não foi editado: exigir a chave quebraria testes de PRs abertos (#115, #77) e mudaria o fail-closed de manifesto antigo.
+
+GREEN no commit `a56b14c`: o dict gerado inclui `"duplicates": len(duplicates)`. `failed` continua `len(missing) + len(conflicting)`.
+
+### Gates neste ambiente
+
+Python 3.12.3 em `/tmp/nexus-ci312` (`pip install --require-hashes -r requirements-ci.lock`, exit 0). Não há `python3.11` neste ambiente; o CI usa 3.11. Ruff 0.17.1, Bandit 1.9.4, Coverage 7.16.2, Hypothesis 6.170.5. `PYTHONPATH=.`. `NEXUS_AUDIT_DB` fora do repo.
+
+- Ruff e `compileall` dos caminhos do workflow: exit 0.
+- Focado, venv: `test_integrated_manifest_duplicate_count_contract.py`, `test_state_manifest.py`, `test_integrated_summary_duplicates_contract.py`, `test_state_consistency_audit.py`, `test_state_counter_sentinel_contract.py`, `test_state_stray_marker_contract.py`: exit 0.
+- `reality_audit.py` exit 0 e `git diff --exit-code` dos dois relatórios exit 0.
+- Bandit na worktree `/tmp/nexus-main` da `main`: `bandit -r core vita tools -f json -o /tmp/base.json` → 139 LOW, exit 1 pelos LOW. No branch: `bandit -r core vita tools -b /tmp/base.json -f json -o /tmp/branch.json` → 0 achados novos, exit 0. `security_triage.py /tmp/base.json SECURITY_TRIAGE.md --check` exit 0. `embedded_assert_audit.py`: `ok` verdadeiro, 111 B101. `implementation_gap_audit.py`: `pass_only_count` 0, `not_implemented_count` 0.
+- `tools/targeted_mutation.py`: 80/80 mortos, exit 0. O catálogo não foi editado.
+- `validar_registro.py --expirados aviso`: exit 0.
+- Cobertura (`LC_ALL=en_US.UTF-8`): `coverage run --branch -m unittest discover -p 'test_*.py'` → 1498 testes, 2 falhas, 5 falhas esperadas, 206,106 s, exit 1. Demo `coverage run --append --branch core/constitutional_brain.py`: exit 0. `integrated-summary.json` em `/tmp`: `result` passed, 31 esperados, 30 aprovados, 1 skip (`0`), `duplicates` `[]`. O banner do demo não é evidência de capacidade. Pisos: total 83%, fila 95%, VRAM 94%, temporal 94%, Vita 76%, núcleo 72%, `core/cognitivo/*` 98%. `tools/state_manifest.py` 84%. Todos os `--fail-under` saíram 0.
+- As 2 falhas da descoberta: (1) `test_claims_stay_empty_and_module_type_does_not_grow` exige a substring `claims: []` (`e21d25c`, #178); o claim deste branch remove essa substring. (2) `test_unparseable_lines` com a linha `٣` em `timeout_margin.sh`, arquivo igual ao da `main`. Com `LC_ALL=C` e `LC_ALL=C.UTF-8` esse teste isolado sai 0; com `LC_ALL=en_US.UTF-8` sai 1. `tools/test_summary.py` repetiu as mesmas 2 falhas (1498 executados, 1496 aprovados, 2 falhas).
+- **Lição não copiada para `docs/agentes/LICOES_APRENDIDAS.md`.** O arquivo está nas PRs #46, #77 e #152. Texto que caberia, status `registrada`, sem bloco de reincidência: a descoberta local falhou no claim exigido pela §9C e num dígito não ASCII da margem só com `en_US.UTF-8`. Evidência: base `6c608f9`, RED `df2707f`, GREEN `a56b14c`.
+- **Não verificado:** CI hospedado, Python 3.11, actionlint, zizmor, a suíte inteira com `LC_ALL=C.UTF-8`, `tools/cognitivo_mutation.py`. Manifesto local não foi gravado com `ci.gates_status: success`.
+
 ## Rodada — encerrar o lease do grok-bot já mesclado (#176) — 2026-11-12
 
 - **Base:** `a09b780655dabaf9b22018951cf91075868c920e` (`origin/main`, squash da #176). Branch `cursor/close-grok-claim-176-0a05`. Agent-Id: `grok-bot`.
