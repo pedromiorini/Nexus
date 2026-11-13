@@ -737,7 +737,7 @@ class RealKnowledgeGraph:
         """
         self.total_queries += 1
         self.total_multihop_queries += 1
-
+        if start_id not in self.entity_index or end_id not in self.entity_index: return QueryResult([], [], "", 0.0, 0)
         if self.nx:
             # NetworkX: usar shortest_path
             try:
@@ -745,7 +745,7 @@ class RealKnowledgeGraph:
                 hops = len(path) - 1
 
                 if hops > max_hops:
-                    return QueryResult([], [], "", 0.0, hops)
+                    return QueryResult([], [], "", 0.0, 0)
 
                 # Coletar entidades no caminho
                 entities = [self.entity_index[nid] for nid in path if nid in self.entity_index]
