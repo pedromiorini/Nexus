@@ -6,6 +6,6 @@ coverage==7.16.2
 hypothesis==6.170.5
 bandit==1.9.4
 ruff==0.17.1
-zizmor==1.31.1
+zizmor==1.32.0
 # actionlint não é instalado por pip (o pacote actionlint-py só publica sdist e baixa um binário no build):
 # o workflow baixa o binário oficial fixado por SHA-256.
