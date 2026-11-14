@@ -13,12 +13,20 @@ import os
 import re
 import shutil
 import subprocess
+from defusedxml import ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 _INTEGRATED_CHECK_ID = re.compile(r"[0-9]+(?:\.[0-9]+)?\Z")
+_CRITICAL_COVERAGE_PATHS = (
+    "core/deferred_task_queue.py",
+    "core/vram_defense_guard.py",
+    "core/temporal_facts.py",
+    "vita/nexus_constitutional_bridge_v3.py",
+    "core/constitutional_brain.py",
+)
 
 
 def _git(*args: str) -> str:
@@ -206,6 +214,127 @@ def _mutation_summary() -> dict[str, Any]:
     return {"status": "generated", **{key: summary.get(key) for key in ("declared", "applicable", "killed", "survived", "not_applied", "score_percent")}}
 
 
+def _coverage_count(value: str, field: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"invalid coverage count: {field}") from exc
+    if parsed < 0:
+        raise ValueError(f"negative coverage count: {field}")
+    return parsed
+
+
+def _coverage_metrics(classes: list[ET.Element]) -> dict[str, Any]:
+    """Agrega linhas/branches de classes, sem transformar ausência em cobertura zero."""
+    attributes = {
+        "lines_valid": "lines-valid",
+        "lines_covered": "lines-covered",
+        "branches_valid": "branches-valid",
+        "branches_covered": "branches-covered",
+    }
+    totals = {key: 0 for key in attributes}
+    for element in classes:
+        line_elements = element.findall("./lines/line")
+        derived = {
+            "lines_valid": len(line_elements),
+            "lines_covered": sum(element.get("hits") not in (None, "0") for element in line_elements),
+            "branches_valid": 0,
+            "branches_covered": 0,
+        }
+        for line in line_elements:
+            if line.get("branch") != "true":
+                continue
+            match = re.search(r"\((\d+)/(\d+)\)\s*\Z", line.get("condition-coverage", ""))
+            if match:
+                derived["branches_covered"] += int(match.group(1))
+                derived["branches_valid"] += int(match.group(2))
+        for key, attribute in attributes.items():
+            value = element.get(attribute)
+            if value is not None:
+                totals[key] += _coverage_count(value, attribute)
+            elif derived[key] >= 0:
+                totals[key] += derived[key]
+    if any(totals[f"{kind}_covered"] > totals[f"{kind}_valid"] for kind in ("lines", "branches")):
+        raise ValueError("covered coverage count exceeds valid count")
+    result: dict[str, Any] = {
+        "files": len(classes),
+        **totals,
+        "line_rate": (
+            totals["lines_covered"] / totals["lines_valid"]
+            if totals["lines_valid"] else None
+        ),
+        "branch_rate": (
+            totals["branches_covered"] / totals["branches_valid"]
+            if totals["branches_valid"] else None
+        ),
+    }
+    return result
+
+
+def _coverage_summary() -> dict[str, Any]:
+    """Lê coverage.xml produzido pelo gate e registra cobertura observada."""
+    path = ROOT / "coverage.xml"
+    try:
+        root = ET.parse(path).getroot()
+    except FileNotFoundError:
+        return {"status": "not_generated"}
+    except (OSError, ET.ParseError):
+        return {"status": "invalid_report"}
+
+    files: dict[str, list[ET.Element]] = {}
+    filename_occurrences: dict[str, int] = {}
+    for element in root.findall(".//class"):
+        filename = element.get("filename")
+        if isinstance(filename, str) and filename:
+            files.setdefault(filename.replace("\\", "/"), []).append(element)
+            filename_occurrences[filename.replace("\\", "/")] = filename_occurrences.get(filename.replace("\\", "/"), 0) + 1
+
+    class_elements = [element for items in files.values() for element in items]
+    try:
+        overall = _coverage_metrics(class_elements)
+    except ValueError:
+        return {"status": "invalid_report"}
+    overall["files"] = len(files)
+    root_attributes = {
+        "lines_valid": "lines-valid",
+        "lines_covered": "lines-covered",
+        "branches_valid": "branches-valid",
+        "branches_covered": "branches-covered",
+    }
+    if all(root.get(attribute) is not None for attribute in root_attributes.values()):
+        try:
+            root_counts = {
+                key: _coverage_count(root.get(attribute, ""), attribute)
+                for key, attribute in root_attributes.items()
+            }
+        except ValueError:
+            return {"status": "invalid_report"}
+        if any(root_counts[f"{kind}_covered"] > root_counts[f"{kind}_valid"] for kind in ("lines", "branches")):
+            return {"status": "invalid_report"}
+        overall.update(root_counts)
+        overall["line_rate"] = overall["lines_covered"] / overall["lines_valid"] if overall["lines_valid"] else None
+        overall["branch_rate"] = overall["branches_covered"] / overall["branches_valid"] if overall["branches_valid"] else None
+    critical = {}
+    for target in _CRITICAL_COVERAGE_PATHS:
+        matching_filenames = [filename for filename in files if filename == target or filename.endswith(f"/{target}")]
+        if not matching_filenames:
+            basename = Path(target).name
+            matching_filenames = [
+                filename for filename in files
+                if filename == basename and filename_occurrences.get(filename) == 1
+            ]
+        matching = [element for filename in matching_filenames for element in files[filename]]
+        if matching:
+            try:
+                critical[target] = _coverage_metrics(matching)
+            except ValueError:
+                return {"status": "invalid_report"}
+            critical[target]["files"] = len(matching_filenames)
+        else:
+            critical[target] = {"status": "not_present"}
+    return {"status": "generated", "overall": overall, "critical_components": critical}
+
+
 def _optional_dependencies() -> dict[str, str]:
     modules = {"psutil": "psutil", "faiss": "faiss", "sentence_transformers": "sentence_transformers"}
     return {name: "available" if importlib.util.find_spec(module) else "unavailable" for name, module in modules.items()}
@@ -258,6 +387,7 @@ def build_manifest(test_result: str = "not_run", test_command: str | None = None
             "tests": tests,
             "integrated": _integrated_summary(),
             "ast": _ast_summary(),
+            "coverage": _coverage_summary(),
         },
         "security": {"bandit": _bandit_summary()},
         "mutation": _mutation_summary(),

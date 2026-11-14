@@ -7,3 +7,4 @@ hypothesis
 bandit
 ruff==0.17.1
 networkx
+defusedxml

@@ -190,6 +190,94 @@ class StateManifestTests(unittest.TestCase):
         manifest = self._manifest_with_files({"integrated-summary.json": json.dumps(summary)})
         self.assertEqual(manifest["verification"]["integrated"], {"status": "invalid_summary"})
 
+    def test_missing_or_invalid_coverage_report_is_not_assumed(self):
+        for files, status in (
+            ({}, "not_generated"),
+            ({"coverage.xml": "not xml"}, "invalid_report"),
+        ):
+            with self.subTest(status=status):
+                manifest = self._manifest_with_files(files)
+                self.assertEqual(manifest["verification"]["coverage"], {"status": status})
+
+    def test_coverage_report_preserves_global_and_critical_metrics(self):
+        coverage = """<?xml version="1.0"?>
+        <coverage version="7.0">
+          <packages><package name="core"><classes>
+            <class filename="core/deferred_task_queue.py" lines-valid="10" lines-covered="9" branches-valid="4" branches-covered="3" />
+            <class filename="vita/nexus_constitutional_bridge_v3.py" lines-valid="20" lines-covered="15" branches-valid="6" branches-covered="5" />
+            <class filename="other.py" lines-valid="5" lines-covered="5" />
+          </classes></package></packages>
+        </coverage>
+        """
+        manifest = self._manifest_with_files({"coverage.xml": coverage})
+        result = manifest["verification"]["coverage"]
+        self.assertEqual(result["status"], "generated")
+        self.assertEqual(result["overall"]["lines_valid"], 35)
+        self.assertEqual(result["overall"]["lines_covered"], 29)
+        self.assertEqual(result["overall"]["branches_valid"], 10)
+        self.assertEqual(result["overall"]["branches_covered"], 8)
+        self.assertAlmostEqual(result["overall"]["line_rate"], 29 / 35)
+        self.assertAlmostEqual(result["overall"]["branch_rate"], 0.8)
+        queue = result["critical_components"]["core/deferred_task_queue.py"]
+        self.assertEqual(queue["lines_valid"], 10)
+        self.assertAlmostEqual(queue["line_rate"], 0.9)
+        self.assertEqual(
+            result["critical_components"]["core/constitutional_brain.py"],
+            {"status": "not_present"},
+        )
+
+    def test_coverage_report_reads_coverage_py_line_elements(self):
+        coverage = """<coverage lines-valid="4" lines-covered="3" branches-valid="2" branches-covered="1">
+          <packages><package><classes>
+            <class filename="deferred_task_queue.py" line-rate="0.75" branch-rate="0.5">
+              <lines>
+                <line number="1" hits="1" />
+                <line number="2" hits="1" branch="true" condition-coverage="50% (1/2)" />
+                <line number="3" hits="1" />
+                <line number="4" hits="0" />
+              </lines>
+            </class>
+          </classes></package></packages>
+        </coverage>"""
+        manifest = self._manifest_with_files({"coverage.xml": coverage})
+        queue = manifest["verification"]["coverage"]["critical_components"]["core/deferred_task_queue.py"]
+        self.assertEqual(queue["lines_valid"], 4)
+        self.assertEqual(queue["lines_covered"], 3)
+        self.assertEqual(queue["branches_valid"], 2)
+        self.assertEqual(queue["branches_covered"], 1)
+        self.assertAlmostEqual(queue["line_rate"], 0.75)
+        self.assertAlmostEqual(queue["branch_rate"], 0.5)
+
+    def test_coverage_report_rejects_impossible_counts(self):
+        cases = (
+            '<coverage lines-valid="-1" lines-covered="0" branches-valid="0" branches-covered="0" />',
+            '<coverage lines-valid="1" lines-covered="2" branches-valid="0" branches-covered="0" />',
+            '<coverage lines-valid="0" lines-covered="0" branches-valid="1" branches-covered="2" />',
+            '<coverage><packages><package><classes><class filename="core/deferred_task_queue.py" lines-valid="x" lines-covered="0" /></classes></package></packages></coverage>',
+            '<coverage><packages><package><classes><class filename="core/deferred_task_queue.py" lines-valid="1" lines-covered="2" /></classes></package></packages></coverage>',
+        )
+        for content in cases:
+            with self.subTest(content=content):
+                manifest = self._manifest_with_files({"coverage.xml": content})
+                self.assertEqual(manifest["verification"]["coverage"], {"status": "invalid_report"})
+
+    def test_coverage_report_does_not_match_critical_component_by_basename(self):
+        coverage = """<coverage><packages><package><classes>
+          <class filename="other/deferred_task_queue.py" lines-valid="1" lines-covered="1" />
+        </classes></package></packages></coverage>"""
+        manifest = self._manifest_with_files({"coverage.xml": coverage})
+        queue = manifest["verification"]["coverage"]["critical_components"]["core/deferred_task_queue.py"]
+        self.assertEqual(queue, {"status": "not_present"})
+
+    def test_coverage_report_does_not_match_ambiguous_root_basename(self):
+        coverage = """<coverage><packages><package><classes>
+          <class filename="deferred_task_queue.py" lines-valid="1" lines-covered="1" />
+          <class filename="deferred_task_queue.py" lines-valid="1" lines-covered="1" />
+        </classes></package></packages></coverage>"""
+        manifest = self._manifest_with_files({"coverage.xml": coverage})
+        queue = manifest["verification"]["coverage"]["critical_components"]["core/deferred_task_queue.py"]
+        self.assertEqual(queue, {"status": "not_present"})
+
 
 if __name__ == "__main__":
     unittest.main()
