@@ -214,6 +214,16 @@ def _mutation_summary() -> dict[str, Any]:
     return {"status": "generated", **{key: summary.get(key) for key in ("declared", "applicable", "killed", "survived", "not_applied", "score_percent")}}
 
 
+def _coverage_count(value: str, field: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"invalid coverage count: {field}") from exc
+    if parsed < 0:
+        raise ValueError(f"negative coverage count: {field}")
+    return parsed
+
+
 def _coverage_metrics(classes: list[ET.Element]) -> dict[str, Any]:
     """Agrega linhas/branches de classes, sem transformar ausência em cobertura zero."""
     attributes = {
@@ -241,14 +251,11 @@ def _coverage_metrics(classes: list[ET.Element]) -> dict[str, Any]:
         for key, attribute in attributes.items():
             value = element.get(attribute)
             if value is not None:
-                try:
-                    parsed = int(value)
-                except ValueError:
-                    continue
-                if parsed >= 0:
-                    totals[key] += parsed
+                totals[key] += _coverage_count(value, attribute)
             elif derived[key] >= 0:
                 totals[key] += derived[key]
+    if any(totals[f"{kind}_covered"] > totals[f"{kind}_valid"] for kind in ("lines", "branches")):
+        raise ValueError("covered coverage count exceeds valid count")
     result: dict[str, Any] = {
         "files": len(classes),
         **totals,
@@ -281,7 +288,10 @@ def _coverage_summary() -> dict[str, Any]:
             files.setdefault(filename.replace("\\", "/"), []).append(element)
 
     class_elements = [element for items in files.values() for element in items]
-    overall = _coverage_metrics(class_elements)
+    try:
+        overall = _coverage_metrics(class_elements)
+    except ValueError:
+        return {"status": "invalid_report"}
     overall["files"] = len(files)
     root_attributes = {
         "lines_valid": "lines-valid",
@@ -290,20 +300,27 @@ def _coverage_summary() -> dict[str, Any]:
         "branches_covered": "branches-covered",
     }
     if all(root.get(attribute) is not None for attribute in root_attributes.values()):
-        for key, attribute in root_attributes.items():
-            try:
-                overall[key] = int(root.get(attribute, "0"))
-            except ValueError:
-                pass
+        try:
+            root_counts = {
+                key: _coverage_count(root.get(attribute, ""), attribute)
+                for key, attribute in root_attributes.items()
+            }
+        except ValueError:
+            return {"status": "invalid_report"}
+        if any(root_counts[f"{kind}_covered"] > root_counts[f"{kind}_valid"] for kind in ("lines", "branches")):
+            return {"status": "invalid_report"}
+        overall.update(root_counts)
         overall["line_rate"] = overall["lines_covered"] / overall["lines_valid"] if overall["lines_valid"] else None
         overall["branch_rate"] = overall["branches_covered"] / overall["branches_valid"] if overall["branches_valid"] else None
     critical = {}
     for target in _CRITICAL_COVERAGE_PATHS:
-        basename = Path(target).name
-        matching_filenames = [filename for filename in files if filename == target or filename.endswith(f"/{target}") or Path(filename).name == basename]
+        matching_filenames = [filename for filename in files if filename == target or filename.endswith(f"/{target}")]
         matching = [element for filename in matching_filenames for element in files[filename]]
         if matching:
-            critical[target] = _coverage_metrics(matching)
+            try:
+                critical[target] = _coverage_metrics(matching)
+            except ValueError:
+                return {"status": "invalid_report"}
             critical[target]["files"] = len(matching_filenames)
         else:
             critical[target] = {"status": "not_present"}

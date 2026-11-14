@@ -229,7 +229,7 @@ class StateManifestTests(unittest.TestCase):
     def test_coverage_report_reads_coverage_py_line_elements(self):
         coverage = """<coverage lines-valid="4" lines-covered="3" branches-valid="2" branches-covered="1">
           <packages><package><classes>
-            <class filename="deferred_task_queue.py" line-rate="0.75" branch-rate="0.5">
+            <class filename="core/deferred_task_queue.py" line-rate="0.75" branch-rate="0.5">
               <lines>
                 <line number="1" hits="1" />
                 <line number="2" hits="1" branch="true" condition-coverage="50% (1/2)" />
@@ -247,6 +247,27 @@ class StateManifestTests(unittest.TestCase):
         self.assertEqual(queue["branches_covered"], 1)
         self.assertAlmostEqual(queue["line_rate"], 0.75)
         self.assertAlmostEqual(queue["branch_rate"], 0.5)
+
+    def test_coverage_report_rejects_impossible_counts(self):
+        cases = (
+            '<coverage lines-valid="-1" lines-covered="0" branches-valid="0" branches-covered="0" />',
+            '<coverage lines-valid="1" lines-covered="2" branches-valid="0" branches-covered="0" />',
+            '<coverage lines-valid="0" lines-covered="0" branches-valid="1" branches-covered="2" />',
+            '<coverage><packages><package><classes><class filename="core/deferred_task_queue.py" lines-valid="x" lines-covered="0" /></classes></package></packages></coverage>',
+            '<coverage><packages><package><classes><class filename="core/deferred_task_queue.py" lines-valid="1" lines-covered="2" /></classes></package></packages></coverage>',
+        )
+        for content in cases:
+            with self.subTest(content=content):
+                manifest = self._manifest_with_files({"coverage.xml": content})
+                self.assertEqual(manifest["verification"]["coverage"], {"status": "invalid_report"})
+
+    def test_coverage_report_does_not_match_critical_component_by_basename(self):
+        coverage = """<coverage><packages><package><classes>
+          <class filename="other/deferred_task_queue.py" lines-valid="1" lines-covered="1" />
+        </classes></package></packages></coverage>"""
+        manifest = self._manifest_with_files({"coverage.xml": coverage})
+        queue = manifest["verification"]["coverage"]["critical_components"]["core/deferred_task_queue.py"]
+        self.assertEqual(queue, {"status": "not_present"})
 
 
 if __name__ == "__main__":
