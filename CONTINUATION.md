@@ -4,7 +4,7 @@
 commit: HEAD
 ci_run: CURRENT_RUN
 tests: CURRENT_TESTS
-bandit_low: 139
+bandit_low: 147
 -->
 
 ## Rodada local — contrato de endpoints e limite de hops do grafo — 2026-11-13
