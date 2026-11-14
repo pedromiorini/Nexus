@@ -229,7 +229,7 @@ class StateManifestTests(unittest.TestCase):
     def test_coverage_report_reads_coverage_py_line_elements(self):
         coverage = """<coverage lines-valid="4" lines-covered="3" branches-valid="2" branches-covered="1">
           <packages><package><classes>
-            <class filename="core/deferred_task_queue.py" line-rate="0.75" branch-rate="0.5">
+            <class filename="deferred_task_queue.py" line-rate="0.75" branch-rate="0.5">
               <lines>
                 <line number="1" hits="1" />
                 <line number="2" hits="1" branch="true" condition-coverage="50% (1/2)" />
@@ -264,6 +264,15 @@ class StateManifestTests(unittest.TestCase):
     def test_coverage_report_does_not_match_critical_component_by_basename(self):
         coverage = """<coverage><packages><package><classes>
           <class filename="other/deferred_task_queue.py" lines-valid="1" lines-covered="1" />
+        </classes></package></packages></coverage>"""
+        manifest = self._manifest_with_files({"coverage.xml": coverage})
+        queue = manifest["verification"]["coverage"]["critical_components"]["core/deferred_task_queue.py"]
+        self.assertEqual(queue, {"status": "not_present"})
+
+    def test_coverage_report_does_not_match_ambiguous_root_basename(self):
+        coverage = """<coverage><packages><package><classes>
+          <class filename="deferred_task_queue.py" lines-valid="1" lines-covered="1" />
+          <class filename="deferred_task_queue.py" lines-valid="1" lines-covered="1" />
         </classes></package></packages></coverage>"""
         manifest = self._manifest_with_files({"coverage.xml": coverage})
         queue = manifest["verification"]["coverage"]["critical_components"]["core/deferred_task_queue.py"]

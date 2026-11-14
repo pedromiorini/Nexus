@@ -282,10 +282,12 @@ def _coverage_summary() -> dict[str, Any]:
         return {"status": "invalid_report"}
 
     files: dict[str, list[ET.Element]] = {}
+    filename_occurrences: dict[str, int] = {}
     for element in root.findall(".//class"):
         filename = element.get("filename")
         if isinstance(filename, str) and filename:
             files.setdefault(filename.replace("\\", "/"), []).append(element)
+            filename_occurrences[filename.replace("\\", "/")] = filename_occurrences.get(filename.replace("\\", "/"), 0) + 1
 
     class_elements = [element for items in files.values() for element in items]
     try:
@@ -315,6 +317,12 @@ def _coverage_summary() -> dict[str, Any]:
     critical = {}
     for target in _CRITICAL_COVERAGE_PATHS:
         matching_filenames = [filename for filename in files if filename == target or filename.endswith(f"/{target}")]
+        if not matching_filenames:
+            basename = Path(target).name
+            matching_filenames = [
+                filename for filename in files
+                if filename == basename and filename_occurrences.get(filename) == 1
+            ]
         matching = [element for filename in matching_filenames for element in files[filename]]
         if matching:
             try:
