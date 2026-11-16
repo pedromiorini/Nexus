@@ -7,6 +7,15 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Squash merge verificado da PR #173 — 2026-11-16
+
+- **Fato:** a PR #173 foi marcada como pronta para revisão e squash-merged na `main` pelo GitHub às `2026-11-16T04:46:57Z`.
+- **Commits:** candidato validado `aa278a56baaa54318d93ff91fdc5dc2e2ed1dd96`; merge commit em `main` `9444ad2f45f010c210923276d4d22f43efe9597d`.
+- **Evidência remota:** Contract Gate `43804880031` concluído com sucesso; `1555/1555` testes, mutação direcionada `84/84` morta, 0 sobreviventes e 0 não aplicados; compatibilidade Python 3.12/3.13, replay, segurança e atestação final aprovados.
+- **Escopo:** correção restrita à validação exata de `line_number` na triagem Bandit e seu contrato; nenhum claim de AGI, consciência ou segurança absoluta foi adicionado.
+- **Limitações:** o squash merge não substitui revisão de segurança externa; os indicadores são evidência deste commit e deste run, não garantia geral do sistema.
+- **Próximo passo:** reconsultar o estado de `main` e selecionar a próxima tarefa de menor risco; não iniciar nova alteração ampla sem evidência e contrato.
+
 ## Revalidação local da PR #173 sobre `main` atual — 2026-11-16
 
 - **Fenômeno:** a PR #173 (`ac2665d`) corrige `tools/security_triage.resolve_scope`, que convertia `line_number` com `int(line)`. No `main` atual `2e4f2d3`, o contrato novo reproduziu coerção de `bool`, floats e strings numéricas para escopos e `±inf` como erro; o resultado RED válido foi 7 testes, 12 falhas e 5 erros. A primeira tentativa RED em diretório incorreto foi descartada como erro operacional, não como evidência.
