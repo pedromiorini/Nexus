@@ -7,6 +7,17 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Follow-up da PR #116 — restauração atômica de working memory — 2026-11-16
+
+- **Base e commits:** `main`/base da PR `5c24ddfc1bdd4489d2220185c3031868129f12a3`; head #116 antes da integração `c586711158021b1b0d831407a0ec80504fe399e3`. Candidata `fix/working-memory-atomic-slot-restore-20261116`; commit de código, teste e relatórios `b384ae9692068f1ba73ec46e83d22c6311a5cd19`.
+- **Contrato:** `__setstate__` rejeita subclasses com `__setattr__` definido em qualquer classe do MRO antes de alterar estado. Testes cobrem setter que falha, efeitos colaterais, substituição de `__dict__` e override herdado. O teste herdado falhou na base com `TypeError not raised`; a candidata passou.
+- **Focado:** `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-focused-audit-final.sqlite3 PYTHONPYCACHEPREFIX=/tmp/nexus-pycache-focused-final /tmp/nexus-ci312/bin/python -m unittest -v test_working_memory_contract.py` — 38/38, OK.
+- **Suíte completa:** `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-full-audit.sqlite3 PYTHONPYCACHEPREFIX=/tmp/nexus-pycache-full-final LC_ALL=C.UTF-8 /tmp/nexus-ci312/bin/python -m unittest discover -p 'test_*.py'` — 1.586 testes, 5 expected failures, exit 0 (136,879 s), Python 3.12.3.
+- **Outros gates:** Ruff (`ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`), `compileall` nos mesmos caminhos e `git diff --check` passaram. `reality_audit.py` regenerado duas vezes com hashes estáveis; working_memory: 558 linhas; total de módulos extraídos: 7.286 linhas. Os 27 mutantes WM existentes morreram (0 sobreviventes, 0 não aplicados); relatório em `/tmp/nexus-wm-mutation-report.json`, fora do repositório.
+- **Nota operacional:** a primeira execução focada após o RED temporário usou bytecode obsoleto e retornou 1 falha/3 erros; importação e rerun com `PYTHONPYCACHEPREFIX` isolado usaram a fonte candidata atual e passaram. A suíte final também usou cache isolado.
+- **Limites:** validação local só em Python 3.12.3; `psutil`, FAISS e SentenceTransformers ausentes, com fallback opcional. Subclasses com `__setattr__` customizado são rejeitadas na restauração; descritores customizados/sombreamento de `capacity`, pickles não confiáveis e compatibilidade de downgrade continuam fora do contrato.
+- **Estado:** nenhuma alteração em `main`, claims ou outra PR; a #116 deve permanecer draft, sem merge.
+
 ## Revalidação local da PR #116 sobre `main` atual — 2026-11-16
 
 - **Fenômeno:** a PR #116 foi aberta a partir de `af28cc1` e seu head `9c7508d` estava 39 commits à frente e 6 commits atrás de `origin/main=5c24ddfc1bdd4489d2220185c3031868129f12a3`. O rebase local encontrou conflitos em documentos históricos; o conflito funcional em `NEXUS_DECISIONS.md` foi resolvido preservando `main`, e cinco snapshots documentais redundantes foram descartados.
