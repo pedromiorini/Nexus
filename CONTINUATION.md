@@ -7,6 +7,17 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Revalidação local da PR #173 sobre `main` atual — 2026-11-16
+
+- **Fenômeno:** a PR #173 (`ac2665d`) corrige `tools/security_triage.resolve_scope`, que convertia `line_number` com `int(line)`. No `main` atual `2e4f2d3`, o contrato novo reproduziu coerção de `bool`, floats e strings numéricas para escopos e `±inf` como erro; o resultado RED válido foi 7 testes, 12 falhas e 5 erros. A primeira tentativa RED em diretório incorreto foi descartada como erro operacional, não como evidência.
+- **Hipóteses:** H1, valores não inteiros já eram `<unresolved>` (falsificada por `True`/float/string); H2, valores não conversíveis já falhavam sem interromper o relatório (falsificada por `±inf`); H3, inteiros exatos seriam preservados (sobreviveu); H4, o patch poderia afetar outras disposições da triagem (ainda não falsificada além dos contratos executados).
+- **Rebase e escopo:** worktree `review/pr173-rebase-20261116`, base exata `origin/main=2e4f2d3ab03ce7d89e048f5a1805d65c0f61bb51`; rebase linear concluído. O conflito esperado em `CONTINUATION.md` foi resolvido preservando o handoff atual de `main`. O lease expirado de `docs/agentes/CLAIMS.yaml` e o commit documental histórico da PR foram removidos da candidata. O diff efetivo contém somente `tools/security_triage.py` e `test_security_triage_line_contract.py`; não toca o núcleo.
+- **GREEN focado:** 15/15 testes (`test_security_triage_line_contract.py` e `test_security_triage.py`), incluindo Hypothesis; Ruff, `py_compile` e `git diff --check` passaram.
+- **Suíte e cobertura:** `tools/test_summary.py` executou 1.555/1.555, sem falhas ou skips e com 5 expected failures do conjunto. Pisos do workflow: fila 95%, VRAM 95%, fatos temporais 94%, Vita 76%, núcleo 72%; total 84%. Suíte integrada: 30 aprovados, 1 skip opcional, sem missing/unexpected/conflicting/duplicates.
+- **Mutação, segurança e auditoria:** mutação direcionada 84/84 mortos, 0 sobreviventes e 0 não aplicados; `reality_audit.py`, `security_triage.py --check`, auditoria B101 e auditoria de gaps passaram. Bandit permaneceu em 139 LOW; nenhum MEDIUM/HIGH foi observado. LOW não é clearance de segurança.
+- **Limitações:** não houve push, alteração da PR remota, CI hospedado, atualização dos quatro marcadores canônicos ou manifesto com `ci.gates_status: success`. O `main` atual possui Contract Gate verde no run `43801719037`; o candidato rebased ainda precisa de CI próprio se for publicado. A candidata local não carrega o handoff histórico da PR nem lease expirado; esta seção é o registro atual da revalidação.
+- **Próximo passo:** revisão do diff e autorização explícita antes de `--force-with-lease` na branch da #173. Não marcar pronta nem mesclar automaticamente.
+
 ## Rodada local — contrato de endpoints e limite de hops do grafo — 2026-11-13
 
 - **Base/candidata:** `main` revalidada em `99437e52d03e6b0f973d764052e93b89ac77941d`; clone isolado `/workspace/Nexus-kg-contracts-20261113`, branch `fix/kg-endpoint-hops-contract-20261113`, sem commit. O checkout protegido e as três WIPs antigas permaneceram intocados.
