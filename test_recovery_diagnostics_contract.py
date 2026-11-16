@@ -11,12 +11,45 @@ from unittest.mock import patch
 from hypothesis import given, settings, strategies as st
 
 from vita.nexus_constitutional_bridge_v3 import NexusConstitutionalBridge
-from tools.diagnostics_dashboard import load_snapshot, main, render_dashboard
+from tools.diagnostics_dashboard import (
+    EVENT_TRACE_LABELS,
+    FUNCTION_EVIDENCE_CATALOG,
+    FUNCTION_EVIDENCE_CATALOG_VERSION,
+    RUNTIME_EVENT_AREA_MAP,
+    load_snapshot,
+    main,
+    render_dashboard,
+    render_html_dashboard,
+)
 
 
 class RecoveryDiagnosticsContractTests(unittest.TestCase):
     def setUp(self):
         self.bridge = NexusConstitutionalBridge(":memory:")
+
+    def test_function_evidence_catalog_has_stable_ids_and_resolving_references(self):
+        expected_ids = (
+            "routing-and-deferred-tasks", "tool-decisions-and-permissions", "attention-and-workspace",
+            "working-memory", "episodic-and-contextual-memory", "semantic-knowledge-and-temporal-facts",
+            "causal-modeling-and-simulation", "mcts-planning", "prediction-and-incremental-learning",
+            "analogy-and-future-thinking", "multimodal-backends", "operational-resilience", "recovery-diagnostics",
+        )
+        self.assertEqual(FUNCTION_EVIDENCE_CATALOG_VERSION, "nexus.function-evidence.v1")
+        self.assertEqual(tuple(entry.id for entry in FUNCTION_EVIDENCE_CATALOG), expected_ids)
+        self.assertEqual(len({entry.id for entry in FUNCTION_EVIDENCE_CATALOG}), len(expected_ids))
+        self.assertEqual(RUNTIME_EVENT_AREA_MAP, {
+            "policy_transition": ("recovery-diagnostics",),
+            "telemetry": ("recovery-diagnostics",),
+        })
+        self.assertEqual(set(EVENT_TRACE_LABELS), set(RUNTIME_EVENT_AREA_MAP))
+        root = Path(__file__).resolve().parent
+        for entry in FUNCTION_EVIDENCE_CATALOG:
+            self.assertTrue(entry.label)
+            self.assertTrue(entry.code_refs)
+            self.assertTrue(entry.test_refs)
+            for reference in (*entry.code_refs, *entry.test_refs):
+                with self.subTest(entry=entry.id, reference=reference):
+                    self.assertTrue((root / reference).is_file(), reference)
 
     def test_export_has_versioned_contract(self):
         payload = self.bridge.export_recovery_diagnostics()
@@ -66,6 +99,253 @@ class RecoveryDiagnosticsContractTests(unittest.TestCase):
     def test_dashboard_rejects_invalid_snapshot(self):
         with self.assertRaises(ValueError):
             render_dashboard({"schema": "nexus.recovery.diagnostics.v9"})
+
+    def test_html_dashboard_uses_accessible_inline_charts_without_event_payloads(self):
+        self.bridge.record_policy_transition("active", "paused", "pause marker", {})
+        self.bridge.record_policy_transition("paused", "active", "recovery marker", {})
+        snapshot = self.bridge.export_recovery_diagnostics()
+        snapshot["events"][0]["payload"]["reason"] = "RAW_EVENT_PAYLOAD_MARKER"
+
+        rendered = render_html_dashboard(snapshot)
+
+        self.assertIn("<!doctype html>", rendered.lower())
+        self.assertIn('<meta name="viewport"', rendered)
+        self.assertIn("<style>", rendered)
+        self.assertNotIn("<script", rendered.lower())
+        self.assertNotIn("http://", rendered.lower())
+        self.assertNotIn("https://", rendered.lower())
+        self.assertEqual(rendered.count("<table"), 3)
+        self.assertIn("Eventos por severidade", rendered)
+        self.assertIn("Pausas e recuperações", rendered)
+        self.assertIn("<th scope=\"row\">Crítica</th>", rendered)
+        self.assertIn("<th scope=\"row\">Pausas</th>", rendered)
+        self.assertNotIn("RAW_EVENT_PAYLOAD_MARKER", rendered)
+
+    def test_html_dashboard_event_trace_uses_allowlist_and_registration_order(self):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        snapshot["events"] = [
+            {
+                "event_type": "policy_transition", "timestamp": 50.5,
+                "payload": {"reason": "RAW_TRACE_PAYLOAD_MARKER"},
+                "private_field": "RAW_TRACE_ARBITRARY_FIELD_MARKER",
+            },
+            {
+                "event_type": "PRIVATE_UNKNOWN_TRACE_TYPE_MARKER", "timestamp": 51.0,
+                "payload": {"reason": "RAW_UNKNOWN_TRACE_PAYLOAD_MARKER"},
+            },
+            {"event_type": "telemetry", "timestamp": 10.0, "payload": {"secret": "RAW_TELEMETRY_PAYLOAD_MARKER"}},
+        ]
+
+        rendered = render_html_dashboard(snapshot)
+        trace = rendered.split('<section id="event-trace"', 1)[1].split("</section>", 1)[0]
+
+        self.assertIn('<a href="#event-trace">', rendered)
+        self.assertIn("Rastro de eventos observáveis", trace)
+        self.assertIn("em ordem de registro", trace.lower())
+        self.assertIn("não é um feed ao vivo", trace.lower())
+        self.assertIn("Transição de política", trace)
+        self.assertIn("Telemetria de reprocessamento", trace)
+        self.assertLess(trace.index("50.5"), trace.index("10.0"))
+        for marker in (
+            "PRIVATE_UNKNOWN_TRACE_TYPE_MARKER", "RAW_TRACE_PAYLOAD_MARKER",
+            "RAW_TRACE_ARBITRARY_FIELD_MARKER", "RAW_UNKNOWN_TRACE_PAYLOAD_MARKER",
+            "RAW_TELEMETRY_PAYLOAD_MARKER",
+        ):
+            with self.subTest(marker=marker):
+                self.assertNotIn(marker, rendered)
+
+    def test_html_dashboard_event_trace_distinguishes_empty_and_unknown_only_snapshots(self):
+        empty_snapshot = self.bridge.export_recovery_diagnostics()
+        empty_trace = render_html_dashboard(empty_snapshot).split(
+            '<section id="event-trace"', 1
+        )[1].split("</section>", 1)[0]
+        self.assertIn("Nenhum evento incluído neste snapshot.", empty_trace)
+
+        unknown_snapshot = self.bridge.export_recovery_diagnostics()
+        unknown_snapshot["events"] = [{
+            "event_type": "PRIVATE_UNKNOWN_TRACE_TYPE_MARKER", "timestamp": 1.0,
+            "payload": {"private": "RAW_UNKNOWN_TRACE_PAYLOAD_MARKER"},
+        }]
+        unknown_trace = render_html_dashboard(unknown_snapshot).split(
+            '<section id="event-trace"', 1
+        )[1].split("</section>", 1)[0]
+        self.assertIn("Nenhum evento permitido neste snapshot", unknown_trace)
+        self.assertIn("1 registro com tipo não permitido foi omitido", unknown_trace)
+        self.assertNotIn("PRIVATE_UNKNOWN_TRACE_TYPE_MARKER", unknown_trace)
+        self.assertNotIn("RAW_UNKNOWN_TRACE_PAYLOAD_MARKER", unknown_trace)
+
+    def test_html_dashboard_event_trace_limits_rows_and_reports_each_omission(self):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        snapshot["events"] = [
+            {"event_type": "telemetry", "timestamp": float(index), "payload": {}}
+            for index in range(22)
+        ]
+        snapshot["events"].insert(3, {
+            "event_type": "PRIVATE_UNKNOWN_TRACE_TYPE_MARKER", "timestamp": 22.0,
+            "payload": {"private": "RAW_LIMIT_TRACE_PAYLOAD_MARKER"},
+        })
+
+        trace = render_html_dashboard(snapshot).split(
+            '<section id="event-trace"', 1
+        )[1].split("</section>", 1)[0]
+
+        self.assertEqual(trace.count("<li>"), 20)
+        self.assertIn("Exibindo 20 de 22 eventos permitidos neste recorte", trace)
+        self.assertIn("2 eventos permitidos anteriores foram omitidos pelo limite de 20 linhas visíveis", trace)
+        self.assertIn("1 registro com tipo não permitido foi omitido", trace)
+        self.assertNotIn("Unix): 0.0 s", trace)
+        self.assertIn("Unix): 2.0 s", trace)
+        self.assertNotIn("PRIVATE_UNKNOWN_TRACE_TYPE_MARKER", trace)
+        self.assertNotIn("RAW_LIMIT_TRACE_PAYLOAD_MARKER", trace)
+
+    def test_html_dashboard_event_trace_wraps_extreme_finite_integer_timestamps(self):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        timestamp = 10**300
+        snapshot["events"] = [{
+            "event_type": "telemetry", "timestamp": timestamp, "payload": {},
+        }]
+
+        rendered = render_html_dashboard(snapshot)
+        trace = rendered.split('<section id="event-trace"', 1)[1].split("</section>", 1)[0]
+        timestamp_style = rendered.split(".event-timestamp {", 1)[1].split("}", 1)[0]
+
+        self.assertIn(f"Unix): {timestamp} s", trace)
+        self.assertIn("overflow-wrap: anywhere;", timestamp_style)
+
+    def test_html_dashboard_escapes_variable_text(self):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        snapshot["source"] = '<img src=x onerror="alert(1)">&'
+        snapshot["diagnostics"]["latest_state"] = '</div><script>alert("x")</script>'
+
+        rendered = render_html_dashboard(snapshot)
+
+        self.assertIn('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;&amp;', rendered)
+        self.assertIn('&lt;/div&gt;&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;', rendered)
+        self.assertNotIn('<img src=x onerror="alert(1)">', rendered)
+        self.assertNotIn('<script>alert("x")</script>', rendered)
+
+    def test_html_dashboard_cli_is_opt_in_and_invalid_input_emits_no_partial_html(self):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        encoded = json.dumps(snapshot, allow_nan=False)
+
+        default_result = self._run_dashboard(encoded, False)
+        self.assertEqual(default_result.returncode, 0, default_result.stderr)
+        self.assertIn("NEXUS RECOVERY DASHBOARD", default_result.stdout)
+        self.assertNotIn("<!doctype html>", default_result.stdout.lower())
+
+        for stdin in (False, True):
+            with self.subTest(stdin=stdin):
+                result = self._run_dashboard(encoded, stdin, "--format", "html")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("<!doctype html>", result.stdout.lower())
+                self.assertEqual(result.stderr, "")
+
+                invalid = json.dumps({"schema": "nexus.recovery.diagnostics.v9"})
+                failed = self._run_dashboard(invalid, stdin, "--format", "html")
+                self.assertEqual(failed.returncode, 2)
+                self.assertEqual(failed.stdout, "")
+                self.assertTrue(failed.stderr.startswith("dashboard error:"))
+                self.assertNotIn("<!doctype html>", failed.stdout.lower())
+
+    def test_html_dashboard_catalog_is_navigable_versioned_and_separates_evidence_axes(self):
+        self.bridge.record_policy_transition(
+            "active", "paused", "RAW_CATALOG_REASON_MARKER", {"secret": "RAW_CATALOG_POLICY_MARKER"},
+        )
+        self.bridge.record_reprocessing_telemetry({
+            "attempts": 2, "failed": 0, "discarded": 0, "total_latency_ms": 0.0,
+            "secret": "RAW_CATALOG_TELEMETRY_MARKER",
+        })
+        snapshot = self.bridge.export_recovery_diagnostics()
+
+        rendered = render_html_dashboard(snapshot)
+
+        self.assertIn('<a href="#functions-and-evidence">', rendered)
+        self.assertIn('<section id="functions-and-evidence"', rendered)
+        self.assertIn("nexus.function-evidence.v1", rendered)
+        self.assertIn("13 IDs cadastrados", rendered)
+        self.assertIn("As áreas se sobrepõem", rendered)
+        self.assertIn("não mede cobertura de funções", rendered)
+        self.assertIn("Evidência de implementação/contrato", rendered)
+        self.assertIn("Visibilidade de runtime", rendered)
+        self.assertIn("routing-and-deferred-tasks", rendered)
+        self.assertIn("recovery-diagnostics", rendered)
+        self.assertIn("Parcial", rendered)
+        self.assertIn("Não instrumentado", rendered)
+        self.assertNotIn("RAW_CATALOG_REASON_MARKER", rendered)
+        self.assertNotIn("RAW_CATALOG_POLICY_MARKER", rendered)
+        self.assertNotIn("RAW_CATALOG_TELEMETRY_MARKER", rendered)
+
+    def test_html_dashboard_runtime_status_requires_matching_snapshot_events(self):
+        empty_snapshot = self.bridge.export_recovery_diagnostics()
+        empty_rendered = render_html_dashboard(empty_snapshot)
+
+        self.assertIn("Sem observação neste snapshot (0 eventos)", empty_rendered)
+        self.assertIn("Não instrumentado", empty_rendered)
+        recovery_row = empty_rendered.split('id="catalog-recovery-diagnostics"', 1)[1].split("</tr>", 1)[0]
+        self.assertNotIn("<strong>Parcial</strong>", recovery_row)
+
+        unknown_snapshot = self.bridge.export_recovery_diagnostics()
+        unknown_snapshot["events"] = [{
+            "event_type": "PRIVATE_UNKNOWN_EVENT_MARKER", "timestamp": 1.0,
+            "payload": {"event_type": "telemetry", "reason": "PRIVATE_PAYLOAD_CLAIM_MARKER"},
+        }]
+        unknown_rendered = render_html_dashboard(unknown_snapshot)
+        self.assertNotIn("<strong>Parcial</strong>", unknown_rendered)
+        self.assertNotIn("PRIVATE_UNKNOWN_EVENT_MARKER", unknown_rendered)
+        self.assertNotIn("PRIVATE_PAYLOAD_CLAIM_MARKER", unknown_rendered)
+
+        self.bridge.record_reprocessing_telemetry({
+            "attempts": 1, "failed": 0, "discarded": 0, "total_latency_ms": 1.0,
+        })
+        observed_rendered = render_html_dashboard(self.bridge.export_recovery_diagnostics())
+        self.assertIn("Parcial", observed_rendered)
+        self.assertNotIn("Sem observação neste snapshot (0 eventos)", observed_rendered)
+
+    def test_vita_events_only_mark_the_matching_operational_recovery_area(self):
+        for event_type in ("policy_transition", "telemetry"):
+            with self.subTest(event_type=event_type):
+                snapshot = self.bridge.export_recovery_diagnostics()
+                snapshot["events"] = [{"event_type": event_type, "timestamp": 1.0, "payload": {}}]
+                rendered = render_html_dashboard(snapshot)
+                self.assertEqual(rendered.count("<strong>Parcial</strong>"), 1)
+                self.assertIn("Parcial: 1/13; sem observação: 0/13; não instrumentado: 12/13.", rendered)
+                for entry in FUNCTION_EVIDENCE_CATALOG:
+                    row = rendered.split(f'id="catalog-{entry.id}"', 1)[1].split("</tr>", 1)[0]
+                    if entry.id == "recovery-diagnostics":
+                        self.assertIn("<strong>Parcial</strong>", row)
+                    else:
+                        self.assertIn("<strong>Não instrumentado</strong>", row)
+                        self.assertNotIn("<strong>Parcial</strong>", row)
+
+    def test_html_dashboard_distinguishes_zero_unknown_and_missing_denominator(self):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        rendered_without_pauses = render_html_dashboard(snapshot)
+        self.assertIn("Sem denominador (0 recuperações / 0 pausas)", rendered_without_pauses)
+
+        snapshot["diagnostics"].update({"pauses": 3, "recoveries": 0, "recovery_rate": 0.0})
+        rendered_zero_ratio = render_html_dashboard(snapshot)
+        self.assertIn("0/3 (recuperações/pausas)", rendered_zero_ratio)
+
+        del snapshot["diagnostics"]["pauses"]
+        rendered_unknown = render_html_dashboard(snapshot)
+        self.assertIn("Desconhecido", rendered_unknown)
+
+    def test_html_dashboard_shows_extra_severities_in_a_safe_bucket_that_scales_the_chart(self):
+        snapshot = self.bridge.export_recovery_diagnostics()
+        snapshot["diagnostics"]["severity_counts"] = {
+            "info": 2, "warning": 1, "critical": 0,
+            "untrusted-dynamic-severity": 100, "second-untrusted-severity": 50,
+        }
+        self.assertTrue(self.bridge.validate_recovery_diagnostics(snapshot)["valid"])
+
+        rendered = render_html_dashboard(snapshot)
+
+        self.assertIn("<th scope=\"row\">Não reconhecida</th>", rendered)
+        self.assertIn('<td class="count">150</td>', rendered)
+        self.assertIn('style="width: 1%"', rendered)
+        self.assertIn('style="width: 100%"', rendered)
+        self.assertNotIn("untrusted-dynamic-severity", rendered)
+        self.assertNotIn("second-untrusted-severity", rendered)
 
     def _assert_dashboard_deep_json(self, source, *, direct=False):
         # Exceed Python and C decoder limits (which differ on Python 3.12).
@@ -197,10 +477,10 @@ class RecoveryDiagnosticsContractTests(unittest.TestCase):
                 path.write_text(encoded, encoding="utf-8")
                 yield str(path)
 
-    def _run_dashboard(self, encoded, stdin):
+    def _run_dashboard(self, encoded, stdin, *arguments):
         with self._snapshot_source(encoded, stdin) as source:
             return subprocess.run(
-                [sys.executable, "-m", "tools.diagnostics_dashboard", source],
+                [sys.executable, "-m", "tools.diagnostics_dashboard", source, *arguments],
                 input=encoded if stdin else None, capture_output=True, text=True,
                 cwd=Path(__file__).resolve().parent, timeout=15, check=False,
             )

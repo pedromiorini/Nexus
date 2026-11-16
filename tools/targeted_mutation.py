@@ -164,6 +164,30 @@ MUTATIONS = [
         "        parse_float=_parse_finite_float,", tests=DASHBOARD_NUMBERS,
     ),
     Mutation(
+        "dashboard_trace_allowlist", "tools/diagnostics_dashboard.py",
+        'event for event in events if event["event_type"] in EVENT_TRACE_LABELS',
+        'event for event in events if event["event_type"] not in EVENT_TRACE_LABELS',
+        tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "dashboard_trace_payload_leak", "tools/diagnostics_dashboard.py",
+        "f'{html.escape(str(event[\"timestamp\"]), quote=True)} s</span> '",
+        "f'{html.escape(str(event[\"timestamp\"]), quote=True)} s {html.escape(str(event[\"payload\"]), quote=True)}</span> '",
+        tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "dashboard_trace_registration_order", "tools/diagnostics_dashboard.py",
+        "for event in visible_events",
+        'for event in sorted(visible_events, key=lambda event: event["timestamp"])',
+        tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
+        "dashboard_trace_limit_keeps_latest", "tools/diagnostics_dashboard.py",
+        "visible_events = permitted_events[-MAX_VISIBLE_TRACE_EVENTS:]",
+        "visible_events = permitted_events[:MAX_VISIBLE_TRACE_EVENTS]",
+        tests=DASHBOARD_NUMBERS,
+    ),
+    Mutation(
         "embedded_assert_only_module_level_guards",
         "tools/embedded_assert_audit.py",
         "for node in tree.body:",
