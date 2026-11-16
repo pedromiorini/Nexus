@@ -54,7 +54,13 @@ def _positive_capacity(capacity: SupportsIndex) -> int:
 
 
 def _restore_working_memory_state(instance: Any, state: Any) -> None:
-    """Restore default dict/slot state with a validated capacity value."""
+    """Restore validated dict/slot state; subclasses defining custom __setattr__ are unsupported."""
+    if any(
+        cls is not object and "__setattr__" in vars(cls)
+        for cls in type(instance).__mro__
+    ):
+        raise TypeError("working memory restoration does not support custom __setattr__")
+
     if type(state) is dict:
         dict_state = state
         slot_state = None
@@ -74,12 +80,12 @@ def _restore_working_memory_state(instance: Any, state: Any) -> None:
     restored_slots = {} if slot_state is None else slot_state.copy()
     if any(type(name) is not str for name in restored_slots):
         raise TypeError("working memory slot state keys must be strings")
-    valid_slots = {
-        name
-        for cls in type(instance).__mro__
-        for name, descriptor in vars(cls).items()
-        if isinstance(descriptor, MemberDescriptorType)
-    }
+    slot_descriptors = {}
+    for cls in type(instance).__mro__:
+        for name, descriptor in vars(cls).items():
+            if isinstance(descriptor, MemberDescriptorType):
+                slot_descriptors.setdefault(name, descriptor)
+    valid_slots = set(slot_descriptors)
     if any(name not in valid_slots for name in restored_slots):
         raise TypeError("working memory slot state contains an unsupported slot")
 
@@ -99,9 +105,34 @@ def _restore_working_memory_state(instance: Any, state: Any) -> None:
         restored_slots["_capacity"] = normalized_capacity
     else:
         restored_state["_capacity"] = normalized_capacity
-    instance.__dict__.update(restored_state)
-    for name, value in restored_slots.items():
-        setattr(instance, name, value)
+    instance_dict = instance.__dict__
+    original_dict_state = instance_dict.copy()
+    missing_slot = object()
+    original_slot_state = {}
+    for name in restored_slots:
+        descriptor = slot_descriptors[name]
+        try:
+            original_slot_state[name] = descriptor.__get__(instance, type(instance))
+        except AttributeError:
+            original_slot_state[name] = missing_slot
+
+    try:
+        instance_dict.update(restored_state)
+        for name, value in restored_slots.items():
+            setattr(instance, name, value)
+    except BaseException:
+        instance_dict.clear()
+        instance_dict.update(original_dict_state)
+        for name, value in reversed(tuple(original_slot_state.items())):
+            descriptor = slot_descriptors[name]
+            if value is missing_slot:
+                try:
+                    descriptor.__delete__(instance)
+                except AttributeError:
+                    pass
+            else:
+                descriptor.__set__(instance, value)
+        raise
 
 
 class PhonologicalLoop:

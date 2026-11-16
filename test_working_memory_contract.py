@@ -50,6 +50,35 @@ class SlottedPhonologicalLoop(PhonologicalLoop):
     __slots__ = ("label",)
 
 
+class RejectingSlottedPhonologicalLoop(SlottedPhonologicalLoop):
+    __slots__ = ("marker",)
+
+    def __setattr__(self, name, value):
+        if name == "label" and value == "reject":
+            raise RuntimeError("slot assignment rejected")
+        object.__setattr__(self, name, value)
+
+
+class SideEffectSlottedPhonologicalLoop(SlottedPhonologicalLoop):
+    __slots__ = ("trigger", "collateral")
+
+    def __setattr__(self, name, value):
+        if name == "trigger" and value == "trigger-side-effect":
+            object.__setattr__(self, "collateral", "setter side effect")
+            raise RuntimeError("slot setter failed after side effect")
+        object.__setattr__(self, name, value)
+
+
+class ReplacingDictSlottedPhonologicalLoop(SlottedPhonologicalLoop):
+    __slots__ = ("label",)
+
+    def __setattr__(self, name, value):
+        if name == "label" and value == "replace-dict":
+            object.__setattr__(self, "__dict__", {"replacement": "setter side effect"})
+            raise RuntimeError("slot setter failed after replacing dict")
+        object.__setattr__(self, name, value)
+
+
 class SlottedVisuospatialSketchpad(VisuospatialSketchpad):
     __slots__ = ("label",)
 
@@ -533,6 +562,87 @@ class WorkingMemoryCapacityContractTests(unittest.TestCase):
                     self.assertEqual(instance.capacity, 2)
                     self.assertEqual(instance.label, "original slot value")
                     self.assertNotIn("metadata", instance.__dict__)
+
+    def test_slot_assignment_error_does_not_partially_restore_dict_state(self):
+        instance = RejectingSlottedPhonologicalLoop(capacity=2)
+        instance.label = "original slot value"
+        instance.marker = "original marker value"
+        original_state = instance.__dict__.copy()
+        incoming_state = (
+            {"_capacity": 9, "metadata": "new-state"},
+            {"marker": "new marker value", "label": "reject"},
+        )
+
+        with self.assertRaisesRegex(TypeError, "custom __setattr__"):
+            instance.__setstate__(incoming_state)
+
+        self.assertEqual(instance.__dict__, original_state)
+        self.assertEqual(instance.capacity, 2)
+        self.assertEqual(instance.label, "original slot value")
+        self.assertEqual(instance.marker, "original marker value")
+        self.assertNotIn("metadata", instance.__dict__)
+
+    def test_custom_setattr_side_effects_are_rejected_before_mutation(self):
+        instance = SideEffectSlottedPhonologicalLoop(capacity=2)
+        instance.trigger = "original trigger"
+        instance.collateral = "original collateral"
+        original_dict = instance.__dict__
+        original_state = original_dict.copy()
+        incoming_state = (
+            {"_capacity": 9, "metadata": "incoming"},
+            {"trigger": "trigger-side-effect"},
+        )
+
+        with self.assertRaisesRegex(TypeError, "custom __setattr__"):
+            instance.__setstate__(incoming_state)
+
+        self.assertIs(instance.__dict__, original_dict)
+        self.assertEqual(instance.__dict__, original_state)
+        self.assertEqual(instance.capacity, 2)
+        self.assertEqual(instance.trigger, "original trigger")
+        self.assertEqual(instance.collateral, "original collateral")
+
+    def test_custom_setattr_dict_replacement_is_rejected_before_mutation(self):
+        instance = ReplacingDictSlottedPhonologicalLoop(capacity=2)
+        instance.label = "original label"
+        original_dict = instance.__dict__
+        original_state = original_dict.copy()
+        incoming_state = (
+            {"_capacity": 9, "metadata": "incoming"},
+            {"label": "replace-dict"},
+        )
+
+        with self.assertRaisesRegex(TypeError, "custom __setattr__"):
+            instance.__setstate__(incoming_state)
+
+        self.assertIs(instance.__dict__, original_dict)
+        self.assertEqual(instance.__dict__, original_state)
+        self.assertEqual(instance.capacity, 2)
+        self.assertEqual(instance.label, "original label")
+
+    def test_inherited_custom_setattr_is_rejected_before_mutation(self):
+        class CustomSetattrParent(SlottedPhonologicalLoop):
+            __slots__ = ()
+
+            def __setattr__(self, name, value):
+                object.__setattr__(self, name, value)
+
+        class InheritedCustomSetattr(CustomSetattrParent):
+            __slots__ = ()
+
+        self.assertIn("__setattr__", vars(CustomSetattrParent))
+        self.assertNotIn("__setattr__", vars(InheritedCustomSetattr))
+        instance = InheritedCustomSetattr(capacity=2)
+        original_dict = instance.__dict__
+        original_state = original_dict.copy()
+
+        with self.assertRaisesRegex(TypeError, "custom __setattr__"):
+            instance.__setstate__({"_capacity": 9, "metadata": "incoming"})
+
+        self.assertIs(instance.__dict__, original_dict)
+        self.assertEqual(instance.__dict__, original_state)
+        self.assertEqual(instance.capacity, 2)
+        self.assertNotIn("metadata", instance.__dict__)
 
     def test_invalid_legacy_pickle_capacity_is_rejected_before_state_update(self):
         wm = _module()
