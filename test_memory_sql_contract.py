@@ -23,6 +23,31 @@ class MemorySqlContractTests(unittest.TestCase):
         results = memory.retrieve("alpha", limit=5)
         self.assertEqual([item["content"] for item in results], ["alpha beta"])
 
+    def test_keyword_search_treats_like_wildcards_as_literal_text(self):
+        memory = RealHierarchicalMemory(":memory:")
+        memory.store("literal 100% value")
+        memory.store("literal underscore_value")
+        memory.store("unrelated content")
+
+        self.assertEqual(
+            [item["content"] for item in memory.retrieve("100%", limit=5)],
+            ["literal 100% value"],
+        )
+        self.assertEqual(
+            [item["content"] for item in memory.retrieve("underscore_", limit=5)],
+            ["literal underscore_value"],
+        )
+
+    def test_keyword_search_treats_backslash_as_literal_text(self):
+        memory = RealHierarchicalMemory(":memory:")
+        memory.store(r"windows path C:\\tmp")
+        memory.store("windows path C:tmp")
+
+        self.assertEqual(
+            [item["content"] for item in memory.retrieve(r"C:\\", limit=5)],
+            [r"windows path C:\\tmp"],
+        )
+
     def test_multiple_keywords_preserve_or_search_and_limit(self):
         memory = RealHierarchicalMemory(":memory:")
         memory.store("low beta", importance=0.2)

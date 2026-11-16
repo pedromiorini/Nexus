@@ -227,7 +227,7 @@ class RealHierarchicalMemory:
     _KEYWORD_SEARCH_SQL = """
         SELECT id, content, importance, memory_type, access_count
         FROM memories
-        WHERE content LIKE ?
+        WHERE content LIKE ? ESCAPE '\\'
         ORDER BY importance DESC, access_count DESC
         LIMIT ?
     """
@@ -425,7 +425,7 @@ class RealHierarchicalMemory:
                 # parâmetros, sem montar SQL com entrada variável.
                 rows_by_id = {}
                 for keyword in keywords:
-                    cursor.execute(self._KEYWORD_SEARCH_SQL, (f"%{keyword}%", limit))
+                    cursor.execute(self._KEYWORD_SEARCH_SQL, (f"%{_escape_like_literal(keyword)}%", limit))
                     for row in cursor.fetchall():
                         rows_by_id[row[0]] = row
                 rows = sorted(
@@ -21110,6 +21110,10 @@ class CompleteNexusBrain:
 # ═══════════════════════════════════════════════════════════════════════════
 # DEMONSTRATION
 # ═══════════════════════════════════════════════════════════════════════════
+
+def _escape_like_literal(value: str) -> str:
+    """Escapa curingas SQL para que a busca de palavra seja literal."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 if __name__ == "__main__":
     if not __debug__:
