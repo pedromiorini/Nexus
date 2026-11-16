@@ -114,9 +114,9 @@
       },
       {
         "path": "core/cognitivo/working_memory.py",
-        "lines": 438,
+        "lines": 527,
         "classes": 6,
-        "functions": 25
+        "functions": 33
       },
       {
         "path": "core/system_health_diagnostics.py",

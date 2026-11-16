@@ -7,6 +7,16 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Revalidação local da PR #116 sobre `main` atual — 2026-11-16
+
+- **Fenômeno:** a PR #116 foi aberta a partir de `af28cc1` e seu head `9c7508d` estava 39 commits à frente e 6 commits atrás de `origin/main=5c24ddfc1bdd4489d2220185c3031868129f12a3`. O rebase local encontrou conflitos em documentos históricos; o conflito funcional em `NEXUS_DECISIONS.md` foi resolvido preservando `main`, e cinco snapshots documentais redundantes foram descartados.
+- **Candidata:** rebase concluído em `f8e7417087733858940a6280eb7a2ca4e90121f9`; diff efetivo contém `core/cognitivo/working_memory.py`, `test_working_memory_contract.py`, `tools/cognitivo_mutation.py` e os relatórios de realidade regenerados. Nenhuma branch ou PR remota foi alterada.
+- **Hipóteses discriminadas:** H1, a validação de capacidade quebra contratos existentes (sobreviveu aos testes focados e à suíte completa); H2, a restauração de estados pickle introduz regressão em memórias relacionadas (não observada nos contratos executados); H3, o catálogo cognitivo não protege o comportamento (falsificada pelos três shards sem sobreviventes). Compatibilidade externa de subclasses arbitrárias e pickles não confiáveis permanece hipótese não testada.
+- **Testes:** `test_working_memory_contract.py` passou 34/34; contratos de memória/regressão passaram 61/61; suíte completa no venv derivado de `requirements-ci.lock` passou 1.582 testes, com 5 expected failures; Ruff e compilação passaram. A tentativa anterior com o Python global foi invalidada por dependências ausentes, não usada como evidência funcional.
+- **Gates:** mutação direcionada passou 84/84, com 0 sobreviventes e 0 não aplicados; os três shards cognitivos passaram 379/379 cada, totalizando 1.137/1.137; Bandit encontrou 139 LOW e nenhum MEDIUM/HIGH; `security_triage.py --check` passou. `reality_audit.py` foi executado e revelou atualização necessária dos relatórios, agora regenerados para `working_memory.py` com 527 linhas e 33 funções.
+- **Limitações:** não houve CI hospedado, publicação, revisão humana ou atualização de `NEXUS_EVIDENCE.md` nesta rodada; dependências opcionais FAISS, SentenceTransformers e psutil estavam ausentes. Os resultados são evidência local deste commit, não garantia de compatibilidade externa, segurança geral ou capacidade cognitiva.
+- **Próximo passo:** revisão do diff documental/código e autorização explícita antes de publicar a branch rebased; não marcar pronta nem mesclar automaticamente.
+
 ## Squash merge verificado da PR #173 — 2026-11-16
 
 - **Fato:** a PR #173 foi marcada como pronta para revisão e squash-merged na `main` pelo GitHub às `2026-11-16T04:46:57Z`.
