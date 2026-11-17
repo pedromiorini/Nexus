@@ -323,7 +323,11 @@ class TemporalFactStore:
                     if target is not None and not isinstance(target, str):
                         raise ValueError(f"superseded_by inválido no evento {n}")
                 else:
-                    _text(raw.get("source"), "source")
+                    source = raw.get("source")
+                    _text(source, "source")
+                    fact = store._facts[raw["fact_id"]]
+                    if source == fact.source or source in fact.corroborated_by:
+                        raise ValueError(f"corroboração duplicada no evento {n}")
             else:
                 raise ValueError(f"tipo de evento desconhecido no evento {n}")
             store._events.append(copy.deepcopy(raw))

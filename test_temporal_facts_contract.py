@@ -307,6 +307,36 @@ class SnapshotContract(unittest.TestCase):
             with self.assertRaises(ValueError):
                 TemporalFactStore.from_snapshot(forge(edit), clock=c)
 
+    def test_snapshot_rejects_duplicate_or_primary_corroboration(self):
+        from core import temporal_facts as tf
+
+        s = store(Clock(10.0))
+        s.assert_fact("ana", "mora_em", "A", source="user")
+        s.assert_fact("ana", "mora_em", "A", source="tool:x")
+        base = s.export_snapshot()
+
+        def forge(source):
+            snap = copy.deepcopy(base)
+            last = snap["events"][-1]
+            snap["events"].append({
+                "kind": "corroborate",
+                "fact_id": "tf-000001",
+                "source": source,
+                "recorded_at": last["recorded_at"],
+            })
+            prev = tf.GENESIS
+            for n, event in enumerate(snap["events"], 1):
+                event["seq"], event["prev"] = n, prev
+                event["hash"] = tf._digest(event)
+                prev = event["hash"]
+            snap["head"] = prev
+            return snap
+
+        for source in ("user", "tool:x"):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "corrobor"):
+                    TemporalFactStore.from_snapshot(forge(source), clock=Clock(10.0))
+
     def test_wrong_prev_link_on_last_event_is_rejected_even_if_self_hash_is_valid(self):
         from core import temporal_facts as tf
 

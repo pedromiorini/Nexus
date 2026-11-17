@@ -7,6 +7,17 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Experimento local — idempotência de corroboração temporal — 2026-11-17
+
+- **Base/candidata:** branch local `fix/temporal-corroboration-idempotency-20261117`, base `main` `8c5a3d4468be115c492fede7e809feda6607e377`; commit experimental `f82408502c93cc525be203b7adda554f92b60275` (`fix: reject duplicate temporal corroboration`). Nenhum push, PR ou alteração remota foi feito.
+- **Fenômeno:** `assert_fact` já ignorava fonte primária e fonte de corroboração repetidas, mas `from_snapshot` aceitava um snapshot reencadeado com esses eventos duplicados e reconstruía `('tool:x', 'tool:x')`.
+- **Hipóteses:** H1, a repetição era permitida pelo contrato de replay (falsificada pela divergência com `assert_fact`); H2, o snapshot reencadeado seria rejeitado pela cadeia/hash (falsificada no teste adversarial); H3, a correção exigiria alterar o modelo de eventos (sobreviveu apenas como hipótese não necessária; a guarda no validador foi suficiente).
+- **RED:** o novo contrato `test_snapshot_rejects_duplicate_or_primary_corroboration` falhou nos dois casos antes da correção (`ValueError not raised`).
+- **GREEN:** o contrato novo passou; os contratos temporais e de integração passaram `37/37`; suíte completa passou `1587` testes, com `5 expected failures`, exit 0. Ruff, `py_compile` e `git diff --check` passaram.
+- **Mudança:** `from_snapshot` agora rejeita uma fonte de corroboração igual à fonte primária ou já presente em `corroborated_by`; a escrita normal permanece inalterada. A mudança afeta somente `core/temporal_facts.py` e seu contrato.
+- **Limitações:** não houve CI hospedado, Bandit/reality audit específico da candidata ou mutação temporal. O catálogo geral de mutação reportou `84/84`, mas não possui mutantes deste módulo; isso não é evidência de cobertura da nova guarda. `psutil`, FAISS e SentenceTransformers continuam ausentes.
+- **Próximo passo:** revisão independente do contrato e eventual publicação como PR pequena somente com autorização explícita; não aplicar em `main` nem alegar atestação remota.
+
 ## Squash merge verificado da PR #116 — 2026-11-17
 
 - **Fato:** a PR #116 foi squash-merged na `main` pelo GitHub às `2026-11-17T03:50:06Z`.
