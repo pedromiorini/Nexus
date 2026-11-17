@@ -7,6 +7,15 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Squash merge verificado da PR #116 — 2026-11-17
+
+- **Fato:** a PR #116 foi squash-merged na `main` pelo GitHub às `2026-11-17T03:50:06Z`.
+- **Commits:** head final validado `eeac810c5e65923d50abc5eae09499fdc34c8462`; merge commit em `main` `014b1e5924ce02f66c4e620b3208a9fcda180883`.
+- **Evidência remota:** Contract Gate `44011706356` passou com compatibilidade Python 3.12/3.13, três shards de mutação cognitiva, replay de agentes e atestação final.
+- **Escopo:** validação de capacidade e restauração de estado da Working Memory, incluindo rejeição de `__setattr__` customizado durante `__setstate__`; nenhum claim de AGI, consciência ou segurança absoluta foi adicionado.
+- **Limitações:** os resultados são evidência do head e do gate registrados, não garantia de compatibilidade externa, segurança geral ou capacidade cognitiva.
+- **Próximo passo:** reconsultar o estado de `main` pós-merge e selecionar a próxima tarefa de menor risco.
+
 ## Follow-up da PR #116 — restauração atômica de working memory — 2026-11-16
 
 - **Base e commits:** `main`/base da PR `5c24ddfc1bdd4489d2220185c3031868129f12a3`; head #116 antes da integração `c586711158021b1b0d831407a0ec80504fe399e3`. Candidata `fix/working-memory-atomic-slot-restore-20261116`; commit de código, teste e relatórios `b384ae9692068f1ba73ec46e83d22c6311a5cd19`.
@@ -16,7 +25,7 @@ bandit_low: 139
 - **Outros gates:** Ruff (`ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`), `compileall` nos mesmos caminhos e `git diff --check` passaram. `reality_audit.py` regenerado duas vezes com hashes estáveis; working_memory: 558 linhas; total de módulos extraídos: 7.286 linhas. Os 27 mutantes WM existentes morreram (0 sobreviventes, 0 não aplicados); relatório em `/tmp/nexus-wm-mutation-report.json`, fora do repositório.
 - **Nota operacional:** a primeira execução focada após o RED temporário usou bytecode obsoleto e retornou 1 falha/3 erros; importação e rerun com `PYTHONPYCACHEPREFIX` isolado usaram a fonte candidata atual e passaram. A suíte final também usou cache isolado.
 - **Limites:** validação local só em Python 3.12.3; `psutil`, FAISS e SentenceTransformers ausentes, com fallback opcional. Subclasses com `__setattr__` customizado são rejeitadas na restauração; descritores customizados/sombreamento de `capacity`, pickles não confiáveis e compatibilidade de downgrade continuam fora do contrato.
-- **Estado atualizado (2026-11-17):** a #116 foi marcada como pronta para revisão no head `755943637bd1ab7cf3f0f18e8b5fc07f8712d1fb`; `main`, claims e outras PRs não foram alterados. O merge continua não executado.
+- **Estado histórico (2026-11-17, antes do merge):** a #116 foi marcada como pronta para revisão no head `755943637bd1ab7cf3f0f18e8b5fc07f8712d1fb`; o merge ainda não havia sido executado naquele momento.
 
 ## Revalidação local da PR #116 sobre `main` atual — 2026-11-16
 
