@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from core.constitutional_brain import RealToolUse
+from core.constitutional_brain import RealToolUse, ToolDefinition
 
 
 class ToolPermissionFailClosedContractTests(unittest.TestCase):
@@ -106,6 +106,40 @@ class ToolPermissionFailClosedContractTests(unittest.TestCase):
         self.assertTrue(result.success, result.error)
         self.assertEqual(result.result, [1, 2])
         self.assertEqual(self.tool_use.failed_executions, 0)
+
+    def test_permission_metadata_is_validated_when_registering(self):
+        invalid_definitions = (
+            {"requires_permission": 1, "permission_level": "read"},
+            {"requires_permission": False, "permission_level": "unknown"},
+            {"requires_permission": False, "permission_level": True},
+        )
+        for index, overrides in enumerate(invalid_definitions):
+            with self.subTest(overrides=overrides):
+                definition = ToolDefinition(
+                    name=f"invalid_permission_metadata_{index}",
+                    description="A safe registered capability",
+                    parameters={},
+                    returns={"type": "object"},
+                    **overrides,
+                )
+                self.assertFalse(self.tool_use.registry.register_tool(definition))
+                self.assertNotIn(definition.name, self.tool_use.registry.tools)
+                self.assertEqual(self.log.events[-1][0], "TOOL_VALIDATION_FAILED")
+
+    def test_mutated_permission_metadata_blocks_execution_before_executor(self):
+        tool = self.tool_use.registry.get_tool("list_operations")
+        tool.permission_level = "not-a-level"
+        with patch.object(
+            self.tool_use, "_execute_list_operations", return_value=[1, 2]
+        ) as executor:
+            result = self.tool_use.execute_tool(
+                "list_operations", {"items": [2, 1], "operation": "sort"}
+            )
+        self.assertFalse(result.success)
+        self.assertEqual(result.error, "Tool permission policy validation failed")
+        self.assertIsNone(result.result)
+        executor.assert_not_called()
+        self.assertEqual(self.tool_use.failed_executions, 1)
 
     def test_grant_rejects_empty_unregistered_and_non_string(self):
         for name in ("", "missing_tool", None, True):
