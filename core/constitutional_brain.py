@@ -2694,7 +2694,7 @@ class ToolValidator:
             return False
 
         # 3. Validar orçamento; executores síncronos não são interrompidos.
-        if not self.validate_timeout_seconds(tool):
+        if not self.validate_timeout_seconds(tool) or not _validate_permission_policy(self.log, tool):
             return False
 
         return True
@@ -3373,9 +3373,9 @@ class RealToolUse:
             )
 
         # Fail-closed: flag verdadeira sem grant não chega ao cache nem ao executor.
-        if tool.requires_permission and tool_name not in self._permission_grants:
+        if not _validate_permission_policy(self.log, tool) or (tool.requires_permission and tool_name not in self._permission_grants):
             self.failed_executions += 1
-            error = "permission denied: no active grant"
+            error = "Tool permission policy validation failed" if getattr(tool, "_permission_policy_invalid", False) else "permission denied: no active grant"
             self.log.log_event("TOOL_PERMISSION_DENIED", {
                 "tool": tool_name,
                 "reason": "no_active_grant",
@@ -21114,6 +21114,30 @@ class CompleteNexusBrain:
 def _escape_like_literal(value: str) -> str:
     """Escapa curingas SQL para que a busca de palavra seja literal."""
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _validate_permission_policy(log: Any, tool: ToolDefinition) -> bool:
+    """Validate tool permission metadata conservatively and fail closed."""
+    requires_permission = tool.requires_permission
+    permission_level = tool.permission_level
+    if type(requires_permission) is not bool:
+        setattr(tool, "_permission_policy_invalid", True)
+        log.log_event("TOOL_VALIDATION_FAILED", {
+            "tool": tool.name,
+            "reason": "requires_permission must be a boolean",
+            "requires_permission_type": type(requires_permission).__name__,
+        })
+        return False
+    if type(permission_level) is not str or permission_level not in {"read", "write", "admin"}:
+        setattr(tool, "_permission_policy_invalid", True)
+        log.log_event("TOOL_VALIDATION_FAILED", {
+            "tool": tool.name,
+            "reason": "permission_level must be read, write, or admin",
+            "permission_level_type": type(permission_level).__name__,
+        })
+        return False
+    setattr(tool, "_permission_policy_invalid", False)
+    return True
 
 if __name__ == "__main__":
     if not __debug__:
