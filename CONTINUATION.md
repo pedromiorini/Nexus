@@ -16,7 +16,7 @@ bandit_low: 139
 - **Outros gates:** Ruff (`ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`), `compileall` nos mesmos caminhos e `git diff --check` passaram. `reality_audit.py` regenerado duas vezes com hashes estáveis; working_memory: 558 linhas; total de módulos extraídos: 7.286 linhas. Os 27 mutantes WM existentes morreram (0 sobreviventes, 0 não aplicados); relatório em `/tmp/nexus-wm-mutation-report.json`, fora do repositório.
 - **Nota operacional:** a primeira execução focada após o RED temporário usou bytecode obsoleto e retornou 1 falha/3 erros; importação e rerun com `PYTHONPYCACHEPREFIX` isolado usaram a fonte candidata atual e passaram. A suíte final também usou cache isolado.
 - **Limites:** validação local só em Python 3.12.3; `psutil`, FAISS e SentenceTransformers ausentes, com fallback opcional. Subclasses com `__setattr__` customizado são rejeitadas na restauração; descritores customizados/sombreamento de `capacity`, pickles não confiáveis e compatibilidade de downgrade continuam fora do contrato.
-- **Estado:** nenhuma alteração em `main`, claims ou outra PR; a #116 deve permanecer draft, sem merge.
+- **Estado atualizado (2026-11-17):** a #116 foi marcada como pronta para revisão no head `755943637bd1ab7cf3f0f18e8b5fc07f8712d1fb`; `main`, claims e outras PRs não foram alterados. O merge continua não executado.
 
 ## Revalidação local da PR #116 sobre `main` atual — 2026-11-16
 
