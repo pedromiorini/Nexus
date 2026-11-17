@@ -1,14 +1,18 @@
-"""Working memory (POST6) extraída de core/constitutional_brain.py.
+"""Working memory (POST6), extraída de core/constitutional_brain.py.
 
-Extração strangler: o código abaixo foi movido sem alteração de comportamento;
-core.constitutional_brain reexporta as classes no ponto original.
+As classes continuam reexportadas por core.constitutional_brain; a construção e
+toda reatribuição de capacity usam o protocolo de índice e exigem valor positivo.
+Subclasses que sombreiam o descriptor `capacity` ou usam descritores de slot
+customizados não são suportadas pelo contrato de validação de capacidade.
 Não há relógio injetável: decay e rehearsal usam time.time().
 """
 
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from operator import index
+from types import MemberDescriptorType
+from typing import Any, Dict, List, Optional, SupportsIndex
 
 __all__ = [
     "CentralExecutive",
@@ -39,6 +43,98 @@ class RehearsalEvent:
     activation_boost: float
 
 
+def _positive_capacity(capacity: SupportsIndex) -> int:
+    """Normalize an integer-like capacity and reject bool/non-positive values."""
+    if isinstance(capacity, bool):
+        raise TypeError("capacity must be a positive integer, not bool")
+    normalized = int(index(capacity))
+    if normalized <= 0:
+        raise ValueError("capacity must be a positive integer")
+    return normalized
+
+
+def _restore_working_memory_state(instance: Any, state: Any) -> None:
+    """Restore validated dict/slot state; subclasses defining custom __setattr__ are unsupported."""
+    if any(
+        cls is not object and "__setattr__" in vars(cls)
+        for cls in type(instance).__mro__
+    ):
+        raise TypeError("working memory restoration does not support custom __setattr__")
+
+    if type(state) is dict:
+        dict_state = state
+        slot_state = None
+    elif type(state) is tuple and len(state) == 2:
+        dict_state, slot_state = state
+        if dict_state is not None and type(dict_state) is not dict:
+            raise TypeError("working memory state must be a dict or a (dict, dict) tuple")
+        if slot_state is not None and type(slot_state) is not dict:
+            raise TypeError("working memory state must be a dict or a (dict, dict) tuple")
+    else:
+        raise TypeError("working memory state must be a dict or a (dict, dict) tuple")
+
+    restored_state = {} if dict_state is None else dict_state.copy()
+    if any(type(name) is not str for name in restored_state):
+        raise TypeError("working memory dict state keys must be strings")
+
+    restored_slots = {} if slot_state is None else slot_state.copy()
+    if any(type(name) is not str for name in restored_slots):
+        raise TypeError("working memory slot state keys must be strings")
+    slot_descriptors = {}
+    for cls in type(instance).__mro__:
+        for name, descriptor in vars(cls).items():
+            if isinstance(descriptor, MemberDescriptorType):
+                slot_descriptors.setdefault(name, descriptor)
+    valid_slots = set(slot_descriptors)
+    if any(name not in valid_slots for name in restored_slots):
+        raise TypeError("working memory slot state contains an unsupported slot")
+
+    capacity_values = []
+    if "capacity" in restored_state:
+        capacity_values.append(_positive_capacity(restored_state.pop("capacity")))
+    if "_capacity" in restored_state:
+        capacity_values.append(_positive_capacity(restored_state.pop("_capacity")))
+    if "_capacity" in restored_slots:
+        capacity_values.append(_positive_capacity(restored_slots["_capacity"]))
+    if not capacity_values:
+        raise ValueError("working memory state must include capacity")
+    normalized_capacity = capacity_values[0]
+    if any(value != normalized_capacity for value in capacity_values[1:]):
+        raise ValueError("conflicting capacity values in working memory state")
+    if "_capacity" in valid_slots:
+        restored_slots["_capacity"] = normalized_capacity
+    else:
+        restored_state["_capacity"] = normalized_capacity
+    instance_dict = instance.__dict__
+    original_dict_state = instance_dict.copy()
+    missing_slot = object()
+    original_slot_state = {}
+    for name in restored_slots:
+        descriptor = slot_descriptors[name]
+        try:
+            original_slot_state[name] = descriptor.__get__(instance, type(instance))
+        except AttributeError:
+            original_slot_state[name] = missing_slot
+
+    try:
+        instance_dict.update(restored_state)
+        for name, value in restored_slots.items():
+            setattr(instance, name, value)
+    except BaseException:
+        instance_dict.clear()
+        instance_dict.update(original_dict_state)
+        for name, value in reversed(tuple(original_slot_state.items())):
+            descriptor = slot_descriptors[name]
+            if value is missing_slot:
+                try:
+                    descriptor.__delete__(instance)
+                except AttributeError:
+                    pass
+            else:
+                descriptor.__set__(instance, value)
+        raise
+
+
 class PhonologicalLoop:
     """
     Loop Fonológico (Phonological Loop).
@@ -47,7 +143,19 @@ class PhonologicalLoop:
     Capacidade ~2s sem rehearsal, ~7±2 chunks.
     """
 
-    def __init__(self, capacity: int = 7):
+    @property
+    def capacity(self) -> int:
+        """Return the current normalized buffer capacity."""
+        return self._capacity
+
+    @capacity.setter
+    def capacity(self, capacity: SupportsIndex) -> None:
+        self._capacity = _positive_capacity(capacity)
+
+    def __setstate__(self, state: Any) -> None:
+        _restore_working_memory_state(self, state)
+
+    def __init__(self, capacity: SupportsIndex = 7):
         self.capacity = capacity
         self.buffer: List[WorkingMemoryItem] = []
         self.decay_rate = 0.5  # Por segundo
@@ -120,7 +228,19 @@ class VisuospatialSketchpad:
     Capacidade ~3-4 objetos.
     """
 
-    def __init__(self, capacity: int = 4):
+    @property
+    def capacity(self) -> int:
+        """Return the current normalized buffer capacity."""
+        return self._capacity
+
+    @capacity.setter
+    def capacity(self, capacity: SupportsIndex) -> None:
+        self._capacity = _positive_capacity(capacity)
+
+    def __setstate__(self, state: Any) -> None:
+        _restore_working_memory_state(self, state)
+
+    def __init__(self, capacity: SupportsIndex = 4):
         self.capacity = capacity
         self.buffer: List[WorkingMemoryItem] = []
 
