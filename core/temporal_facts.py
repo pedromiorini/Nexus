@@ -325,6 +325,13 @@ class TemporalFactStore:
             recorded = _number(raw.get("recorded_at"), "recorded_at")
             if recorded < store._last_recorded:
                 raise ValueError(f"recorded_at regride no evento {n}")
+            if recorded > store._last_recorded:
+                historical_problems = store.check_invariants()
+                if historical_problems:
+                    raise ValueError(
+                        "invariantes violadas em corte histórico: "
+                        + "; ".join(historical_problems[:3])
+                    )
             kind = raw.get("kind")
             if type(kind) is not str or kind not in _EVENT_KEYS:
                 raise ValueError(f"tipo de evento desconhecido no evento {n}")
