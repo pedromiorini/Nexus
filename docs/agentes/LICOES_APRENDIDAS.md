@@ -140,3 +140,27 @@ O replay `tools/agente/replay/run_replay.sh` não executa este auditor. Tipo des
 - Nota sobre medição: sem bloco de reincidência, de propósito. `test_current_lessons_are_not_reported_as_measured` exige `nao_checavel` para toda lição deste arquivo, e `test_correction_claim_audit_contract.py` está no PR #77. Três casos, medidos à parte, sem mudar o status para `ativa`: (a) o mutante de tipo morre com a mensagem; (b) `scm_cf_blank_action_accepted` continua morto; (c) o assert só de tipo, na rodada de `5771bf4`, não o mata.
 - Alternativas descartadas: editar `tools/cognitivo_mutation.py` para apontar o mutante ao teste novo (arquivo em PRs abertos); apagar a guarda `isinstance` e ficar só com `str.__str__` (o mutante deixaria de aplicar e o gate contaria `not_applied`).
 - Status: registrada (mesmo desvio de L-010; ativação é decisão do Pedro)
+
+### L-012 — Profundidade de snapshot estoura a pilha fora do try no Python 3.12 local
+- Data: 2026-11-18
+- Verificador que falhou: `tools/test_summary.py` e `python -m unittest test_audit_atomic_restore_regression.IndependentBoundaryTests.test_runtime_depth_failure_does_not_leave_a_partial_ledger`.
+- Fato observado: na `main` `5da85e171a979eafdf944d7c5617b76ff8fdecdf` e no branch `cursor/vita-telemetry-counters-4ca8`, o teste isolado sai 1 com `RecursionError` em `TemporalFactStore.export_snapshot` (`copy.deepcopy` dos eventos), no ramo em que `assert_fact` não levantou. `tools/test_summary.py` neste Python 3.12.3: 1642 executados, 1641 aprovados, 1 erro. A mesma suíte com `coverage run --branch` saiu 0 (1642, 5 falhas esperadas). O CI da `main`, run `44237831118`, está verde em Python 3.11.
+- Causa: Inferência. O teste só captura `RecursionError` dentro de `assert_fact`. A exportação posterior, com limite de recursão 1000, estoura a pilha neste 3.12.3. A cobertura acrescenta frames e, nesta máquina, a suíte passou; isso não foi medido frame a frame.
+- Correção: nenhuma neste branch. `core/temporal_facts.py` e o teste ficaram intocados para não refazer o trabalho das #195/#196.
+- Regra/checagem derivada: um teste de profundidade que aceita sucesso precisa capturar `RecursionError` também na exportação, ou recusar a profundidade antes de gravar. Promoção só com contrato novo e revisão humana.
+- Evidência: `main` `5da85e171a979eafdf944d7c5617b76ff8fdecdf`; run `44237831118`; teste `test_audit_atomic_restore_regression.py`.
+- Derivada de: L-010 (o runner local e o CI não são o mesmo verificador).
+- Alternativas descartadas: alterar `export_snapshot` ou o teste de atomicidade nesta rodada (pedido explícito de não repetir #195/#196).
+- Status: registrada (ativação é decisão do Pedro)
+
+### L-013 — Claim da §9C remove a substring que um contrato exige vazia
+- Data: 2026-11-18
+- Verificador que falhou: `test_router_episodic_memory_bridge_contract.C15ExistingContractsStayUntouched.test_claims_stay_empty_and_module_type_does_not_grow`.
+- Fato observado: o teste exige a substring `claims: []` em `docs/agentes/CLAIMS.yaml`. Na `main` o arquivo tem `claims: []` e o teste passa. Com o claim deste branch a substring some e o teste falha. O teste não foi editado.
+- Causa: Fato. A §9C pede o claim no arquivo e o contrato pede a lista vazia no mesmo arquivo.
+- Correção: nenhuma no teste. A falha fica relatada para o CI, como pedido da rodada.
+- Regra/checagem derivada: não enfraquecer o assert da substring para fazer o claim passar. A decisão de onde o claim vive é a da #79, ainda em rascunho.
+- Evidência: teste em `test_router_episodic_memory_bridge_contract.py`; base `5da85e171a979eafdf944d7c5617b76ff8fdecdf`; branch `cursor/vita-telemetry-counters-4ca8`.
+- Derivada de: nenhuma.
+- Alternativas descartadas: apagar o claim para manter `claims: []` (a §9C e o pedido da rodada exigem o claim); alterar o teste (pedido explícito de não alterá-lo).
+- Status: registrada (ativação é decisão do Pedro)
