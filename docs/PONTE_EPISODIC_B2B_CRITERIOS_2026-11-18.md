@@ -1,6 +1,8 @@
 # Pré-registro — B2b: o episódio aberto corrente só entra se a chamada pedir
 
-Status: critérios fechados antes de qualquer arquivo de teste novo e antes de qualquer edição de produção. Não implementa B2b. Não é GREEN. A B2 pré-registrada está rejeitada em `docs/PONTE_EPISODIC_B2_RESULTADO_NEGATIVO_2026-11-18.md`. Este texto não reabre aquele critério e não o ajusta.
+Status: critérios ainda não aceitos. Não implementa B2b. Não é GREEN. A B2 pré-registrada está rejeitada em `docs/PONTE_EPISODIC_B2_RESULTADO_NEGATIVO_2026-11-18.md`. Este texto não reabre aquele critério e não o ajusta.
+
+Revisão: a B2b fica só na camada de memória, C1–C3 e N1–N10. `core/constitutional_brain.py` inteiro é arquivo intocado, inclusive a linha `:10437`. N8 vale integralmente.
 
 Base desta leitura e da suíte: `31f0aa0dff487cd7990e6fb29e63c093e30fc6a6`.
 Python: 3.12.3 (`python3`). `python3.11` não está neste host. O CI usa 3.11. Os critérios abaixo não dependem de contagem de cobertura nem de um float que não seja o literal já gravado no fonte (`0.7` e `0.6`).
@@ -44,11 +46,11 @@ Contratos vigentes congelam a chamada do roteador como args `()` e kwargs exatam
 
 ## Hipótese
 
-**H1, hipótese de trabalho.** A chamada `search_episodes(query, limit)` e toda chamada que não pede o caminho novo continuam com o mesmo resultado que esta `main`. O episódio aberto corrente entra só quando o chamador passa um parâmetro keyword-only com default que preserva o resultado atual. A ponte pede esse caminho na linha `:10437`.
+**H1, hipótese de trabalho.** A chamada `search_episodes(query, limit)` e toda chamada que não pede o caminho novo continuam com o mesmo resultado que esta `main`. O episódio aberto corrente entra só quando o chamador passa um parâmetro keyword-only com default que preserva o resultado atual. A ponte não passa esse parâmetro. `core/constitutional_brain.py` permanece o arquivo desta base, linha `:10437` incluída.
 
 **H0, alternativa nula.** Não há mudança. A B2 fica rejeitada. O `think` continua sem ver o episódio que acabou de abrir. A suíte desta base continua verde. H0 é o estado medido acima.
 
-Falsifica H1 se uma chamada sem o parâmetro novo mudar de resultado, se o parâmetro default incluir o aberto, ou se pedir o caminho na linha `:10437` obrigar a editar um contrato vigente para a suíte voltar a sair 0.
+Falsifica H1 se uma chamada sem o parâmetro novo mudar de resultado, se o parâmetro default incluir o aberto, ou se a implementação alterar `core/constitutional_brain.py`.
 
 ## Desenho mínimo proposto
 
@@ -75,20 +77,19 @@ Com `include_current_open is True`, e só então, a lista é a que `_search_vali
 
 Esse `Episode` entra por último. Nenhuma linha fechada sai. A ordem do prefixo fechado não muda. O `LIMIT` do SQL fechado não corta essa linha extra. `limit == 0` continua `[]` antes desse acréscimo. Query vazia, query que não é `str` e `limit` inválido continuam a levantar no caminho atual. `status` que não é a string `"closed"` não recebe a linha extra: `"open"`, `bool`, `None` e o resto ficam como hoje, sem normalização nova. Não há segunda chamada pública a `search_episodes`. A leitura da linha é SQL interno ou função privada no mesmo arquivo, com SQL literal e placeholders. Sem `f-string` e sem concatenação na string SQL.
 
-Pedido explícito da ponte, se uma tarefa futura for autorizada a fazê-lo: só a linha `:10437` passa a `return module.search_episodes(query=prompt, limit=3, include_current_open=True)`. O histórico (`:20821`) e o learner (`incremental_learner.py:259-261`) não passam o flag.
+A linha `:10437` continua `return module.search_episodes(query=prompt, limit=3)`. O histórico (`:20821`) e o learner (`incremental_learner.py:259-261`) também não passam o flag. Quem quiser o aberto chama a memória direto, com `include_current_open=True`.
 
 ### Arquivos que uma implementação futura pode tocar
 
 Ainda não autorizada por este texto:
 
 - `core/cognitivo/episodic_memory.py`, no parâmetro e no acréscimo descrito acima.
-- `core/constitutional_brain.py`, somente a chamada da linha `:10437`, e só se o owner aceitar o choque com os kwargs congelados, descrito em «O que invalida».
-- Um arquivo de teste novo, na raiz, ainda não nomeado e não criado aqui.
+- Um arquivo de teste novo, na raiz, ainda não nomeado e não criado aqui. Esse teste cobre C1–C3 e N1–N10 na memória direta.
 
 ### Arquivos intocados
 
+- `core/constitutional_brain.py` inteiro, inclusive a linha `:10437`.
 - `test_episodic_like_literal_contract.py`.
-- O resto de `core/constitutional_brain.py`. O monólito inteiro não fica intocado se a ponte for pedir o caminho: a única busca do roteador está na linha `:10437`. Fica intocado fora dessa chamada.
 - `test_router_episodic_memory_bridge_contract.py` e os outros contratos vigentes.
 - `tools/targeted_mutation.py` e `tools/cognitivo_mutation.py`.
 - Workflows, timeouts e pisos de cobertura.
@@ -97,7 +98,7 @@ Ainda não autorizada por este texto:
 
 ## Critérios que falham na main
 
-Um teste futuro, ainda não escrito, deve falhar nesta `31f0aa0` e só passaria depois da mudança mínima do desenho. Memória direta: `RealEpisodicMemory(":memory:")`. Harness do cérebro, se for usado: `brain_kwargs` de `test_router_episodic_memory_bridge_contract.py:197-214`.
+Um teste futuro, ainda não escrito, deve falhar nesta `31f0aa0` e só passaria depois da mudança mínima do desenho. Memória direta: `RealEpisodicMemory(":memory:")`. A B2b não usa o cérebro.
 
 - **C1.** `include_current_open=True` devolve o corrente que casa. `start_episode("Q: remember the last time", trigger_query="remember the last time", importance=0.7)`, sem fechar. `search_episodes("remember the last time", limit=3, include_current_open=True)` devolve um `Episode`: esse id, título `"Q: remember the last time"`, `trigger_query` `"remember the last time"`, `importance == 0.7`, `status == "open"`. `current_episode_id` continua esse id. Na main, medido nesta tarefa: `TypeError` com `unexpected keyword argument 'include_current_open'`.
 
@@ -105,13 +106,9 @@ Um teste futuro, ainda não escrito, deve falhar nesta `31f0aa0` e só passaria 
 
 - **C3.** O `LIMIT` fechado não corta o extra quando o flag está ligado. Três fechados, títulos `"remember the last time 0"`, `"remember the last time 1"` e `"remember the last time 2"`, cada um com `trigger_query="remember the last time"`. Com o corrente `None`, `search_episodes("remember the last time", limit=3)` devolve um prefixo de três ids. Abrir o episódio de C1 e chamar `search_episodes("remember the last time", limit=3, include_current_open=True)`. A lista é o prefixo seguido do id aberto, uma vez. Na main: o mesmo `TypeError`. A chamada sem o flag, nesta main, devolve só o prefixo. Isso é não-regressão, N3.
 
-- **C4.** O `think` de recall vê o episódio que acabou de abrir, porque a ponte pediu o caminho. `think("remember the last time", use_router=True)`. A única `search_episodes` fica entre `start_episode` e `close_episode`. A lista tem um item, o `episode_id` do dict, título `"Q: remember the last time"`, `trigger_query` `"remember the last time"`, `importance == 0.7`, `status` `"open"`. Na devolução, `current_episode_id` é esse id. Na main, medido na tarefa B2 neste commit: a lista é `[]`, com o corrente já igual a esse id e os kwargs `{"query": "remember the last time", "limit": 3}`. C4 não fica verde sob este texto se N8 continuar a exigir esses kwargs. Ver «O que invalida».
+## Fora de escopo: B2c futura
 
-- **C5.** Recall longo. `question = "remember " + ("x" * 80)`. `think(question, use_router=True)`. A `query` é a pergunta inteira. A lista tem um item: título `"Q: " + question[:50]`, `trigger_query` a pergunta inteira, `importance == 0.7`, `status` `"open"`, id igual ao `episode_id`. Na main, medido na tarefa B2: a lista é `[]` e `request_type` é `"recall"`. Mesma trava de C4 diante de N8.
-
-- **C6.** O aberto anterior fica de fora. No mesmo cérebro: fechar `start_episode("remember the last time")`; deixar aberto `start_episode("remember the last time prior")`; `think("remember the last time", use_router=True)`. A lista é o fechado de C2 e, depois, o episódio desta `think` com os campos de C4. O id anterior não está. Na devolução, `current_episode_id` é o id desta `think`. Na main, medido na tarefa B2: a lista é só o fechado. Mesma trava de C4 diante de N8.
-
-- **C7.** `route` projeta o extra quando a ponte pediu o caminho. Memória real no mapa. Fechar `start_episode("remember the last time")`. Abrir o episódio de C1. `route("remember the last time", {})` devolve `success is True`, `degraded is False` e `episodes` com dois dicts, fechado primeiro e aberto depois, cada um com exatamente as chaves `episode_id`, `title`, `trigger_query`, `importance`, `status`. O dict da rota não tem `episode_id` nem `episodic`. `current_episode_id` continua o aberto. Na main, medido na tarefa B2: `episodes` tem só o dict fechado. Mesma trava de C4 diante de N8.
+C4–C7 do rascunho anterior saem desta fatia. A B2c exigirá pré-registro próprio, que declare de antemão quais asserções de kwargs do contrato da ponte ela substitui. Este texto não define os critérios da B2c.
 
 ## Critérios de não-regressão
 
@@ -154,8 +151,8 @@ A implementação para e o critério não é reescrito se qualquer item abaixo a
 
 - Uma chamada sem `include_current_open=True` muda de resultado. Em particular, N2 fica vermelho. Foi a rejeição da B2.
 - O default do parâmetro inclui o aberto. Isso é a B2 com outro nome.
-- A linha `:10437` passa `include_current_open=True` e N8 fica vermelho. Os contratos exigem kwargs exatamente `query` e `limit`. A não-regressão exige a suíte sem editar esses testes. O pedido explícito da ponte, lido junto com N8, não tem GREEN nesta fatia. C4–C7 dependem desse pedido. Persegui-los editando `:10437` invalida a fatia. Persegui-los mudando o default também invalida. Esta tarefa não escolhe um lado e não autoriza a edição.
-- O monólito muda fora da linha `:10437`. O histórico ou o learner passam a pedir o flag.
+- `core/constitutional_brain.py` muda, em qualquer linha, inclusive `:10437`. N8 continua a exigir kwargs exatamente `{"query": ..., "limit": 3}`, sem `include_current_open` e sem `status`. Passar o flag na ponte, ou qualquer outra edição do monólito, invalida a fatia.
+- O histórico ou o learner passam a pedir o flag.
 - Todo `status` `"open"` que casa entra na busca, ou o SQL passa a aceitar `"closed"` e `"open"` dentro do `LIMIT`.
 - Há segunda chamada pública a `search_episodes`, ou o dict de `think` ganha `episodes`.
 - `limit == 0`, query inválida ou `limit` inválido passam a devolver o aberto em vez de `[]` ou do erro atual.
