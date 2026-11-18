@@ -3,7 +3,7 @@
 schema_version: 1
 claims:
   - agente: grok-bot
-    tarefa: "rejeitar coerção de contadores em record_reprocessing_telemetry"
+    tarefa: "rejeitar coerção de contadores em record_reprocessing_telemetry (#198)"
     arquivos:
       - vita/nexus_constitutional_bridge_v3.py
       - test_vita_telemetry_counter_contract.py
