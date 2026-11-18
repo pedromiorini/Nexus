@@ -745,7 +745,7 @@ class RealKnowledgeGraph:
                 hops = len(path) - 1
 
                 if hops > max_hops:
-                    return QueryResult([], [], "", 0.0, 0)
+                    return QueryResult([], [], "", 0.0, hops)
 
                 # Coletar entidades no caminho
                 entities = [self.entity_index[nid] for nid in path if nid in self.entity_index]
