@@ -50,15 +50,10 @@ class NexusConstitutionalBridge:
     def record_reprocessing_telemetry(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
         """Registra métricas do fluxo adiado e produz alertas operacionais determinísticos."""
         snapshot = dict(metrics)
-        attempts = int(snapshot.get("attempts", 0))
-        failed = int(snapshot.get("failed", 0))
-        discarded = int(snapshot.get("discarded", 0))
-        try:
-            total_latency = float(snapshot.get("total_latency_ms", 0.0))
-        except (OverflowError, TypeError, ValueError) as exc:
-            raise ValueError("total_latency_ms must be finite and nonnegative") from exc
-        if not math.isfinite(total_latency) or total_latency < 0:
-            raise ValueError("total_latency_ms must be finite and nonnegative")
+        attempts = self._require_nonnegative_int(snapshot.get("attempts", 0), "attempts")
+        failed = self._require_nonnegative_int(snapshot.get("failed", 0), "failed")
+        discarded = self._require_nonnegative_int(snapshot.get("discarded", 0), "discarded")
+        total_latency = self._require_nonnegative_latency(snapshot.get("total_latency_ms", 0.0))
         avg_latency = total_latency / attempts if attempts else 0.0
         failure_rate = failed / attempts if attempts else 0.0
         discard_rate = discarded / attempts if attempts else 0.0
@@ -129,6 +124,35 @@ class NexusConstitutionalBridge:
         if not finite or normalized <= 0:
             raise ValueError("window_seconds deve ser positivo e finito")
         return normalized
+
+    @staticmethod
+    def _require_nonnegative_int(value: Any, name: str) -> int:
+        """Rejeita bool e tipos que não são inteiros antes da taxa."""
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError(f"{name} deve ser inteiro")
+        normalized = int.__index__(value)
+        if normalized < 0:
+            raise ValueError(f"{name} deve ser não negativo")
+        return normalized
+
+    @staticmethod
+    def _require_nonnegative_latency(value: Any) -> float:
+        """Rejeita bool e não numéricos; infinito, NaN e negativo não viram latência."""
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError("total_latency_ms deve ser número real")
+        if isinstance(value, int):
+            normalized = int.__index__(value)
+        else:
+            normalized = float.__float__(value)
+        try:
+            as_float = float(normalized)
+            finite = math.isfinite(as_float)
+        except OverflowError:
+            finite = False
+            as_float = None
+        if not finite or as_float < 0:
+            raise ValueError("total_latency_ms must be finite and nonnegative")
+        return as_float
 
     def get_policy_audit(self, limit: int = 128) -> List[Dict[str, Any]]:
         """Retorna eventos recentes de auditoria em ordem cronológica."""
