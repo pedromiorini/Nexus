@@ -46,3 +46,18 @@ Identidade, Constituição (8 regras), vocabulário epistemológico, precedênci
 - "Teste dos três casos" com critério de aprovação explícito; política local sem verificação automática; distinto do replay de guardas.
 - Exceção explícita para registros legados (L-001..L-007); L-006 marcada com evidência legada (hash de patch local).
 - Fontes: 2610.19910 rebaixado a analogia; 2610.22987 descrito como preprint com testes em Claude Code e Codex CLI, sem replicação independente; lista de comandos é política local.
+
+## v3.4.2 (2026-10-22)
+- §9C.3: o claim vive só no branch do PR aberto; o último commit do mesmo PR o remove antes do merge (elimina PRs só de remoção como #72 e #76). Claims ativos = `main` + `CLAIMS.yaml` de cada PR aberto (comando `gh`/`git` documentado).
+- Motivo: no fluxo anterior o claim só chegava à `main` depois do trabalho mesclado, sem proteger nada. Teste dos três casos com critérios prévios no PR.
+- Pendente: leitura automática de claims de PRs abertos no validador (follow-up; arquivos do Axis não alterados).
+
+### Estado histórico da reconciliação local com schema 2 (pós-#113; antes do aceite direto do Axis)
+- A #113 foi integrada na main `cb74cad7cfcd0ab536178ed984989ef2425c8211`. Na reconciliação histórica anterior ao aceite direto do Axis, a composição local acrescentava o artefato 3.4.2 exato da #79 (`8f03762d2a2d128eea955597f1b55210e387c08385bdc5544514ea2f39701b5d`) e atualizava o ponto de entrada, sem atribuir aceite automático aos agentes. O checkpoint local pré-publicação de 10:36 -03 está registrado em `CONTINUATION.md`.
+- Axis continua integralmente em 3.4.1. Após declaração explícita do Grok na #78/comentário 6367039207 e autorização do owner apenas para refletir o aceite localmente, só o trio arquivo/SHA/versão aceita do Grok passa para 3.4.2. O catálogo/snapshot 3.4.1 e os demais metadados dos agentes foram preservados. Schema e validador da #113 não precisam de alteração.
+- §9C.4 permanece nos bytes históricos solicitados, mas a promoção sob schema 2 não exige atualizar hashes/aceites dos agentes: só o catálogo e o ponto de entrada mudam; cada aceite depende de declaração própria. Ver [ACEITE_VERSIONADO.md](ACEITE_VERSIONADO.md).
+
+### Atualização da candidata local — 2026-11-18
+- O owner declarou diretamente: “Aceito a v3.4.2 para as instruções do Axis” e autorizou registrar a aceitação para o artefato 3.4.2 cujo SHA-256 é `8f03762d2a2d128eea955597f1b55210e387c08385bdc5544514ea2f39701b5d`. A candidata local passa a apontar Axis e Grok para esse snapshot exato.
+- Os registros `cursor-grok-4-7` e `cursor-grok-4-7-il` continuam em 3.4.1; são os dois avisos de versão anteriores esperados. O estado anterior acima descreve a proposta antes da declaração do owner e não é o estado desta candidata.
+- O preparo foi isolado sobre a `main` em `1795ee0`. O owner autorizou separadamente atualizar a branch da #79 com lease no head revisado, mantendo a PR draft e sem merge; a autorização não substitui a verificação do novo head e dos checks.
