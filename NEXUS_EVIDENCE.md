@@ -7,6 +7,10 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Contadores da telemetria Vita sem coerção — validação local 2026-11-18
+
+Base `5da85e171a979eafdf944d7c5617b76ff8fdecdf`, branch `cursor/vita-telemetry-counters-4ca8`. O contrato `test_vita_telemetry_counter_contract.py` falhou na produção intacta (9 testes, 16 falhas, 7 erros, exit 1) e, com a rejeição de `bool`, não inteiro, negativo, texto e subclasse mentirosa antes da gravação, passou 9/9 (exit 0). A latência não finita continua `ValueError` com a mensagem que contém `finite`. A suíte com coverage executou 1642 testes, exit 0, com 5 falhas esperadas. Bandit não acrescentou achado sobre a baseline de 139 LOW. Comandos e limites estão na rodada de 2026-11-18 de `CONTINUATION.md`. Isto é evidência de contrato local, não de capacidade operacional nem de CI hospedado.
+
 ## LIKE literal na busca episódica — validação local 2026-10-29
 
 Base `616a9b2217bace790aeb39bf08e3bb717d7d4318`, branch `cursor/episodic-like-literal-2c0b`. O contrato `test_episodic_like_literal_contract.py` falhou na produção intacta (10 testes, 17 falhas, exit 1) e, com o fallback `LIKE ... ESCAPE '\'` e a rejeição de query vazia ou não-string, passou 10/10 (exit 0). A ausência documentada continua sendo `None`. Descoberta: 770 testes, exit 0. Bandit não acrescentou achado sobre a baseline de 131 LOW. Comandos e limites estão na rodada de 2026-10-29 de `CONTINUATION.md`. Isto é evidência de contrato local, não de capacidade de memória nem de CI hospedado.

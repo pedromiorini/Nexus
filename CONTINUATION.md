@@ -7,6 +7,44 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — contadores da telemetria Vita sem coerção — 2026-11-18
+
+- **Base:** `5da85e171a979eafdf944d7c5617b76ff8fdecdf` (`origin/main`, merge da #196). Branch `cursor/vita-telemetry-counters-4ca8`. Agent-Id: `grok-bot`.
+- **Bloco `NEXUS-CURRENT-STATE`:** reexecutado e deixado como está. Continua `tests: CURRENT_TESTS` e `bandit_low: 139`. `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md` não foram editados.
+- **Claim:** `docs/agentes/CLAIMS.yaml`, `expira_em: 2026-11-21T06:00:00+00:00`. O teste `test_claims_stay_empty_and_module_type_does_not_grow` exige a substring `claims: []`. Ele passa na `main` e falha neste branch. O teste não foi alterado.
+- **Fora deste diff:** `core/constitutional_brain.py`, `tools/targeted_mutation.py`, a atomicidade e os cortes de snapshot das #195/#196, e os arquivos de instrução da #79 (`AGENTS.md`, `docs/agentes/INSTRUCOES_AGENTE_NEXUS_v3.md`, `REGISTRO_AGENTES.yaml`, `CHANGELOG_INSTRUCOES.md`, `ACEITE_VERSIONADO.md`, os testes da #79 e `tools/agente/README.md`). PRs #38–#50/#60 não foram editadas.
+- **Sobreposição documental:** `CONTINUATION.md` e `CLAIMS.yaml` também estão na #79. Esta seção é só acréscimo; o comentário de cabeçalho da #79 não foi trazido.
+
+### Fenômeno e hipóteses
+
+Em `5da85e1`, `NexusConstitutionalBridge.record_reprocessing_telemetry` faz `int()` em `attempts`, `failed` e `discarded`, e `float()` em `total_latency_ms`, antes de gravar a auditoria. O produtor em `reprocess_deferred_tasks` só incrementa esses contadores com `+= 1` a partir de `0`.
+
+RED no commit `d153525`, produção intacta: `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus_audit_red.sqlite3 LC_ALL=C /tmp/nexus-ci312/bin/python -m unittest -v test_vita_telemetry_counter_contract.py` saiu 1. 9 testes, 16 falhas, 7 erros, 0,059 s. Controles que passaram: inteiros exatos e alerta de taxa, subclasse de `int` com o valor real, omissão (taxas 0), latência não finita ou enorme, e a propriedade de inteiros/floats não negativos.
+
+- **H1.** `True` já era recusado como contagem. Falsificada: `int(True)` vira 1 e a linha de auditoria é gravada.
+- **H2.** Float, texto numérico e `None` já eram `TypeError` de contrato. Falsificada: `1.5` e `"2"` viram inteiros; `None` levanta `TypeError` de `int()`, sem a mensagem `deve ser inteiro`.
+- **H3.** Infinito no contador já falha fechado com mensagem estável. Falsificada: `int(float("inf"))` levanta `OverflowError`.
+- **H4.** Contagem negativa já era recusada. Falsificada: `-1` é aceito e a taxa fica negativa.
+- **H5.** `__int__`/`__float__` de subclasse já não reescreviam o valor. Falsificada: `LyingCount(-2)` publica 3 e `LyingLatency(-1.0)` publica 9.0.
+- **H6.** A latência `True`, `"10"`, `None` e lista já eram erro de tipo, e NaN/`±inf`/inteiro enorme já eram `ValueError` com `finite`, sem auditoria. Sobreviveu só a segunda parte. `True` e `"10"` viram número; `""`, `None` e lista viram `ValueError` genérico de latência.
+
+GREEN no commit `b7d3ce2`: os mesmos 9 testes, OK. A guarda usa `int.__index__` e `float.__float__`, rejeita `bool` antes, e só então calcula taxas e grava. `failed` pode continuar maior que `attempts` junto com `discarded` (o teste já existente de alerta de descarte usa 2, 2 e 1).
+
+### Gates neste ambiente
+
+Python 3.12.3 em `/tmp/nexus-ci312` (`pip install --require-hashes -r requirements-ci.lock`). Não há `python3.11` neste ambiente; o CI usa 3.11. Ruff 0.17.1, Bandit 1.9.4, Coverage 7.16.2, Hypothesis 6.170.5. `PYTHONPATH=.`. `NEXUS_AUDIT_DB` fora do repo.
+
+- Ruff e `compileall` dos caminhos do workflow: exit 0. `git diff --check`: exit 0.
+- Focado, antes dos docs: o contrato novo mais `test_vita_audit_bounds_contract.py`, `test_recovery_diagnostics_contract.py`, `test_vita_audit_concurrency_contract.py`, `test_vita_audit_cross_connection_contract.py` e `test_deferred_task_queue.py`: 82 testes, OK, 5,361 s.
+- `coverage run --branch -m unittest discover -p 'test_*.py'`: 1642 testes, OK, 5 falhas esperadas, 202,551 s, exit 0. Demo `coverage run --append --branch core/constitutional_brain.py`: exit 0. `integrated-summary.json` em `/tmp`: `result` passed, skip `0`, `duplicates` `[]`. O banner do demo não é evidência de capacidade. Pisos: total 84%, fila 95%, VRAM 95%, temporal 96%, Vita 81%, núcleo 72%, `core/cognitivo/*` 98%. Todos os `--fail-under` saíram 0.
+- `tools/targeted_mutation.py`: 84/84 mortos, 0 sobreviventes, 0 não aplicados. O catálogo não foi editado.
+- Bandit na worktree `/tmp/nexus-main` da `main`, com caminhos relativos `core vita tools`: 139 LOW, 0 MEDIUM, 0 HIGH, exit 1 pelos LOW. No branch, `bandit -r core vita tools -b /tmp/base.json`: 0 achados novos, exit 0; totais continuam 139 LOW. `security_triage.py /tmp/base.json SECURITY_TRIAGE.md --check`: exit 0. `embedded_assert_audit.py`: `ok` verdadeiro, 111 B101. `implementation_gap_audit.py`: `pass_only_count` 0, `not_implemented_count` 0.
+- `reality_audit.py`: exit 0 e `git diff` de `AUDIT_REALITY_REPORT.md` e `audit_reality.json` vazio. Núcleo 23011 linhas, 210 classes, 690 funções. Não é evidência de capacidade.
+- `validar_registro.py --expirados aviso`, antes deste claim: exit 0. Replay `run_replay.sh`: 17 casos, exit 0. `predeleg.sh HEAD origin/main`: `OK: sem conflito`, exit 0.
+- `bash tools/agente/artefatos_drift.sh .` com o `python3` do sistema saiu 3: `entrada invalida: bandit nao gerou relatorio` (`No module named bandit`). Com `PY=/tmp/nexus-ci312/bin/python`, o mesmo script saiu 0.
+- `tools/test_summary.py` neste Python 3.12.3: 1642 executados, 1641 aprovados, 1 erro, `result` failed. O erro é `RecursionError` em `test_runtime_depth_failure_does_not_leave_a_partial_ledger`, dentro de `export_snapshot` → `copy.deepcopy`, no ramo em que `assert_fact` não levantou. O mesmo teste isolado sai 1 na `main` `5da85e1` e neste branch. A suíte com coverage, no mesmo interpretador, saiu 0. O CI da `main` no run `44237831118` está verde em Python 3.11. Não alterei `core/temporal_facts.py` nem esse teste: é o trabalho das #195/#196. Registro em `docs/agentes/LICOES_APRENDIDAS.md` (L-012).
+- **Não verificado:** CI hospedado deste branch, Python 3.11, actionlint, zizmor, `tools/cognitivo_mutation.py`. Não se gravou manifesto com `ci.gates_status: success`. Contadores `numpy` e um teto SQLite para o contador (o valor vai para JSON, não para `LIMIT`) ficam fora do contrato.
+
 ## Estado atual — pós-merges #192, #193, #194 e #195 — 2026-11-18
 
 - **Main:** `2815d1d`, sincronizada com `origin/main`, worktree limpo. Foram incorporadas a serialização de `TemporalFactStore.head_hash` (#194), a preservação fail-closed do requisito de permissão registrado (#192), a validação dos limites de auditoria Vita (#193) e a atomicidade de escritas/replay temporal (#195).
