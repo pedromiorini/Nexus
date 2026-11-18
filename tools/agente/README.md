@@ -20,7 +20,7 @@ O runner deve manter modo Git `100755`: `tools/agente/replay/run_replay.sh` func
 
 ## Registro e aceite das instruções
 
-`python tools/agente/validar_registro.py --expirados aviso` valida registro e claims sem escrever nos arquivos. No schema 2, aceite anterior só gera aviso se versão, artefato e SHA forem verificáveis; versão desconhecida/futura, arquivo ausente ou SHA divergente continuam falhando. O schema 1 permanece estrito. Contrato, caminhos de migração e limites de confiança em [ACEITE_VERSIONADO.md](../../docs/agentes/ACEITE_VERSIONADO.md). Essa migração local mantém ambos os agentes em 3.4.1 e não aprova a v3.4.2.
+`python tools/agente/validar_registro.py --expirados aviso` valida registro e claims sem escrever nos arquivos. No schema 2, aceite anterior só gera aviso se versão, artefato e SHA forem verificáveis; versão desconhecida/futura, arquivo ausente ou SHA divergente continuam falhando. O schema 1 permanece estrito. Contrato, caminhos de migração e limites de confiança em [ACEITE_VERSIONADO.md](../../docs/agentes/ACEITE_VERSIONADO.md). A migração schema 2 foi integrada pela #113. Nesta composição da #79, as instruções atuais são 3.4.2; Grok tem aceite explícito verificado e Axis tem aceite direto do owner para o mesmo SHA. `cursor-grok-4-7` e `cursor-grok-4-7-il` permanecem em 3.4.1, portanto são os dois avisos esperados. O validador lê somente o checkout local: não publica a composição, não atesta o head remoto da PR e não consulta claims de outras PRs; confira o estado remoto no GitHub (§9C.3).
 
 ## Dependências e limitações
 - Rodar de dentro de um clone do repositório (o padrão é `git rev-parse --show-toplevel`; pode-se definir `R=`/`REPO=`). Requer `git` ≥ 2.38 (`merge-tree --write-tree`), `rg` e `awk`.
