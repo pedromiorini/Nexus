@@ -1,9 +1,9 @@
 # Nexus — Continuidade entre agentes
 
 <!-- NEXUS-CURRENT-STATE
-commit: 47c0563
-ci_run: PR_192_AND_PR_193_GREEN
-tests: 1610_passed_5_expected_failures
+commit: HEAD
+ci_run: CURRENT_RUN
+tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
