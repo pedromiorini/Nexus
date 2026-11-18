@@ -58,6 +58,60 @@ class ToolPermissionFailClosedContractTests(unittest.TestCase):
         self.assertEqual(result.result, [1, 2])
         executor.assert_called_once()
 
+    def test_dynamic_elevation_stays_required_after_grant_is_revoked(self):
+        tool = self._arm_list_operations(requires_permission=False, cacheable=False)
+        self.assertTrue(self.tool_use.registry.register_tool(tool))
+        tool.requires_permission = True
+        self.tool_use.grant_permission("list_operations")
+        with patch.object(
+            self.tool_use, "_execute_list_operations", return_value=[1, 2]
+        ) as executor:
+            elevated = self.tool_use.execute_tool(
+                "list_operations", {"items": [2, 1], "operation": "sort"}
+            )
+            self.assertTrue(elevated.success, elevated.error)
+            self.tool_use.revoke_permission("list_operations")
+            tool.requires_permission = False
+            lowered = self.tool_use.execute_tool(
+                "list_operations", {"items": [2, 1], "operation": "sort"}
+            )
+        self.assertFalse(lowered.success)
+        self.assertIn("permission", lowered.error.lower())
+        self.assertEqual(executor.call_count, 1)
+
+    def test_dynamic_elevation_latches_registry_key_when_name_mutates(self):
+        tool = self._arm_list_operations(requires_permission=False, cacheable=False)
+        tool.name = "renamed_list_operations"
+        tool.requires_permission = True
+        self.tool_use.grant_permission("list_operations")
+        with patch.object(
+            self.tool_use, "_execute_list_operations", return_value=[1, 2]
+        ) as executor:
+            elevated = self.tool_use.execute_tool(
+                "list_operations", {"items": [2, 1], "operation": "sort"}
+            )
+            self.assertTrue(elevated.success, elevated.error)
+            self.tool_use.revoke_permission("list_operations")
+            tool.requires_permission = False
+            lowered = self.tool_use.execute_tool(
+                "list_operations", {"items": [2, 1], "operation": "sort"}
+            )
+        self.assertFalse(lowered.success)
+        self.assertIn("permission", lowered.error.lower())
+        self.assertEqual(executor.call_count, 1)
+        listed = next(
+            item for item in self.tool_use.registry.list_tools()
+            if item["name"] == "list_operations"
+        )
+        self.assertTrue(listed["requires_permission"])
+
+    def test_reregister_rejects_mutated_registered_name(self):
+        tool = self.tool_use.registry.get_tool("list_operations")
+        tool.name = "renamed_list_operations"
+        self.assertFalse(self.tool_use.registry.register_tool(tool))
+        self.assertIs(self.tool_use.registry.get_tool("list_operations"), tool)
+        self.assertNotIn("renamed_list_operations", self.tool_use.registry.tools)
+
     def test_ts1c_revoke_blocks_cached_success(self):
         self._arm_list_operations(requires_permission=True, cacheable=True)
         params = {"items": [2, 1], "operation": "sort"}
@@ -129,7 +183,7 @@ class ToolPermissionFailClosedContractTests(unittest.TestCase):
     def test_mutated_permission_metadata_blocks_execution_before_executor(self):
         tool = self.tool_use.registry.get_tool("list_operations")
         tool.permission_level = "not-a-level"
-        with patch.object(
+        with patch.object(self.tool_use, "_snapshot_cache_params") as snapshot, patch.object(
             self.tool_use, "_execute_list_operations", return_value=[1, 2]
         ) as executor:
             result = self.tool_use.execute_tool(
@@ -138,8 +192,121 @@ class ToolPermissionFailClosedContractTests(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertEqual(result.error, "Tool permission policy validation failed")
         self.assertIsNone(result.result)
+        snapshot.assert_not_called()
         executor.assert_not_called()
         self.assertEqual(self.tool_use.failed_executions, 1)
+
+    def test_registered_requirement_cannot_be_mutated_off(self):
+        tool = self.tool_use.registry.get_tool("list_operations")
+        tool.requires_permission = True
+        self.assertTrue(self.tool_use.registry.register_tool(tool))
+        tool.requires_permission = False
+        listed = next(
+            item for item in self.tool_use.registry.list_tools()
+            if item["name"] == "list_operations"
+        )
+        self.assertTrue(listed["requires_permission"])
+        with patch.object(
+            self.tool_use, "_execute_list_operations", return_value=[1, 2]
+        ) as executor:
+            result = self.tool_use.execute_tool(
+                "list_operations", {"items": [2, 1], "operation": "sort"}
+            )
+        self.assertFalse(result.success)
+        self.assertIn("permission", result.error.lower())
+        executor.assert_not_called()
+
+    def test_reregister_cannot_lower_registered_requirement(self):
+        original = self.tool_use.registry.get_tool("list_operations")
+        original.requires_permission = True
+        self.assertTrue(self.tool_use.registry.register_tool(original))
+        replacement = ToolDefinition(
+            name="list_operations",
+            description="A safe registered capability",
+            parameters={},
+            returns={"type": "list"},
+            requires_permission=False,
+        )
+        self.assertFalse(self.tool_use.registry.register_tool(replacement))
+        self.assertIs(self.tool_use.registry.get_tool("list_operations"), original)
+        with patch.object(
+            self.tool_use, "_execute_list_operations", return_value=[1, 2]
+        ) as executor:
+            result = self.tool_use.execute_tool(
+                "list_operations", {"items": [2, 1], "operation": "sort"}
+            )
+        self.assertFalse(result.success)
+        self.assertIn("permission", result.error.lower())
+        executor.assert_not_called()
+
+    def test_permission_snapshot_survives_mutation_after_validation(self):
+        self._arm_list_operations(requires_permission=True, cacheable=False)
+
+        def lower_requirement_after_validation(_log, definition, _permission_floor, _permission_key):
+            definition.requires_permission = False
+            return True, True
+
+        with patch(
+            "core.constitutional_brain._validate_permission_policy",
+            side_effect=lower_requirement_after_validation,
+        ), patch.object(
+            self.tool_use, "_execute_list_operations", return_value=[1, 2]
+        ) as executor:
+            result = self.tool_use.execute_tool(
+                "list_operations", {"items": [2, 1], "operation": "sort"}
+            )
+        self.assertFalse(result.success)
+        self.assertIn("permission", result.error.lower())
+        executor.assert_not_called()
+
+    def test_revoke_during_execution_does_not_cancel_current_call(self):
+        self._arm_list_operations(requires_permission=True, cacheable=False)
+        self.tool_use.grant_permission("list_operations")
+
+        def revoke_during_execution(*_args, **_kwargs):
+            self.tool_use.revoke_permission("list_operations")
+            return [1, 2]
+
+        with patch.object(
+            self.tool_use, "_execute_list_operations", side_effect=revoke_during_execution
+        ) as executor:
+            current = self.tool_use.execute_tool(
+                "list_operations", {"items": [2, 1], "operation": "sort"}
+            )
+            subsequent = self.tool_use.execute_tool(
+                "list_operations", {"items": [2, 1], "operation": "sort"}
+            )
+        self.assertTrue(current.success, current.error)
+        self.assertFalse(subsequent.success)
+        self.assertIn("permission", subsequent.error.lower())
+        self.assertEqual(executor.call_count, 1)
+
+    def test_elevation_after_snapshot_applies_to_next_call(self):
+        self._arm_list_operations(requires_permission=False, cacheable=False)
+        from core.constitutional_brain import _validate_permission_policy
+
+        def elevate_after_snapshot(log, definition, permission_floor, permission_key):
+            snapshot = _validate_permission_policy(log, definition, permission_floor, permission_key)
+            definition.requires_permission = True
+            return snapshot
+
+        with patch.object(
+            self.tool_use, "_execute_list_operations", return_value=[1, 2]
+        ) as executor:
+            with patch(
+                "core.constitutional_brain._validate_permission_policy",
+                side_effect=elevate_after_snapshot,
+            ):
+                current = self.tool_use.execute_tool(
+                    "list_operations", {"items": [2, 1], "operation": "sort"}
+                )
+            subsequent = self.tool_use.execute_tool(
+                "list_operations", {"items": [2, 1], "operation": "sort"}
+            )
+        self.assertTrue(current.success, current.error)
+        self.assertFalse(subsequent.success)
+        self.assertIn("permission", subsequent.error.lower())
+        self.assertEqual(executor.call_count, 1)
 
     def test_grant_rejects_empty_unregistered_and_non_string(self):
         for name in ("", "missing_tool", None, True):

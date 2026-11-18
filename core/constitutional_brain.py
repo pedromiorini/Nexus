@@ -2620,7 +2620,7 @@ class ToolValidator:
 
     def __init__(self, constitutional_log):
         self.log = constitutional_log
-
+        self._permission_required: Set[str] = set()
         # Forbidden patterns - using word boundaries to avoid false positives
         self.forbidden_words = {
             "eval", "exec", "compile", "__import__",
@@ -2683,7 +2683,6 @@ class ToolValidator:
                 "principle": "P6"
             })
             return False
-
         # 2. Verificar descrição não contém instruções maliciosas
         if self._contains_forbidden(tool.description):
             self.log.log_event("TOOL_VALIDATION_FAILED", {
@@ -2692,9 +2691,10 @@ class ToolValidator:
                 "principle": "P6"
             })
             return False
-
-        # 3. Validar orçamento; executores síncronos não são interrompidos.
-        if not self.validate_timeout_seconds(tool) or not _validate_permission_policy(self.log, tool):
+        if not self.validate_timeout_seconds(tool):
+            return False
+        policy_valid, requires_permission = _validate_permission_policy(self.log, tool, self._permission_required, tool.name)
+        if not policy_valid or (tool.name in self._permission_required and not requires_permission):
             return False
 
         return True
@@ -2825,8 +2825,8 @@ class ToolRegistry:
 
     def register_tool(self, tool: ToolDefinition) -> bool:
         """Registrar nova ferramenta (com validação P6)"""
-
-        if not self.validator.validate_tool_definition(tool):
+        registered_key = next((key for key, registered in self.tools.items() if registered is tool), tool.name)
+        if registered_key != tool.name or not self.validator.validate_tool_definition(tool):
             return False
 
         self.tools[tool.name] = tool
@@ -2840,12 +2840,12 @@ class ToolRegistry:
         """Listar todas as ferramentas disponíveis"""
         return [
             {
-                "name": tool.name,
+                "name": tool_name,
                 "description": tool.description,
                 "parameters": list(tool.parameters.keys()),
-                "requires_permission": tool.requires_permission
+                "requires_permission": tool.requires_permission or tool_name in self.validator._permission_required
             }
-            for tool in self.tools.values()
+            for tool_name, tool in self.tools.items()
         ]
 
     def get_usage_statistics(self) -> Dict[str, int]:
@@ -3371,15 +3371,15 @@ class RealToolUse:
                 result=None,
                 error=f"Tool '{tool_name}' not found"
             )
-
-        # Fail-closed: flag verdadeira sem grant não chega ao cache nem ao executor.
-        if not _validate_permission_policy(self.log, tool) or (tool.requires_permission and tool_name not in self._permission_grants):
+        policy_valid, requires_permission = _validate_permission_policy(self.log, tool, self.registry.validator._permission_required, tool_name)
+        # Gate: snapshot + grant autorizam esta chamada; mudanças posteriores valem na próxima, sem cancelamento.
+        if not policy_valid or (
+            (requires_permission or tool_name in self.registry.validator._permission_required)
+            and tool_name not in self._permission_grants
+        ):
             self.failed_executions += 1
-            error = "Tool permission policy validation failed" if getattr(tool, "_permission_policy_invalid", False) else "permission denied: no active grant"
-            self.log.log_event("TOOL_PERMISSION_DENIED", {
-                "tool": tool_name,
-                "reason": "no_active_grant",
-            })
+            error = "Tool permission policy validation failed" if not policy_valid else "permission denied: no active grant"
+            self.log.log_event("TOOL_PERMISSION_DENIED", {"tool": tool_name, "reason": "no_active_grant"})
             return ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
@@ -13194,7 +13194,6 @@ class RealAdversarialRobustnessLayer:
         }
 
 
-
 # ═══════════════════════════════════════════════════════════════════════════
 # MÓDULO 37: COUNTERFACTUAL REASONING ENGINE (POST 37)
 # ═══════════════════════════════════════════════════════════════════════════
@@ -21116,7 +21115,7 @@ def _escape_like_literal(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def _validate_permission_policy(log: Any, tool: ToolDefinition) -> bool:
+def _validate_permission_policy(log: Any, tool: ToolDefinition, permission_floor: Set[str], permission_key: str) -> Tuple[bool, Optional[bool]]:
     """Validate tool permission metadata conservatively and fail closed."""
     requires_permission = tool.requires_permission
     permission_level = tool.permission_level
@@ -21127,7 +21126,7 @@ def _validate_permission_policy(log: Any, tool: ToolDefinition) -> bool:
             "reason": "requires_permission must be a boolean",
             "requires_permission_type": type(requires_permission).__name__,
         })
-        return False
+        return False, None
     if type(permission_level) is not str or permission_level not in {"read", "write", "admin"}:
         setattr(tool, "_permission_policy_invalid", True)
         log.log_event("TOOL_VALIDATION_FAILED", {
@@ -21135,9 +21134,10 @@ def _validate_permission_policy(log: Any, tool: ToolDefinition) -> bool:
             "reason": "permission_level must be read, write, or admin",
             "permission_level_type": type(permission_level).__name__,
         })
-        return False
+        return False, None
     setattr(tool, "_permission_policy_invalid", False)
-    return True
+    permission_floor.update({permission_key} if requires_permission else ())
+    return True, requires_permission
 
 if __name__ == "__main__":
     if not __debug__:
