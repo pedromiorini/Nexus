@@ -1,11 +1,20 @@
 # Nexus — Continuidade entre agentes
 
 <!-- NEXUS-CURRENT-STATE
-commit: HEAD
-ci_run: CURRENT_RUN
-tests: CURRENT_TESTS
+commit: 47c0563
+ci_run: PR_192_AND_PR_193_GREEN
+tests: 1610_passed_5_expected_failures
 bandit_low: 139
 -->
+
+## Estado atual — pós-merges #192, #193 e #194 — 2026-11-18
+
+- **Main:** `47c0563`, sincronizada com `origin/main`, worktree limpo. Foram incorporadas a serialização de `TemporalFactStore.head_hash` (#194), a preservação fail-closed do requisito de permissão registrado (#192) e a validação dos limites de auditoria Vita antes de consultas SQLite (#193).
+- **Evidência remota:** as PRs #192, #193 e #194 tiveram todos os gates hospedados aprovados, incluindo contratos/regressão, compatibilidade Python 3.12/3.13, três shards de mutação cognitiva, replay de guardas e atestação final. As PRs #192 e #193 foram promovidas/revisadas conforme o estado dos checks e mescladas; os branches de trabalho foram removidos.
+- **Validação local combinada:** contratos focados de permissão, temporal e Vita passaram `32/32`; a suíte `unittest discover -p 'test_*.py'` passou `1610` testes, com `5 expected failures`, exit 0. Ruff, compilação de todos os módulos e `git diff --check` passaram.
+- **Branches de trabalho observadas:** as antigas PRs empilhadas #47–#50 e #115 permanecem abertas no GitHub, mas seus branches originais foram removidos e estão 229 commits atrás/divergentes de `main`; não foram rebaseadas cegamente. O conteúdo temporal útil foi isolado em #194. Não há branches `work/*` dessas duas rodadas restantes após os merges.
+- **Limitações:** o CI hospedado acima é evidência dos heads das PRs, não uma garantia geral do sistema. O ambiente local continua sem `psutil`, FAISS e SentenceTransformers opcionais; Bandit mantém 139 achados LOW históricos e não há alegação de AGI, consciência ou autonomia geral.
+- **Próximo passo:** reconsultar o estado das PRs antigas e priorizar somente mudanças que possam ser isoladas em PRs pequenas, com contrato independente e sem rebase destrutivo de cadeias obsoletas.
 
 ## Experimento local — idempotência de corroboração temporal — 2026-11-17
 
