@@ -760,17 +760,20 @@ class RealKnowledgeGraph:
                 return QueryResult([], [], "", 0.0, 0)
         else:
             # Fallback: BFS manual
-            path = self._bfs_path(start_id, end_id, max_hops)
+            path = self._bfs_path(start_id, end_id)
             if not path:
                 return QueryResult([], [], "", 0.0, 0)
+            hops = len(path) - 1
+            if hops > max_hops:
+                return QueryResult([], [], "", 0.0, hops)
 
             entities = [self.entity_index[nid] for nid in path if nid in self.entity_index]
             context = self._build_path_context(path)
             confidence = 0.7  # heurística para fallback
 
-            return QueryResult(entities, [path], context, confidence, len(path) - 1)
+            return QueryResult(entities, [path], context, confidence, hops)
 
-    def _bfs_path(self, start: str, end: str, max_depth: int) -> List[str]:
+    def _bfs_path(self, start: str, end: str) -> List[str]:
         """BFS manual para fallback sem NetworkX."""
         from collections import deque
 
@@ -779,9 +782,6 @@ class RealKnowledgeGraph:
 
         while queue:
             node, path = queue.popleft()
-
-            if len(path) > max_depth + 1:
-                continue
 
             if node == end:
                 return path

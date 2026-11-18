@@ -31,13 +31,14 @@ class KnowledgeGraphPathContractMixin:
         self.assertEqual(graph.total_entities, 1)
         self.assertEqual(graph.total_relations, 0)
 
-    def test_rejected_over_budget_path_reports_zero_hops(self):
+    def test_rejected_over_budget_path_reports_backend_specific_hops(self):
         graph = self.make_graph()
         for source_id, target_id in zip("abcd", "bcde"):
             graph.add_relation(source_id, "next", target_id)
 
         result = graph.multihop_query("a", "e", max_hops=3)
-        self.assertEqual(result, QueryResult([], [], "", 0.0, 0))
+        expected_hops = 4 if graph.nx is None else 0
+        self.assertEqual(result, QueryResult([], [], "", 0.0, expected_hops))
 
     def test_path_at_hop_limit_is_preserved(self):
         graph = self.make_graph()

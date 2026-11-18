@@ -402,6 +402,13 @@ MUTATIONS = [
         '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")\n        if limit < 0:\n            raise ValueError("limit must be non-negative")\n        if False:\n            return []',
         tests=EPISODIC_SEARCH_LIMIT,
     ),
+    Mutation(
+        "knowledge_graph_fallback_over_budget_hops_to_zero",
+        "core/constitutional_brain.py",
+        '            hops = len(path) - 1\n            if hops > max_hops:\n                return QueryResult([], [], "", 0.0, hops)',
+        '            hops = len(path) - 1\n            if hops > max_hops:\n                return QueryResult([], [], "", 0.0, 0)',
+        tests=("test_knowledge_graph_hops_contract.py",),
+    ),
 ]
 
 
