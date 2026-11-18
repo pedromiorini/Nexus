@@ -1,14 +1,4 @@
 # Claims (leases) de trabalho: abra antes de começar; renove ou remova ao terminar.
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "rejeitar coerção de contadores em record_reprocessing_telemetry (#198)"
-    arquivos:
-      - vita/nexus_constitutional_bridge_v3.py
-      - test_vita_telemetry_counter_contract.py
-      - CONTINUATION.md
-      - NEXUS_EVIDENCE.md
-      - docs/agentes/LICOES_APRENDIDAS.md
-      - docs/agentes/CLAIMS.yaml
-    expira_em: "2026-11-21T06:00:00+00:00"
+claims: []
