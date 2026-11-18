@@ -7,14 +7,14 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
-## Estado atual — pós-merges #192, #193 e #194 — 2026-11-18
+## Estado atual — pós-merges #192, #193, #194 e #195 — 2026-11-18
 
-- **Main:** `47c0563`, sincronizada com `origin/main`, worktree limpo. Foram incorporadas a serialização de `TemporalFactStore.head_hash` (#194), a preservação fail-closed do requisito de permissão registrado (#192) e a validação dos limites de auditoria Vita antes de consultas SQLite (#193).
-- **Evidência remota:** as PRs #192, #193 e #194 tiveram todos os gates hospedados aprovados, incluindo contratos/regressão, compatibilidade Python 3.12/3.13, três shards de mutação cognitiva, replay de guardas e atestação final. As PRs #192 e #193 foram promovidas/revisadas conforme o estado dos checks e mescladas; os branches de trabalho foram removidos.
-- **Validação local combinada:** contratos focados de permissão, temporal e Vita passaram `32/32`; a suíte `unittest discover -p 'test_*.py'` passou `1610` testes, com `5 expected failures`, exit 0. Ruff, compilação de todos os módulos e `git diff --check` passaram.
-- **Branches de trabalho observadas:** as antigas PRs empilhadas #47–#49 e #115 permanecem abertas no GitHub, mas seus branches originais foram removidos e estão 229 commits atrás/divergentes de `main`; não foram rebaseadas cegamente. As duplicatas #152 (Vita) e #50 (lock temporal) foram encerradas com referência às PRs substitutas #193 e #194. O conteúdo temporal útil foi isolado em #194. Não há branches `work/*` dessas duas rodadas restantes após os merges.
+- **Main:** `2815d1d`, sincronizada com `origin/main`, worktree limpo. Foram incorporadas a serialização de `TemporalFactStore.head_hash` (#194), a preservação fail-closed do requisito de permissão registrado (#192), a validação dos limites de auditoria Vita (#193) e a atomicidade de escritas/replay temporal (#195).
+- **Evidência remota:** o CI pós-merge `44234866330` passou integralmente no commit `2815d1d`, incluindo contratos/regressão, compatibilidade Python 3.12/3.13, três shards de mutação cognitiva, replay de guardas, auditoria de realidade, segurança e atestação final. A PR #195 também passou 8/8 gates antes do merge.
+- **Validação local:** os contratos temporais focados da extração passaram `56/56`; a suíte `unittest discover -p 'test_*.py'` passou `1627` testes, com `5 expected failures`, exit 0. Ruff, compilação de todos os módulos e `git diff --check` passaram.
+- **Backlog histórico:** as antigas PRs empilhadas #47–#49 permanecem abertas e conflitantes; #115 continua draft e contém uma composição muito maior que o residual extraído em #195. As duplicatas #152 (Vita) e #50 (lock temporal) foram encerradas com referência às PRs substitutas #193 e #194. O residual de atomicidade temporal foi isolado em #195; não reintroduzir a composição integral da #115.
 - **Limitações:** o CI hospedado acima é evidência dos heads das PRs, não uma garantia geral do sistema. O ambiente local continua sem `psutil`, FAISS e SentenceTransformers opcionais; Bandit mantém 139 achados LOW históricos e não há alegação de AGI, consciência ou autonomia geral.
-- **Próximo passo:** reconsultar o estado das PRs antigas e priorizar somente mudanças que possam ser isoladas em PRs pequenas, com contrato independente e sem rebase destrutivo de cadeias obsoletas.
+- **Próximo passo:** revisar apenas os contratos de cortes de snapshot ainda exclusivos da #115; se não houver benefício compatível com o `main`, encerrar a #115 como superseded. Não rebasear a cadeia histórica integral.
 
 ## Experimento local — idempotência de corroboração temporal — 2026-11-17
 
