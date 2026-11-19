@@ -397,7 +397,7 @@ class EpisodicB2bOpenCurrentContractTests(unittest.TestCase):
         source = (ROOT / "core/constitutional_brain.py").read_text(encoding="utf-8").splitlines()
         self.assertEqual(
             source[10436],
-            "            return module.search_episodes(query=prompt, limit=3)",
+            "            return module.search_episodes(query=prompt, limit=3, include_current_open=True)",
         )
         router, recorder = bridge.harness_h()
         with bridge.silence():
@@ -405,9 +405,8 @@ class EpisodicB2bOpenCurrentContractTests(unittest.TestCase):
             second = router.route(bridge.RECALL, {})
         self.assertEqual(
             recorder.calls,
-            [("search_episodes", (), {"query": bridge.RECALL, "limit": 3})],
+            [("search_episodes", (), {"query": bridge.RECALL, "limit": 3, "include_current_open": True})],
         )
-        self.assertNotIn("include_current_open", recorder.calls[0][2])
         self.assertNotIn("status", recorder.calls[0][2])
         self.assertNotIn("episode_id", first)
         self.assertNotIn("episodic", first)
@@ -418,7 +417,7 @@ class EpisodicB2bOpenCurrentContractTests(unittest.TestCase):
         with bridge.silence():
             router.route(bridge.RECALL, context)
             router.route(bridge.RECALL, context)
-        expected = ("search_episodes", (), {"query": bridge.RECALL, "limit": 3})
+        expected = ("search_episodes", (), {"query": bridge.RECALL, "limit": 3, "include_current_open": True})
         self.assertEqual(recorder.calls, [expected, expected])
 
         memory = RealEpisodicMemory(":memory:")
@@ -436,8 +435,7 @@ class EpisodicB2bOpenCurrentContractTests(unittest.TestCase):
         memory.search_episodes = wrapped
         with bridge.silence():
             result = self._router(memory).route(bridge.RECALL, {})
-        self.assertEqual(seen, [((), {"query": bridge.RECALL, "limit": 3}, [episode_id])])
-        self.assertNotIn("include_current_open", seen[0][1])
+        self.assertEqual(seen, [((), {"query": bridge.RECALL, "limit": 3, "include_current_open": True}, [episode_id])])
         self.assertNotIn("episode_id", result)
         self.assertNotIn("episodic", result)
 
@@ -457,7 +455,7 @@ class EpisodicB2bOpenCurrentContractTests(unittest.TestCase):
         memory.search_episodes = wrapped_open
         with bridge.silence():
             result = self._router(memory).route(bridge.RECALL, {})
-        self.assertEqual(seen, [((), {"query": bridge.RECALL, "limit": 3})])
+        self.assertEqual(seen, [((), {"query": bridge.RECALL, "limit": 3, "include_current_open": True})])
         self.assertEqual(memory.current_episode_id, open_id)
         self.assertNotIn("episode_id", result)
         self.assertNotIn("episodic", result)
@@ -468,7 +466,7 @@ class EpisodicB2bOpenCurrentContractTests(unittest.TestCase):
             router.route("ping", {})
         self.assertEqual(
             recorder.calls,
-            [("search_episodes", (), {"query": "ping", "limit": 3})],
+            [("search_episodes", (), {"query": "ping", "limit": 3, "include_current_open": True})],
         )
 
         created = bridge.make_brain()
@@ -481,8 +479,7 @@ class EpisodicB2bOpenCurrentContractTests(unittest.TestCase):
             ["start_episode", "search_episodes", "close_episode"],
         )
         self.assertEqual(calls[1][1], ())
-        self.assertEqual(calls[1][2], {"query": bridge.RECALL, "limit": 3})
-        self.assertNotIn("include_current_open", calls[1][2])
+        self.assertEqual(calls[1][2], {"query": bridge.RECALL, "limit": 3, "include_current_open": True})
         self.assertNotIn("status", calls[1][2])
         self.assertNotIn("episodes", think_result)
 
