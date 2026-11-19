@@ -16,3 +16,14 @@ T-incompat-ausente	tmo	12 fixtures/nao_existe.txt	3
 T-incompat-vazio	tmo	12 fixtures/tmo_vazio.txt	3
 T-incompat-texto	tmo	12 fixtures/tmo_texto.txt	3
 T-incompat-timeout	tmo	abc fixtures/tmo_anterior.txt	3
+# 2026-11-18: claim no branch do PR x contrato claims: [] (L-013; runs 44255448348 e 44440302690)
+# K1/K2 origem e anterior nao sao ancestrais de main; estao em branches que o job busca (fetch-depth 0, refs/heads/*).
+# K-incompat-yaml: fixture no repo; o /tmp do ensaio local nao existe no CI.
+K1-origem	claim	bcad61e	8
+K2-origem	claim	d041382	8
+K1-anterior	claim	7d0b950	0
+K2-anterior	claim	c5d701d	0
+K3-anterior-com-claim	claim	632ce84	0
+K4-anterior-com-claim	claim	a09b780	0
+K-incompat-ausente	claim	/tmp/nao-existe-claim-1118	3
+K-incompat-yaml	claim	fixtures/claim-yaml-invalido	3
