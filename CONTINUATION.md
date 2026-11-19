@@ -11,7 +11,7 @@ bandit_low: 139
 
 - **Base:** `c4722fd6fc02ec3fbc1deb9066bcd5fd055d55d8` (`origin/main`, merge da #201). Branch `cursor/deferred-enqueue-types-812b`. Agent-Id: `grok-bot`.
 - **Bloco `NEXUS-CURRENT-STATE`:** não reescrito. Continua `tests: CURRENT_TESTS` e `bandit_low: 139`. `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md` não foram editados.
-- **Claim:** `docs/agentes/CLAIMS.yaml`, `expira_em: 2026-11-22T05:48:42+00:00` (71 h depois de 2026-11-19T06:48:42Z). Os testes `test_claims_stay_empty_and_module_type_does_not_grow` e `test_claim_policy_present_without_introducing_active_claims` passam na `main` e falham neste branch. Não foram alterados. O claim sai no último commit antes do merge (§9C.3); este rascunho não faz esse commit.
+- **Claim:** removido no commit `c410449`. A PR #202 foi mesclada por squash em 2026-11-19T07:51:15Z como `2d88315`. Em `main`, `docs/agentes/CLAIMS.yaml` está com `claims: []`. A redação anterior deste item, a do squash, afirmava o claim com `expira_em: 2026-11-22T05:48:42+00:00`, a falha de `test_claims_stay_empty_and_module_type_does_not_grow` e `test_claim_policy_present_without_introducing_active_claims` neste branch e que este rascunho não fazia esse commit. Os dois testes não foram alterados.
 - **Fora deste diff:** `core/constitutional_brain.py`, `tools/cognitivo_mutation.py`, workflows, lock e as PRs #38–#50/#60. PRs abertas conferidas antes da escolha: lista vazia. Issue #78, último comentário em 2026-11-10, é dado: não reserva arquivo nesta data. `core/temporal_facts.py` não foi editado.
 
 ### Fenômeno e hipóteses
