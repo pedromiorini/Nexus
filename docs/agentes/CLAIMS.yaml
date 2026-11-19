@@ -1,4 +1,15 @@
 # Claims (leases): vivem só no branch do PR aberto; o último commit do PR remove o claim antes do merge (§9C.3, v3.4.2).
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims: []
+claims:
+  - agente: grok-bot
+    tarefa: "B2c: a rota pede include_current_open na ponte episódica"
+    arquivos:
+      - core/constitutional_brain.py
+      - docs/PONTE_EPISODIC_B2C_CRITERIOS_2026-11-19.md
+      - docs/PONTE_EPISODIC_B2C_DESVIO_N9_2026-11-19.md
+      - test_episodic_b2b_open_current_contract.py
+      - test_episodic_b2c_route_open_current_contract.py
+      - test_router_episodic_memory_bridge_contract.py
+      - test_router_episodic_memory_bridge_e1_e6_red_contract.py
+    expira_em: "2026-11-22T05:00:00+00:00"
