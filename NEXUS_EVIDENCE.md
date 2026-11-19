@@ -7,6 +7,10 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Fronteira de enqueue da fila adiada — validação local 2026-11-19
+
+Base `c4722fd6fc02ec3fbc1deb9066bcd5fd055d55d8`, branch `cursor/deferred-enqueue-types-812b`. O contrato `test_deferred_enqueue_boundary_contract.py` falhou na produção intacta (6 testes, 14 falhas, 3 erros, exit 1) e, com a rejeição de `bool`, não inteiro e não-`str` antes da capacidade, passou 6/6 (exit 0). Inteiro negativo, zero, subclasse de `int` e o descarte de um enqueue válido com a fila cheia continuaram aceitos. A suíte executou 1673 testes e saiu 1 só em `test_claims_stay_empty_and_module_type_does_not_grow` e `test_claim_policy_present_without_introducing_active_claims`, porque o claim deste rascunho está no arquivo. Bandit não acrescentou achado sobre a baseline de 139 LOW. Mutação direcionada: 91/91 mortos. Comandos e limites estão na rodada de 2026-11-19 de `CONTINUATION.md`. Isto é evidência de contrato local, não de capacidade operacional nem de CI hospedado.
+
 ## Contadores da telemetria Vita sem coerção — validação local 2026-11-18
 
 Base `5da85e171a979eafdf944d7c5617b76ff8fdecdf`, branch `cursor/vita-telemetry-counters-4ca8`. O contrato `test_vita_telemetry_counter_contract.py` falhou na produção intacta (9 testes, 16 falhas, 7 erros, exit 1) e, com a rejeição de `bool`, não inteiro, negativo, texto e subclasse mentirosa antes da gravação, passou 9/9 (exit 0). A latência não finita continua `ValueError` com a mensagem que contém `finite`. A suíte com coverage executou 1642 testes, exit 0, com 5 falhas esperadas. Bandit não acrescentou achado sobre a baseline de 139 LOW. Comandos e limites estão na rodada de 2026-11-18 de `CONTINUATION.md`. Isto é evidência de contrato local, não de capacidade operacional nem de CI hospedado.

@@ -10,4 +10,5 @@ claims:
       - tools/targeted_mutation.py
       - CONTINUATION.md
       - NEXUS_EVIDENCE.md
+      - docs/agentes/LICOES_APRENDIDAS.md
     expira_em: "2026-11-22T05:48:42+00:00"
