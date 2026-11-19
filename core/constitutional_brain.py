@@ -10434,7 +10434,7 @@ class CentralRouter:
             return {"hash": module.log_event("ROUTED_REQUEST", {"prompt": prompt[:100]})}
 
         elif module_name == ModuleType.EPISODIC:
-            return module.search_episodes(query=prompt, limit=3)
+            return module.search_episodes(query=prompt, limit=3, include_current_open=True)
 
         elif module_name == ModuleType.INCREMENTAL_LEARNER:
             # Learning é assíncrono - apenas registra intenção
