@@ -1,14 +1,4 @@
 # Claims (leases): vivem só no branch do PR aberto; o último commit do PR remove o claim antes do merge (§9C.3, v3.4.2).
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "enqueue da fila adiada recusa bool e tipos que o snapshot já rejeita"
-    arquivos:
-      - core/deferred_task_queue.py
-      - test_deferred_enqueue_boundary_contract.py
-      - tools/targeted_mutation.py
-      - CONTINUATION.md
-      - NEXUS_EVIDENCE.md
-      - docs/agentes/LICOES_APRENDIDAS.md
-    expira_em: "2026-11-22T05:48:42+00:00"
+claims: []
