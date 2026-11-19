@@ -1,10 +1,4 @@
 # Claims (leases): vivem só no branch do PR aberto; o último commit do PR remove o claim antes do merge (§9C.3, v3.4.2).
 # Dois claims ativos não podem cobrir o mesmo arquivo. Prazo máximo recomendado: 72 h.
 schema_version: 1
-claims:
-  - agente: grok-bot
-    tarefa: "B2b: include_current_open na busca episódica, só quando a chamada pede"
-    arquivos:
-      - core/cognitivo/episodic_memory.py
-      - test_episodic_b2b_open_current_contract.py
-    expira_em: "2026-11-21T18:00:00+00:00"
+claims: []
