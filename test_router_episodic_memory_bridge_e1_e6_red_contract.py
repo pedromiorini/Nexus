@@ -43,7 +43,7 @@ class ErrataC5AndE2EmptySuccess(unittest.TestCase):
             second = router.route(RECALL, {})
         self.assertEqual(
             recorder.calls,
-            [("search_episodes", (), {"query": RECALL, "limit": 3})],
+            [("search_episodes", (), {"query": RECALL, "limit": 3, "include_current_open": True})],
         )
         self.assertIs(first["success"], True)
         self.assertIs(first["degraded"], False)
@@ -73,7 +73,7 @@ class E1ClosedEpisodeProjection(unittest.TestCase):
         with bridge.silence():
             first = router.route(RECALL, {})
             second = router.route(RECALL, {})
-        self.assertEqual(calls, [((), {"query": RECALL, "limit": 3})])
+        self.assertEqual(calls, [((), {"query": RECALL, "limit": 3, "include_current_open": True})])
         self.assertNotIn("episode_id", first)
         self.assertNotIn("episodic", first)
         self.assertIs(second["cached"], True)
@@ -182,7 +182,7 @@ class E5ThinkDoesNotGainEpisodes(unittest.TestCase):
             "importance": 0.7,
         })
         self.assertEqual(calls[1][1], ())
-        self.assertEqual(calls[1][2], {"query": RECALL, "limit": 3})
+        self.assertEqual(calls[1][2], {"query": RECALL, "limit": 3, "include_current_open": True})
         self.assertEqual(result["episode_id"], calls[0][3])
         self.assertEqual(calls[2][1], (result["episode_id"],))
         self.assertEqual(calls[2][2], {})

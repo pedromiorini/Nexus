@@ -351,7 +351,7 @@ class C5RecallCallAndPublicResult(unittest.TestCase):
             second = router.route(RECALL, {})
         self.assertEqual(
             recorder.calls,
-            [("search_episodes", (), {"query": RECALL, "limit": 3})],
+            [("search_episodes", (), {"query": RECALL, "limit": 3, "include_current_open": True})],
         )
         self.assertIs(first["success"], True)
         self.assertIs(first["degraded"], False)
@@ -376,7 +376,7 @@ class C6ContextDoesNotRetarget(unittest.TestCase):
         with silence():
             first = router.route(RECALL, context)
             second = router.route(RECALL, context)
-        expected = ("search_episodes", (), {"query": RECALL, "limit": 3})
+        expected = ("search_episodes", (), {"query": RECALL, "limit": 3, "include_current_open": True})
         self.assertEqual(recorder.calls, [expected, expected])
         self.assertEqual(first["request_type"], "recall")
         self.assertIs(second["cached"], False)
@@ -492,7 +492,7 @@ class C10RealMemoryInTheMap(unittest.TestCase):
         memory.search_episodes = wrapped
         with silence():
             result = self._router(memory).route(RECALL, {})
-        self.assertEqual(seen, [((), {"query": RECALL, "limit": 3}, [episode_id])])
+        self.assertEqual(seen, [((), {"query": RECALL, "limit": 3, "include_current_open": True}, [episode_id])])
         self.assertNotIn("episode_id", result)
         self.assertNotIn("episodic", result)
         self.assertIn("episodic", result["modules_executed"])
@@ -514,7 +514,7 @@ class C10RealMemoryInTheMap(unittest.TestCase):
         memory.search_episodes = wrapped
         with silence():
             result = self._router(memory).route(RECALL, {})
-        self.assertEqual(seen, [((), {"query": RECALL, "limit": 3})])
+        self.assertEqual(seen, [((), {"query": RECALL, "limit": 3, "include_current_open": True})])
         self.assertNotIn("episode_id", result)
         self.assertNotIn("episodic", result)
         self.assertEqual(memory.current_episode_id, open_id)
@@ -544,7 +544,7 @@ class C11LearningIsNotADefaultProposer(unittest.TestCase):
         self.assertEqual(result["request_type"], "learning")
         self.assertEqual(
             recorder.calls,
-            [("search_episodes", (), {"query": "ping", "limit": 3})],
+            [("search_episodes", (), {"query": "ping", "limit": 3, "include_current_open": True})],
         )
         self.assertIn("episodic", result["modules_executed"])
         self.assertIn("learner", result["modules_executed"])
@@ -587,7 +587,7 @@ class C12ThinkWithRouter(unittest.TestCase):
             "importance": 0.7,
         })
         self.assertEqual(calls[1][1], ())
-        self.assertEqual(calls[1][2], {"query": RECALL, "limit": 3})
+        self.assertEqual(calls[1][2], {"query": RECALL, "limit": 3, "include_current_open": True})
         self.assertEqual(calls[2][1], (result["episode_id"],))
         self.assertEqual(calls[2][2], {})
         self.assertNotIn("get_episode_memories", method_names(calls))
