@@ -7,6 +7,40 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — enqueue da fila adiada recusa tipos que o snapshot já rejeita — 2026-11-19
+
+- **Base:** `c4722fd6fc02ec3fbc1deb9066bcd5fd055d55d8` (`origin/main`, merge da #201). Branch `cursor/deferred-enqueue-types-812b`. Agent-Id: `grok-bot`.
+- **Bloco `NEXUS-CURRENT-STATE`:** não reescrito. Continua `tests: CURRENT_TESTS` e `bandit_low: 139`. `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md` não foram editados.
+- **Claim:** `docs/agentes/CLAIMS.yaml`, `expira_em: 2026-11-22T05:48:42+00:00` (71 h depois de 2026-11-19T06:48:42Z). Os testes `test_claims_stay_empty_and_module_type_does_not_grow` e `test_claim_policy_present_without_introducing_active_claims` passam na `main` e falham neste branch. Não foram alterados. O claim sai no último commit antes do merge (§9C.3); este rascunho não faz esse commit.
+- **Fora deste diff:** `core/constitutional_brain.py`, `tools/cognitivo_mutation.py`, workflows, lock e as PRs #38–#50/#60. PRs abertas conferidas antes da escolha: lista vazia. Issue #78, último comentário em 2026-11-10, é dado: não reserva arquivo nesta data. `core/temporal_facts.py` não foi editado.
+
+### Fenômeno e hipóteses
+
+Em `c4722fd`, `DeferredTaskQueue.enqueue` grava `priority` `True`/`False`/`1.5`/NaN/`±inf` e `prompt`/`reason` que não são `str`. O `restore_snapshot` já recusa bool em `priority` e não-str em `prompt` e `last_reason`. Com `max_size=1` ocupado, `priority=True` levanta `OverflowError` e incrementa `discarded`. `priority="1"` e `priority=None` levantam `TypeError` em `DeferredTask.__post_init__` (`bad operand type for unary -`), depois da checagem de capacidade.
+
+RED no commit `0677e49`, produção ainda a de `c4722fd`: `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus_audit_red.sqlite3 LC_ALL=C /tmp/nexus-ci312/bin/python -m unittest -v test_deferred_enqueue_boundary_contract.py` saiu 1. 6 testes, 14 falhas, 3 erros, 0,029 s. Controles que passaram: inteiro negativo, zero, subclasse de `int`, string vazia e o descarte de um enqueue válido com a fila cheia.
+
+- **H1.** O tipo inválido já era recusado antes de mutar a fila. Falsificada: bool, float, NaN, infinito e não-str entram; a fila cheia conta descarte.
+- **H2.** `bool` como prioridade 1 é o contrato, e o snapshot é que diverge. Não adotada: o teste de snapshot já recusa bool e nenhum teste de enqueue exige aceitá-lo.
+- **H3.** `prompt` ou `reason` não-str já quebram na inserção. Falsificada nos oito casos medidos: `ValueError` não foi levantado e a tarefa entra.
+- **H4.** Inteiro (inclusive negativo e zero), texto e string vazia já são o caminho preservado. Sobreviveu nos três controles, antes e depois.
+- **H5.** Checar o tipo depois da capacidade bastaria. Descartada no desenho: o caso cheio com `priority=True` contava `discarded`. A checagem ficou antes do lock.
+
+GREEN no commit `77bcc4e`: os mesmos 6 testes, OK. `test_deferred_task_queue.py`, `test_deferred_task_snapshot.py` e `test_deferred_task_properties.py` junto do contrato novo: 46 testes, OK. A guarda rejeita `bool` antes de `int`, e `prompt`/`reason` que não são `str`, sem normalizar o valor.
+
+### Gates neste ambiente
+
+Python 3.12.3 em `/tmp/nexus-ci312` (`pip install --require-hashes -r requirements-ci.lock`). Não há `python3.11` neste ambiente; o CI usa 3.11. Ruff 0.17.1, Bandit 1.9.4, Coverage 7.16.2, Hypothesis 6.170.5. `PYTHONPATH=.`. `NEXUS_AUDIT_DB` fora do repo.
+
+- Ruff e `compileall` dos caminhos do workflow: exit 0. `git diff --check`: exit 0.
+- `tools/targeted_mutation.py`: 91 declarados, 91 aplicáveis, 91 mortos, 0 sobreviventes, 0 não aplicados, exit 0. Quatro mutantes novos: `queue_enqueue_prompt_type`, `queue_enqueue_priority_bool`, `queue_enqueue_priority_type`, `queue_enqueue_reason_type`.
+- Bandit na worktree `/tmp/nexus-main-wt` de `origin/main` `c4722fd`, caminhos relativos `core vita tools`: 139 LOW, 0 MEDIUM, 0 HIGH, exit 1 pelos LOW. No branch, `bandit -r core vita tools -b /tmp/base.json`: 0 achados novos, exit 0; totais continuam 139 LOW, 0 MEDIUM, 0 HIGH. `security_triage.py /tmp/bandit-full.json SECURITY_TRIAGE.md --check`: exit 0.
+- `reality_audit.py`: exit 0 e `git diff` de `AUDIT_REALITY_REPORT.md` e `audit_reality.json` vazio. Núcleo 23011 linhas, 210 classes, 690 funções. Não é evidência de capacidade.
+- Suíte `python -m unittest discover -p 'test_*.py'`: 1673 testes, 71,215 s, exit 1, `FAILED (failures=2, expected failures=5)`. As duas falhas são só os testes do claim vazio, já citados. A mesma suíte com `coverage run --branch` saiu 1 pelas mesmas duas falhas (198,702 s). Demo `coverage run --append --branch core/constitutional_brain.py`: exit 0. `integrated-summary.json` em `/tmp`: `result` passed, `skipped` `['0']`, `duplicates` `[]`. O banner do demo não é evidência de capacidade. Pisos, mesmo com a suíte em exit 1: total 84%, fila 95%, VRAM 95%, temporal 96%, Vita 81%, núcleo 72%, `core/cognitivo/*` 98%. Todos os `--fail-under` saíram 0.
+- `validar_registro.py --expirados aviso`: exit 0, só os dois avisos de versão 3.4.1 dos agentes Cursor. Replay `run_replay.sh`: 17 casos, exit 0. `predeleg.sh HEAD origin/main`: `OK: sem conflito`, exit 0.
+- **CI hospedado do head `a4ca34cb0687e8e168b28f5167c1c60d47b99ad3`:** run `44475971468`. Contract gate (Python 3.11), Python 3.12 e Python 3.13 saíram 1 com 1673 testes, `FAILED (failures=2, expected failures=5)`. As duas falhas são só os testes do claim vazio. Replay 17/17 e os três shards cognitivos passaram. A atestação final ficou skipped. O job de contrato parou na suíte com cobertura; Bandit e a mutação direcionada desse job não chegaram a rodar no hospedado. Localmente os dois já tinham saído 0.
+- **Não verificado:** actionlint, zizmor e `tools/test_summary.py` nesta rodada. O `RecursionError` de L-012 não foi reexecutado aqui. Não se gravou manifesto com `ci.gates_status: success`. Contexto que não é `dict`, NaN dentro do contexto e `reason` vazio continuam como já estavam: o vazio é aceito; o contexto inválido continua depois da checagem de capacidade.
+
 ## Preparação local da #79 — aceite direto do Axis para 3.4.2 — 2026-11-18
 
 - **Base e isolamento:** branch `local/axis-acceptance-pr79-20261118`, `HEAD` mantido em `1795ee0d8846caebd1ef4a4211fdf134e6ff0332`, igual à `origin/main` confirmada antes desta edição. Na inspeção da preparação (10:33–10:36 -03), a candidata estava sem commit. `/workspace/Nexus` preserva seu WIP anterior; `/workspace/Nexus-bfs-hops-pr39-20261118` permanece limpo em `f2d9dcaaf7075de5d9c8eca68332bed2d6d52020`.
