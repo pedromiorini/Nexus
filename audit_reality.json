@@ -66,9 +66,9 @@
       },
       {
         "path": "core/cognitivo/episodic_memory.py",
-        "lines": 290,
+        "lines": 355,
         "classes": 2,
-        "functions": 15
+        "functions": 17
       },
       {
         "path": "core/cognitivo/incremental_learner.py",

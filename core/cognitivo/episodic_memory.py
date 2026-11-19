@@ -180,18 +180,83 @@ class RealEpisodicMemory:
             """, (episode_id, memory_id, relevance_score))
             self.conn.commit()
 
-    def search_episodes(self, query: Optional[str] = None, 
-                       status: str = "closed", limit: int = 10) -> List[Episode]:
+    def search_episodes(self, query: Optional[str] = None,
+                       status: str = "closed", limit: int = 10, *,
+                       include_current_open: bool = False) -> List[Episode]:
         """Valida a query (None = ausência documentada) e delega a busca.
 
         A validação vem antes do atalho de ``limit == 0``: query vazia ou que não
         é ``str`` levanta mesmo com limite zero, em vez de imitar sucesso.
+
+        ``include_current_open`` falso ou ausente devolve só o resultado já
+        validado. Verdadeiro pode acrescentar o episódio aberto corrente.
         """
         if query is not None and not isinstance(query, str):
             raise TypeError("query must be a string")
         if query == "":
             raise ValueError("query must be non-empty")
-        return self._search_validated(query, status, limit)
+        found = self._search_validated(query, status, limit)
+        if include_current_open is not True:
+            return found
+        extra = self._open_current_ranked_match(query, status, limit, found)
+        if extra is None:
+            return found
+        return found + [extra]
+
+    def _open_current_ranked_match(
+        self,
+        query: Optional[str],
+        status: str,
+        limit: int,
+        found: List[Episode],
+    ) -> Optional[Episode]:
+        """O episódio corrente, se o chamador pediu e a busca fechada o deixou de fora."""
+        if not isinstance(query, str) or query == "":
+            return None
+        if status != "closed":
+            return None
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
+            return None
+        current = self.current_episode_id
+        if current is None or any(episode.episode_id == current for episode in found):
+            return None
+        return self._row_matching_ranked_predicate(current, query)
+
+    def _row_matching_ranked_predicate(self, episode_id: str, query: str) -> Optional[Episode]:
+        """Predicado de ``_ranked_search``: FTS dos termos ``\\w+``, senão LIKE escapado."""
+        literal = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like_pattern = "%" + literal + "%"
+        terms = re.findall(r"\w+", query)
+        if "\\" in query:
+            terms = []
+        with self.db_lock:
+            cursor = self.conn.cursor()
+            row = None
+            if self._fts_enabled and terms:
+                match = " OR ".join('"' + term + '"' for term in terms)
+                try:
+                    cursor.execute(
+                        "SELECT m.episode_id, m.title, m.start_timestamp, m.end_timestamp, "
+                        "m.trigger_query, m.importance, m.status "
+                        "FROM episodic_fts f JOIN episodic_memories m ON m.episode_id = f.episode_id "
+                        "WHERE m.episode_id = ? AND m.status = 'open' AND episodic_fts MATCH ?",
+                        (episode_id, match),
+                    )
+                    row = cursor.fetchone()
+                except sqlite3.OperationalError:
+                    row = None
+            if row is None:
+                cursor.execute(
+                    "SELECT episode_id, title, start_timestamp, end_timestamp, "
+                    "trigger_query, importance, status FROM episodic_memories "
+                    "WHERE episode_id = ? AND status = 'open' "
+                    "AND (title LIKE ? ESCAPE '\\' OR trigger_query LIKE ? ESCAPE '\\')",
+                    (episode_id, like_pattern, like_pattern),
+                )
+                row = cursor.fetchone()
+        if row is None:
+            return None
+        return Episode(*row)
 
     def _search_validated(self, query: Optional[str], status: str, limit: int) -> List[Episode]:
         """Buscar episódios"""
