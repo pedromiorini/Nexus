@@ -165,3 +165,35 @@ O replay `tools/agente/replay/run_replay.sh` não executa este auditor. Tipo des
 - Alternativas descartadas: apagar o claim para manter `claims: []` (a §9C e o pedido da rodada exigem o claim); alterar o teste (pedido explícito de não alterá-lo).
 - Status: registrada (ativação é decisão do Pedro)
 - Nota 2026-11-19: recorrência no branch `cursor/deferred-enqueue-types-812b`, produção `77bcc4e`, base `c4722fd6fc02ec3fbc1deb9066bcd5fd055d55d8`. `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus_audit_suite.sqlite3 LC_ALL=C /tmp/nexus-ci312/bin/python -m unittest discover -p 'test_*.py'` em Python 3.12.3 saiu 1: 1673 testes, `FAILED (failures=2, expected failures=5)`. Falharam só `test_claim_policy_present_without_introducing_active_claims` e `test_claims_stay_empty_and_module_type_does_not_grow`. Os dois testes não foram editados. O claim permanece neste rascunho e sai no último commit antes do merge (§9C.3). A mesma suíte sob `coverage run --branch` repetiu as duas falhas (198,702 s) e os pisos de cobertura ainda saíram 0. O CI hospedado do head `a4ca34cb0687e8e168b28f5167c1c60d47b99ad3`, run `44475971468`, repetiu as mesmas duas falhas no Contract gate (Python 3.11), em Python 3.12 (79,216 s) e em Python 3.13 (96,122 s), cada um com 1673 testes e `FAILED (failures=2, expected failures=5)`. A atestação final ficou skipped. Os testes não foram enfraquecidos.
+- Nota 2026-11-19 (reincidência #199, #201 e #202, sem lição nova): a mesma contradição repetiu. #199, head `d041382`, run `44440302690` (failure); o commit `c5d701d` tirou o claim e o run `44441780005` ficou success. #201, commit `5361af28e`, run `44466502736`: falharam `test_claim_policy_present_without_introducing_active_claims` e `test_claims_stay_empty_and_module_type_does_not_grow` no Contract gate; o claim saiu em `ba8632777`. #202 é a nota acima (head `a4ca34c`, run `44475971468`). O bloco formal de três eixos não entra nesta lição `registrada`: com ele o auditor marca `verificada`, e `test_current_lessons_are_not_reported_as_measured` exige `nao_checavel` para toda lição deste arquivo.
+
+### L-014 — Contrato que roda `git diff` contra um SHA fixo falha no checkout raso do CI
+- Data: 2026-11-18
+- Verificador que falhou: CI "Nexus Contract Gate", job Python compatibility (3.12), `test_episodic_b2b_open_current_contract.EpisodicB2bOpenCurrentContractTests.test_n9_existing_tests_are_not_edited`.
+- Fato observado: run `44440302690` (head `d041382`, PR #199): "AssertionError: 128 != 0 : fatal: bad object 31f0aa0dff487cd7990e6fb29e63c093e30fc6a6". Localmente, com histórico completo, o mesmo teste passava.
+- Causa: Fato. O job de testes usa actions/checkout sem `fetch-depth: 0` (só o job da linha 366 do workflow pede histórico), então o SHA base não existe no clone do CI.
+- Correção: `c5d701d` trocou o `git diff` por SHA-256 dos arquivos fixados na `31f0aa0`, sem mudar o critério. O run `44441780005` ficou success; mesclado em `b56ebf2` (#199).
+- Regra/checagem derivada: contrato que precisa comparar com uma base fixa compara conteúdo (hash fixado) em vez de pedir objetos git ausentes no checkout raso; antes do push, rodar o teste novo também num clone `--depth 1`.
+- Evidência: PR #199; runs `44440302690` (failure) e `44441780005` (success); SHAs `d041382`, `c5d701d`, `b56ebf2`.
+- Derivada de: nenhuma.
+- Alternativas descartadas: `fetch-depth: 0` no job de testes (muda workflow e custo de todas as rodadas; não testado) | nenhuma outra registrada
+- Status: registrada (a proposta pedia `pendente`; ativação é decisão do Pedro)
+- Nota: `pendente` com o bloco de reincidência vira `verificada`, e `pendente` sem o bloco vira `falhou` (`reincidencia_ausente`). Os dois quebram a suíte (`test_current_lessons_are_not_reported_as_measured` exige `nao_checavel`; `test_current_documents_have_no_failed_locator` exige zero `falhou`). O teste não foi editado. Mesmo desvio já registrado para a L-010 em `docs/agentes/ARTEFATOS_DRIFT.md` (AD8). Com esta entrada o teto passa de 10 para 11 lições `registrada` (teto 15); `pendente` não contaria, mas o contrato deste arquivo não aceita esse status. L-008 e L-009 seguem livres; L-014 era o próximo número depois da L-013. O texto proposto, com status `pendente` e os três eixos, está na cerca e não entra na medição.
+
+```
+### L-014 — Contrato que roda `git diff` contra um SHA fixo falha no checkout raso do CI
+- Data: 2026-11-18
+- Verificador que falhou: CI "Nexus Contract Gate", job Python compatibility (3.12), `test_episodic_b2b_open_current_contract.EpisodicB2bOpenCurrentContractTests.test_n9_existing_tests_are_not_edited`.
+- Fato observado: run 44440302690 (head d041382, PR #199): "AssertionError: 128 != 0 : fatal: bad object 31f0aa0dff487cd7990e6fb29e63c093e30fc6a6". Localmente, com histórico completo, o mesmo teste passava.
+- Causa: Fato. O job de testes usa actions/checkout sem `fetch-depth: 0` (só o job da linha 366 do workflow pede histórico), então o SHA base não existe no clone do CI.
+- Correção: c5d701d trocou o `git diff` por SHA-256 dos arquivos fixados na 31f0aa0, sem mudar o critério -> run 44441780005 success; mesclado em b56ebf2 (#199).
+- Regra/checagem derivada: contrato que precisa comparar com uma base fixa compara conteúdo (hash fixado) em vez de pedir objetos git ausentes no checkout raso; antes do push, rodar o teste novo também num clone `--depth 1`.
+- Evidência: PR #199; runs 44440302690 (failure) e 44441780005 (success); SHAs d041382, c5d701d, b56ebf2.
+- Derivada de: nenhuma.
+- Reincidência (eixos separados; um não preenche o outro):
+  - Falha-alvo: corrigida
+  - Falhas parecidas: não medido
+  - Casos novos: não medido
+- Alternativas descartadas: `fetch-depth: 0` no job de testes (muda workflow e custo de todas as rodadas; não testado) | nenhuma outra registrada
+- Status: pendente
+```

@@ -29,6 +29,7 @@ while IFS=$'\t' read -r id tipo args exp || [[ -n $id ]]; do
     pre) R=$R "$D/predeleg.sh" "$1" "$2" >/dev/null 2>&1; rc=$?;;
     tmo) a2=${2:-}; [[ -n $a2 && $a2 != /* ]] && a2=$D/$a2; "$D/../timeout_margin.sh" "$1" "$a2" >/dev/null 2>&1; rc=$?;;
     drift) if [[ $1 == /* ]]; then PY=${PY:-python3} "$D/../artefatos_drift.sh" "$1" >/dev/null 2>&1; rc=$?; else shas_ok "$1" && abre "$1" || continue; PY=${PY:-python3} "$D/../artefatos_drift.sh" "$T/$id" >/dev/null 2>&1; rc=$?; fi;;
+    claim) if [[ $1 == /* ]]; then alvo=$1; elif [[ -d $D/$1 ]]; then alvo=$D/$1; else shas_ok "$1" && abre "$1" || continue; alvo=$T/$id; fi; PY=${PY:-python3} "$D/../claims_contrato.sh" "$alvo" >/dev/null 2>&1; rc=$?;;
     *) echo "FALHOU $id tipo desconhecido: $tipo" >&2; fail=1; continue;;
   esac
   executados=$((executados + 1))
