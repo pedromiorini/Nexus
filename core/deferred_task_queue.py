@@ -51,6 +51,12 @@ class DeferredTaskQueue:
         self._lock = threading.RLock()
 
     def enqueue(self, prompt: str, context: Optional[Dict[str, Any]] = None, priority: int = 0, reason: str = "") -> DeferredTask:
+        if not isinstance(prompt, str):
+            raise ValueError("prompt deve ser string")
+        if isinstance(priority, bool) or not isinstance(priority, int):
+            raise ValueError("priority deve ser inteiro")
+        if not isinstance(reason, str):
+            raise ValueError("reason deve ser string")
         with self._lock:
             if len(self._heap) >= self.max_size:
                 self._stats["discarded"] += 1
