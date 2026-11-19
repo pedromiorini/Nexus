@@ -409,6 +409,23 @@ MUTATIONS = [
         '            hops = len(path) - 1\n            if hops > max_hops:\n                return QueryResult([], [], "", 0.0, 0)',
         tests=("test_knowledge_graph_hops_contract.py",),
     ),
+    Mutation(
+        "episodic_search_include_current_open_defaults_off",
+        "core/cognitivo/episodic_memory.py",
+        "include_current_open: bool = False",
+        "include_current_open: bool = True",
+        tests=(
+            "test_episodic_b2b_open_current_contract.py",
+            "test_episodic_like_literal_contract.py",
+        ),
+    ),
+    Mutation(
+        "episodic_search_include_current_open_can_append",
+        "core/cognitivo/episodic_memory.py",
+        "        if include_current_open is not True:\n            return found",
+        "        if True:\n            return found",
+        tests=("test_episodic_b2b_open_current_contract.py",),
+    ),
 ]
 
 
