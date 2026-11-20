@@ -7,6 +7,39 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — contexto do enqueue é validado antes da capacidade — 2026-11-20
+
+- **Base:** `f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf` (`origin/main`, CI `44665023210` verde). Branch `cursor/deferred-enqueue-context-7bdf`. Agent-Id: `grok-bot`.
+- **Bloco `NEXUS-CURRENT-STATE`:** não reescrito. Continua `tests: CURRENT_TESTS` e `bandit_low: 139`. `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md` não foram editados.
+- **Claim:** não entrou em `docs/agentes/CLAIMS.yaml`. O contrato vigente exige a lista vazia (`test_claims_stay_empty_and_module_type_does_not_grow` e `test_claim_policy_present_without_introducing_active_claims`). Numa cópia fora do repo, `PY=/tmp/nexus-ci312/bin/python bash tools/agente/claims_contrato.sh /tmp/claim-probe` saiu 8. No checkout deste branch, o mesmo script saiu 0 (`OK: sem claims ativos`). Os dois testes não foram editados.
+- **PRs abertas na escolha:** lista vazia na API. As PRs #38–#50/#60 não foram editadas. `core/constitutional_brain.py` não foi editado.
+
+### Fenômeno e hipóteses
+
+Em `f4c66c0`, `DeferredTaskQueue.enqueue` (`core/deferred_task_queue.py`, checagem de capacidade nas linhas 60–69 da base) incrementa `discarded` antes de copiar o contexto. Com `max_size=1` ocupado, `context` lista, `True`, `Boom` (deepcopy que levanta `RuntimeError`) e subclasse de `dict` cujo deepcopy devolve lista levantam `OverflowError` e o contador sobe. Na fila vazia, um objeto que não é `dict` e cujo deepcopy devolve `{}` é gravado.
+
+RED no commit `d793797`, produção ainda a de `f4c66c0`: `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus_audit_red.sqlite3 LC_ALL=C /tmp/nexus-ci312/bin/python -m unittest -v test_deferred_enqueue_context_contract.py` saiu 1. 8 testes, 1 falha, 12 erros, 1,156 s. Controles que passaram: subclasse de `dict` e descarte de um enqueue válido com a fila cheia; `None` e dict destacado; `float("inf")` ainda entra e só o export JSON falha; a propriedade de escalares JSON; o deepcopy que devolve lista com a fila ainda com vaga.
+
+- **H1.** Contexto inválido já era recusado antes de contar descarte. Falsificada: na fila cheia o erro é `OverflowError` e `discarded` sobe.
+- **H2.** Não-dict cujo deepcopy devolve dict já era recusado. Falsificada: a tarefa entra com contexto `{}` e o `__deepcopy__` chega a rodar.
+- **H3.** Falha de deepcopy na fila cheia já era `ValueError` sem descarte. Falsificada: `OverflowError` e `discarded` sobe; a cópia nem ocorre.
+- **H4.** `None`, dict, subclasse de `dict`, `reason` vazio e o descarte de um enqueue válido já são o caminho preservado. Sobreviveu nos controles, antes e depois.
+- **H5.** Checar o contexto depois da capacidade bastaria. Descartada no desenho: a fila cheia contava descarte. A checagem ficou antes do lock.
+
+GREEN no commit `f2ce42e`: os mesmos 8 testes, OK. Junto de `test_deferred_enqueue_boundary_contract.py`, `test_deferred_task_queue.py`, `test_deferred_task_snapshot.py` e `test_deferred_task_properties.py`: 54 testes, OK, 0,254 s. A guarda rejeita o que não é `dict` antes do `deepcopy`, rejeita cópia que não devolve `dict` e falha de cópia, e só então olha a capacidade.
+
+### Gates neste ambiente
+
+Python 3.12.3 em `/tmp/nexus-ci312` (`pip install --require-hashes -r requirements-ci.lock`). Não há `python3.11` neste ambiente; o CI usa 3.11. Ruff 0.17.1, Bandit 1.9.4, Coverage 7.16.2, Hypothesis 6.170.5. `PYTHONPATH=.`. `NEXUS_AUDIT_DB` fora do repo.
+
+- Ruff e `compileall` dos caminhos do workflow: exit 0. `git diff --check`: exit 0.
+- `tools/targeted_mutation.py`: 94 declarados, 94 aplicáveis, 94 mortos, 0 sobreviventes, 0 não aplicados, exit 0. Três mutantes novos: `queue_enqueue_context_type`, `queue_enqueue_context_copy_type`, `queue_enqueue_context_copy_error`.
+- Bandit na worktree `/tmp/nexus-main-wt` de `origin/main` `f4c66c0`, caminhos relativos `core vita tools`: 139 LOW, 0 MEDIUM, 0 HIGH, exit 1 pelos LOW. No branch, `bandit -r core vita tools -b /tmp/base.json`: 0 achados novos, exit 0. Varredura completa no branch: 139 LOW, 0 MEDIUM, 0 HIGH. `security_triage.py /tmp/bandit-full.json SECURITY_TRIAGE.md --check`: exit 0.
+- `reality_audit.py`: exit 0 e `git diff` de `AUDIT_REALITY_REPORT.md` e `audit_reality.json` vazio. Núcleo 23011 linhas, 210 classes, 690 funções. Não é evidência de capacidade.
+- Suíte `coverage run --branch -m unittest discover -p 'test_*.py'`: 1681 testes, 227,994 s, exit 0, `OK (expected failures=5)`. Demo `coverage run --append --branch core/constitutional_brain.py`: exit 0. `integrated-summary.json` em `/tmp`: `result` passed, `skipped` `['0']`, `duplicates` `[]`. O banner do demo não é evidência de capacidade. Pisos: total 84%, fila 97%, VRAM 95%, temporal 96%, Vita 81%, núcleo 72%, `core/cognitivo/*` 98%. Todos os `--fail-under` saíram 0.
+- `validar_registro.py --expirados aviso`: exit 0, só os dois avisos de versão 3.4.1 dos agentes Cursor. Replay `run_replay.sh`: 33 casos, exit 0. `predeleg.sh HEAD origin/main`: `OK: sem conflito`, exit 0. `artefatos_drift.sh .` com `PY=/tmp/nexus-ci312/bin/python`: exit 0.
+- **Não verificado:** CI hospedado deste branch, Python 3.11, actionlint, zizmor, `tools/test_summary.py` e `tools/cognitivo_mutation.py`. Não se gravou manifesto com `ci.gates_status: success`. NaN/`±inf` e valores não serializáveis dentro de um dict continuam entrando; o export JSON é que falha. `reason` vazio continua aceito. O caminho do roteador em `core/constitutional_brain.py` (checagem própria na linha 9897 e `int(...)` na prioridade adiada) não foi alterado.
+
 ## Rodada — enqueue da fila adiada recusa tipos que o snapshot já rejeita — 2026-11-19
 
 - **Base:** `c4722fd6fc02ec3fbc1deb9066bcd5fd055d55d8` (`origin/main`, merge da #201). Branch `cursor/deferred-enqueue-types-812b`. Agent-Id: `grok-bot`.
