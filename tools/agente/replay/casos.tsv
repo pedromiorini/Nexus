@@ -27,3 +27,12 @@ K3-anterior-com-claim	claim	632ce84	0
 K4-anterior-com-claim	claim	a09b780	0
 K-incompat-ausente	claim	/tmp/nao-existe-claim-1118	3
 K-incompat-yaml	claim	fixtures/claim-yaml-invalido	3
+# 2026-11-19: reincidencia L-013 fora da amostra (runs 44453121636 44466502736 44475971468 44477108727)
+K5-origem	claim	fb5d47c	8
+K6-origem	claim	5361af2	8
+K7-origem	claim	a4ca34c	8
+K8-origem	claim	2776a9f	8
+K5-anterior	claim	3d32d19	0
+K6-anterior	claim	ba86327	0
+K7-anterior	claim	c410449	0
+K-incompat-ausente-1119	claim	/tmp/nao-existe-claim-1119	3
