@@ -7,9 +7,9 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
-## Finitude após conversão no livro-razão temporal — validação local 2026-11-20
+## Finitude após conversão no livro-razão temporal — validação local 2026-11-20/21
 
-Base `f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf`, branch local `fix/temporal-number-finiteness-20261121`. O contrato novo falhou na implementação intacta: 3 testes, 1 falha para subclasse de `float` cujo `__float__` devolve `inf`, e 2 controles aprovados. Após a alteração mínima, o contrato e as regressões temporais passaram 67/67; a suíte completa passou 1.676 testes com 5 expected failures. Ruff, compileall, reality audit sem drift, gate de artefatos e Bandit do módulo passaram. A campanha geral de mutação passou 91/91, mas não contém mutante temporal e não mede especificamente esta guarda. Validação somente local em Python 3.12.3; sem Python 3.11/3.13, CI hospedada, revisão externa ou publicação. Comandos exatos e limites estão na rodada de 2026-11-20 de `CONTINUATION.md`. Evidência de contrato numérico local, não de capacidade ou segurança geral.
+Base `f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf`, branch local `fix/temporal-number-finiteness-20261121`, commit de código/teste `d5ef509ad6bb5715444dd1914f94284467c72e8a`. Na revalidação de 2026-11-21, o contrato falhou no pai (3 testes, 1 falha esperada para subclasse de `float` cujo `__float__` devolve `inf`, 2 controles aprovados) e os contratos temporais passaram 67/67 no commit. A suíte completa passou 1.676 testes em 135,091 s, com 5 expected failures. Ruff, compileall, py_compile, reality audit sem drift, gate de artefatos e Bandit do módulo passaram; Bandit registrou zero findings e zero erros. A campanha geral de mutação anteriormente registrada passou 91/91, mas não contém mutante temporal e não mede especificamente esta guarda. Validação somente local em Python 3.12.3; sem Python 3.11/3.13, CI hospedada, revisão externa ou publicação. Comandos e limites estão na rodada de 2026-11-20/21 de `CONTINUATION.md`. Evidência de contrato numérico local, não de capacidade ou segurança geral.
 
 ## Fronteira de enqueue da fila adiada — validação local 2026-11-19
 
