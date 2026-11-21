@@ -10,7 +10,9 @@ anterior; os demais são multivalorados e apenas acumulam.
 Limites: a substituição é determinística ("o mais recente vence"), sem arbitragem
 por confiança; a cadeia de hash detecta edição e remoção no meio, mas truncamento
 final só é detectado com ``expected_head`` guardado fora do arquivo; as consultas
-com ``known_at`` reconstroem a projeção (O(eventos)).
+com ``known_at`` reconstroem a projeção (O(eventos)). Metadados aceitam até 128
+contêineres JSON aninhados; profundidade maior é rejeitada antes de mutar o ledger
+para preservar exportação e restauração de snapshots.
 """
 from __future__ import annotations
 
@@ -26,6 +28,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 SCHEMA = "nexus.temporal_facts.v1"
 GENESIS = "0" * 64
+_MAX_METADATA_DEPTH = 128
 _FACT_KEYS = frozenset({"fact_id", "subject", "predicate", "object", "valid_from", "valid_to",
                         "recorded_at", "confidence", "source", "superseded_by", "metadata"})
 
@@ -77,21 +80,44 @@ def _text(value: Any, name: str) -> str:
     return value
 
 
-def _json_value(value: Any) -> Any:
-    """Return a detached JSON value, rejecting lossy or non-finite payloads."""
+def _json_value(value: Any, depth: int = 0) -> Any:
+    """Return detached JSON data, rejecting lossy, non-finite, or too-deep payloads."""
     if value is None or type(value) in (str, bool, int):
         return value
     if type(value) is float:
         if not math.isfinite(value):
             raise ValueError("metadata deve conter somente números finitos")
         return value
+    if type(value) not in (list, dict):
+        raise ValueError("metadata deve conter somente valores JSON")
+    if depth >= _MAX_METADATA_DEPTH:
+        raise ValueError(
+            f"metadata excede a profundidade suportada (máximo {_MAX_METADATA_DEPTH})"
+        )
     if type(value) is list:
-        return [_json_value(item) for item in value]
-    if type(value) is dict:
-        if not all(type(key) is str for key in value):
-            raise ValueError("chaves de metadata devem ser strings")
-        return {key: _json_value(item) for key, item in value.items()}
-    raise ValueError("metadata deve conter somente valores JSON")
+        return [_json_value(item, depth + 1) for item in value]
+    if not all(type(key) is str for key in value):
+        raise ValueError("chaves de metadata devem ser strings")
+    return {key: _json_value(item, depth + 1) for key, item in value.items()}
+
+
+def _check_metadata_depth(value: Any, depth: int = 0) -> None:
+    """Check depth using built-in shallow copies, not subclass iteration methods."""
+    value_type = type(value)
+    if issubclass(value_type, dict):
+        children = dict.copy(value).values()
+    elif issubclass(value_type, list):
+        children = list.copy(value)
+    elif issubclass(value_type, tuple):
+        children = tuple.__iter__(value)
+    else:
+        return
+    if depth >= _MAX_METADATA_DEPTH:
+        raise ValueError(
+            f"metadata excede a profundidade suportada (máximo {_MAX_METADATA_DEPTH})"
+        )
+    for child in children:
+        _check_metadata_depth(child, depth + 1)
 
 
 class TemporalFactStore:
@@ -315,6 +341,12 @@ class TemporalFactStore:
         for n, raw in enumerate(events, 1):
             if not isinstance(raw, dict):
                 raise ValueError(f"evento {n} inválido")
+            raw_values = dict.copy(raw)
+            fact = raw_values.get("fact")
+            if isinstance(fact, dict):
+                fact_values = dict.copy(fact)
+                if "metadata" in fact_values:
+                    _check_metadata_depth(fact_values["metadata"])
             try:
                 chain_ok = raw.get("seq") == n and raw.get("prev") == store._head \
                     and raw.get("hash") == _digest(raw)
@@ -352,6 +384,7 @@ class TemporalFactStore:
                     raise ValueError(f"recorded_at divergente no evento {n}")
                 if not isinstance(fact["metadata"], dict):
                     raise ValueError(f"metadata inválido no evento {n}")
+                _check_metadata_depth(fact["metadata"])
                 expected_id = f"tf-{store._seq + 1:06d}"
                 if fact["fact_id"] != expected_id or fact["superseded_by"] is not None:
                     raise ValueError(f"fact_id ou superseded_by inválido no evento {n}")
