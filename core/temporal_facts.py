@@ -368,9 +368,16 @@ class TemporalFactStore:
                 snapshot = json.loads(snapshot, parse_constant=_reject_constant)
             except (ValueError, RecursionError) as exc:
                 raise ValueError("snapshot JSON inválido") from exc
-        if not isinstance(snapshot, dict) or snapshot.get("schema") != SCHEMA:
+        if not isinstance(snapshot, dict):
+            raise ValueError("schema incompatível")
+        snapshot = dict.copy(snapshot)
+        if snapshot.get("schema") != SCHEMA:
             raise ValueError("schema incompatível")
         funcs, events = snapshot.get("functional_predicates"), snapshot.get("events")
+        if isinstance(funcs, list) and type(funcs) is not list:
+            funcs = list.copy(funcs)
+        if isinstance(events, list) and type(events) is not list:
+            events = list.copy(events)
         if not isinstance(funcs, list) or not all(isinstance(x, str) for x in funcs):
             raise ValueError("functional_predicates inválido")
         if not isinstance(events, list):

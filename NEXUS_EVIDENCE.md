@@ -7,6 +7,14 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Containers externos subclassificados no restore temporal — validação local 2026-11-21
+
+Base `0abc63a7ec414dc815228b96a1a32152cbffe6fe`; branch local não commitada `fix/temporal-export-container-subclass-20261121`. No RED, quatro de cinco casos falharam na produção intacta: `snapshot.get()` sobrescrito, iteração sobrescrita em `events`, iteração sobrescrita em `functional_predicates` e validação de schema inválido que antes chegava ao override. O controle com snapshot nativo válido passou. A cópia do dict raiz e de listas externas subclassificadas com `dict.copy`/`list.copy` eliminou as chamadas de overrides. No GREEN, 5/5 passaram; snapshots subclassificados válidos preservam o hash e restauram, enquanto o inválido continua rejeitado por `ValueError` sem execução do override.
+
+A bateria temporal executou 92 testes, OK, com 1 skip opcional. `tools/test_summary.py` executou 1.684 testes: 1.675 aprovados, 0 falhas, 9 skips e 5 expected failures (`result: passed`, exit 0). Ruff 0.17.1, compilação e `git diff --check` passaram; `tools/reality_audit.py` terminou sem drift nos relatórios versionados; Bandit focalizado em `core/temporal_facts.py` não encontrou findings nem erros.
+
+Evidência local apenas em Python 3.12.3; sem Python 3.11/3.13, CI hospedada ou mutação específica. Identidade/overrides das subclasses de containers externos não são preservados; seus valores-base são processados como containers nativos. Sem stage, commit, publicação, mudança de `main`, claims ou PRs.
+
 ## Subclasses rasas de metadata no digest temporal — validação local 2026-11-21
 
 Base `70b2dcfa113ba724d714db133b44941d9d293962`, branch `fix/temporal-export-digest-subclass-20261121`. A regressão integrada falhou antes da correção nos dois traps rasos: `from_snapshot` deixou escapar `RuntimeError` quando `json.dumps` chamou `dict.items()` sobrescrito ou `list.__iter__()` sobrescrito dentro de `_digest`. Probe isolado também observou os dois overrides em `copy.deepcopy`. A correção usa cópias/iterações-base; após validar a profundidade, `from_snapshot` materializa metadata subclassificado em containers nativos antes do digest e do armazenamento. A identidade e semântica customizada de subclasses não são preservadas; o conteúdo-base JSON é usado.
