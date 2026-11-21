@@ -3,10 +3,13 @@
 schema_version: 1
 claims:
   - agente: axis
-    tarefa: Reconciliar contratos de claims ativos com o protocolo §9C.3
+    tarefa: Reconciliar contratos de claims ativos com o protocolo §9C.3 e exceção B2B autorizada
     arquivos:
       - docs/agentes/CLAIMS.yaml
       - docs/agentes/LICOES_APRENDIDAS.md
+      - docs/PONTE_EPISODIC_B2B_CRITERIOS_2026-11-18.md
+      - docs/cognitivo/PONTE_EPISODIC_MEMORY_CARACTERIZACAO_2026-11-12.md
       - test_agent_pr79_composition_contract.py
+      - test_episodic_b2b_open_current_contract.py
       - test_router_episodic_memory_bridge_contract.py
     expira_em: "2026-11-23T20:00:00+00:00"
