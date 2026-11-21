@@ -6,6 +6,8 @@ ci_run: CURRENT_RUN
 tests: CURRENT_TESTS
 bandit_low: 139
 -->
+## Limites normalizados das métricas de saúde — validação local 2026-11-21
+Base `f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf`, branch `fix/system-health-normalized-metrics-20261121`, commit de código/testes `1fb1450730c8b439f972877897cb2f7454a97331`. O contrato RED na base reproduziu 11 falhas, incluindo métricas fora de `[0,1]`, valores não finitos/não numéricos e mutação parcial em diagnóstico composto. A candidata passou 11/11 focados e 1.677 testes completos com 5 falhas esperadas; Ruff, compilação e auditorias locais passaram. Mutação geral 91/91 sem sobreviventes, mas sem mutante específico desta área. Bandit: 139 LOW, 0 MEDIUM/HIGH, exit 1 pelos LOW; sem CI hospedada ou teste em Python 3.11/3.13. Evidência de contrato local, não de saúde operacional real nem de segurança geral.
 
 ## Fronteira de enqueue da fila adiada — validação local 2026-11-19
 
