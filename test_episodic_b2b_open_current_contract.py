@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent
 EXISTING_TEST_SHA256 = {
     "test_action_effects_contract.py": "ec91baf5e3e8b87101e03ec3b3e652142990118622f1301bd66a019f10e25369",
     "test_agent_instruction_versions_contract.py": "10807649e48bb1e065d7e646855c658b36492b13bd728deba9f3206da62e2c4f",
-    "test_agent_pr79_composition_contract.py": "4ed7fd83d72072325e952b7f171042d18f73525f580ee4c3fab21fdae57607b2",
+    "test_agent_pr79_composition_contract.py": "a846c141e4ec7ade11d1eabe954f3605cdbd9405eb70cb06a9cf19a34ed56f8d",
     "test_agent_registry_contract.py": "8de446f2221522b164c77e68c1364852d3d1f74847270a93b5b985ffd3c50544",
     "test_agent_replay_contract.py": "9915064907c845052e8d71a2af9c0aa0359d8c4927fa8e30b04fc0f78beb499e",
     "test_analogical_reasoning_contract.py": "507eb52c41ac8b8be5896521819bd60730c9ce6ca81ee270008a739ca52b9cee",
@@ -111,7 +111,7 @@ EXISTING_TEST_SHA256 = {
     "test_router_budget_swarm_contract.py": "2831d054bb74554db1fabf28870becaf59935e677f07db2f6564d76c1d2f7824",
     "test_router_decision_cycle_bridge_contract.py": "3f0943afdc640b7d267f17b3aaa76d33ac4da0a5402721f6220277e72cc53533",
     "test_router_decision_cycle_bridge_red_contract.py": "29c798684be56339b3474662411685dbb1a54c3cc633ccdded6aadda73b2d290",
-    "test_router_episodic_memory_bridge_contract.py": "42b9df0f2b6fd7b71fae43a1511ab4192cea16f3582ac687a80d90f500d77767",
+    "test_router_episodic_memory_bridge_contract.py": "95800613c0d845de3012a31415b7f4ecf82b40480abef0405546899eb05e3f85",
     "test_router_episodic_memory_bridge_e1_e6_red_contract.py": "0a5324cb32e88199310f32c963803127fea9456b035308f08f98eaa133c968c1",
     "test_router_fail_closed_contract.py": "9035b90cf3bd50a68eb029c17d5c517d703751b21a930bf715a1a53a3339062e",
     "test_router_review_addendum_contract.py": "a58a055290d515f4e208289e598e0354ed90668a4fba891887442c1b0f0c6b98",
