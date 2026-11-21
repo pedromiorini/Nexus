@@ -120,9 +120,9 @@
       },
       {
         "path": "core/system_health_diagnostics.py",
-        "lines": 310,
+        "lines": 375,
         "classes": 4,
-        "functions": 13
+        "functions": 16
       }
     ],
     "core_lines": 23011,
