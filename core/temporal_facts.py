@@ -58,8 +58,46 @@ class TemporalFact:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+def _contains_container_subclass(value: Any) -> bool:
+    value_type = type(value)
+    if issubclass(value_type, dict):
+        if value_type is not dict:
+            return True
+        return any(_contains_container_subclass(child) for child in dict.copy(value).values())
+    if issubclass(value_type, list):
+        if value_type is not list:
+            return True
+        return any(_contains_container_subclass(child) for child in list.copy(value))
+    if issubclass(value_type, tuple):
+        if value_type is not tuple:
+            return True
+        return any(_contains_container_subclass(child) for child in tuple.__iter__(value))
+    return False
+
+
+def _to_builtin_json_containers(value: Any) -> Any:
+    """Copy JSON containers without dispatching to subclass iteration methods."""
+    value_type = type(value)
+    if issubclass(value_type, dict):
+        return {key: _to_builtin_json_containers(child)
+                for key, child in dict.copy(value).items()}
+    if issubclass(value_type, list):
+        return [_to_builtin_json_containers(child) for child in list.copy(value)]
+    if issubclass(value_type, tuple):
+        return tuple(_to_builtin_json_containers(child) for child in tuple.__iter__(value))
+    return value
+
+
 def _digest(event: Dict[str, Any]) -> str:
-    body = json.dumps({k: v for k, v in event.items() if k != "hash"},
+    event_values = dict.copy(event)
+    fact = event_values.get("fact")
+    if isinstance(fact, dict):
+        fact_values = dict.copy(fact)
+        metadata = fact_values.get("metadata")
+        if _contains_container_subclass(metadata):
+            fact_values["metadata"] = _to_builtin_json_containers(metadata)
+        event_values["fact"] = fact_values
+    body = json.dumps({k: v for k, v in event_values.items() if k != "hash"},
                       sort_keys=True, allow_nan=False, separators=(",", ":"))
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
@@ -346,7 +384,12 @@ class TemporalFactStore:
             if isinstance(fact, dict):
                 fact_values = dict.copy(fact)
                 if "metadata" in fact_values:
-                    _check_metadata_depth(fact_values["metadata"])
+                    metadata = fact_values["metadata"]
+                    _check_metadata_depth(metadata)
+                    if _contains_container_subclass(metadata):
+                        fact_values["metadata"] = _to_builtin_json_containers(metadata)
+                raw_values["fact"] = fact_values
+            raw = raw_values
             try:
                 chain_ok = raw.get("seq") == n and raw.get("prev") == store._head \
                     and raw.get("hash") == _digest(raw)

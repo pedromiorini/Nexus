@@ -1,5 +1,6 @@
 """Contrato para impor o limite de profundidade também ao restaurar snapshots."""
 import copy
+import hashlib
 import json
 import unittest
 
@@ -46,6 +47,22 @@ class DigestTrapListSubclass(list):
     def __iter__(self):
         type(self).override_calls += 1
         raise RuntimeError("subclass iterator must not run before depth validation")
+
+
+class ShallowTrapDictSubclass(dict):
+    override_calls = 0
+
+    def items(self):
+        type(self).override_calls += 1
+        raise RuntimeError("shallow subclass items must not run during restore")
+
+
+class ShallowTrapListSubclass(list):
+    override_calls = 0
+
+    def __iter__(self):
+        type(self).override_calls += 1
+        raise RuntimeError("shallow subclass iterator must not run during restore")
 
 
 def nested_dict(levels):
@@ -141,6 +158,44 @@ class TemporalMetadataRestoreDepthLimitContract(unittest.TestCase):
             with self.subTest(shape=shape):
                 with self.assertRaisesRegex(ValueError, "profundidade"):
                     _check_metadata_depth(metadata)
+
+    def test_shallow_trap_subclasses_restore_without_overrides_and_keep_valid_hashes(self):
+        metadata_by_shape = (
+            ("dict", {"trap": {"k": "v"}}, ShallowTrapDictSubclass),
+            ("list", {"trap": ["v"]}, ShallowTrapListSubclass),
+        )
+
+        for shape, native_metadata, trap_type in metadata_by_shape:
+            with self.subTest(shape=shape):
+                snapshot = snapshot_with_metadata(native_metadata)
+                event = snapshot["events"][0]
+                fact = event["fact"]
+                legacy_body = json.dumps(
+                    {key: value for key, value in event.items() if key != "hash"},
+                    sort_keys=True, allow_nan=False, separators=(",", ":"),
+                )
+                expected_hash = hashlib.sha256(legacy_body.encode("utf-8")).hexdigest()
+                self.assertEqual(event["hash"], expected_hash)
+                if shape == "dict":
+                    dict.__setitem__(fact, "metadata", trap_type({"trap": {"k": "v"}}))
+                else:
+                    metadata = dict.copy(fact["metadata"])
+                    dict.__setitem__(metadata, "trap", trap_type(["v"]))
+                    dict.__setitem__(fact, "metadata", metadata)
+                trap_type.override_calls = 0
+
+                self.assertEqual(_digest(event), expected_hash)
+                self.assertEqual(trap_type.override_calls, 0)
+
+                restored = TemporalFactStore.from_snapshot(snapshot)
+                exported = restored.export_snapshot()
+
+                self.assertEqual(restored.head_hash, expected_hash)
+                self.assertEqual(exported["events"][0]["hash"], expected_hash)
+                self.assertEqual(trap_type.override_calls, 0)
+                restored_metadata = exported["events"][0]["fact"]["metadata"]
+                self.assertIs(type(restored_metadata), dict)
+                self.assertIs(type(restored_metadata["trap"]), dict if shape == "dict" else list)
 
 
 if __name__ == "__main__":
