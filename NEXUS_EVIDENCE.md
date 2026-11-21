@@ -7,6 +7,10 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Finitude após conversão no livro-razão temporal — validação local 2026-11-20
+
+Base `f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf`, branch local `fix/temporal-number-finiteness-20261121`. O contrato novo falhou na implementação intacta: 3 testes, 1 falha para subclasse de `float` cujo `__float__` devolve `inf`, e 2 controles aprovados. Após a alteração mínima, o contrato e as regressões temporais passaram 67/67; a suíte completa passou 1.676 testes com 5 expected failures. Ruff, compileall, reality audit sem drift, gate de artefatos e Bandit do módulo passaram. A campanha geral de mutação passou 91/91, mas não contém mutante temporal e não mede especificamente esta guarda. Validação somente local em Python 3.12.3; sem Python 3.11/3.13, CI hospedada, revisão externa ou publicação. Comandos exatos e limites estão na rodada de 2026-11-20 de `CONTINUATION.md`. Evidência de contrato numérico local, não de capacidade ou segurança geral.
+
 ## Fronteira de enqueue da fila adiada — validação local 2026-11-19
 
 Base `c4722fd6fc02ec3fbc1deb9066bcd5fd055d55d8`, branch `cursor/deferred-enqueue-types-812b`. O contrato `test_deferred_enqueue_boundary_contract.py` falhou na produção intacta (6 testes, 14 falhas, 3 erros, exit 1) e, com a rejeição de `bool`, não inteiro e não-`str` antes da capacidade, passou 6/6 (exit 0). Inteiro negativo, zero, subclasse de `int` e o descarte de um enqueue válido com a fila cheia continuaram aceitos. A suíte executou 1673 testes e saiu 1 só em `test_claims_stay_empty_and_module_type_does_not_grow` e `test_claim_policy_present_without_introducing_active_claims`, porque o claim deste rascunho está no arquivo. Bandit não acrescentou achado sobre a baseline de 139 LOW. Mutação direcionada local: 91/91 mortos. O run hospedado `44475971468`, no head `a4ca34cb0687e8e168b28f5167c1c60d47b99ad3`, executou 1673 testes em Python 3.11, 3.12 e 3.13 e falhou só nos dois testes que exigem `claims: []`. Comandos e limites estão na rodada de 2026-11-19 de `CONTINUATION.md`. Isto é evidência de contrato, não de capacidade operacional.

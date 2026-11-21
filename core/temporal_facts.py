@@ -66,9 +66,12 @@ def _reject_constant(name: str) -> Any:
 
 
 def _number(value: Any, name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{name} deve ser um número finito")
-    return float(value)
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"{name} deve ser um número finito")
+    return number
 
 
 def _text(value: Any, name: str) -> str:

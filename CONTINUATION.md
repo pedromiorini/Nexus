@@ -7,6 +7,19 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada local — finitude após conversão em `_number` temporal — 2026-11-20
+
+- **Base e isolamento:** branch `fix/temporal-number-finiteness-20261121`, base `f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf` (HEAD e ref local `origin/main` no início). Alterações apenas nesta worktree isolada. `/workspace/Nexus` e as outras WIPs não foram tocadas; nenhuma alteração remota, stage ou commit. `docs/agentes/CLAIMS.yaml` e o trabalho de claims dependente da #210 permaneceram intocados.
+- **Contrato:** `_number` rejeita bool e tipos não numéricos, converte uma vez para `float`, valida a finitude do resultado e devolve esse mesmo float. `int`, `float` e subclasse finita continuam válidos; se `float(value)` de uma subclasse produzir `inf`, deve levantar `ValueError` antes de a consulta devolver fatos, sem alterar o snapshot.
+- **RED:** em Python 3.12.3, `/tmp/nexus-ci312/bin/python -m unittest -v test_temporal_number_finiteness_contract` contra a implementação original: 3 testes, 1 falha e 2 controles aprovados, exit 1. A única falha foi `ValueError not raised` para subclasse com valor armazenado finito e `__float__` que retorna `inf`.
+- **GREEN focado:** `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-temporal-focused.sqlite3 PYTHONPYCACHEPREFIX=/tmp/nexus-temporal-pycache LC_ALL=C /tmp/nexus-ci312/bin/python -m unittest -v test_temporal_number_finiteness_contract test_temporal_facts_contract test_temporal_graph_integration_contract test_temporal_head_hash_concurrency_contract test_temporal_reasoning_contract test_temporal_snapshot_cut_validation_contract` — 67/67, 3,043 s, exit 0.
+- **Suíte completa:** `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus-temporal-full-suite.sqlite3 PYTHONPYCACHEPREFIX=/tmp/nexus-temporal-full-pycache LC_ALL=C /tmp/nexus-ci312/bin/python -m unittest discover -p 'test_*.py'` — 1.676 testes em 145,630 s; `OK (expected failures=5)`, exit 0.
+- **Gates locais:** Ruff completo (`ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`), `compileall` completo, `py_compile` dos dois arquivos de código/teste e `git diff --check` passaram. `tools/reality_audit.py` saiu 0 e os relatórios versionados ficaram sem diff. `PY=/tmp/nexus-ci312/bin/python bash tools/agente/artefatos_drift.sh /workspace/Nexus-temporal-number-finiteness-20261121` saiu 0; Bandit no módulo alterado registrou zero findings e zero erros.
+- **Mutação e limite de evidência:** `tools/targeted_mutation.py` — 91 declarados/aplicáveis, 91 mortos, 0 sobreviventes, 0 não aplicados, exit 0. O catálogo atual não contém mutante temporal nem para `_number`; portanto o placar geral não mede especificamente a nova guarda. A discriminação direta é o contrato RED/GREEN acima.
+- **Interpretação:** a hipótese de que `math.isfinite(value)` validava o resultado de `float(value)` foi falsificada pelo RED. O patch mínimo valida o float convertido; os controles finitos, entradas padrão não finitas e igualdade do snapshot antes/depois da consulta passaram. Nenhum teste histórico protegido foi alterado.
+- **Limites:** validação local somente em Python 3.12.3; Python 3.11/3.13 e CI hospedada não foram executados. A suíte tem cinco expected failures, sem falhas inesperadas. Não houve revisão externa, publicação, PR ou commit; os resultados são de uma árvore local, não atestação remota nem garantia geral.
+- **Próximo passo:** revisão e decisão humana antes de qualquer publicação. Não preparar nem alterar o trabalho de claims enquanto a dependência indicada pelo owner estiver pendente.
+
 ## Rodada — enqueue da fila adiada recusa tipos que o snapshot já rejeita — 2026-11-19
 
 - **Base:** `c4722fd6fc02ec3fbc1deb9066bcd5fd055d55d8` (`origin/main`, merge da #201). Branch `cursor/deferred-enqueue-types-812b`. Agent-Id: `grok-bot`.
