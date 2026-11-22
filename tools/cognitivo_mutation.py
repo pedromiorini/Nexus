@@ -68,6 +68,7 @@ DC_TESTS = ("test_decision_cycle_contract.py", "test_decision_cycle_review_contr
 VK_TESTS = ("test_red_pr156_veto_names.py", "test_veto_key_precedence_contract.py",
             "test_scm_counterfactual_second_review_contract.py", "test_decision_cycle_review_contract.py")
 VK2_TESTS = VK_TESTS + ("test_red_pr157_pearl.py",)
+VK_MCTS_NON_STR_TESTS = VK2_TESTS + ("test_mcts_non_str_veto_candidate_contract.py",)
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
@@ -2282,7 +2283,7 @@ MUTATIONS = [
              r'(?:\(_*\))?[_;!?]*\Z', r'(?:\(_*\))?[;!?]*\Z', tests=VK2_TESTS),
     Mutation('vk_mcts_non_str_candidate_vetoed', MCTS,
              'if not isinstance(action, str) or any(v["action"] == action for v in vetoed):',
-             'if any(v["action"] == action for v in vetoed):', tests=VK2_TESTS),
+             'if any(v["action"] == action for v in vetoed):', tests=VK_MCTS_NON_STR_TESTS),
     Mutation('vk_lookup_non_str_hashed', EFFECTS,
              'if isinstance(action, str) and action in vetoes:', 'if action in vetoes:', tests=VK2_TESTS),
     Mutation('vk_underscores_not_collapsed', EFFECTS,

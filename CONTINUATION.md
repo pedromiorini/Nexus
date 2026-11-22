@@ -7,6 +7,15 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Correção do mutante sobrevivente do MCTS — 2026-11-22
+- **Base e isolamento:** continuação na worktree `/workspace/Nexus-continue-20261122`, branch `local/continue-evolution-20261122`, sobre o HEAD inicial `9de333b8690dfb93ac63c1af20f23729578b0824`; `origin/main=f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf`. A PR #215 permanece draft; nenhum outro checkout nem `main` foi alterado e não houve merge.
+- **Diagnóstico:** `test_veto_key_retired_mutants_contract.py` registra que o mutante não equivalente permanece no catálogo, mas não estava na lista executada para matá-lo. A lista do mutante era `VK2_TESTS`; a guarda de `plan()` só alcançava candidato não-str no espaço padrão interno, pois itens de `available_actions` já são filtrados antes.
+- **Mudança e contrato:** criada `test_mcts_non_str_veto_candidate_contract.py`, com candidato interno não-str cuja igualdade lança erro; após um veto válido, a guarda deve ignorá-lo antes da deduplicação. O teste também garante o vínculo ao mutante `vk_mcts_non_str_candidate_vetoed`. Só esse mutante recebe o novo teste (`VK_MCTS_NON_STR_TESTS`); produção e testes antigos hash-pinned ficaram intocados.
+- **Suíte de base:** em Python 3.12.3, `PYTHONDONTWRITEBYTECODE=1 python -m unittest -v test_red_pr156_veto_names test_veto_key_precedence_contract test_scm_counterfactual_second_review_contract test_decision_cycle_review_contract test_red_pr157_pearl test_mcts_non_str_veto_candidate_contract` — 111 testes, `OK (expected failures=2)`.
+- **Mutante isolado:** `PYTHONDONTWRITEBYTECODE=1 python -c 'from pathlib import Path; from tools import cognitivo_mutation as cm; selected=[m for m in cm.MUTATIONS if m.name=="vk_mcts_non_str_candidate_vetoed"]; raise SystemExit(cm.main(["--jobs","1"], mutations=selected, root=cm.ROOT, report=Path("/tmp/nexus215-vk-mcts-nonstr-mutation.json")))'` — `declared=1`, `killed=1`, `survived=0`, `not_applied=0`; a falha induzida ocorreu somente no teste novo, ao chamar `__eq__` no código mutado. O relatório da execução temporária está em `/tmp/nexus215-vk-mcts-nonstr-mutation.json`.
+- **Outras verificações:** `PYTHONDONTWRITEBYTECODE=1 python -m unittest -v test_episodic_b2b_open_current_contract` — 13 testes OK, incluindo `test_n9_existing_tests_are_not_edited`; `ruff check tools/cognitivo_mutation.py test_mcts_non_str_veto_candidate_contract.py`, `python -m py_compile` nos dois arquivos alterados e `git diff --check` passaram. `preflight_catalog(MUTATIONS, ROOT)` validou 1.140 entradas, zero erros.
+- **Limites:** não foi executada localmente a suíte completa nem o shard 3/3 inteiro; a CI hospedada da PR deve confirmar a matriz no novo head. Nenhum artefato rastreado é gerado por esses arquivos; relatórios de mutação são ignorados pelo Git.
+
 ## Rodada local — fronteira de `available_actions` no MCTS — 2026-11-22
 
 - **Base e isolamento:** worktree `/workspace/Nexus-continue-20261122`, branch `local/continue-evolution-20261122`, base `origin/main=f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf`. A candidata continua sem commit; não houve push, PR, merge ou alteração de outros checkouts. Nenhum claim foi criado ou editado.
