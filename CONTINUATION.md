@@ -7,6 +7,18 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada local — fronteira de `available_actions` no MCTS — 2026-11-22
+
+- **Base e isolamento:** worktree `/workspace/Nexus-continue-20261122`, branch `local/continue-evolution-20261122`, base `origin/main=f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf`. A candidata continua sem commit; não houve push, PR, merge ou alteração de outros checkouts. Nenhum claim foi criado ou editado.
+- **Contrato:** `available_actions=None` mantém as ações padrão; um recipiente `str`, `bytes`, `bytearray` ou não iterável levanta `TypeError` antes de incrementar os contadores; itens que não sejam `str` são ignorados; ações `str` válidas continuam disponíveis.
+- **Hipóteses discriminadas:** (1) texto no nível externo é iterável de ações por intenção — incompatível com a anotação `Optional[List[str]]` e com a reprodução de `"MONITOR"` produzindo `["O"]`; (2) itens não-str são ações opacas — contradito por `[None]` retornando `[None]` e por dict causando `TypeError: unhashable type: 'dict'`; (3) o erro vem só do veto — contradito pelo traceback, que chega a `_apply_action`/`_action_effects.get`.
+- **RED:** antes da correção, `python -m unittest -v test_mcts_available_actions_contract` saiu 1: 3 testes, `FAILED (failures=4, errors=1)`. Observou-se o dict não hashable, `[None]` no resultado e containers textuais aceitos. Log: `/tmp/nexus-mcts-available-actions-red-20261122.log`.
+- **GREEN:** contratos MCTS/Pearl com `coverage run --branch` passaram `69/69`; cobertura de `core/cognitivo/mcts_planner.py` nesse conjunto: 93%. Suíte final: `python -m unittest discover -p 'test_*.py'` — 1.676 testes em 138,738 s, `OK (expected failures=5)`, Python 3.12.3.
+- **Contratos do catálogo:** `python -m unittest -v test_cognitivo_mutation_parallel_contract test_cognitivo_mutation_preflight_edges_contract test_ci_gate_shard_contract test_episodic_b2b_open_current_contract` — 55 testes, OK. Ruff (`ruff check core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`), compilação (`/tmp/nexus-ci312/bin/python -m compileall -q core vita tools test_*.py benchmarks/nexus_pomdp_benchmark_v2.py`) e `git diff --check` passaram.
+- **Mutação específica:** `mcts_rejects_text_actions_container`, `mcts_filters_non_string_actions` e `mcts_reports_non_iterable_actions` foram mortos: 3/3, 0 sobreviventes, 0 `not_applied`; relatório `/tmp/nexus-mcts-available-actions-mutations-final3-20261122.json`. O catálogo cognitivo completo não foi executado.
+- **Segurança e artefatos:** Bandit completo na candidata final: 139 LOW, 0 MEDIUM/HIGH, 0 erros; exit 1 apenas pelos LOW. Delta contra a base `/tmp/nexus-mcts-bandit-base-20261122.json`: 0 achados novos, 0 erros, exit 0. `security_triage.py /tmp/nexus-mcts-bandit-candidate-final3-20261122.json SECURITY_TRIAGE.md --check` passou. `reality_audit.py` reexecutado; saídas estáveis, atualizadas de 7.351 para 7.360 linhas extraídas; `mcts_planner.py`: 650 linhas, 3 classes, 27 funções. Isso é inventário estrutural, não evidência de capacidade.
+- **Limites:** validação local apenas em Python 3.12.3; CI hospedada e Python 3.11/3.13 não foram executados. Nada foi publicado nem mesclado.
+
 ## Rodada — enqueue da fila adiada recusa tipos que o snapshot já rejeita — 2026-11-19
 
 - **Base:** `c4722fd6fc02ec3fbc1deb9066bcd5fd055d55d8` (`origin/main`, merge da #201). Branch `cursor/deferred-enqueue-types-812b`. Agent-Id: `grok-bot`.
