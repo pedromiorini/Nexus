@@ -50,7 +50,20 @@ def classify_text_effects(
     Cada efeito é ``"chave valor"``. Par do WORLD_SCHEMA vira claim; fora do schema é ignorado; chave em
     ``skip`` (declarada) é pulada. Chave com mais de um valor canônico é conflito e não vira claim (a
     ordem de iteração do conjunto de arestas não decide nada).
+
+    ``effects is None`` e coleções vazias não têm efeitos. ``str``, ``bytes`` e ``bytearray`` não são
+    coleções: fatiá-los descartaria o texto. ``bool``, números, mapas e geradores também não. ``skip``
+    é lista, tupla, set, frozenset ou dict; texto não vale, porque ``in`` nele é substring.
     """
+    if effects is not None and (
+        isinstance(effects, (str, bytes, bytearray))
+        or not isinstance(effects, (list, tuple, set, frozenset))
+    ):
+        raise TypeError("effects deve ser lista, tupla, set ou frozenset")
+    if isinstance(skip, (str, bytes, bytearray)) or not isinstance(
+        skip, (list, tuple, set, frozenset, dict)
+    ):
+        raise TypeError("skip deve ser lista, tupla, set, frozenset ou dict")
     seen: Dict[str, set] = {}
     ignored: List[str] = []
     for effect in sorted(str(item).strip() for item in (effects or ())):
