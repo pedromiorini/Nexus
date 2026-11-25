@@ -30,7 +30,7 @@
       },
       {
         "path": "core/cognitivo/causal_world_model.py",
-        "lines": 319,
+        "lines": 332,
         "classes": 5,
         "functions": 14
       },
