@@ -57,16 +57,18 @@ class DeferredTaskQueue:
             raise ValueError("priority deve ser inteiro")
         if not isinstance(reason, str):
             raise ValueError("reason deve ser string")
+        if context is not None and not isinstance(context, dict):
+            raise ValueError("context must be a dictionary")
+        try:
+            copied_context = copy.deepcopy(context) if context is not None else {}
+        except Exception as exc:
+            raise ValueError("context must be deep-copyable") from exc
+        if not isinstance(copied_context, dict):
+            raise ValueError("context must be a dictionary")
         with self._lock:
             if len(self._heap) >= self.max_size:
                 self._stats["discarded"] += 1
                 raise OverflowError("fila de tarefas adiadas está cheia")
-            try:
-                copied_context = copy.deepcopy(context) if context is not None else {}
-            except Exception as exc:
-                raise ValueError("context must be deep-copyable") from exc
-            if not isinstance(copied_context, dict):
-                raise ValueError("context must be a dictionary")
             task_id = str(uuid.uuid4())
             while task_id in self._tasks:
                 task_id = str(uuid.uuid4())
