@@ -1,6 +1,6 @@
 ## Fora de escopo (seções A e B)
 
-- S2a (`expected_reward == 0.0`) e a errata de `counterfactual.py:180`.
+- S2a (`expected_reward == 0.0`) e a errata :180 do `mcts_planner.py`.
 - `tools/targeted_mutation.py` e o catálogo dos 80 mutantes direcionados.
 - Workflows, timeouts, pisos de cobertura e qualquer arquivo de `.github/`.
 - Validadores, schema, aceites e `versao_aceita` do Axis (#79 e `tools/agente/validar_registro.py` além de rodá-lo).

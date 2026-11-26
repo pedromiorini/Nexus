@@ -5,7 +5,7 @@ Base: `main` `e21d25cfc0b2e43b19d82af05cdefc1ddb5bd9be` (pai `8e9feac5447c1c759f
 Desenho de origem, local e não publicado: `docs/cognitivo/PONTE_EPISODIC_MEMORY_SECAO_B_DESENHO_2026-11-12.md`, SHA-256 `01bba0df1ab5b894a5a1a11d68eaafb069e5d73d355a59326695430906a7faee`. B1 foi aceito em 2026-11-12 só como desenho: chave `episodes` no dict de `route`, errata de C5, `think` sem a chave nesta fatia. Implementar e publicar continuam não autorizados.
 Agent-Id: grok-bot.
 
-Fora desta fatia: B2, B3, B4, B5, S2a, a errata de `counterfactual.py:180`, a opção 1c da ponte do roteador, reexportação no pacote e membro novo de `ModuleType`.
+Fora desta fatia: B2, B3, B4, B5, S2a, a errata :180 do `mcts_planner.py`, a opção 1c da ponte do roteador, reexportação no pacote e membro novo de `ModuleType`.
 
 O teste novo (RED e GREEN) não entra nesta tarefa. Até a errata ser aprovada, C5 é o contrato vigente. E1 contradiz esse C5.
 
