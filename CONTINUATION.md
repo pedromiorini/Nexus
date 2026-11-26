@@ -38,8 +38,8 @@ Python 3.12.3 em `/tmp/nexus-ci` (`pip install --require-hashes -r requirements-
 - `tools/targeted_mutation.py`: 93 declarados, 93 aplicáveis, 93 mortos, 0 sobreviventes, 0 não aplicados, exit 0. `tools/cognitivo_mutation.py` não foi editado.
 - Bandit na worktree `/tmp/nexus-main` de `d7e092f`: 139 LOW, 0 MEDIUM, 0 HIGH, exit 1 pelos LOW. No branch, `bandit -r core vita tools -b /tmp/base.json`: 0 achados novos. Totais continuam 139 LOW, 0 MEDIUM, 0 HIGH. `security_triage.py /tmp/bandit-full.json SECURITY_TRIAGE.md --check`: exit 0.
 - `reality_audit.py`: exit 0 e `git diff` de `AUDIT_REALITY_REPORT.md` e `audit_reality.json` vazio. Núcleo 23011 linhas, 210 classes, 690 funções. Não é evidência de capacidade.
-- `validar_registro.py --expirados aviso`: exit 0, só os dois avisos de versão 3.4.1 dos agentes Cursor. `predeleg.sh HEAD origin/main`: `OK: sem conflito`, exit 0.
-- **Não verificado:** actionlint, zizmor, Python 3.11/3.13, o CI hospedado e o replay (`run_replay.sh` não foi reexecutado nesta rodada). A guarda de `pressure_critical` não cobre `requeue` nem o texto de `reason`. O locale `en_US.UTF-8` continua fazendo `[0-9]` em `tools/agente/timeout_margin.sh` aceitar `٣`.
+- `validar_registro.py --expirados aviso`: exit 0, só os dois avisos de versão 3.4.1 dos agentes Cursor. `predeleg.sh HEAD origin/main`: `OK: sem conflito`, exit 0. `LC_ALL=C bash tools/agente/replay/run_replay.sh`: 33 executados, exit 0.
+- **Não verificado:** actionlint, zizmor, Python 3.11/3.13 e o CI hospedado. A guarda de `pressure_critical` não cobre `requeue` nem o texto de `reason`. O locale `en_US.UTF-8` continua fazendo `[0-9]` em `tools/agente/timeout_margin.sh` aceitar `٣`.
 
 ## Rodada — classify_text_effects recusa recipiente que não é coleção — 2026-11-25
 
