@@ -6,6 +6,32 @@ ci_run: CURRENT_RUN
 tests: CURRENT_TESTS
 bandit_low: 139
 -->
+## Limites normalizados das métricas de saúde — validação local 2026-11-21
+Base `f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf`, branch `fix/system-health-normalized-metrics-20261121`, commit de código/testes `1fb1450730c8b439f972877897cb2f7454a97331`. O contrato RED na base reproduziu 11 falhas, incluindo métricas fora de `[0,1]`, valores não finitos/não numéricos e mutação parcial em diagnóstico composto. A candidata passou 11/11 focados e 1.677 testes completos com 5 falhas esperadas; Ruff, compilação e auditorias locais passaram. Mutação geral 91/91 sem sobreviventes, mas sem mutante específico desta área. Bandit: 139 LOW, 0 MEDIUM/HIGH, exit 1 pelos LOW; sem CI hospedada ou teste em Python 3.11/3.13. Evidência de contrato local, não de saúde operacional real nem de segurança geral.
+
+## Finitude após conversão no livro-razão temporal — validação local 2026-11-20/21
+
+Base `f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf`, branch local `fix/temporal-number-finiteness-20261121`, commit de código/teste `d5ef509ad6bb5715444dd1914f94284467c72e8a`. Na revalidação de 2026-11-21, o contrato falhou no pai (3 testes, 1 falha esperada para subclasse de `float` cujo `__float__` devolve `inf`, 2 controles aprovados) e os contratos temporais passaram 67/67 no commit. A suíte completa passou 1.676 testes em 135,091 s, com 5 expected failures. Ruff, compileall, py_compile, reality audit sem drift, gate de artefatos e Bandit do módulo passaram; Bandit registrou zero findings e zero erros. A campanha geral de mutação anteriormente registrada passou 91/91, mas não contém mutante temporal e não mede especificamente esta guarda. Validação somente local em Python 3.12.3; sem Python 3.11/3.13, CI hospedada, revisão externa ou publicação. Comandos e limites estão na rodada de 2026-11-20/21 de `CONTINUATION.md`. Evidência de contrato numérico local, não de capacidade ou segurança geral.
+
+## Containers externos subclassificados no restore temporal — validação local 2026-11-25
+
+Base `ccdf7a75f4fb26c0def57a196569da65bb38f06b` (`main`, já com a finitude da #219). Branch `cursor/temporal-snapshot-hardening-limpa-6995`. Reaplica só o diff `3eab789c5204c5e7d5567526dc4ac7880857a809..45c90fca884fcbf19afeda2ed43a1282793db6ab` de `core/temporal_facts.py` da draft #214. O blob de `core/temporal_facts.py` na base era idêntico a `3eab789`; o patch aplicou limpo e o resultado ficou idêntico ao arquivo em `45c90fc`. `_number` permanece a checagem de finitude depois de `float()` da #219.
+
+No RED, antes do patch, `test_temporal_snapshot_container_boundary_contract.py` teve 4 erros e 1 controle nativo aprovado: `RuntimeError` em `snapshot.get()`, em `events.__iter__()` e em `functional_predicates.__iter__()`, inclusive no schema inválido que chegava ao override. A cópia do dict raiz com `dict.copy` e das listas externas subclassificadas com `list.copy` eliminou essas chamadas. No GREEN, 5/5 passaram; o snapshot nativo válido preserva o hash e o inválido continua `ValueError` de schema.
+
+## Subclasses rasas de metadata no digest temporal — validação local 2026-11-25
+
+O contrato `test_temporal_metadata_restore_depth_limit_contract.py` importa `_check_metadata_depth`. Na `main` sem o patch esse nome não existe. Pedro autorizou aceitar o `ImportError` de coleta como RED deste módulo. As oito falhas comportamentais que a draft #214 registrou (restore/export de profundidade 129 e `RuntimeError` de `items()`/`__iter__()` dentro de `_digest`) não foram observadas nesta coleta.
+
+Depois do patch, o mesmo módulo passou 4/4. A correção valida a profundidade com operações-base, canonicaliza metadata subclassificado em `dict`/`list`/`tuple` nativos antes do digest e da cópia, e compara o hash com a fórmula legada para containers nativos. Identidade e overrides de subclasses não são preservados.
+
+## Limite de profundidade dos metadados temporais — validação local 2026-11-25
+
+`test_temporal_metadata_depth_limit_contract.py`, na produção intacta: o round-trip de profundidade 128 passou; os dois subcasos de profundidade 129 falharam com `AssertionError: ValueError not raised`. Os dois subcasos aparecem como `metadata_type='dict'` porque `alternating_containers(129)` também devolve um `dict` na raiz. Depois do patch, 2/2. `assert_fact` rejeita mais de 128 contêineres antes da transação; `from_snapshot` aplica o mesmo limite. Profundidade 128 continua válida. Schema do snapshot inalterado.
+
+Os três contratos juntos: 11 testes, OK, exit 0. `python -m unittest discover -p 'test_temporal*.py'` (inclui `test_temporal_number_finiteness_contract.py`): 78 testes, OK, 1,116 s, exit 0. `test_snapshot_depth_atomicity_contract.py` e `test_audit_atomic_restore_regression.py`: 17 testes, OK, exit 0. `tools/test_summary.py` com `LC_ALL=C`: 1710 executados, 0 falhas, 0 skips, 5 expected failures, `result: passed`, exit 0, 70,180 s. O JSON do resumo conta os expected failures dentro de `passed` (1710). Ruff 0.17.1, `compileall` e `git diff --check` passaram. `python tools/targeted_mutation.py`: 91 declarados, 91 aplicáveis, 91 mortos, 0 sobreviventes, exit 0. O catálogo não tem alvo em `core/temporal_facts.py`; o placar não mede estas guardas. Bandit 1.9.4: 139 LOW, 0 erros, sem MEDIUM/HIGH; `tools/security_triage.py --check` exit 0. Isso não é clearance de segurança.
+
+Em `LC_ALL=en_US.UTF-8` a mesma suíte teve 1 falha em `test_timeout_margin_contract.py` (dígito arábico `٣`). `tools/agente/timeout_margin.sh` e esse teste estão iguais à `main`; com `LC_ALL=C` o teste passa. Não é efeito deste diff. Python 3.12.3, dependências do `requirements-ci.lock` com hashes. Python 3.11/3.13 e CI hospedada não foram executados. Os totais 1.678/1.679/1.684 da draft #214 são o registro daquela pilha, não desta execução. Evidência de contrato local, não de capacidade.
 
 ## Fronteira de enqueue da fila adiada — validação local 2026-11-19
 
