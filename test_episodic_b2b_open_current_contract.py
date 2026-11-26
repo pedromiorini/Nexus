@@ -38,7 +38,7 @@ EXISTING_TEST_SHA256 = {
     "test_core_hygiene_contract.py": "3de0b0e1e1217b4fe8ea8093c77f6d829c83d89c088f89cd928c0da13573c4a6",
     "test_correction_claim_audit_contract.py": "c1c79f4c3455e4b392b4146bdb3c720bb276460ff5b621c57e3d161dd960a865",
     "test_counterfactual_contract.py": "afd20e55961724afc31ae67e93d1663fcf9fb5bf6475661ef8b864031d18f764",
-    "test_counterfactual_dox_contract.py": "9249ff591787b53394d157348054e9f537849bd75616e8355a28757bc71f4e06",
+    "test_counterfactual_dox_contract.py": "3a12a97b937220ce71a29f651d495f63da80379b1db0983293316704655188f8",
     "test_counterfactual_eval_contract.py": "f3bf675d00d37268020f8ca6f41cf21b5b70556cd50eb6361eedadc7f716f86c",
     "test_counterfactual_extraction_contract.py": "fb97b1f7cbb11fb49f28d09619979b0005c85dd5f2af17d037930d5a067f1e31",
     "test_counterfactual_gap3_contract.py": "900cb42861f82bde8497d39081b498c6d1521b4eb44667572ea333e419d5f1da",
