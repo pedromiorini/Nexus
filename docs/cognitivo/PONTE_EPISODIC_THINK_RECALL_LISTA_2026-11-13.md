@@ -6,7 +6,7 @@ Desenho citado, inalterado: `docs/cognitivo/PONTE_EPISODIC_MEMORY_SECAO_B_DESENH
 Agent-Id: grok-bot.
 Python previsto: 3.11, o que estiver em `python3.11 --version` no momento da corrida. A versão exata entra só na seção Medição, depois da corrida.
 
-Fora de escopo: B2, B3, B4, B5, opção 1c, S2a, errata de `counterfactual.py:180`, produção, testes C1–C15 e E1–E6 já na main, workflows, Axis.
+Fora de escopo: B2, B3, B4, B5, opção 1c, S2a, errata :180 do `mcts_planner.py`, produção, testes C1–C15 e E1–E6 já na main, workflows, Axis.
 
 ## Fato já no código, antes da lista
 

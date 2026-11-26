@@ -36,7 +36,7 @@ A ligação já existe. Não é o caso da ponte do ciclo, em que a seção A reg
 - O dict de `route` não publica a lista que `search_episodes` já devolveu.
 - Os proposers padrão não selecionam `learning`, embora a regra de roteamento desse tipo inclua `EPISODIC`.
 - `auto_log` e `constitutional_log` não são lidos no módulo episódico (caracterização, inventário).
-- S2a (`expected_reward == 0.0`) e a errata de `counterfactual.py:180` não fazem parte desta ligação. Fora de escopo. A #77 está aberta e edita o monólito e `core/cognitivo/episodic_memory.py`.
+- S2a (`expected_reward == 0.0`) e a errata :180 do `mcts_planner.py` não fazem parte desta ligação. Fora de escopo. A #77 está aberta e edita o monólito e `core/cognitivo/episodic_memory.py`.
 
 ## Inferência
 
