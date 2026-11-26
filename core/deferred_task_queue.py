@@ -79,6 +79,8 @@ class DeferredTaskQueue:
             return task
 
     def recheck_and_pop(self, pressure_critical: bool) -> Optional[DeferredTask]:
+        if type(pressure_critical) is not bool:
+            raise TypeError("pressure_critical deve ser bool")
         with self._lock:
             if pressure_critical or not self._heap:
                 return None
@@ -112,6 +114,8 @@ class DeferredTaskQueue:
         """Processa um lote finito. Erros de callback são reportados, sem reverter estados."""
         if type(max_batch) is not int or max_batch < 1:
             raise ValueError("max_batch deve ser um inteiro positivo")
+        if type(pressure_critical) is not bool:
+            raise TypeError("pressure_critical deve ser bool")
         if pressure_critical:
             return {
                 "processed": 0, "completed": 0, "retried": 0,

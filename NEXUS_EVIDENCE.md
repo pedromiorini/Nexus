@@ -6,6 +6,11 @@ ci_run: CURRENT_RUN
 tests: CURRENT_TESTS
 bandit_low: 139
 -->
+
+## Flag de pressão da fila adiada — validação local 2026-11-26
+
+Base `d7e092f809cb6ca71617805a01eec0fb092b0014`, branch `cursor/deferred-pressure-flag-122a`. O contrato `test_deferred_pressure_flag_contract.py`, com a produção da base, saiu 1: 4 testes, 20 falhas, controles de `True`/`False` e de `max_batch` inválido aprovados. `1`, `"false"`, NaN e infinito bloqueavam a fila; `0`, `""`, `None` e `[]` retiravam a tarefa. Depois da guarda (`type is bool`, antes de mutar a fila), os mesmos 4 testes passaram. A suíte com `LC_ALL=C` passou 1719 testes em 87,369 s, com 5 expected failures. Mutação direcionada: 93/93 mortos, incluindo `queue_pressure_flag_recheck` e `queue_pressure_flag_consume`. Bandit: 139 LOW, 0 MEDIUM/HIGH, 0 achados novos contra a base. Evidência de contrato local em Python 3.12.3, não de capacidade, de segurança geral nem do CI hospedado. Comandos e o claim que não entrou (saída 8 de `claims_contrato.sh`) estão na rodada de 2026-11-26 de `CONTINUATION.md`.
+
 ## Limites normalizados das métricas de saúde — validação local 2026-11-21
 Base `f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf`, branch `fix/system-health-normalized-metrics-20261121`, commit de código/testes `1fb1450730c8b439f972877897cb2f7454a97331`. O contrato RED na base reproduziu 11 falhas, incluindo métricas fora de `[0,1]`, valores não finitos/não numéricos e mutação parcial em diagnóstico composto. A candidata passou 11/11 focados e 1.677 testes completos com 5 falhas esperadas; Ruff, compilação e auditorias locais passaram. Mutação geral 91/91 sem sobreviventes, mas sem mutante específico desta área. Bandit: 139 LOW, 0 MEDIUM/HIGH, exit 1 pelos LOW; sem CI hospedada ou teste em Python 3.11/3.13. Evidência de contrato local, não de saúde operacional real nem de segurança geral.
 
