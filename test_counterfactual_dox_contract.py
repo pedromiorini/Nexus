@@ -19,7 +19,7 @@ from types import SimpleNamespace
 from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
-from core.cognitivo.action_effects import ACTION_EFFECTS
+from core.cognitivo.action_effects import ACTION_EFFECTS, veto_key
 from core.cognitivo.causal_world_model import RealCausalReasoning, RealWorldModelSimulator
 from core.cognitivo.counterfactual import RealCounterfactualReasoningEngine
 
@@ -74,6 +74,7 @@ def spec_action(intervention, adjacency_keys):
         name
         for name in ACTION_EFFECTS
         if tokens == set(re.findall(r"[a-z0-9]+", name.lower()))
+        and veto_key(intervention) == veto_key(name)
     ]
     if len(matches) == 1:
         return matches[0]
@@ -140,7 +141,7 @@ class CounterfactualDoContractTests(unittest.TestCase):
         self.assertEqual(spy.calls, [["APPLY_PATCH"], ["APPLY_PATCH"]])
 
     def test_real_simulator_maps_apply_patch_token_orders(self):
-        for intervention in ("apply patch", "patch apply", "apply_patch", "APPLY_PATCH"):
+        for intervention in ("apply patch", "apply_patch", "APPLY_PATCH"):
             with self.subTest(intervention=intervention):
                 causal = _with_edge("noop causes nothing relevant")
                 world = RecordingWorld(causal_reasoning=causal)
@@ -151,6 +152,15 @@ class CounterfactualDoContractTests(unittest.TestCase):
                 self.assertEqual(scenario.actual_outcome, "outcome_without_intervention")
                 self.assertEqual(scenario.intervention, intervention)
                 self.assertTrue(all(not step.startswith("do(") for step in scenario.causal_chain))
+        causal = _with_edge("noop causes nothing relevant")
+        world = RecordingWorld(causal_reasoning=causal)
+        eng = _engine(world_model=world, causal_reasoning=causal)
+        scenario = eng.generate_counterfactual_scenario("system vulnerable", "patch apply")
+        self.assertEqual(world.calls, [])
+        self.assertEqual(scenario.counterfactual_outcome, "outcome_with_patch_apply")
+        self.assertEqual(scenario.actual_outcome, "outcome_without_intervention")
+        self.assertEqual(scenario.intervention, "patch apply")
+        self.assertTrue(all(not step.startswith("do(") for step in scenario.causal_chain))
 
     def test_deploy_fix_outcome_comes_from_c4_do(self):
         causal = _with_edge()
