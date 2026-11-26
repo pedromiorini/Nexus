@@ -8,9 +8,12 @@ import inspect
 import io
 import traceback
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+
+from tools.agente.validar_registro import validate
 
 import core.cognitivo as cognitivo_pkg
 import core.cognitivo.episodic_memory as episodic_module
@@ -729,9 +732,15 @@ class C15ExistingContractsStayUntouched(unittest.TestCase):
         "tools/cognitivo_mutation.py",
     )
 
-    def test_claims_stay_empty_and_module_type_does_not_grow(self):
-        claims = (ROOT / "docs/agentes/CLAIMS.yaml").read_text(encoding="utf-8")
-        self.assertIn("claims: []", claims)
+    def test_current_claims_validate_and_module_type_does_not_grow(self):
+        # A branch-local lease is expected on an open PR; validate it instead of requiring [].
+        errors, _ = validate(
+            ROOT,
+            Path("docs/agentes/REGISTRO_AGENTES.yaml"),
+            Path("docs/agentes/CLAIMS.yaml"),
+            datetime.now(timezone.utc),
+        )
+        self.assertEqual(errors, [])
         self.assertEqual(frozenset(member.name for member in ModuleType), MODULE_NAMES)
         for relative in self.UNTOUCHED:
             self.assertTrue((ROOT / relative).is_file(), relative)

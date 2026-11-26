@@ -112,14 +112,14 @@ class PR79CompositionContract(unittest.TestCase):
                 self.save(root, reg)
                 self.assertTrue(validate(root, REG, CLAIMS, NOW)[0])
 
-    def test_claim_policy_present_without_introducing_active_claims(self):
+    def test_claim_policy_is_present_and_current_claims_validate(self):
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("no próprio branch do PR", agents)
         self.assertIn("último commit", agents)
         self.assertIn("PRs abertos", agents)
-        body = (ROOT / CLAIMS).read_bytes().split(b"\n", 1)[1]
-        # #117 removed the expired Grok claim; this PR must not restore it.
-        self.assertEqual(yaml.safe_load(body)["claims"], [])
+        # A PR branch may carry a live lease; malformed or expired claims remain errors.
+        errors, _ = validate(ROOT, REG, CLAIMS, datetime.now(timezone.utc))
+        self.assertEqual(errors, [])
         self.assertIn("v3.4.2", (ROOT / "docs/agentes/CHANGELOG_INSTRUCOES.md").read_text())
 
 
