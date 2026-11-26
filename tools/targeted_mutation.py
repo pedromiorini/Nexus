@@ -197,6 +197,30 @@ MUTATIONS = [
     Mutation("queue_capacity_guard", "core/deferred_task_queue.py", "max_attempts < 1", "max_attempts < 0"),
     Mutation("queue_priority_direction", "core/deferred_task_queue.py", "(-self.priority, self.created_at)", "(self.priority, self.created_at)"),
     Mutation("queue_pressure_guard", "core/deferred_task_queue.py", "if pressure_critical or not self._heap:", "if pressure_critical and not self._heap:"),
+    Mutation(
+        "queue_pressure_flag_recheck",
+        "core/deferred_task_queue.py",
+        "    def recheck_and_pop(self, pressure_critical: bool) -> Optional[DeferredTask]:\n"
+        "        if type(pressure_critical) is not bool:\n"
+        "            raise TypeError(\"pressure_critical deve ser bool\")\n"
+        "        with self._lock:",
+        "    def recheck_and_pop(self, pressure_critical: bool) -> Optional[DeferredTask]:\n"
+        "        with self._lock:",
+        tests=("test_deferred_pressure_flag_contract.py",),
+    ),
+    Mutation(
+        "queue_pressure_flag_consume",
+        "core/deferred_task_queue.py",
+        "        if type(max_batch) is not int or max_batch < 1:\n"
+        "            raise ValueError(\"max_batch deve ser um inteiro positivo\")\n"
+        "        if type(pressure_critical) is not bool:\n"
+        "            raise TypeError(\"pressure_critical deve ser bool\")\n"
+        "        if pressure_critical:",
+        "        if type(max_batch) is not int or max_batch < 1:\n"
+        "            raise ValueError(\"max_batch deve ser um inteiro positivo\")\n"
+        "        if pressure_critical:",
+        tests=("test_deferred_pressure_flag_contract.py",),
+    ),
     Mutation("queue_retry_limit", "core/deferred_task_queue.py", "task.attempts >= task.max_attempts", "task.attempts > task.max_attempts"),
     Mutation("queue_success_branch", "core/deferred_task_queue.py", "if ok:\n                if self.complete(task.task_id):", "if not ok:\n                if self.complete(task.task_id):"),
     Mutation("queue_batch_validation", "core/deferred_task_queue.py", "max_batch < 1", "max_batch < 0"),

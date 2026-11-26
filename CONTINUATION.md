@@ -7,6 +7,40 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — pressure_critical só aceita bool exato — 2026-11-26
+
+- **Base:** `d7e092f809cb6ca71617805a01eec0fb092b0014` (`origin/main`). Branch `cursor/deferred-pressure-flag-122a`. Agent-Id: `grok-bot`.
+- **Bloco `NEXUS-CURRENT-STATE`:** não reescrito. Continua `tests: CURRENT_TESTS` e `bandit_low: 139`. `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md` não foram editados. `NEXUS_EVIDENCE.md` ganhou só a seção desta rodada.
+- **Claim:** não entrou neste branch. `bash tools/agente/claims_contrato.sh .` com `claims: []` saiu 0. Com um claim de `grok-bot` no working tree (arquivos deste item, `expira_em: 2026-11-28T18:00:00Z`), saiu 8: `test_agent_pr79_composition_contract.py` e `test_router_episodic_memory_bridge_contract.py` exigem lista vazia (L-013). Os testes não foram editados. O arquivo de claims foi restaurado antes do commit. A #210 já altera esses testes e `docs/agentes/CLAIMS.yaml`.
+- **Fora deste diff:** `core/constitutional_brain.py`, `tools/cognitivo_mutation.py`, workflows, lock e as PRs #38–#50/#60. A #210 (rascunho) é a única PR aberta; os arquivos dela não foram editados. `docs/agentes/LICOES_APRENDIDAS.md` também não: a #210 já o altera.
+
+### Fenômeno e hipóteses
+
+Em `d7e092f`, `recheck_and_pop` e `consume` tratam `pressure_critical` pela verdade Python. Sonda local, produção ainda a da base: `1`, `"false"`, NaN e `+inf` devolvem `None` no pop (profundidade 1) e `consume` sai `blocked=True` sem chamar o processador. `0`, `""`, `None` e `[]` estouram a tarefa e `consume` a conclui.
+
+RED, produção ainda a de `d7e092f`: `PYTHONPATH=. LC_ALL=C /tmp/nexus-ci/bin/python -m unittest test_deferred_pressure_flag_contract.py` saiu 1. 4 testes, 20 falhas, 0,002 s. Controles que passaram: `True` bloqueia sem processar, `False` libera, e `max_batch=True` continua `ValueError` antes do flag.
+
+- **H1.** Não-bool já levantava `TypeError`. Falsificada: as 20 falhas são `TypeError not raised`.
+- **H2.** Verdadeiro não-bool é o sinal de pressão crítica. Não adotada: a anotação é `bool`, `True`/`False` já tinham teste, e a string `"false"` bloqueava a fila.
+- **H3.** Falso não-bool é ausência de pressão. Falsificada: `0`, `""`, `None` e `[]` retiraram a tarefa e o `consume` a processou.
+- **H4.** `True` bloqueia sem processador, `False` libera, e `max_batch` inválido continua `ValueError`. Sobreviveu nos controles, antes e depois.
+- **H5.** Checar o flag depois do pop bastaria. Descartada no desenho: o falso não-bool já retirava a tarefa. A checagem ficou antes do lock em `recheck_and_pop` e, em `consume`, depois da checagem já existente de `max_batch`.
+
+GREEN no mesmo contrato: 4 testes, OK. Dois mutantes novos, `queue_pressure_flag_recheck` e `queue_pressure_flag_consume`, removem a guarda. O catálogo passou 93/93.
+
+### Gates neste ambiente
+
+Python 3.12.3 em `/tmp/nexus-ci` (`pip install --require-hashes -r requirements-ci.lock`). Não há `python3.11` neste ambiente; o CI usa 3.11. Ruff 0.17.1, Bandit 1.9.4, Coverage 7.16.2, Hypothesis 6.170.5. `PYTHONPATH=.`. `NEXUS_AUDIT_DB` fora do repo.
+
+- Ruff e `compileall` dos caminhos do workflow: exit 0. `git diff --check`: exit 0.
+- Suíte `LC_ALL=C python -m unittest discover -p 'test_*.py'`: 1719 testes, 87,369 s, exit 0, `OK (expected failures=5)`. A mesma suíte sem `LC_ALL=C` (`LANG=en_US.UTF-8`), sob `coverage run --branch`, saiu 1: 1719 testes, 205,304 s, `FAILED (failures=1, expected failures=5)`. A única falha foi `test_timeout_margin_contract.GuardInvalidInputTests.test_unparseable_lines` com a linha `٣`: o `[0-9]` do bash casou o dígito e `(( ))` escreveu erro na stderr, mas o script saiu 0 (`OK: max 500s <= 612s`). Com `LC_ALL=C` e com `LC_ALL=C.UTF-8` o mesmo script sai 3. Não é regressão deste diff: o arquivo da guarda não mudou. Não foi para `LICOES_APRENDIDAS.md` porque a #210 já edita esse arquivo.
+- Demo `coverage run --append --branch core/constitutional_brain.py` com `NEXUS_INTEGRATED_SUMMARY=/tmp/integrated.json`: exit 0. O resumo tem `result` passed, `skipped` `['0']`, `duplicates` `[]`. O banner do demo não é evidência de capacidade. Pisos do workflow, medidos nessa cobertura (a suíte dessa rodada teve a falha de locale acima): total 84% (`--fail-under=0`), fila 97%, VRAM 95%, temporal 94%, Vita 81%, núcleo 72%, `core/cognitivo/*` 98%. Todos os `--fail-under` saíram 0.
+- `tools/targeted_mutation.py`: 93 declarados, 93 aplicáveis, 93 mortos, 0 sobreviventes, 0 não aplicados, exit 0. `tools/cognitivo_mutation.py` não foi editado.
+- Bandit na worktree `/tmp/nexus-main` de `d7e092f`: 139 LOW, 0 MEDIUM, 0 HIGH, exit 1 pelos LOW. No branch, `bandit -r core vita tools -b /tmp/base.json`: 0 achados novos. Totais continuam 139 LOW, 0 MEDIUM, 0 HIGH. `security_triage.py /tmp/bandit-full.json SECURITY_TRIAGE.md --check`: exit 0.
+- `reality_audit.py`: exit 0 e `git diff` de `AUDIT_REALITY_REPORT.md` e `audit_reality.json` vazio. Núcleo 23011 linhas, 210 classes, 690 funções. Não é evidência de capacidade.
+- `validar_registro.py --expirados aviso`: exit 0, só os dois avisos de versão 3.4.1 dos agentes Cursor. `predeleg.sh HEAD origin/main`: `OK: sem conflito`, exit 0. `LC_ALL=C bash tools/agente/replay/run_replay.sh`: 33 executados, exit 0.
+- **Não verificado:** actionlint, zizmor, Python 3.11/3.13 e o CI hospedado. A guarda de `pressure_critical` não cobre `requeue` nem o texto de `reason`. O locale `en_US.UTF-8` continua fazendo `[0-9]` em `tools/agente/timeout_margin.sh` aceitar `٣`.
+
 ## Rodada — classify_text_effects recusa recipiente que não é coleção — 2026-11-25
 
 - **Base:** `f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf` (`origin/main`). Branch `cursor/causal-text-effects-container-1027`. Agent-Id: `grok-bot`.
