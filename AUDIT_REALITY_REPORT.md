@@ -16,7 +16,7 @@ O núcleo analisado possui **23011 linhas**, **210 classes** e **690 funções**
 | Frases fortes de capacidade no código (inventário; só pode diminuir) | 51 | Ênfase "REAL <Capacidade>", "REAL e FUNCIONAL", "100% funcional"; limite em test_reality_audit.py |
 | Terminologia científica no código (informativo) | 241 | Nomes de constructos modelados; não são alegações por si só |
 | Classes com prefixo Real (identificadores) | 63 | Nome histórico; renomear exige alias de compatibilidade |
-| Módulos extraídos nas varreduras de alegações e evidência estrutural | 20 (7438 linhas) | Listados separadamente; métricas do núcleo contam somente o monólito |
+| Módulos extraídos nas varreduras de alegações e evidência estrutural | 20 (7440 linhas) | Listados separadamente; métricas do núcleo contam somente o monólito |
 | Dependências opcionais sinalizadas | 2 | Fallbacks podem alterar o comportamento |
 
 ## Alegações (README e código-fonte)
