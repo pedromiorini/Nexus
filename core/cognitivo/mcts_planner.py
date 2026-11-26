@@ -513,7 +513,7 @@ class RealMCTSPlanner:
         
         Args:
             goal: Objetivo em linguagem natural (ex: "secure the system")
-            available_actions: Lista de ações possíveis (usa padrão se None)
+            available_actions: Iterable de ações; None usa padrão, texto não é recipiente e itens não-str são ignorados
             max_iterations: Número de iterações MCTS (200 = ~50ms)
         
         Returns:
@@ -527,6 +527,16 @@ class RealMCTSPlanner:
             raise TypeError("max_iterations must be an integer")
         if max_iterations < 0:
             raise ValueError("max_iterations must be non-negative")
+        if isinstance(available_actions, (str, bytes, bytearray)):
+            raise TypeError("available_actions must be an iterable of action names, not text")
+        if available_actions is None:
+            allowed = None
+        else:
+            try:
+                action_iterator = iter(available_actions)
+            except TypeError as exc:
+                raise TypeError("available_actions must be iterable") from exc
+            allowed = [action for action in action_iterator if isinstance(action, str)]
         start_time = time.time()
         self.total_plans += 1
 
@@ -535,7 +545,6 @@ class RealMCTSPlanner:
 
         # Ações fornecidas valem em todas as profundidades, só neste plano; a lista do
         # chamador é copiada. Ações sem modelo deixam as métricas do estado intactas.
-        allowed = list(available_actions) if available_actions is not None else None
         # P1b: veto padrão. Ações vetadas saem do espaço de busca e voltam em PlanResult.vetoed_actions.
         candidates = allowed if allowed is not None else list(self._action_effects)
         vetoed: List[Dict[str, str]] = []

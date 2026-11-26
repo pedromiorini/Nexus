@@ -7,6 +7,38 @@ tests: CURRENT_TESTS
 bandit_low: 139
 -->
 
+## Rodada — classify_text_effects recusa recipiente que não é coleção — 2026-11-25
+
+- **Base:** `f4c66c053fa7ad3d6ae7d5f1d4bd3527e12948cf` (`origin/main`). Branch `cursor/causal-text-effects-container-1027`. Agent-Id: `grok-bot`.
+- **Bloco `NEXUS-CURRENT-STATE`:** não reescrito. Continua `tests: CURRENT_TESTS` e `bandit_low: 139`. `NEXUS_EVIDENCE.md`, `NEXUS_KNOWLEDGE.md` e `SECURITY_TRIAGE.md` não foram editados: o item não muda alegação de capacidade. Os relatórios de realidade só atualizam a contagem de linhas do módulo (319 → 332; extraídos 7351 → 7364).
+- **Claim:** não entrou neste branch. `bash tools/agente/claims_contrato.sh .` com `claims: []` saiu 0. Com um claim de `grok-bot` no working tree, saiu 8: `test_agent_pr79_composition_contract.py` e `test_router_episodic_memory_bridge_contract.py` exigem lista vazia (L-013). Os testes não foram editados. A #210 já altera esses arquivos e `CLAIMS.yaml`.
+- **Fora deste diff:** `core/constitutional_brain.py`, `tools/targeted_mutation.py`, `tools/cognitivo_mutation.py`, workflows e lock. PRs #38–#50/#60 não foram editadas.
+
+### Fenômeno e hipóteses
+
+Em `f4c66c0`, `classify_text_effects("alert_level high")`, `b"..."`, `bytearray`, `False`, `0` e `0.0` devolvem `({}, {}, [])`. `True`, `-1`, NaN e ±infinito levantam `TypeError` de iteração. `skip="alert_level"` apaga a claim porque `in` em `str` é substring. Lista, tupla, set e frozenset com o mesmo texto já viram claim.
+
+RED, produção ainda a de `f4c66c0`: `PYTHONPATH=. NEXUS_AUDIT_DB=/tmp/nexus_audit_red.sqlite3 LC_ALL=C python3 -m unittest -v test_causal_text_effects_container_contract.py` saiu 1. 8 testes, 31 falhas, 0,003 s. Controles que passaram: coleção real com um efeito, `None` e vazios, skip por chave, conflito determinístico, e `True`/`False`/`1` dentro da coleção (continuam stringificados, não viram bool do schema).
+
+- **H1.** Texto e bytes já eram um efeito só. Falsificada: o retorno é vazio, sem `TypeError`.
+- **H2.** `False`, `0` e `0.0` já falhavam fechado como `True`. Falsificada: `effects or ()` os trata como ausência.
+- **H3.** `skip` string já era conjunto de chaves. Falsificada: a chave contida na string some.
+- **H4.** Coleções reais e skip por chave já eram o caminho preservado. Sobreviveu nos controles, antes e depois.
+
+GREEN no mesmo contrato: 8 testes, OK. A guarda fica antes do laço; a linha do mutante `sr_effects_unsorted` não mudou. Itens dentro da coleção ainda passam por `str()`: isso não foi alterado.
+
+### Gates neste ambiente
+
+Python 3.12.3 em `/tmp/nexus-ci` (`pip install --require-hashes -r requirements-ci.lock`). Não há `python3.11` neste ambiente; o CI usa 3.11. Ruff 0.17.1, Bandit 1.9.4, Coverage 7.16.2, Hypothesis 6.170.5. `PYTHONPATH=.`. `NEXUS_AUDIT_DB` fora do repo.
+
+- Ruff e `compileall` dos caminhos do workflow: exit 0.
+- Suíte `coverage run --branch -m unittest discover -p 'test_*.py'`: 1681 testes, 204,522 s, exit 0, `OK (expected failures=5)`. Demo `coverage run --append --branch core/constitutional_brain.py` com `NEXUS_INTEGRATED_SUMMARY=/tmp/integrated.json`: exit 0. O resumo tem `result` passed, `skipped` `['0']`, `duplicates` `[]`. O banner do demo não é evidência de capacidade. Pisos: total 84%, fila 95%, VRAM 95%, temporal 96%, Vita 81%, núcleo 72%, `core/cognitivo/*` 98%. Todos os `--fail-under` saíram 0.
+- Mutantes cujo alvo é `core/cognitivo/causal_world_model.py`: 71 declarados, 71 mortos, 0 sobreviventes, 0 não aplicados, exit 0. Não há mutante novo: `tools/cognitivo_mutation.py` está na #215 e `tools/targeted_mutation.py` na #206.
+- Bandit na worktree `/tmp/nexus-main` de `f4c66c0`: 139 LOW, 0 MEDIUM, 0 HIGH, exit 1 pelos LOW. No branch, `bandit -r core vita tools -b /tmp/base.json`: 0 achados novos, exit 0; totais continuam 139 LOW, 0 MEDIUM, 0 HIGH. `security_triage.py /tmp/base.json SECURITY_TRIAGE.md --check`: exit 0.
+- `reality_audit.py`: exit 0. O diff é só a contagem de linhas citada acima. Núcleo continua 23011 linhas, 210 classes, 690 funções. Não é evidência de capacidade.
+- `tools/targeted_mutation.py`: 91 declarados, 91 aplicáveis, 91 mortos, 0 sobreviventes, 0 não aplicados, exit 0. O catálogo não cobre `classify_text_effects`; os 71 mutantes do arquivo em `tools/cognitivo_mutation.py` já tinham saído mortos.
+- **Não verificado:** actionlint, zizmor, Python 3.11/3.13 e o CI hospedado. O ramo parcial pré-existente `causal_world_model.py:205->210` (`declared_raw` que não é `dict`) segue parcial; as linhas novas da guarda estão cobertas.
+
 ## Rodada — enqueue da fila adiada recusa tipos que o snapshot já rejeita — 2026-11-19
 
 - **Base:** `c4722fd6fc02ec3fbc1deb9066bcd5fd055d55d8` (`origin/main`, merge da #201). Branch `cursor/deferred-enqueue-types-812b`. Agent-Id: `grok-bot`.

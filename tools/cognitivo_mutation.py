@@ -33,7 +33,8 @@ PREDICTIVE = "core/cognitivo/predictive_coding.py"
 POMDP = ("test_predictive_coding_extraction_contract.py", "test_pomdp_belief_filter_contract.py")
 PC_EXTRACTION = ("test_predictive_coding_extraction_contract.py",)
 MCTS = "core/cognitivo/mcts_planner.py"
-MCTS_INPUT = ("test_mcts_planner_input_contract.py", "test_mcts_planner_extraction_contract.py")
+MCTS_INPUT = ("test_mcts_planner_input_contract.py", "test_mcts_planner_extraction_contract.py",
+              "test_mcts_available_actions_contract.py")
 MCTS_TESTS = ("test_mcts_planner_extraction_contract.py", "test_mcts_action_contract.py")
 _GUARD = '"""Buscar episódios"""\n        if isinstance(limit, bool) or not isinstance(limit, int):\n            raise TypeError("limit must be an integer")'
 
@@ -67,6 +68,7 @@ DC_TESTS = ("test_decision_cycle_contract.py", "test_decision_cycle_review_contr
 VK_TESTS = ("test_red_pr156_veto_names.py", "test_veto_key_precedence_contract.py",
             "test_scm_counterfactual_second_review_contract.py", "test_decision_cycle_review_contract.py")
 VK2_TESTS = VK_TESTS + ("test_red_pr157_pearl.py",)
+VK_MCTS_NON_STR_TESTS = VK2_TESTS + ("test_mcts_non_str_veto_candidate_contract.py",)
 CAUSAL_TESTS = ("test_causal_world_model_extraction_contract.py",)
 
 MCTS_QUALITY = ("test_mcts_planner_quality_contract.py",)
@@ -137,6 +139,16 @@ MUTATIONS = [
     Mutation("mcts_copies_caller_action_list", MCTS,
              "untried_actions=list(allowed) if allowed is not None else (",
              "untried_actions=allowed if allowed is not None else (", tests=MCTS_QUALITY),
+    Mutation("mcts_rejects_text_actions_container", MCTS,
+             'if isinstance(available_actions, (str, bytes, bytearray)):\n            raise TypeError("available_actions must be an iterable of action names, not text")',
+             'if False:\n            raise TypeError("available_actions must be an iterable of action names, not text")',
+             tests=MCTS_INPUT),
+    Mutation("mcts_filters_non_string_actions", MCTS,
+             "allowed = [action for action in action_iterator if isinstance(action, str)]",
+             "allowed = list(action_iterator)", tests=MCTS_INPUT),
+    Mutation("mcts_reports_non_iterable_actions", MCTS,
+             'raise TypeError("available_actions must be iterable") from exc',
+             "raise", tests=MCTS_INPUT),
     Mutation("mcts_available_actions_every_depth", MCTS,
              "all_actions = (list(self._plan_actions) if self._plan_actions is not None",
              "all_actions = (list(self._plan_actions) if False", tests=MCTS_QUALITY),
@@ -2271,7 +2283,7 @@ MUTATIONS = [
              r'(?:\(_*\))?[_;!?]*\Z', r'(?:\(_*\))?[;!?]*\Z', tests=VK2_TESTS),
     Mutation('vk_mcts_non_str_candidate_vetoed', MCTS,
              'if not isinstance(action, str) or any(v["action"] == action for v in vetoed):',
-             'if any(v["action"] == action for v in vetoed):', tests=VK2_TESTS),
+             'if any(v["action"] == action for v in vetoed):', tests=VK_MCTS_NON_STR_TESTS),
     Mutation('vk_lookup_non_str_hashed', EFFECTS,
              'if isinstance(action, str) and action in vetoes:', 'if action in vetoes:', tests=VK2_TESTS),
     Mutation('vk_underscores_not_collapsed', EFFECTS,
