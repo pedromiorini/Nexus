@@ -81,11 +81,16 @@ class S2FallbackVetoKeyContractTests(unittest.TestCase):
                 self.assertEqual(scenario.causal_chain, [f"{SITUATION} causes {text}"])
 
     def test_s2_c2_same_veto_key_fallback_still_maps(self):
-        for text in ("shutdown.service", "shutdown_service()"):
+        # Errata: docs/cognitivo/S3_ERRATA_S2C2_2026-11-26.md
+        # O nome do método permanece o do contrato S2. As duas grafias deixam de mapear.
+        for text, outcome in (
+            ("shutdown.service", "outcome_with_shutdown.service"),
+            ("shutdown_service()", "outcome_with_shutdown_service()"),
+        ):
             with self.subTest(intervention=text):
                 world, scenario = _wired(text)
-                self.assertEqual(world.calls, [["SHUTDOWN_SERVICE"]])
-                self.assertEqual(scenario.counterfactual_outcome, OFFLINE)
+                self.assertEqual(world.calls, [])
+                self.assertEqual(scenario.counterfactual_outcome, outcome)
                 self.assertEqual(scenario.intervention, text)
                 self.assertEqual(scenario.causal_chain, [f"{SITUATION} causes {text}"])
 
