@@ -5,6 +5,6 @@ numpy
 coverage
 hypothesis
 bandit
-ruff==0.17.5
+ruff==0.17.6
 networkx
 defusedxml
