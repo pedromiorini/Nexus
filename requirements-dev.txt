@@ -2,7 +2,7 @@
 # Instalação: python -m pip install -r requirements-dev.txt
 -r requirements.txt
 numpy==2.5.5
-coverage==7.17.3
+coverage==7.17.5
 hypothesis==6.170.15
 bandit==1.9.4
 ruff==0.17.5
