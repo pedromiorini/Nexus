@@ -573,7 +573,8 @@ MUTATIONS = [
              "        if False and len(matches) == 1:\n"
              "            return matches[0]\n",
              tests=("test_counterfactual_dox_contract.py",
-                    "test_counterfactual_s2_fallback_veto_key_contract.py")),
+                    "test_counterfactual_s2_fallback_veto_key_contract.py",
+                    "test_counterfactual_s3_shutdown_service_veto_contract.py")),
     Mutation("cf_do_hook_prefers_private", COUNTERFACTUAL,
              "        for hook_name in (\"do\", \"_do\"):\n",
              "        for hook_name in (\"_do\", \"do\"):\n",

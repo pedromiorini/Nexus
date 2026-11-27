@@ -277,11 +277,13 @@ class RealCounterfactualReasoningEngine:
         if not tokens:
             return None
         from core.cognitivo.action_effects import veto_key
+        from core.cognitivo.mcts_planner import DEFAULT_VETOES
         matches = [
             name
             for name in ACTION_EFFECTS
             if tokens == set(re.findall(r"[a-z0-9]+", name.lower()))
             and veto_key(intervention) == veto_key(name)
+            and name not in DEFAULT_VETOES
         ]
         if len(matches) == 1:
             return matches[0]
